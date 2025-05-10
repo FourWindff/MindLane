@@ -1,9 +1,8 @@
-import DraggableGridCanvas from "@/app/components/DraggableGridCanvas";
-import React, { useCallback, useState } from "react";
+import DraggableGridCanvas from "@/app/routes/Flow/DraggableGridCanvas";
+import React, { useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
-import { Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Button } from "react-native-paper";
-import { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 
 interface NodeType {
   id: number;
@@ -15,10 +14,7 @@ interface NodeType {
 export default function FlowRoute() {
   const [nodes, setNodes] = useState<NodeType[]>([]);
   const [scale, setScale] = useState(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const startX = useSharedValue(0);
-  const startY = useSharedValue(0);
+
 
   const addNode = () => {
     setNodes([...nodes, {
@@ -29,31 +25,6 @@ export default function FlowRoute() {
     }]);
   };
 
-  const handleNodeDragEnd = useCallback((id: number, x: number, y: number) => {
-    setNodes(prev => prev.map(node =>
-      node.id === id ? { ...node, x, y } : node
-    ));
-  }, []);
-
-  const panGesture = Gesture.Pan()
-    .onBegin(() => {
-      'worklet';
-      startX.value = translateX.value;
-      startY.value = translateY.value;
-    })
-    .onUpdate((event) => {
-      'worklet';
-      translateX.value = startX.value + event.translationX;
-      translateY.value = startY.value + event.translationY;
-    });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale }
-    ]
-  }));
 
   return (
     <GestureHandlerRootView style={styles.container}>

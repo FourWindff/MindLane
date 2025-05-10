@@ -1,28 +1,27 @@
 import React from "react";
-import { Text } from "react-native";
 import { BottomNavigation } from "react-native-paper";
-import FlowRoute from "./routes/Flow/FlowRoute";
-import HomeRoute from "./routes/Home/HomeRoute";
+import FlowRoute from "./routes/Flow";
+import HomeRoute from "./routes/Home";
+import MindMapRoute from "./routes/MindMap";
+import SettingsRoute from "./routes/Settings";
 
 
-const RecentsRoute = () => <Text>Recents</Text>;
 
-const NotificationsRoute = () => <Text>Notifications</Text>;
 export default function Index() {
   const [index, setIndex] = React.useState(0);
   const [routes] = React.useState([
     { key: 'home', title: 'Home', focusedIcon: 'home', unfocusedIcon: 'home-outline'},
     { key: 'flow', title: 'Flow', focusedIcon: 'album' },
     
-    { key: 'recents', title: 'Recents', focusedIcon: 'history' },
-    { key: 'notifications', title: 'Notifications', focusedIcon: 'bell', unfocusedIcon: 'bell-outline' },
+    { key: 'mindMap', title: 'MindMap', focusedIcon: 'map' },
+    { key: 'settings', title: 'Setting', focusedIcon: 'tools', unfocusedIcon: 'tools' },
   ]);
 
   const renderScene = BottomNavigation.SceneMap({
     home: HomeRoute,
     flow: FlowRoute,
-    recents: RecentsRoute,
-    notifications: NotificationsRoute,
+    mindMap: MindMapRoute,
+    settings: SettingsRoute,
   });
 
   return (

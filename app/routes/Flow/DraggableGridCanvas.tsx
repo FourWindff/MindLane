@@ -3,7 +3,11 @@ import { Animated, Dimensions, PanResponder, StyleSheet, Text, View } from "reac
 
 const GRID_SIZE = 20; // 网格大小
 const { width, height } = Dimensions.get('window');
-const EXTRA_SPACE = 2000; // 额外空间，确保画布可以延伸
+const SCREEN_WIDTH = width;
+const SCREEN_HEIGHT = height;
+const EXTRA_SPACE = 500; // 额外空间，确保画布可以延伸
+const DRAFT_WIDTH = SCREEN_WIDTH + EXTRA_SPACE * 2;
+const DRAFT_HEIGHT = SCREEN_HEIGHT + EXTRA_SPACE * 2;
 
 interface CanvasItem {
   id: string;
@@ -25,39 +29,65 @@ const CustomComponent = ({ title, description }: { title: string; description: s
 );
 
 export default function DraggableGridCanvas() {
-  // 初始化画布位置在中心
   const pan = useRef(new Animated.ValueXY({
-    x: -EXTRA_SPACE,
-    y: -EXTRA_SPACE
+    x: 0,
+    y: 0
   })).current;
-  
+
   const [scale, setScale] = useState(1);
   const [items, setItems] = useState<CanvasItem[]>([
-    { 
-      id: '1', 
-      x: width / 2 - 100, // 屏幕中心偏左
-      y: height / 2 - 75, // 屏幕中心偏上
-      width: 200, 
-      height: 150, 
+    {
+      id: '1',
+      x: 0, // 屏幕中心偏左
+      y: 0, // 屏幕中心偏上
+      width: 300,
+      height: 150,
       component: <CustomComponent title="任务1" description="这是一个示例任务描述" />
     },
-    { 
-      id: '2', 
+    {
+      id: '2',
       x: width / 2 + 100, // 屏幕中心偏右
       y: height / 2 - 75, // 屏幕中心偏上
-      width: 200, 
-      height: 150, 
+      width: 200,
+      height: 150,
       component: <CustomComponent title="任务2" description="这是另一个示例任务描述" />
     },
   ]);
-  
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: Animated.event(
-        [null, { dx: pan.x, dy: pan.y }],
-        { useNativeDriver: false }
-      ),
+      onPanResponderMove(e, gestureState) {
+        const panX: number = (pan.x as any)._offset;
+        const panY: number = (pan.y as any)._offset;
+        const dX: number = gestureState.dx;
+        const dY: number = gestureState.dy
+        console.log("画布：", panX, panY)
+        console.log("手势：", dX, dY)
+        if (panX + dX < - EXTRA_SPACE * 2) {
+          console.log("画布右边界超出范围");
+          return ;
+        }
+        if (panX + dX > 0) {
+          console.log("画布左边界超出范围");
+          return ;
+        }
+        if(panY + dY < - EXTRA_SPACE * 2) {
+          console.log("画布下边界超出范围");
+          return ;
+        }
+        if(panY + dY > 0) {
+          console.log("画布上边界超出范围");
+          return ;
+        }
+
+
+
+        pan.setValue({
+          x: gestureState.dx,
+          y: gestureState.dy,
+        })
+      },
       onPanResponderRelease: () => {
         pan.extractOffset();
       },
@@ -77,7 +107,7 @@ export default function DraggableGridCanvas() {
           style={[
             styles.gridLine,
             {
-              left: i * GRID_SIZE - EXTRA_SPACE,
+              left: i * GRID_SIZE,
               height: height + EXTRA_SPACE * 2,
               width: 1,
             },
@@ -94,7 +124,7 @@ export default function DraggableGridCanvas() {
           style={[
             styles.gridLine,
             {
-              top: i * GRID_SIZE - EXTRA_SPACE,
+              top: i * GRID_SIZE,
               width: width + EXTRA_SPACE * 2,
               height: 1,
             },
@@ -103,7 +133,27 @@ export default function DraggableGridCanvas() {
       );
     }
 
-    return gridLines;
+    return gridLines
+  };
+
+  const renderOrigin = () => {
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          width: 10,
+          height: 10,
+          backgroundColor: 'red',
+          borderRadius: 5,
+          left: width + EXTRA_SPACE,
+          top: height + EXTRA_SPACE,
+          transform: [
+            { translateX: -5 },
+            { translateY: -5 },
+          ],
+        }}
+      />
+    );
   };
 
   const itemPans = useRef(new Map()).current;
@@ -114,21 +164,17 @@ export default function DraggableGridCanvas() {
         itemPans.set(item.id, new Animated.ValueXY());
       }
       const itemPan = itemPans.get(item.id);
-      
+
       const itemPanResponder = PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onPanResponderMove: Animated.event(
-          [null, { dx: itemPan.x, dy: itemPan.y }],
-          { useNativeDriver: false }
-        ),
+        onPanResponderMove: (e, gestureState) => {
+          itemPan.setValue({
+            x: gestureState.dx,
+            y: gestureState.dy
+          })
+        },
         onPanResponderRelease: () => {
           itemPan.extractOffset();
-          // // 更新组件位置
-          // setItems(items.map(i => 
-          //   i.id === item.id 
-          //     ? { ...i, x: i.x + (itemPan.x as any).__getValue(), y: i.y + (itemPan.y as any).__getValue() }
-          //     : i
-          // ));
         },
       });
 
@@ -171,6 +217,7 @@ export default function DraggableGridCanvas() {
         {...panResponder.panHandlers}
       >
         {renderGrid()}
+        {renderOrigin()}
         {renderItems()}
       </Animated.View>
     </View>
@@ -180,17 +227,12 @@ export default function DraggableGridCanvas() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    overflow: 'hidden',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
   },
   canvas: {
-    flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#333333',
     width: width + EXTRA_SPACE * 2,
     height: height + EXTRA_SPACE * 2,
-    position: 'absolute',
-    left: -EXTRA_SPACE,
-    top: -EXTRA_SPACE,
   },
   gridLine: {
     position: 'absolute',
