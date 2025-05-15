@@ -27,7 +27,8 @@ const CustomComponent = ({ title, description }: { title: string; description: s
     <Text style={styles.customComponentContent}>{description}</Text>
   </View>
 );
-
+//该文件是我做自由画布的一个尝试。
+//实现了移动画布以及在画布上放置自定义组件。
 export default function DraggableGridCanvas() {
   const pan = useRef(new Animated.ValueXY({
     x: 0,

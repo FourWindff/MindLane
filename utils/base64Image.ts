@@ -6,8 +6,8 @@ export async function convert2Image64(imagePath: string): Promise<string> {
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64String = reader.result as string;
-          // const base64Data = base64String.split(',')[1];
-          resolve(base64String);
+          const base64Data = base64String.split(",")[1];
+          resolve(base64Data);
         };
         reader.onerror = reject;
         reader.readAsDataURL(blob);

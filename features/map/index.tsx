@@ -1,8 +1,9 @@
-import GeminiClient from "@/features/gemini/mindMapAI";
+import GeminiClient from "@/features/gemini/mapAI";
+import useDialog from "@/hooks/useDialog";
 import { useCallback, useState } from "react";
 import { View } from "react-native";
-import { TextInput } from "react-native-paper";
-import MapDisplayer, { MapDisplayerProps, MindMapAiResponse } from "./MapDisplayer";
+import { Text, TextInput } from "react-native-paper";
+import MapDisplayer, { MapAiResponse, MapDisplayerProps } from "./MapDisplayer";
 const mock = {
   imageUri: 'https://picsum.photos/700',
   title: '示例',
@@ -17,6 +18,7 @@ const mock = {
           "想象一个巨大的门，上面刻着各种应用程序的图标，代表着应用层为用户提供各种服务。",
       },
     },
+
     {
       x: 0,
       y: 700,
@@ -62,27 +64,40 @@ const mock = {
 export default function MindMapRoute() {
   const [input, setInput] = useState<string>("如何记忆OSI7层模型");
   const [data, setData] = useState<MapDisplayerProps>(mock);
-
+  const [Dialog, showDialog] = useDialog();
   const handleSend = useCallback(async (text: string) => {
     console.log("发送内容：", text);
-    GeminiClient.sendMessage(text).then(
+    GeminiClient.mock(text).then(
       (res) => {
-        const obj: MindMapAiResponse = JSON.parse(res.text);
-        setData({
-          imageUri: `data:image/jpeg;base64,${res.image}`,
-          title: obj.title,
-          node: obj.node
-        })
+        try {
+          const obj: MapAiResponse = JSON.parse(res.text);
+          console.log("Mock Image:", res.image.substring(0, 20))
+          setData({
+            imageUri: `data:image/png;base64,${res.image}`,
+            title: obj.title,
+            node: obj.node
+          })
+        } catch (err) {
+          console.log(err)
+          setData({
+            imageUri: `data:image/png;base64,${res.image}`,
+            title: "error",
+            node: []
+          });
+          showDialog("ERROR", (onClose) => <Text>{err as string}</Text>)
+        };
+
       }
     ).catch((err) => {
       console.error("错误：", err);
     })
 
-  }, []);
+  }, [showDialog]);
+
   return (
     <View style={{
-      flex:1,
-      flexDirection:'column'
+      flex: 1,
+      flexDirection: 'column'
     }}>
       <TextInput
         mode="flat"
@@ -91,6 +106,7 @@ export default function MindMapRoute() {
         value={input}
       />
       {data && <MapDisplayer imageUri={data.imageUri} title={data.title} node={data.node} />}
+      {Dialog}
     </View>
   )
 }

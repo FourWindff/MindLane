@@ -11,11 +11,11 @@ export type Node = {
     lane: string;
   }
 };
-export type MindMapAiResponse = {
+export type MapAiResponse = {
   title: string;
   node: Node[]
 }
-export type MapDisplayerProps = MindMapAiResponse & {
+export type MapDisplayerProps = MapAiResponse & {
   imageUri: string;
 }
 

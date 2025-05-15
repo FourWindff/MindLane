@@ -8,11 +8,11 @@ import { promts } from "./promts";
 //然后向另一个ai生成json
 
 //TODO  ERROR  错误： [ClientError: got status: 400 . {"error":{"code":400,"message":"Provided image is not valid.","status":"INVALID_ARGUMENT"}}]
+
 class LandMarkAI extends GeminiAI {
   constructor() {
     super(GEMINI_TYPE.GEMINI_2_0_FLASH);
   }
-
   async sendMessage(
     message?: string,
     base64Image?: string
@@ -35,36 +35,45 @@ class LandMarkAI extends GeminiAI {
       contents: content,
       config: {
         responseMimeType: "application/json",
-        systemInstruction:
-          "你是一个记忆宫殿的标记助手，用户给你一张图片以及需要记忆的主题或者内容，你需要将记忆的内容拆分多个地点然后与给定图片相关联形成一个记忆方法，你需要返回地点的坐标、地点名称、记忆内容、助记方法",
+        systemInstruction: `
+        你是一个记忆宫殿的标记助手，用户给你一张图片以及需要记忆的主题或者内容，你需要将记忆的内容拆分多个地点然后与给定图片相关联形成一个记忆方法,
+        `,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             title: {
               type: Type.STRING,
+              description: "本次对话的标题",
             },
             node: {
               type: Type.ARRAY,
+              description: "存放图片中记忆地点的坐标和相应内容的数组",
               items: {
                 type: Type.OBJECT,
                 properties: {
                   x: {
                     type: Type.NUMBER,
+                    description: "图片中记忆地点的横坐标",
                   },
                   y: {
                     type: Type.NUMBER,
+                    description: "图片中记忆地点的纵坐标",
                   },
                   data: {
                     type: Type.OBJECT,
+                    description: "存放记忆地点的内容",
                     properties: {
                       label: {
                         type: Type.STRING,
+                        description: "记忆地点的标签",
                       },
                       content: {
                         type: Type.STRING,
+                        description: "记忆地点的内容",
                       },
                       lane: {
                         type: Type.STRING,
+                        description: "记忆地点的记忆方法",
                       },
                     },
                     propertyOrdering: ["label", "content", "lane"],
@@ -82,10 +91,10 @@ class LandMarkAI extends GeminiAI {
   }
 }
 
-class MindMapAI extends GeminiAI {
+class MapAI extends GeminiAI {
   private landMarkAI: LandMarkAI;
   constructor() {
-    super(GEMINI_TYPE.GEMINI_2_0_FLASH_EXP);
+    super(GEMINI_TYPE.GEMINI_2_0_PREVIEW_IMAGE_GENERATION);
     this.landMarkAI = new LandMarkAI();
   }
 
@@ -106,6 +115,7 @@ class MindMapAI extends GeminiAI {
         }
       }
     }
+    console.log("生成图片", image);
     const response2 = await this.landMarkAI.sendMessage(message, image);
     const result = {
       text: response2.text,
@@ -114,17 +124,29 @@ class MindMapAI extends GeminiAI {
     return result;
   }
 
-  async sendMessageWithAssetImage(
-    message: string
-  ): Promise<{ text: string; image: string }> {
-    const image = await convert2Image64(
-      "/home/kris/Code/MindLane/assets/test.png"
+  async mock(message: string): Promise<{ text: string; image: string }> {
+    const size = 1024;
+    const nodeSize = Math.floor(Math.random() * 8);
+    const image: string = await convert2Image64(
+      `https://picsum.photos/${size}`
     );
-    console.log(image);
-    console.log("123s")
-    const response = await this.landMarkAI.sendMessage(message, image);
-    return { text: response.text, image: image };
+    const text = JSON.stringify({
+      title: "Mock Title",
+      node: Array.from({ length: nodeSize }, () => ({
+        x: Math.random() * size,
+        y: Math.random() * size,
+        data: {
+          label: "Mock Label",
+          content: "Mock Content",
+          lane: "Mock Laneasd",
+        },
+      })),
+    });
+    return {
+      text: text,
+      image: image,
+    };
   }
 }
 
-export default new MindMapAI();
+export default new MapAI();

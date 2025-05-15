@@ -4,7 +4,7 @@
     "slug": "MindLane",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.jpeg",
+    "icon": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.png",
     "scheme": "mindlane",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.jpeg",
+        "foregroundImage": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -22,14 +22,14 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.jpeg"
+      "favicon": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.jpeg",
+          "image": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
