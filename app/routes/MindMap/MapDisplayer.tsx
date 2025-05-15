@@ -29,11 +29,34 @@ export default function MapDisplayer({ imageUri, title, node }: MapDisplayerProp
       console.log(e.message);
     }
   });
-  const scaleX = image?.width ? layout.width / image?.width : 1;
-  const scaleY = image?.height ? layout.height / image?.height : 1;
 
-  console.log("图片显示宽度", image?.width);
-  console.log("图片放缩：", image?.scale);
+  // 计算图片缩放比例
+  const getScaleFactor = () => {
+    if (!image?.width || !layout.width) return { scaleX: 1, scaleY: 1 };
+
+    // 计算宽高比
+    const imageRatio = image.width / image.height;
+    const containerRatio = layout.width / layout.height;
+
+    let scaleX, scaleY;
+
+    if (imageRatio > containerRatio) {
+      // 图片比容器更宽，以宽度为基准
+      scaleX = layout.width / image.width;
+      scaleY = scaleX;  // 保持宽高比
+    } else {
+      // 图片比容器更高，以高度为基准
+      scaleY = layout.height / image.height;
+      scaleX = scaleY;  // 保持宽高比
+    }
+
+    return { scaleX, scaleY };
+  };
+
+  // 获取缩放比例
+  const { scaleX, scaleY } = getScaleFactor();
+
+  console.log("图片真实宽高", image?.width, image?.height);
 
   return (
     <View style={styles.container}>
@@ -48,7 +71,7 @@ export default function MapDisplayer({ imageUri, title, node }: MapDisplayerProp
         {node.map((item, index) => (
           <Pressable
             key={index}
-            style={[styles.marker, { left: item.x / scaleX, top: item.y / scaleY }, selectedNode === item && styles.markerSelected]}
+            style={[styles.marker, { left: item.x * scaleX, top: item.y * scaleY }, selectedNode === item && styles.markerSelected]}
             onPress={() => setSelectedNode(item)}
           >
           </Pressable>
@@ -85,27 +108,30 @@ export default function MapDisplayer({ imageUri, title, node }: MapDisplayerProp
 
 const styles = StyleSheet.create({
   container: {
-    display: 'flex',
+    flex: 1
   },
   imageContainer: {
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 20,
+    width: '100%',
+    maxWidth: 300,
+    maxHeight: 300,
+    flex: 1,
     marginHorizontal: 20,
+    alignSelf: 'center',
+    position: 'relative',
+    marginBottom: 20,
+    borderColor: 'red'
   },
   image: {
-    flex: 1,
     width: '100%',
-    borderRadius: 20,
-    margin: 20,
-    backgroundColor: '#0553',
+    height: '100%',
   },
   marker: {
     width: 20,
     height: 20,
     borderRadius: 10,
     position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 5,
     transform: [{ translateX: -10 }, { translateY: -10 }],
   },

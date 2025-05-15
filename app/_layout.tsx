@@ -1,14 +1,20 @@
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 export default function RootLayout() {
   return (
-    <SafeAreaView style={{ flex: 1,marginBottom:-20 }}>
-      <Stack screenOptions={{
-        headerShown: false
-      }} />
-      <StatusBar  style="auto"/>
-    </SafeAreaView>
+    <GestureHandlerRootView>
+      <BottomSheetModalProvider>
+        <Stack screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: '#fffbff',
+          }
+        }} />
+        <StatusBar style="auto" translucent={true}/>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   )
 }

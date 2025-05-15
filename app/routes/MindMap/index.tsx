@@ -8,8 +8,8 @@ const mock = {
   title: '示例',
   node: [
     {
-      x: 100,
-      y: 70,
+      x: 0,
+      y: 0,
       data: {
         label: "大门",
         content: "应用层: 为用户提供应用程序接口",
@@ -18,8 +18,8 @@ const mock = {
       },
     },
     {
-      x: 100,
-      y: 140,
+      x: 0,
+      y: 700,
       data: {
         label: "大厅",
         content: "表示层: 对数据进行编码和解码",
@@ -28,8 +28,8 @@ const mock = {
       },
     },
     {
-      x: 200,
-      y: 70,
+      x: 700,
+      y: 0,
       data: {
         label: "图书馆",
         content: "会话层: 管理会话的建立、维护和终止",
@@ -38,8 +38,18 @@ const mock = {
       },
     },
     {
-      x: 200,
-      y: 140,
+      x: 350,
+      y: 350,
+      data: {
+        label: "图书馆",
+        content: "会话层: 管理会话的建立、维护和终止",
+        lane:
+          "想象一个巨大的图书馆，里面摆放着各种书籍和文件，代表着会话层管理着各种会话。",
+      },
+    },
+    {
+      x: 700,
+      y: 700,
       data: {
         label: "餐厅",
         content: "传输层: 提供可靠的数据传输服务",
@@ -67,16 +77,18 @@ export default function MindMapRoute() {
     ).catch((err) => {
       console.error("错误：", err);
     })
-    
+
   }, []);
   return (
-    <View>
+    <View style={{
+      flex:1,
+      flexDirection:'column'
+    }}>
       <TextInput
         mode="flat"
         right={<TextInput.Icon icon="chevron-up" onPress={() => handleSend(input)} />}
         onChangeText={(t) => setInput(t)}
         value={input}
-        
       />
       {data && <MapDisplayer imageUri={data.imageUri} title={data.title} node={data.node} />}
     </View>

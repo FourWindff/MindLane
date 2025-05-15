@@ -1,41 +1,35 @@
-import React, { ReactNode, useCallback, useMemo, useState } from "react";
-import { Portal, Modal as PPModal } from "react-native-paper";
+// import React, { ReactNode, useCallback, useMemo, useState } from "react";
 
+// export default function useActionSheet(): [
+//   ReactNode | null,
+//   (showActions: (onClose: () => void) => ReactNode) => void
+// ] {
+//   const [actionsContent, setActionsContent] = useState<null | {
+//     content: ReactNode
+//   }>(null);
 
-export default function useActionSheet(): [
-  ReactNode | null,
-  (showActions: (onClose: () => void) => ReactNode) => void
-] {
-  const [actionsContent, setActionsContent] = useState<null | {
-    content: ReactNode
-  }>(null);
+//   const onClose = useCallback(() => {
+//     setActionsContent(null);
+//   }, []);
 
-  const onClose = useCallback(() => {
-    setActionsContent(null);
-  }, []);
+//   const ActionSheet = useMemo(() => {
+//     if (actionsContent === null) {
+//       return null;
+//     }
+//     const { content } = actionsContent;
 
-  const Dialog = useMemo(() => {
-    if (actionsContent === null) {
-      return null;
-    }
-    const { content } = actionsContent;
-    const containerStyle = {
-      backgroundColor: 'white',
-      padding: 20,
-      borderRadius: 10,
-    };
-    return (
-      <Portal>
-        <PPModal visible={true} contentContainerStyle={containerStyle} onDismiss={onClose}>{content}</PPModal>
-      </Portal>
-    )
-  }, [actionsContent, onClose]);
+//     return (
+//       <Sheet onDismiss={onClose}>
+//         {content}
+//       </Sheet>
+//     )
+//   }, [actionsContent, onClose]);
 
-  const showActionSheet = useCallback((
-    getContent: (onClose: () => void) => ReactNode,
-  ) => {
-    setActionsContent({ content: getContent(onClose) })
-  }, [onClose])
+//   const showActionSheet = useCallback((
+//     getContent: (onClose: () => void) => ReactNode,
+//   ) => {
+//     setActionsContent({ content: getContent(onClose) })
+//   }, [onClose])
 
-  return [Dialog, showActionSheet];
-}
+//   return [ActionSheet, showActionSheet];
+// }
