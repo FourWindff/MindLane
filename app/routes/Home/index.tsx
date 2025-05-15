@@ -1,3 +1,5 @@
+import useActionSheet from '@/hooks/useActionSheet';
+import useDialog from '@/hooks/useDialog';
 import React, { useCallback, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Searchbar, Text } from 'react-native-paper';
@@ -7,7 +9,8 @@ import { Button, Card, Searchbar, Text } from 'react-native-paper';
 
 const HomeRoute = () => {
   const [text, setText] = useState('');
-
+  const [Dialog, showDialog] = useDialog();
+  const [actionSheet, showActionSheet] = useActionSheet();
   const SearchActionRight = useCallback(() => {
     return (
       <View>
@@ -20,50 +23,60 @@ const HomeRoute = () => {
   }, [])
 
   return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.searchContainer}>
-          <Searchbar
-            style={styles.input}
-            placeholder="请输内容"
-            value={text}
-            onChangeText={setText}
-            icon='attachment'
-            right={() => <SearchActionRight />}
-          />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.searchContainer}>
+        <Searchbar
+          style={styles.input}
+          placeholder="请输内容"
+          value={text}
+          onChangeText={setText}
+          icon='attachment'
+          right={() => <SearchActionRight />}
+        />
+      </View>
+      <View style={styles.garelly}>
+        <Text variant='titleLarge' style={{ fontWeight: 'bold' }}> Latest</Text>
+        <View style={styles.actionContainer}>
+          <Button mode='contained'>流2程</Button>
+          <Button mode='contained'>路2线</Button>
+          <Button mode='contained'
+            onPress={() => showDialog("DialogTItle", (onClose) => (
+              <Text>123</Text>
+            ))}>DialogConent</Button>
+          <Button onPress={() => showActionSheet((onClose) => (
+            <Text>123</Text>
+          ))}>ActinoSheet</Button>
         </View>
-        <View style={styles.garelly}>
-          <Text variant='titleLarge' style={{ fontWeight: 'bold' }}> Latest</Text>
-          <View style={styles.actionContainer}>
-            <Button mode='contained'>流程</Button>
-            <Button mode='contained'>路线</Button>
-          </View>
-          <ScrollView horizontal={true} style={styles.scrollView} contentContainerStyle={{
-            marginLeft: 20,
-            alignItems: 'center',
-            gap: 12,
-            paddingBottom: 20,
-          }}>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/700' }} style={styles.image} resizeMode="cover" />
-            </Card>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/600' }} style={styles.image} resizeMode="cover" />
-            </Card>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/500' }} style={styles.image} resizeMode="cover" />
-            </Card>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/400' }} style={styles.image} resizeMode="cover" />
-            </Card>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/300' }} style={styles.image} resizeMode="cover" />
-            </Card>
-            <Card>
-              <Card.Cover source={{ uri: 'https://picsum.photos/200' }} style={styles.image} resizeMode="cover" />
-            </Card>
-          </ScrollView>
-        </View>
-      </SafeAreaView>
+        <ScrollView horizontal={true} style={styles.scrollView} contentContainerStyle={{
+          marginLeft: 20,
+          alignItems: 'center',
+          gap: 12,
+          paddingBottom: 20,
+        }}>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/700' }} style={styles.image} resizeMode="cover" />
+          </Card>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/600' }} style={styles.image} resizeMode="cover" />
+          </Card>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/500' }} style={styles.image} resizeMode="cover" />
+          </Card>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/400' }} style={styles.image} resizeMode="cover" />
+          </Card>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/300' }} style={styles.image} resizeMode="cover" />
+          </Card>
+          <Card>
+            <Card.Cover source={{ uri: 'https://picsum.photos/200' }} style={styles.image} resizeMode="cover" />
+          </Card>
+
+        </ScrollView>
+      </View>
+      {Dialog}
+      {actionSheet}
+    </SafeAreaView>
   );
 };
 
@@ -103,6 +116,13 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'absolute',
     bottom: 0,
+  },
+  surface: {
+    padding: 8,
+    height: 80,
+    width: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

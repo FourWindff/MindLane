@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.jpeg",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.msplima7.MindLane"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "24a480da-ef58-4c02-8df9-97e4cdbfd80c"
+      }
     }
   }
 }

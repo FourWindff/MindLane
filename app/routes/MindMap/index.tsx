@@ -57,10 +57,9 @@ export default function MindMapRoute() {
     console.log("发送内容：", text);
     GeminiClient.sendMessage(text).then(
       (res) => {
-        console.log("返回内容：", res);
         const obj: MindMapAiResponse = JSON.parse(res.text);
         setData({
-          imageUri: `data:image/png;base64,${res.image}`,
+          imageUri: `data:image/jpeg;base64,${res.image}`,
           title: obj.title,
           node: obj.node
         })
@@ -68,8 +67,8 @@ export default function MindMapRoute() {
     ).catch((err) => {
       console.error("错误：", err);
     })
+    
   }, []);
-
   return (
     <View>
       <TextInput

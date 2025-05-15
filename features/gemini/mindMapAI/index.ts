@@ -1,3 +1,4 @@
+import { convert2Image64 } from "@/utils/base64Image";
 import { Modality, Type } from "@google/genai";
 import { GeminiAI } from "../GeminiAI";
 import { GEMINI_TYPE } from "../types";
@@ -20,12 +21,12 @@ class LandMarkAI extends GeminiAI {
     const content = [
       {
         inlineData: {
-          mimeType: "image/jpeg",
+          mimeType: "image/png",
           data: base64Image,
         },
       },
       {
-        text: `这是用户需要记忆的内容：${message}\n 请你根据上传的图片作为记忆宫殿的图片，你需要根据用户需要记忆的内容输出数据，数据包括记忆的地点在图片中的坐标，以及需要地点名、记忆内容、助记方法`,
+        text: message,
       },
     ];
 
@@ -34,7 +35,8 @@ class LandMarkAI extends GeminiAI {
       contents: content,
       config: {
         responseMimeType: "application/json",
-        systemInstruction:"你不是人",
+        systemInstruction:
+          "你是一个记忆宫殿的标记助手，用户给你一张图片以及需要记忆的主题或者内容，你需要将记忆的内容拆分多个地点然后与给定图片相关联形成一个记忆方法，你需要返回地点的坐标、地点名称、记忆内容、助记方法",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -75,7 +77,7 @@ class LandMarkAI extends GeminiAI {
         },
       },
     });
-
+    console.log("landMark:", response.text);
     return { text: response.text || "" };
   }
 }
@@ -110,6 +112,18 @@ class MindMapAI extends GeminiAI {
       image: image,
     };
     return result;
+  }
+
+  async sendMessageWithAssetImage(
+    message: string
+  ): Promise<{ text: string; image: string }> {
+    const image = await convert2Image64(
+      "/home/kris/Code/MindLane/assets/test.png"
+    );
+    console.log(image);
+    console.log("123s")
+    const response = await this.landMarkAI.sendMessage(message, image);
+    return { text: response.text, image: image };
   }
 }
 

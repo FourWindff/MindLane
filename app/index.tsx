@@ -1,5 +1,5 @@
 import React from "react";
-import { BottomNavigation } from "react-native-paper";
+import { BottomNavigation, PaperProvider } from "react-native-paper";
 import FlowRoute from "./routes/Flow";
 import HomeRoute from "./routes/Home";
 import MindMapRoute from "./routes/MindMap";
@@ -25,10 +25,12 @@ export default function Index() {
   });
 
   return (
-    <BottomNavigation
-      navigationState={{ index, routes }}
-      onIndexChange={setIndex}
-      renderScene={renderScene}
-    />
+    <PaperProvider>
+      <BottomNavigation
+        navigationState={{ index, routes }}
+        onIndexChange={setIndex}
+        renderScene={renderScene}
+      />
+    </PaperProvider>
   );
 }
