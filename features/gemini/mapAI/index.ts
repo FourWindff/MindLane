@@ -126,19 +126,19 @@ class MapAI extends GeminiAI {
 
   async mock(message: string): Promise<{ text: string; image: string }> {
     const size = 1024;
-    const nodeSize = Math.floor(Math.random() * 8);
+    const nodeSize = Math.floor(Math.random() * 6 + 2);
     const image: string = await convert2Image64(
       `https://picsum.photos/${size}`
     );
     const text = JSON.stringify({
       title: "Mock Title",
-      node: Array.from({ length: nodeSize }, () => ({
+      nodes: Array.from({ length: nodeSize }, (_, index) => ({
         x: Math.random() * size,
         y: Math.random() * size,
         data: {
-          label: "Mock Label",
-          content: "Mock Content",
-          lane: "Mock Laneasd",
+          label: `Mock Label ${index + 1}`,
+          content: `Mock Content ${index + 1}`,
+          lane: `Mock Lane ${index + 1}`,
         },
       })),
     });

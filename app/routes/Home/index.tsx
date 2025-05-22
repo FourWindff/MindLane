@@ -1,68 +1,10 @@
-import GeminiClient from "@/features/gemini/mapAI";
+import GeminiClient from '@/features/gemini/mapAI';
 import MapDisplayer, { MapAiResponse, MapDisplayerProps } from '@/features/map/MapDisplayer';
 import useDialog from '@/hooks/useDialog';
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Searchbar, Surface, Switch, Text, useTheme } from 'react-native-paper';
-
-const mock = {
-  imageUri: 'https://picsum.photos/700',
-  title: '示例',
-  node: [
-    {
-      x: 0,
-      y: 0,
-      data: {
-        label: "大门",
-        content: "应用层: 为用户提供应用程序接口",
-        lane:
-          "想象一个巨大的门，上面刻着各种应用程序的图标，代表着应用层为用户提供各种服务。",
-      },
-    },
-
-    {
-      x: 0,
-      y: 700,
-      data: {
-        label: "大厅",
-        content: "表示层: 对数据进行编码和解码",
-        lane:
-          "想象一个宽敞的大厅，里面摆放着各种编码和解码的机器，代表着表示层对数据进行转换。",
-      },
-    },
-    {
-      x: 700,
-      y: 0,
-      data: {
-        label: "图书馆",
-        content: "会话层: 管理会话的建立、维护和终止",
-        lane:
-          "想象一个巨大的图书馆，里面摆放着各种书籍和文件，代表着会话层管理着各种会话。",
-      },
-    },
-    {
-      x: 350,
-      y: 350,
-      data: {
-        label: "图书馆",
-        content: "会话层: 管理会话的建立、维护和终止",
-        lane:
-          "想象一个巨大的图书馆，里面摆放着各种书籍和文件，代表着会话层管理着各种会话。",
-      },
-    },
-    {
-      x: 700,
-      y: 700,
-      data: {
-        label: "餐厅",
-        content: "传输层: 提供可靠的数据传输服务",
-        lane:
-          "想象一个豪华的餐厅，里面摆放着各种餐桌和椅子，代表着传输层为数据传输提供可靠的通道。",
-      },
-    },
-  ]
-}
 const HomeRoute = () => {
   const [text, setText] = useState('模拟请求');
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
@@ -70,19 +12,21 @@ const HomeRoute = () => {
   const bottomMapModalRef = useRef<BottomSheetModal>(null);
   const bottomFlowModalRef = useRef<BottomSheetModal>(null);
   const theme = useTheme();
-  const [data, setData] = useState<MapDisplayerProps>(mock);
 
+
+  const [data, setData] = useState<MapDisplayerProps | undefined>(undefined);
 
   const handleSend = useCallback(() => {
     if (isMapMode) {
-      GeminiClient.sendMessage(text).then(
+      bottomMapModalRef.current?.present();
+      GeminiClient.mock(text).then(
         (res) => {
           try {
             const obj: MapAiResponse = JSON.parse(res.text);
             setData({
               imageUri: `data:image/jpeg;base64,${res.image}`,
               title: obj.title,
-              node: obj.node
+              nodes: obj.nodes
             })
 
           } catch (err) {
@@ -90,18 +34,16 @@ const HomeRoute = () => {
             setData({
               imageUri: `data:image/jpeg;base64,${res.image}`,
               title: "error",
-              node: []
+              nodes: []
             });
             showDialog("ERRor", (onClose) => <Text>{err as string}</Text>)
           };
+          ;
 
         }
       ).catch((err) => {
         console.error("错误：", err);
       })
-        .finally(() => {
-          bottomMapModalRef.current?.present();
-        })
       console.log("发送地图请求", text);
 
     } else {
@@ -134,7 +76,7 @@ const HomeRoute = () => {
   }, [])
 
   //TODO 如果backdrop出现的index似乎只能大于1。如果让它在0出现，背景不会出现
-  const snapPoints = useMemo(() => ["65","70"], []);
+  const snapPoints = useMemo(() => ["65", "70"], []);
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -156,7 +98,7 @@ const HomeRoute = () => {
         width: '100%',
         height: '100%'
       }}>
-        <MapDisplayer title={data.title} node={data.node} imageUri={data.imageUri} />
+        <MapDisplayer title={data?.title} nodes={data?.nodes} imageUri={data?.imageUri} />
       </View>
     )
   }
@@ -168,6 +110,9 @@ const HomeRoute = () => {
 
 
   const handleSheetChanges = useCallback((index: number) => {
+    if (index === -1) {
+      setData(undefined);
+    }
     console.log("handleSheetChanges", index);
   }, []);
 
@@ -201,7 +146,6 @@ const HomeRoute = () => {
       </View>
       <View style={styles.garelly}>
         <Text variant='titleLarge' style={{ fontWeight: 'bold' }}> Latest</Text>
-
         <ScrollView
           horizontal={true}
           contentContainerStyle={{
@@ -272,9 +216,10 @@ const HomeRoute = () => {
           index={1}
           onChange={handleSheetChanges}
           enableDynamicSizing={true}
+
         >
           <BottomSheetView>
-            <BottomMapModal/>
+            <BottomMapModal />
           </BottomSheetView>
         </BottomSheetModal>
 

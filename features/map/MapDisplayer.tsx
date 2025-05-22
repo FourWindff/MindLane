@@ -1,6 +1,12 @@
 import { Image, useImage } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "react-native-paper";
+import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+import Marker from "./Marker";
+
+
 
 export type Node = {
   x: number;
@@ -12,23 +18,30 @@ export type Node = {
   }
 };
 export type MapAiResponse = {
-  title: string;
-  node: Node[]
+  title: string | undefined;
+  nodes: Node[] | undefined;
 }
-export type MapDisplayerProps = MapAiResponse & {
-  imageUri: string;
-}
+export type MapDisplayerProps = {
+  imageUri: string | undefined;
+} & MapAiResponse;
 
+const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
-export default function MapDisplayer({ imageUri, title, node }: MapDisplayerProps) {
+export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerProps) {
   //TODO node[0] >0
-  const [selectedNode, setSelectedNode] = useState<Node>(node[0]);
+  const [selectedNode, setSelectedNode] = useState<Node | undefined>(undefined);
   const [layout, setLayout] = useState<{ width: number, height: number }>({ width: 0, height: 0 });
+
+
   const image = useImage({ uri: imageUri }, {
     onError: (e) => {
       console.log(e.message);
-    }
+    },
   });
+  const handleLayout = (e: LayoutChangeEvent) => {
+    setLayout({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+    setSelectedNode(nodes?.[0]);
+  }
 
   // 计算图片缩放比例
   const getScaleFactor = () => {
@@ -60,55 +73,71 @@ export default function MapDisplayer({ imageUri, title, node }: MapDisplayerProp
 
   return (
     <View style={styles.container}>
+      <ShimmerPlaceholder visible={title !== undefined} style={styles.titleShimmer}>
+        <Text >{title}</Text>
+      </ShimmerPlaceholder>
       <View style={styles.imageContainer}>
-        <Image
-          style={styles.image}
-          source={image}
-          contentFit="cover"
-          transition={1000}
-          onLayout={(e) => setLayout({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-        />
-        {node.map((item, index) => (
-          <Pressable
+        <ShimmerPlaceholder
+          visible={imageUri !== undefined}
+          style={styles.imageShimmer}
+        >
+          <Image
+            style={styles.image}
+            source={image}
+            contentFit="cover"
+            transition={1000}
+            onLayout={handleLayout}
+          />
+        </ShimmerPlaceholder>
+        {nodes && nodes.map((item, index) => (
+          <Marker
             key={index}
-            style={[styles.marker, { left: item.x * scaleX, top: item.y * scaleY }, selectedNode === item && styles.markerSelected]}
-            onPress={() => setSelectedNode(item)}
-          >
-          </Pressable>
+            node={item}
+            offsetX={item.x * scaleX}
+            offsetY={item.y * scaleY}
+            isSelected={selectedNode === item}
+            onSelect={setSelectedNode}
+          />
         ))}
       </View>
 
-      <View style={styles.progressContainer}>
-        {node.map((item, index) => (
-          <View key={index} >
-            <Pressable
-              style={[
-                styles.progressCircle,
-                selectedNode === item && styles.progressCircleSelected]}
-              onPress={() => setSelectedNode(item)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Text style={styles.progressText} >{index + 1}</Text>
-            </Pressable>
-          </View>
-        ))}
-      </View>
-
-      {selectedNode && (
-        <View style={styles.contentContainer}>
-          <Text style={styles.contentLabel}>{selectedNode.data.label}</Text>
-          <Text style={styles.content}>{selectedNode.data.content}</Text>
-          <Text style={styles.contentLane}>{selectedNode.data.lane}</Text>
+      <ShimmerPlaceholder visible={nodes !== undefined} style={styles.progressShimmer}>
+        <View style={styles.progressContainer}>
+          {nodes && nodes.map((item, index) => (
+            <View key={index} >
+              <Pressable
+                style={[
+                  styles.progressCircle,
+                  selectedNode === item && styles.progressCircleSelected]}
+                onPress={() => setSelectedNode(item)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.progressText} >{index + 1}</Text>
+              </Pressable>
+            </View>
+          ))}
         </View>
-      )}
-    </View>
+      </ShimmerPlaceholder>
+
+      <View style={styles.contentContainer}>
+        <ShimmerPlaceholder visible={nodes !== undefined} style={[styles.textShimmer, styles.labelShimmer]}>
+          <Text style={styles.contentLabel}>{selectedNode?.data.label}</Text>
+        </ShimmerPlaceholder >
+        <ShimmerPlaceholder visible={nodes !== undefined} style={[styles.textShimmer, styles.contentShimmer]}>
+          <Text style={styles.content}>{selectedNode?.data.content}</Text>
+        </ShimmerPlaceholder>
+        <ShimmerPlaceholder visible={nodes !== undefined} style={[styles.textShimmer, styles.contentShimmer]}>
+          <Text style={styles.contentLane}>{selectedNode?.data.lane}</Text>
+        </ShimmerPlaceholder>
+      </View>
+    </View >
   )
 
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
   },
   imageContainer: {
     marginTop: 20,
@@ -125,22 +154,6 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
-  },
-  marker: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    position: 'absolute',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 5,
-    transform: [{ translateX: -10 }, { translateY: -10 }],
-  },
-  markerSelected: {
-    backgroundColor: 'royalblue',
-  },
-  markerText: {
-    color: 'white',
-    fontSize: 12,
   },
   contentContainer: {
     marginTop: 10,
@@ -188,4 +201,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16
   },
+  titleShimmer: {
+    alignSelf: 'center',
+    borderRadius: 5,
+    height: 25
+  },
+  imageShimmer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+  },
+  progressShimmer: {
+    alignSelf: 'center',
+    borderRadius: 5,
+    height: 40,
+  },
+  textShimmer: {
+    borderRadius: 5,
+    height: 20
+  },
+  labelShimmer: {
+    height: 32,
+  },
+  contentShimmer: {
+    width: '100%',
+  }
+
 });
