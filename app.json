@@ -4,6 +4,7 @@
     "slug": "MindLane",
     "version": "1.0.0",
     "orientation": "portrait",
+    "owner": "MindLane",
     "icon": "./assets/images/Gemini_Generated_Image_uw50owuw50owuw50.png",
     "scheme": "mindlane",
     "userInterfaceStyle": "automatic",
@@ -42,7 +43,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "24a480da-ef58-4c02-8df9-97e4cdbfd80c"
+        "projectId": "fb1e55d0-36d6-41e7-8ba5-60a57f8aa936"
       }
     }
   }

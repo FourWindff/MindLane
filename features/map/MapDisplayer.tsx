@@ -4,23 +4,24 @@ import { useState } from "react";
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+import ArrowsGroup from "./ArrowsGroup";
 import Marker from "./Marker";
 
-
-
 export type Node = {
+  order: number;
   x: number;
   y: number;
   data: {
     label: string;
     content: string;
     lane: string;
-  }
+  };
 };
 export type MapAiResponse = {
   title: string | undefined;
   nodes: Node[] | undefined;
-}
+};
+
 export type MapDisplayerProps = {
   imageUri: string | undefined;
 } & MapAiResponse;
@@ -28,11 +29,9 @@ export type MapDisplayerProps = {
 const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
 export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerProps) {
-  //TODO node[0] >0
+  //TODO 节点坐标在容器角落会超出容器范围
   const [selectedNode, setSelectedNode] = useState<Node | undefined>(undefined);
   const [layout, setLayout] = useState<{ width: number, height: number }>({ width: 0, height: 0 });
-
-
   const image = useImage({ uri: imageUri }, {
     onError: (e) => {
       console.log(e.message);
@@ -69,12 +68,14 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
   // 获取缩放比例
   const { scaleX, scaleY } = getScaleFactor();
 
+  // 对节点按order排序
+
   console.log("图片真实宽高", image?.width, image?.height);
 
   return (
     <View style={styles.container}>
       <ShimmerPlaceholder visible={title !== undefined} style={styles.titleShimmer}>
-        <Text >{title}</Text>
+        <Text variant={"titleLarge"} style={{ fontWeight: "bold" }}>{title}</Text>
       </ShimmerPlaceholder>
       <View style={styles.imageContainer}>
         <ShimmerPlaceholder
@@ -84,14 +85,21 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
           <Image
             style={styles.image}
             source={image}
-            contentFit="cover"
+            contentFit="contain"
             transition={1000}
             onLayout={handleLayout}
           />
+          <View style={styles.svgOverlay}>
+            <ArrowsGroup
+              nodes={nodes || []}
+              scaleX={scaleX}
+              scaleY={scaleY}
+            />
+          </View>
         </ShimmerPlaceholder>
         {nodes && nodes.map((item, index) => (
           <Marker
-            key={index}
+            key={`${item.data.label}-${index}`}
             node={item}
             offsetX={item.x * scaleX}
             offsetY={item.y * scaleY}
@@ -104,7 +112,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
       <ShimmerPlaceholder visible={nodes !== undefined} style={styles.progressShimmer}>
         <View style={styles.progressContainer}>
           {nodes && nodes.map((item, index) => (
-            <View key={index} >
+            <View key={index}>
               <Pressable
                 style={[
                   styles.progressCircle,
@@ -112,7 +120,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
                 onPress={() => setSelectedNode(item)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text style={styles.progressText} >{index + 1}</Text>
+                <Text style={styles.progressText}>{index + 1}</Text>
               </Pressable>
             </View>
           ))}
@@ -122,7 +130,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
       <View style={styles.contentContainer}>
         <ShimmerPlaceholder visible={nodes !== undefined} style={[styles.textShimmer, styles.labelShimmer]}>
           <Text style={styles.contentLabel}>{selectedNode?.data.label}</Text>
-        </ShimmerPlaceholder >
+        </ShimmerPlaceholder>
         <ShimmerPlaceholder visible={nodes !== undefined} style={[styles.textShimmer, styles.contentShimmer]}>
           <Text style={styles.content}>{selectedNode?.data.content}</Text>
         </ShimmerPlaceholder>
@@ -130,7 +138,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
           <Text style={styles.contentLane}>{selectedNode?.data.lane}</Text>
         </ShimmerPlaceholder>
       </View>
-    </View >
+    </View>
   )
 
 }
@@ -140,16 +148,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   imageContainer: {
-    marginTop: 20,
+    marginHorizontal: 10,
     width: '100%',
     maxWidth: 300,
     maxHeight: 300,
-    flex: 1,
-    marginHorizontal: 20,
     alignSelf: 'center',
     position: 'relative',
-    marginBottom: 20,
-    borderColor: 'red'
+  },
+  svgOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   image: {
     width: '100%',
@@ -182,9 +193,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   progressCircle: {
-    display: 'flex',
     width: 30,
     height: 20,
+    display: 'flex',
     borderRadius: 10,
     backgroundColor: 'rgba(0,0,0,0.1)',
     alignItems: 'center',
@@ -196,20 +207,19 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 13,
-    padding: 0,
-    margin: 0,
     textAlign: 'center',
     lineHeight: 16
   },
   titleShimmer: {
     alignSelf: 'center',
     borderRadius: 5,
-    height: 25
+    height: 25,
   },
   imageShimmer: {
     width: '100%',
     height: '100%',
     borderRadius: 20,
+    
   },
   progressShimmer: {
     alignSelf: 'center',

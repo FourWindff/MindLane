@@ -1,5 +1,5 @@
 import GeminiClient from '@/features/gemini/mapAI';
-import MapDisplayer, { MapAiResponse, MapDisplayerProps } from '@/features/map/MapDisplayer';
+import MapDisplayer, {   MapAiResponse, MapDisplayerProps } from '@/features/map/MapDisplayer';
 import useDialog from '@/hooks/useDialog';
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -36,7 +36,7 @@ const HomeRoute = () => {
               title: "error",
               nodes: []
             });
-            showDialog("ERRor", (onClose) => <Text>{err as string}</Text>)
+            showDialog("ERROR", (onClose) => <Text>{err as string}</Text>)
           };
           ;
 

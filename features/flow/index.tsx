@@ -1,8 +1,8 @@
-import DraggableGridCanvas from "@/app/routes/Flow/DraggableGridCanvas";
-import React, { useState } from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Button } from "react-native-paper";
+import React, {useState} from "react";
+import {Dimensions, StyleSheet, View} from "react-native";
+import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {Button} from "react-native-paper";
+import DraggableGridCanvas from "@/features/flow/DraggableGridCanvas";
 
 interface NodeType {
   id: number;

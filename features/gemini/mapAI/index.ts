@@ -1,8 +1,8 @@
-import { convert2Image64 } from "@/utils/base64Image";
-import { Modality, Type } from "@google/genai";
-import { GeminiAI } from "../GeminiAI";
-import { GEMINI_TYPE } from "../types";
-import { promts } from "./promts";
+import {convert2Image64} from "@/utils/base64Image";
+import {Modality, Type} from "@google/genai";
+import {GeminiAI} from "../GeminiAI";
+import {GEMINI_TYPE} from "../types";
+import {promts} from "./promts";
 
 //先让ai生成图片（因为gemini-2.0-flash-exp不支持json输出以及系统提示词）
 //然后向另一个ai生成json
@@ -13,6 +13,7 @@ class LandMarkAI extends GeminiAI {
   constructor() {
     super(GEMINI_TYPE.GEMINI_2_0_FLASH);
   }
+
   async sendMessage(
     message?: string,
     base64Image?: string
@@ -87,12 +88,13 @@ class LandMarkAI extends GeminiAI {
       },
     });
     console.log("landMark:", response.text);
-    return { text: response.text || "" };
+    return {text: response.text || ""};
   }
 }
 
 class MapAI extends GeminiAI {
   private landMarkAI: LandMarkAI;
+
   constructor() {
     super(GEMINI_TYPE.GEMINI_2_0_PREVIEW_IMAGE_GENERATION);
     this.landMarkAI = new LandMarkAI();
@@ -117,22 +119,22 @@ class MapAI extends GeminiAI {
     }
     console.log("生成图片", image);
     const response2 = await this.landMarkAI.sendMessage(message, image);
-    const result = {
+    return {
       text: response2.text,
       image: image,
     };
-    return result;
   }
 
   async mock(message: string): Promise<{ text: string; image: string }> {
     const size = 1024;
-    const nodeSize = Math.floor(Math.random() * 6 + 2);
+    const nodeSize = Math.floor(Math.random() * 6 + 1);
     const image: string = await convert2Image64(
       `https://picsum.photos/${size}`
     );
-    const text = JSON.stringify({
+    const generateData = {
       title: "Mock Title",
-      nodes: Array.from({ length: nodeSize }, (_, index) => ({
+      nodes: Array.from({length: nodeSize}, (_, index) => ({
+        order: index + 1,
         x: Math.random() * size,
         y: Math.random() * size,
         data: {
@@ -141,7 +143,29 @@ class MapAI extends GeminiAI {
           lane: `Mock Lane ${index + 1}`,
         },
       })),
-    });
+    }
+    const anchors = {
+      order: 0,
+      x: 0,
+      y: 0,
+      data: {
+        label: "Mock Anchor 1",
+        content: "Mock Anchor 1 Content",
+        lane: "Mock Anchor 1 Lane",
+      }
+    };
+    const anchor2 = {
+      order: nodeSize + 1,
+      x: size,
+      y: size,
+      data: {
+        label: "Mock Anchor 2",
+        content: "Mock Anchor 2 Content",
+        lane: "Mock Anchor 2 Lane",
+      }
+    }
+    generateData.nodes = generateData.nodes.concat(anchors, anchor2);
+    const text = JSON.stringify(generateData);
     return {
       text: text,
       image: image,
