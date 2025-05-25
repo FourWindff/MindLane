@@ -40,6 +40,5 @@ yarn-error.*
 .env
 
 #ide
-.idea/
-.vscode/
-.obsidian/
+.idea
+.vscode
