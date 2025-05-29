@@ -35,6 +35,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#000000"
         }
+      ],
+      [
+        "expo-asset",
+        {
+          "assets": [
+            "../assets/images/ai-test-image.png"
+          ]
+        }
       ]
     ],
     "experiments": {

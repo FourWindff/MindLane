@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming, interpolate } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { Node } from "./MapDisplayer";
+import { Node } from "./index";
 
 interface MarkerProps {
   isSelected: boolean;

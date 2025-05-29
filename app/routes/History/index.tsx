@@ -1,8 +1,15 @@
-import { Text } from "react-native-paper";
+import {Text} from "react-native-paper";
+import {ScrollView, View} from "react-native";
 
 export default function HistoryRoute() {
+
   return (
-    <Text variant="titleLarge">History</Text>
+    <View style={{flex: 1}}>
+      <Text variant="titleLarge">History</Text>
+      <ScrollView>
+
+      </ScrollView>
+    </View>
   )
 
 }

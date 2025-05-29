@@ -1,13 +1,8 @@
-import React, { useEffect, useMemo } from 'react';
-import {
-  Easing,
-  useSharedValue,
-  withRepeat,
-  withTiming
-} from 'react-native-reanimated';
-import Svg, { Defs, Polygon, Marker as SvgMarker } from 'react-native-svg';
+import React, {useEffect, useMemo} from 'react';
+import {Easing, useSharedValue, withRepeat, withTiming} from 'react-native-reanimated';
+import Svg, {Defs, Marker as SvgMarker, Polygon} from 'react-native-svg';
 import Arrow from './Arrow'; // Import ArrowProps
-import { Node } from "./MapDisplayer";
+import {Node} from "./index";
 
 export interface ArrowsGroupProps {
   nodes: Node[];
@@ -64,7 +59,8 @@ export default function ArrowsGroup({
     progress.value = 0;
     
     // Create smooth continuous animation
-    const animation = withRepeat(
+    // Start animation
+    progress.value = withRepeat(
       withTiming(1, {
         duration: 4000, // Duration for one complete cycle, increased for slower start/end
         easing: Easing.inOut(Easing.cubic), // Roller coaster easing
@@ -72,9 +68,6 @@ export default function ArrowsGroup({
       -1, // Infinite loop
       false
     );
-
-    // Start animation
-    progress.value = animation;
 
     // 清理函数
     return () => {
@@ -102,7 +95,7 @@ export default function ArrowsGroup({
     if (!hasConnections || totalLength === 0) return []; // Handle totalLength being 0
 
     let currentLength = 0;
-    const result = connections.map((conn, index) => {
+    return connections.map((conn, index) => {
       const length = calculatePathLength(conn.start, conn.end);
       const startRatio = totalLength > 0 ? currentLength / totalLength : 0;
       const endRatio = totalLength > 0 ? (currentLength + length) / totalLength : 0;
@@ -119,8 +112,6 @@ export default function ArrowsGroup({
         length: length // Use actual length
       };
     });
-
-    return result;
   }, [connections, totalLength, hasConnections]);
 
   if (!hasConnections || connectionsWithRatio.length === 0 || totalLength === 0) return null; // Handle totalLength being 0

@@ -1,5 +1,5 @@
-import { loadJsonDataSync, saveJsonDataSync } from '@/utils/fileUtils';
 import { useEffect, useState } from 'react';
+import {loadJsonDataSync, saveJsonDataSync} from "@/utils/filesystem/file";
 
 
 function useDataLoader<T>(filePath: string, defaultData: T): [T, (newData: T) => void, boolean] {
@@ -22,7 +22,7 @@ function useDataLoader<T>(filePath: string, defaultData: T): [T, (newData: T) =>
       }
     };
     loadData();
-  }, [filePath, defaultData]);
+  }, [filePath]);
 
   return [data, updateData, loading];
 }

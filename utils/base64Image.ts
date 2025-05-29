@@ -1,4 +1,9 @@
-export async function convert2Image64(imagePath: string): Promise<string> {
+import {Asset} from "expo-asset";
+
+const imageSize = 1024;
+const placeholderImageURL = `https://picsum.photos/${imageSize}`;
+
+export async function fetchImage2Base64(imagePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     fetch(imagePath)
       .then((res) => res.blob())
@@ -15,3 +20,14 @@ export async function convert2Image64(imagePath: string): Promise<string> {
       .catch(reject);
   });
 }
+
+export async function getStaticBase64Image(): Promise<string> {
+  try {
+    const data = Asset.fromModule(require("../assets/images/ai-test-image.png"));
+    return await fetchImage2Base64(data.uri);
+  } catch (e) {
+    console.log(e);
+    return await fetchImage2Base64(placeholderImageURL);
+  }
+}
+
