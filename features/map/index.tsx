@@ -1,9 +1,9 @@
-import { Image, useImage } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
-import { Text } from "react-native-paper";
-import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+import {Image, useImage} from "expo-image";
+import {LinearGradient} from "expo-linear-gradient";
+import {useState} from "react";
+import {LayoutChangeEvent, Pressable, StyleSheet, View} from "react-native";
+import {Text} from "react-native-paper";
+import {createShimmerPlaceholder} from 'react-native-shimmer-placeholder';
 import ArrowsGroup from "./ArrowsGroup";
 import Marker from "./Marker";
 
@@ -21,30 +21,29 @@ export type MapAiResponse = {
   title: string | undefined;
   nodes: Node[] | undefined;
 };
-
 export type MapDisplayerProps = {
   imageUri: string | undefined;
 } & MapAiResponse;
 
 const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
-export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerProps) {
+export default function MapDisplayer({imageUri, title, nodes}: MapDisplayerProps) {
   //TODO 节点坐标在容器角落会超出容器范围
   const [selectedNode, setSelectedNode] = useState<Node | undefined>(undefined);
-  const [layout, setLayout] = useState<{ width: number, height: number }>({ width: 0, height: 0 });
-  const image = useImage({ uri: imageUri }, {
+  const [layout, setLayout] = useState<{ width: number, height: number }>({width: 0, height: 0});
+  const image = useImage({uri: imageUri}, {
     onError: (e) => {
       console.log(e.message);
     },
   });
   const handleLayout = (e: LayoutChangeEvent) => {
-    setLayout({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })
+    setLayout({width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height})
     setSelectedNode(nodes?.[0]);
   }
 
   // 计算图片缩放比例
   const getScaleFactor = () => {
-    if (!image?.width || !layout.width) return { scaleX: 1, scaleY: 1 };
+    if (!image?.width || !layout.width) return {scaleX: 1, scaleY: 1};
 
     // 计算宽高比
     const imageRatio = image.width / image.height;
@@ -62,11 +61,11 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
       scaleX = scaleY;  // 保持宽高比
     }
 
-    return { scaleX, scaleY };
+    return {scaleX, scaleY};
   };
 
   // 获取缩放比例
-  const { scaleX, scaleY } = getScaleFactor();
+  const {scaleX, scaleY} = getScaleFactor();
 
   // 对节点按order排序
 
@@ -75,7 +74,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
   return (
     <View style={styles.container}>
       <ShimmerPlaceholder visible={title !== undefined} style={styles.titleShimmer}>
-        <Text variant={"titleLarge"} style={{ fontWeight: "bold" }}>{title}</Text>
+        <Text variant={"titleLarge"} style={{fontWeight: "bold"}}>{title}</Text>
       </ShimmerPlaceholder>
       <View style={styles.imageContainer}>
         <ShimmerPlaceholder
@@ -118,7 +117,7 @@ export default function MapDisplayer({ imageUri, title, nodes }: MapDisplayerPro
                   styles.progressCircle,
                   selectedNode === item && styles.progressCircleSelected]}
                 onPress={() => setSelectedNode(item)}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
               >
                 <Text style={styles.progressText}>{index + 1}</Text>
               </Pressable>
@@ -219,7 +218,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 20,
-    
+
   },
   progressShimmer: {
     alignSelf: 'center',

@@ -1,14 +1,20 @@
-import React, { ReactNode, useCallback, useMemo, useState } from "react";
-import { Portal, Dialog as PPDialog } from "react-native-paper";
+import React, {ReactNode, useCallback, useMemo, useState} from "react";
+import {Portal, Dialog as PPDialog, Button} from "react-native-paper";
 
-
+type Action = {
+  label: string,
+  onPress: () => void
+}
 export default function useDialog(): [
-  ReactNode | null,
-  (title: string, showDialog: (onClose: () => void) => ReactNode) => void
+    ReactNode | null,
+  (title: string,
+   showDialog: (onClose: () => void) => ReactNode,
+   actions?: Action[]) => void,
 ] {
   const [dialogContent, setDialogContent] = useState<null | {
     title: string,
-    content: ReactNode
+    content: ReactNode,
+    actions?: Action[]
   }>(null);
 
   const onClose = useCallback(() => {
@@ -19,12 +25,19 @@ export default function useDialog(): [
     if (dialogContent === null) {
       return null;
     }
-    const { title, content } = dialogContent;
+    const {title, content} = dialogContent;
     return (
       <Portal>
         <PPDialog visible={true} onDismiss={onClose}>
           <PPDialog.Title>{title}</PPDialog.Title>
           <PPDialog.Content>{content}</PPDialog.Content>
+          <PPDialog.Actions>
+            {dialogContent.actions?.map((action, index) => (
+              <Button key={index} onPress={() => {
+                action.onPress();
+                onClose()
+              }}>{action.label}</Button>))}
+          </PPDialog.Actions>
         </PPDialog>
       </Portal>
     )
@@ -33,8 +46,9 @@ export default function useDialog(): [
   const showDialog = useCallback((
     title: string,
     getContent: (onClose: () => void) => ReactNode,
+    actions?: Action[],
   ) => {
-    setDialogContent({ title, content: getContent(onClose) })
+    setDialogContent({title, actions: actions, content: getContent(onClose)})
   }, [onClose])
 
   return [Dialog, showDialog];

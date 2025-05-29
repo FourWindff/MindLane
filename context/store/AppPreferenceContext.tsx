@@ -1,5 +1,7 @@
-import useDataLoader from '@/hooks/useDataLoder';
-import React, { createContext, useContext } from 'react';
+import useDataLoader from '@/hooks/useDataLoader';
+import React, {createContext, useContext} from 'react';
+import {APP_DIR} from "@/utils/filesystem/path";
+import {Paths} from "expo-file-system/next";
 
 export type ThemeType = 'light' | 'dark' | 'system';
 const DEFAULT_PREFERENCES = {
@@ -10,21 +12,24 @@ export type PreferenceType = typeof DEFAULT_PREFERENCES;
 export type PreferenceName = keyof typeof DEFAULT_PREFERENCES;
 export type PreferenceValueType = typeof DEFAULT_PREFERENCES[PreferenceName];
 
-interface AppPreferenceContextProps {
+interface AppPreferenceContextShape {
   preference: PreferenceType;
   updatePreference: (name: PreferenceName, value: PreferenceValueType) => void;
 }
-const AppPreferenceContext = createContext<AppPreferenceContextProps | undefined>(undefined);
+
+const AppPreferenceContext = createContext<AppPreferenceContextShape | undefined>(undefined);
 const FILE_NAME = "appPreference.json";
-export const AppPreferenceProvider = ({ children }: { children: React.ReactNode }) => {
-  const [data, originalUpdateData] = useDataLoader(FILE_NAME, DEFAULT_PREFERENCES);
+const FILE_PATH = Paths.join(APP_DIR, FILE_NAME);
+
+export const AppPreferenceProvider = ({children}: { children: React.ReactNode }) => {
+  const [data, setData] = useDataLoader(FILE_PATH, DEFAULT_PREFERENCES);
 
   const updatePreference = (name: PreferenceName, value: PreferenceValueType) => {
-    originalUpdateData({ ...data, [name]: value });
+    setData({...data, [name]: value});
   };
 
   return (
-    <AppPreferenceContext.Provider value={{ preference: data, updatePreference: updatePreference }}>
+    <AppPreferenceContext.Provider value={{preference: data, updatePreference: updatePreference}}>
       {children}
     </AppPreferenceContext.Provider>
   );

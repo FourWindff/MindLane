@@ -11,5 +11,6 @@ export type FlowAiResponse = {
     answer:string;
     node:FlowNode[];
 }
+
 export type FlowDisplayerProps = FlowAiResponse 
 
