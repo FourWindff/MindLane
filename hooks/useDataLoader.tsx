@@ -22,7 +22,8 @@ function useDataLoader<T>(filePath: string, defaultData: T): [T, (newData: T) =>
       }
     };
     loadData();
-  }, [filePath]);
+  },
+    [filePath]);
 
   return [data, updateData, loading];
 }

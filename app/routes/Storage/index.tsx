@@ -1,3 +1,4 @@
+import FlowRoute from '@/features/flow';
 import {StyleSheet, View} from 'react-native';
 import {Text} from 'react-native-paper';
 
@@ -6,7 +7,7 @@ export default function StorageRoute() {
 
   return (
     <View style={styles.container}>
-      <Text variant="titleLarge">Storage</Text>
+      <FlowRoute/>
     </View>
   )
 }
