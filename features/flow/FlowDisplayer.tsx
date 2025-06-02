@@ -1,16 +1,32 @@
-export type FlowNode = {
+export type FlowNodeAIMeta = {
     id: string
     parentId: string[] | null;
     childId: string[] | null;
     label: string;
     content: string;
 }
+export type FlowNodeLayoutMeta = {
+    id: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+export type FlowNodeMeta = FlowNodeAIMeta & FlowNodeLayoutMeta
 export type FlowAiResponse = {
-    createAt: number;
     title: string;
     answer: string;
-    nodes: FlowNode[];
+    nodes: FlowNodeAIMeta[];
 }
 
 export type FlowDisplayerProps = FlowAiResponse
+
+
+export type Connection = {
+    id: string;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+}
 

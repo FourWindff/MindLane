@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { DRAFT_LENGTH, GRID_COUNT, GRID_SIZE } from './constants';
+import { DRAFT_LENGTH, GRID_COUNT, GRID_SIZE } from '../constants';
 
 const AXIS_COLOR = '#666666';
 const TEXT_COLOR = '#999999';
@@ -12,10 +12,6 @@ export default function CoordinateSystem() {
   // 计算坐标轴的位置
   const originX = DRAFT_LENGTH / 2;
   const originY = DRAFT_LENGTH / 2;
-  console.log("原点", originX, originY)
-  console.log("画布宽度", DRAFT_LENGTH);
-  console.log("格子宽度", GRID_SIZE);
-  console.log("格子数量", GRID_COUNT);
 
   // 生成刻度标记
   const renderAxisMarks = () => {

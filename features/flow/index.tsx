@@ -1,7 +1,7 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import FlowCanvas from "./FlowCanvas";
+import FlowCanvas from "./components/FlowCanvas";
 
 
 export default function FlowRoute() {

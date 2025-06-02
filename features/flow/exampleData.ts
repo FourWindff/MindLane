@@ -1,7 +1,6 @@
 import { FlowAiResponse } from "./FlowDisplayer";
 
 export const FlowExampleData: FlowAiResponse = {
-  createAt: Date.now(),
   title: "mock",
   answer: 'answer',
   nodes: [
@@ -23,13 +22,20 @@ export const FlowExampleData: FlowAiResponse = {
       id: '3',
       parentId: null,
       childId: ['4'],
-      label: 'step4',
-      content: 'step4-content'
+      label: 'step3',
+      content: 'step3-content'
+    },
+    {
+      id:'4',
+      parentId:['3'],
+      childId:['5'],
+      label:'step4',
+      content:'step4-content'
     },
     {
       id: '5',
       parentId: ['2', '4'],
-      childId: ['6'],
+      childId: ['6','7'],
       label: 'step5',
       content: 'step5-content'
     },
@@ -40,5 +46,12 @@ export const FlowExampleData: FlowAiResponse = {
       label: 'step6',
       content: 'step6-content'
     },
+    {
+      id:'7',
+      parentId:['5'],
+      childId:['6'],
+      label:'step7',
+      content:'step7-content'
+    }
   ]
 }

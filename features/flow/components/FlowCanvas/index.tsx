@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useRef } from 'react';
-import { StyleSheet, View, Pressable } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { IconButton, Searchbar } from 'react-native-paper'
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -9,26 +10,18 @@ import {
   Gesture,
   GestureDetector,
 } from 'react-native-gesture-handler';
-import { FAB } from 'react-native-paper';
-import CoordinateSystem from './CoordinateSystem';
-import FlowNode from './FlowNode';
-import FlowToolbar from './FlowToolbar';
-import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, DRAFT_ORIGIN_X, DRAFT_ORIGIN_Y, SCREEN_WIDTH } from './constants';
+import FlowToolbar from '../FlowToolbar';
+import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH } from '../constants';
+import { FlowExampleData } from '../../exampleData';
 import GridLines from './GridLines';
+import flowAI from '@/features/gemini/flowAI';
+import { FlowAiResponse } from '../../FlowDisplayer';
+import FlowGraph from '../FlowGraph';
 
-interface FlowCanvasProps {
-  children?: React.ReactNode;
-}
 
-interface Node {
-  id: string;
-  x: number;
-  y: number;
-}
-//TODO 缩放会往原点处靠近
-export default function FlowCanvas({ children }: FlowCanvasProps) {
-  // 节点列表状态
-  const [nodes, setNodes] = useState<Node[]>([]);
+
+export default function FlowCanvas() {
+
 
   // 平移相关的状态
   const translateX = useSharedValue(0);
@@ -39,8 +32,12 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
   // 缩放相关的状态
   const scale = useSharedValue(1);
   const lastScale = useSharedValue(1);
-
   const [saveScale, setSavaScale] = useState(1);
+
+  const [data, setData] = useState(FlowExampleData);
+  const nodes = data.nodes;
+  const [input, setInput] = useState('如何造一台火箭');
+  console.log("画布更新");
 
 
 
@@ -70,26 +67,6 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
   // 组合手势
   const composed = Gesture.Simultaneous(panGesture, pinchGesture);
 
-  // 添加节点
-  const addNode = useCallback(() => {
-    // 计算画布中心点
-    const centerX = DRAFT_ORIGIN_X;
-    const centerY = DRAFT_ORIGIN_Y;
-
-    const currentTranslateX = translateX.value;
-    const currentTranslateY = translateY.value
-    // 考虑当前平移和缩放，计算实际位置
-    const actualX = (centerX - currentTranslateX / scale.value);
-    const actualY = (centerY - currentTranslateY / scale.value);
-
-    const newNode: Node = {
-      id: `node-${nodes.length + 1}`,
-      x: actualX,
-      y: actualY,
-    };
-
-    setNodes(prevNodes => [...prevNodes, newNode]);
-  }, [nodes.length]);
 
   // 动画样式
   const animatedStyle = useAnimatedStyle(() => {
@@ -104,7 +81,7 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
 
   // 清除所有节点
   const handleClear = useCallback(() => {
-    setNodes([]);
+
   }, []);
 
   // 放大画布
@@ -125,10 +102,14 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
 
   // 回到画布中心
   const handleCenter = useCallback(() => {
-    translateX.value = 0;
-    translateY.value = 0;
-    lastTranslateX.value = 0;
-    lastTranslateY.value = 0;
+    // 计算需要平移的距离，使内容居中
+    const centerX = (SCREEN_WIDTH - DRAFT_LENGTH) / 2;
+    const centerY = (SCREEN_WIDTH - DRAFT_LENGTH) / 2;
+
+    translateX.value = centerX;
+    translateY.value = centerY;
+    lastTranslateX.value = centerX;
+    lastTranslateY.value = centerY;
   }, []);
 
   // 重置缩放
@@ -137,6 +118,16 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
     lastScale.value = 1;
     setSavaScale(1);
   }, []);
+
+  const handleSend = () => {
+    flowAI.sendMessage(input)
+      .then(res => {
+        if (res.text) {
+          const result: FlowAiResponse = JSON.parse(res.text);
+          setData(result);
+        }
+      })
+  }
 
   return (
     <View style={styles.container}>
@@ -149,32 +140,26 @@ export default function FlowCanvas({ children }: FlowCanvasProps) {
           onResetScale={handleResetScale}
           scale={saveScale}
         />
+        <Searchbar
+          style={{ marginHorizontal:10 }}
+          value={input}
+          right={() => <IconButton onPress={handleSend} icon={'send'} />}
+          onChangeText={setInput}
+        />
       </View>
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.canvas, animatedStyle]}>
-          <CoordinateSystem />
-          <GridLines />
-          {nodes.map((node) => (
-            <FlowNode
-              key={node.id}
-              id={node.id}
-              initialX={node.x}
-              initialY={node.y}
-              scale={saveScale}
-            />
-          ))}
-          {children}
+          <View style={styles.graphContainer}>
+            {/* <CoordinateSystem /> */}
+            <GridLines />
+            <FlowGraph initalNodes={nodes} scale={saveScale} />
+          </View>
         </Animated.View>
       </GestureDetector>
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={addNode}
-      />
+
     </View>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -189,6 +174,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: -EXTRA_SPACE - (BOX_LENGTH - SCREEN_WIDTH) / 2,
     top: -EXTRA_SPACE,
+  },
+  graphContainer: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fab: {
     position: 'absolute',

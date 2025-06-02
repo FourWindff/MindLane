@@ -46,7 +46,6 @@ const HomeRoute = () => {
     const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
     setMap(data);
     bottomMapModalRef.current?.present();
-
   }
 
 

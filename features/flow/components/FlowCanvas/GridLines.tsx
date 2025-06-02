@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { GRID_SIZE, DRAFT_LENGTH } from './constants';
+import { GRID_SIZE, DRAFT_LENGTH } from '../constants';
 
 
 export default function GridLines() {
