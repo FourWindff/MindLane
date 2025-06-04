@@ -10,7 +10,7 @@ export default function FlowRoute() {
       <View style={styles.canvasContainer}>
         <FlowCanvas />
       </View>
-    </GestureHandlerRootView>
+    </GestureHandlerRootView> 
   );
 }
 

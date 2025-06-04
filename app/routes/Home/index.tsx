@@ -42,6 +42,7 @@ const HomeRoute = () => {
       console.log("生成可视化流程", text);
     }
   }, [isMapMode, saveMap, showDialog, text]);
+  
   const handleReviewCard = (cardPath: string) => {
     const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
     setMap(data);

@@ -5,7 +5,7 @@ import {APP_DIR, isFileExist, MAP_DIR} from "@/utils/filesystem/path";
 import {saveImage} from "@/utils/filesystem/image";
 import {loadJsonDataSync, saveJsonDataSync, unlinkFile} from "@/utils/filesystem/file";
 import useDataLoader from "@/hooks/useDataLoader";
-import {FlowDisplayerProps} from "@/features/flow/FlowDisplayer";
+import {FlowDisplayerProps} from "@/features/flow/types";
 import {Card} from "@/types/types";
 
 
@@ -139,7 +139,7 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
       ...data,
       [newGroupName]: data[group],
     }
-    delete newData.group;
+    delete newData[group];
     updateData(newData);
     return true;
   }

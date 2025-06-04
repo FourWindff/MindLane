@@ -1,5 +1,5 @@
 import dagre from '@dagrejs/dagre';
-import { FlowAiResponse, FlowNodeAIMeta, FlowNodeLayoutMeta } from '../FlowDisplayer';
+import { FlowAiResponse, FlowNodeAIMeta, FlowNodeLayoutMeta } from '../types';
 import { NODE_HEIGHT, NODE_WIDTH } from '../components/constants';
 
 

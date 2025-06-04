@@ -12,11 +12,11 @@ import {
 } from 'react-native-gesture-handler';
 import FlowToolbar from '../FlowToolbar';
 import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH } from '../constants';
-import { FlowExampleData } from '../../exampleData';
 import GridLines from './GridLines';
 import flowAI from '@/features/gemini/flowAI';
-import { FlowAiResponse } from '../../FlowDisplayer';
+import { FlowAiResponse } from '../../types';
 import FlowGraph from '../FlowGraph';
+import { FlowExampleData } from '../../utils/exampleData';
 
 
 
@@ -37,7 +37,6 @@ export default function FlowCanvas() {
   const [data, setData] = useState(FlowExampleData);
   const nodes = data.nodes;
   const [input, setInput] = useState('如何造一台火箭');
-  console.log("画布更新");
 
 
 

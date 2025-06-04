@@ -1,4 +1,4 @@
-import { FlowAiResponse } from "./FlowDisplayer";
+import { FlowAiResponse } from "./types";
 
 export const FlowExampleData: FlowAiResponse = {
   title: "mock",

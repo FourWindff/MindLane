@@ -1,6 +1,6 @@
 import { View, StyleSheet } from "react-native";
 import FlowNode from "../FlowNode";
-import { Connection, FlowNodeAIMeta, FlowNodeMeta } from "../../FlowDisplayer";
+import { Connection, FlowNodeAIMeta, FlowNodeMeta } from "../../types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { calculateLayout } from "../../utils/dagreLayout";
 import Svg from "react-native-svg";
