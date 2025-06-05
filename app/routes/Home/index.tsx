@@ -20,7 +20,7 @@ const HomeRoute = () => {
     if (isMapMode) {
       bottomMapModalRef.current?.present();
       try {
-        const res = await GeminiClient.sendMessage(text);
+        const res = await GeminiClient.mock(text);
         const obj: MapAiResponse = JSON.parse(res.text);
         const base64Data = res.image;
         console.log('---------------------------');

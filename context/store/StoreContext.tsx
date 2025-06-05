@@ -25,7 +25,6 @@ interface StoreContextShape {
   removeMap: (filepath: string) => void;
   saveFlow: (flow: FlowDisplayerProps, group?: string) => void;
   removeFlow: (filepath: string) => void;
-
   addGroup: (group: string) => boolean;
   removeGroup: (group: string) => boolean;
   renameGroup: (group: string, newGroupName: string) => boolean;
@@ -109,7 +108,7 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
 
 
   const addGroup = (group: string) => {
-    if (!(group in data)) return false;
+    if ((group in data)) return false;
     const newData = {
       ...data,
       [group]: [],
@@ -154,7 +153,6 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
   }
   const removeCard = (group: string, card: Card) => {
     if (!(group in data)) return false;
-
     data?.[group].forEach((item) => {
       if (item.filepath === card.filepath && item.type === 'map') {
         removeMap(card.filepath);
@@ -165,6 +163,7 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
     })
     const newData = {
       ...data,
+      ['history']: data['history'].filter((item) => item.filepath !== card.filepath),
       [group]: data[group].filter((item) => item.filepath !== card.filepath),
     }
     updateData(newData);
@@ -195,7 +194,7 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
         removeCard,
         addCard,
         moveCard,
-        removeHistory
+        removeHistory,
       }}>
       {children}
     </StoreContext.Provider>
