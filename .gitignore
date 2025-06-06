@@ -43,4 +43,5 @@ yarn-error.*
 .idea/
 .vscode/
 .obsidian/
+.cursor/
 
