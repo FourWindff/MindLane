@@ -44,7 +44,8 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
       }
     } else {
-      // TODO: 发送flow请求并本地跳转产生记录
+      // TODO: 发送flow请求并本地跳转产生记录， 目前主页理论上能够完成演示，能够在提问后跳转到flowDetail中，
+      //  然后主页scroll能够看到生成的卡片，虽然没有实现缩略图的内容
       try {
           await flowAI.sendMessage(text)
               .then(res => {
@@ -58,7 +59,7 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
           console.log(flow);
           console.log('---------------------------');
             if (flow) {
-                await saveFlow(flow); // TODO: flow相关的文件操作怎么没写
+                await saveFlow(flow); // TODO: 在进入flow中修改后仍然是使用此处的状态，需要在组件change调用update
                 navigation.navigate('Flows', {flowData: flow}); // 跳转到Flows页面 理论能够正常跳转
             } else {
                 showDialog("ERROR", () => <Text>生成流程失败</Text>);
@@ -73,6 +74,7 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
     }
   }, [flow, isMapMode, navigation, saveFlow, saveMap, showDialog, text]);
 
+  // 为Gallery区分map与flow，可能需优化
   const handlePressFlow = (itemData : FlowDisplayerProps) => {navigation.navigate('Flows', {flowData: itemData});}
   const handlePressMap = (itemData : MapDisplayerProps) => {
     setMap(itemData);
@@ -80,7 +82,6 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
   }
 
   type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
-  // TODO: 这里的handle只会生成map的而没有flows的，在flows页面部署后需要修改
   const handleReviewCard = (cardPath: string) => {
     const data = loadJsonDataSync<GalleryProps>(cardPath, {} as GalleryProps);
     if ('imageUri' in data) { // 为MapDisplayerProps

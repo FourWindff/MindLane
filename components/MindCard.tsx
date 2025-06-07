@@ -10,7 +10,7 @@ interface CardProps {
   onPress: (cardPath: string) => void;
 }
 
-// TODO: 为卡片增加Flow的显示内容，未测试
+// TODO: 为卡片增加Flow的显示内容，未测试 ; 获得的内容是Card类型会不会更方便一些
 type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
 type CardType = MapDisplayerProps | (FlowDisplayerProps & {imageUri: string});
 const newGallery = {} as GalleryProps;
