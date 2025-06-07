@@ -8,8 +8,9 @@ import {Avatar, Button, Chip, Icon, IconButton, Searchbar, Text} from 'react-nat
 import {useStore} from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
 import {loadJsonDataSync} from "@/utils/filesystem/file";
+import {HomeStackProps} from "@/types/navigationTypes";
 
-const HomeRoute = () => {
+const HomeRoute = ( {navigation, route} : HomeStackProps) => {
   const [text, setText] = useState('模拟请求');
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
   const [Dialog, showDialog] = useDialog();
@@ -39,10 +40,13 @@ const HomeRoute = () => {
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
       }
     } else {
+
+      // TODO: 发送flow请求并本地跳转产生记录
       console.log("生成可视化流程", text);
     }
   }, [isMapMode, saveMap, showDialog, text]);
-  
+
+  // TODO: 这里的handle只会生成map的而没有flows的，在flows页面部署后需要修改
   const handleReviewCard = (cardPath: string) => {
     const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
     setMap(data);
@@ -152,6 +156,7 @@ const HomeRoute = () => {
                   ))}>DialogContent</Button>
         </ScrollView>
         <Gallery onPressCard={handleReviewCard}/>
+        <Button onPress={() => navigation.push('Flows')}> a test button to flows</Button>
       </View>
       {Dialog}
       <BottomSheetModal
