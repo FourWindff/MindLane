@@ -9,14 +9,18 @@ import {useStore} from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
 import {loadJsonDataSync} from "@/utils/filesystem/file";
 import {HomeStackProps} from "@/types/navigationTypes";
+import {FlowExampleData} from "@/features/flow/utils/exampleData";
+import {FlowAiResponse, FlowDisplayerProps} from "@/features/flow/types";
+import flowAI from "@/features/gemini/flowAI";
 
 const HomeRoute = ( {navigation, route} : HomeStackProps) => {
   const [text, setText] = useState('模拟请求');
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
   const [Dialog, showDialog] = useDialog();
   const bottomMapModalRef = useRef<BottomSheetModal>(null);
-  const {saveMap} = useStore();
+  const {saveMap, saveFlow} = useStore();
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
+  const [flow, setFlow] = useState<FlowDisplayerProps | undefined>(undefined);
   const handleSend = useCallback(async () => {
     if (isMapMode) {
       bottomMapModalRef.current?.present();
@@ -40,19 +44,51 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
       }
     } else {
-
       // TODO: 发送flow请求并本地跳转产生记录
+      try {
+          await flowAI.sendMessage(text)
+              .then(res => {
+                if (res.text) {
+                  const result: FlowAiResponse = JSON.parse(res.text);
+                  setFlow(result);
+                }
+              }); // 直接复制FlowCanvas中的请求方式了
+          // setFlow(FlowExampleData); // 用于测试能否正常跳转；测试saveFlow能否正常运作
+          console.log('---------------------------');
+          console.log(flow);
+          console.log('---------------------------');
+            if (flow) {
+                await saveFlow(flow); // TODO: flow相关的文件操作怎么没写
+                navigation.navigate('Flows', {flowData: flow}); // 跳转到Flows页面 理论能够正常跳转
+            } else {
+                showDialog("ERROR", () => <Text>生成流程失败</Text>);
+            }
+
+      }catch (err) {
+        console.log("Error out of try:", err);
+        showDialog("ERROR", () => <Text>{String(err)}</Text>);
+      }
+
       console.log("生成可视化流程", text);
     }
-  }, [isMapMode, saveMap, showDialog, text]);
+  }, [flow, isMapMode, navigation, saveFlow, saveMap, showDialog, text]);
 
-  // TODO: 这里的handle只会生成map的而没有flows的，在flows页面部署后需要修改
-  const handleReviewCard = (cardPath: string) => {
-    const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
-    setMap(data);
+  const handlePressFlow = (itemData : FlowDisplayerProps) => {navigation.navigate('Flows', {flowData: itemData});}
+  const handlePressMap = (itemData : MapDisplayerProps) => {
+    setMap(itemData);
     bottomMapModalRef.current?.present();
   }
 
+  type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
+  // TODO: 这里的handle只会生成map的而没有flows的，在flows页面部署后需要修改
+  const handleReviewCard = (cardPath: string) => {
+    const data = loadJsonDataSync<GalleryProps>(cardPath, {} as GalleryProps);
+    if ('imageUri' in data) { // 为MapDisplayerProps
+      handlePressMap(data);
+    }else if ('answer' in data){ // 为FlowDisplayerProps
+      handlePressFlow(data);
+    }
+  }
 
   //TODO 如果backdrop出现的index似乎只能大于1。如果让它在0出现，背景不会出现
   const snapPoints = useMemo(() => ["65", "70"], []);
@@ -156,7 +192,7 @@ const HomeRoute = ( {navigation, route} : HomeStackProps) => {
                   ))}>DialogContent</Button>
         </ScrollView>
         <Gallery onPressCard={handleReviewCard}/>
-        <Button onPress={() => navigation.push('Flows')}> a test button to flows</Button>
+        {/*<Button onPress={() => handlePressFlow(FlowExampleData)}>a props test button</Button> 堆栈测试用的，可删除*/}
       </View>
       {Dialog}
       <BottomSheetModal

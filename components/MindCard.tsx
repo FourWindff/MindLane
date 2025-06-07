@@ -2,15 +2,30 @@ import {Button, Card as PPCard, Surface, Text, useTheme} from "react-native-pape
 import {StyleSheet} from "react-native";
 import useDataLoader from "@/hooks/useDataLoader";
 import {MapDisplayerProps} from "@/features/map";
+import {FlowDisplayerProps} from "@/features/flow/types";
+import {testFlowImage} from "@/app/navigation/testFlowImage";
 
 interface CardProps {
   cardPath: string;
   onPress: (cardPath: string) => void;
 }
 
-const newMap = {} as MapDisplayerProps;
+// TODO: 为卡片增加Flow的显示内容，未测试
+type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
+type CardType = MapDisplayerProps | (FlowDisplayerProps & {imageUri: string});
+const newGallery = {} as GalleryProps;
+
 export default function MindCard({ cardPath, onPress}: CardProps) {
-  const [cardData] = useDataLoader(cardPath, newMap);
+  const [card] = useDataLoader(cardPath, newGallery);
+  // 区分 MapDisplayerProps 和 FlowDisplayerProps以分别显示封面
+  let cardData : CardType;
+  if ('imageUri' in card) { // MapDisplayerProps type
+    cardData = card as MapDisplayerProps;
+  } else { // FlowDisplayerProps
+    cardData = card as FlowDisplayerProps & {imageUri : string};
+    cardData.imageUri = testFlowImage;
+  }
+
   const theme = useTheme();
   return (
     <PPCard>
