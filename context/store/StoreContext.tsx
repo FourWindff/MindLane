@@ -1,7 +1,7 @@
 import React from "react";
 import {MapDisplayerProps} from "@/features/map";
 import {Paths} from "expo-file-system/next";
-import {APP_DIR, isFileExist, MAP_DIR} from "@/utils/filesystem/path";
+import {APP_DIR, FLOW_DIR, isFileExist, MAP_DIR} from "@/utils/filesystem/path";
 import {saveImage} from "@/utils/filesystem/image";
 import {loadJsonDataSync, saveJsonDataSync, unlinkFile} from "@/utils/filesystem/file";
 import useDataLoader from "@/hooks/useDataLoader";
@@ -99,10 +99,45 @@ export const StoreProvider = ({children}: { children: React.ReactNode }) => {
     }
     updateData(newData);
   }
-
+  // TODO: 仅仅是更改了上面map的文件操作实现了flow基本的文件操作，需要优化--如缩略图等
   const saveFlow = async (flow: FlowDisplayerProps, group: string = DEFAULT_GROUP) => {
+    const {answer, title, nodes} = flow;
+    if (!answer || !title || !nodes) return;
+    if (group !== DEFAULT_GROUP && !(group in data)) {
+      console.log("StoreContext saveMap:", 'group不存在');
+      throw new Error('group不存在');
+    }
+
+    const savePath = Paths.join(FLOW_DIR, `flow_${Date.now()}.json`);
+    // const imagePath = await saveImage(imageUri, mimeType);
+    const flowData: FlowDisplayerProps = {
+      // imageUri: imagePath ? imagePath : '',
+      answer: answer,
+      title: title,
+      nodes: nodes,
+    }
+    saveJsonDataSync(savePath, flowData);
+    console.log("StoreContext saveMap: mapPath", savePath);
+    const flowCard: Card = {
+      type: 'flow',
+      filepath: savePath,
+      createAt: Date.now(),
+      modifyAt: Date.now(),
+    }
+
+    const newData = {
+      ...data,
+      [group]: [...data[group] || [], flowCard],
+    }
+    updateData(newData);
   }
   const removeFlow = (flowPath: string) => {
+    if (!isFileExist(flowPath)) throw new Error('mapPath对应的文件不存在');
+    const flow = loadJsonDataSync(flowPath, {} as FlowDisplayerProps);
+    // if (flow.imageUri) {
+    //   unlinkFile(flow.imageUri);
+    // } // 目前的flow没有图片，应该确认如何添加图片到flow中
+    unlinkFile(flowPath);
     return;
   }
 
