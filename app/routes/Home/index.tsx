@@ -39,7 +39,7 @@ const HomeRoute = () => {
   const uploadOptionsRef = useRef<BottomSheetModal>(null);
   const { saveMap } = useStore();
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
-  const [input, setInput] = useState("模拟请求");
+  const [input, setInput] = useState<string>("如何记忆算法的五大特性");
   const [selectedImageBase64, setSelectedImageBase64] = useState<
     string | undefined
   >(undefined);
@@ -52,10 +52,16 @@ const HomeRoute = () => {
     restSpeedThreshold: 0.1,
     stiffness: 500,
   });
-
+  //FIXME 键盘输入完发送后键盘不会自动关闭
+  //TODO 发送失败不清除用户输入
   const handleSend = useCallback(async () => {
+    if (!input.trim() && !selectedImageBase64)
+      throw new Error("输入不可以为空");
+
+    console.log("用户发送：", input);
+    console.log("发送附件：", selectedImageBase64?.slice(0, 100));
+    bottomMapModalRef.current?.present();
     if (isMapMode) {
-      bottomMapModalRef.current?.present();
       setLoading(true);
       try {
         const res = await GeminiClient.sendMessage(input, selectedImageBase64);
@@ -71,8 +77,11 @@ const HomeRoute = () => {
         await saveMap({ ...map, imageUri: res.image }, res.mimeType);
       } catch (err) {
         console.error("Error in handleSend:", err);
+        bottomMapModalRef.current?.dismiss();
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
       } finally {
+        setInput("");
+        setSelectedImageBase64(undefined);
         setLoading(false);
       }
     } else {
@@ -104,7 +113,7 @@ const HomeRoute = () => {
   }, []);
 
   //TODO 如果backdrop出现的index似乎只能大于1。如果让它在0出现，背景不会出现
-  const snapPoints = useMemo(() => ["65", "70"], []);
+  const snapPoints = useMemo(() => ["80", "80"], []);
 
   const BottomMapModal = () => {
     return (
@@ -134,7 +143,12 @@ const HomeRoute = () => {
     return loading ? (
       <ActivityIndicator {...props} />
     ) : (
-      <IconButton {...props} onPress={handleSend} icon="send" />
+      <IconButton
+        {...props}
+        onPress={handleSend}
+        icon="send"
+        disabled={!input && !selectedImageBase64}
+      />
     );
   };
 
@@ -218,7 +232,6 @@ const HomeRoute = () => {
         <View style={styles.searchBarContainer}>
           <Searchbar
             placeholder="请输入内容"
-            value={input}
             mode="bar"
             elevation={2}
             onChangeText={setInput}
@@ -226,6 +239,7 @@ const HomeRoute = () => {
             icon="plus"
             onIconPress={handleUploadOptions}
             right={renderSearchbarRight}
+            value={input}
           />
         </View>
         <View style={styles.chipContainer}>
@@ -254,7 +268,6 @@ const HomeRoute = () => {
         snapPoints={snapPoints}
         index={1}
         onChange={handleSheetChanges}
-        enableDynamicSizing={true}
         animationConfigs={bottomSheetConfig}
       >
         <BottomSheetView>
