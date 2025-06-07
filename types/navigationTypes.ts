@@ -1,25 +1,30 @@
 import {StackScreenProps} from "@react-navigation/stack";
+import {FlowDisplayerProps} from "@/features/flow/types";
+
+type FlowRouteParams = {
+    flowData? : FlowDisplayerProps;
+}
 
 export type RootStackParamList = {
     Home : undefined;
     History : undefined;
-    Flows : undefined;
+    Flows : FlowRouteParams;
     Storage : undefined;
 }
 
 export type HomeStackParamList = {
     Home: undefined;
-    Flows: undefined;
+    Flows: FlowRouteParams;
 }
 
 export type HistoryStackParamList = {
     History : undefined;
-    Flows : undefined;
+    Flows : FlowRouteParams;
 }
 
 export type StorageStackParamList = {
     Storage: undefined;
-    Flows : undefined;
+    Flows : FlowRouteParams;
 }
 
 export type HomeStackProps = StackScreenProps<HomeStackParamList, 'Home' | 'Flows'>;

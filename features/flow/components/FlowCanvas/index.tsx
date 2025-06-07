@@ -14,13 +14,13 @@ import FlowToolbar from '../FlowToolbar';
 import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH } from '../constants';
 import GridLines from './GridLines';
 import flowAI from '@/features/gemini/flowAI';
-import { FlowAiResponse } from '../../types';
+import {FlowAiResponse, FlowDisplayerProps} from '../../types';
 import FlowGraph from '../FlowGraph';
 import { FlowExampleData } from '../../utils/exampleData';
 
 
-
-export default function FlowCanvas() {
+// TODO: 可能需要标准化传入参数
+export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : FlowDisplayerProps}) {
 
 
   // 平移相关的状态
@@ -34,7 +34,8 @@ export default function FlowCanvas() {
   const lastScale = useSharedValue(1);
   const [saveScale, setSavaScale] = useState(1);
 
-  const [data, setData] = useState(FlowExampleData);
+  // 传入实际Flow数据，若无传入的数据则默认 {flowData} : {flowData : FlowDisplayerProps} = FlowExampleData;
+  const [data, setData] = useState(flowData);
   const nodes = data.nodes;
   const [input, setInput] = useState('如何造一台火箭');
 

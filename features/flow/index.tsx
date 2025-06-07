@@ -2,13 +2,14 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import FlowCanvas from "./components/FlowCanvas";
+import {FlowDisplayerProps} from "@/features/flow/types";
 
 
-export default function FlowRoute() {
+export default function FlowRoute( {flowData} : {flowData? : FlowDisplayerProps} ) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.canvasContainer}>
-        <FlowCanvas />
+        <FlowCanvas flowData={flowData} />
       </View>
     </GestureHandlerRootView> 
   );

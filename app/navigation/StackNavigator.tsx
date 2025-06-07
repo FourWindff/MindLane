@@ -54,7 +54,6 @@ export function HomeStack() {
             <Stack.Screen name="Home" component={HomeRoute} options={{headerShown: false}} />
             <Stack.Screen name="Flows" component={FlowsDetail}
                           options={{
-
                               header : (props) => (
                                   <Header {...props} />)}} />
         </Stack.Navigator>
