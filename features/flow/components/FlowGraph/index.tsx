@@ -120,8 +120,6 @@ export default function FlowGraph({
     (nodeId: string, x: number, y: number) => {
       // 更新节点位置映射
       nodePositions.current.set(nodeId, { x, y });
-      console.log("change");
-
       // 使用 useAnimatedReaction 来处理连接线更新
       setConnections((prevConnections) => {
         const newConnections = [...prevConnections];

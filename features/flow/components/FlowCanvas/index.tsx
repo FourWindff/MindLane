@@ -11,7 +11,7 @@ import {
   GestureDetector,
 } from 'react-native-gesture-handler';
 import FlowToolbar from '../FlowToolbar';
-import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH } from '../constants';
+import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH, DRAFT_ORIGIN_X, DRAFT_ORIGIN_Y } from '../constants';
 import GridLines from './GridLines';
 import flowAI from '@/features/gemini/flowAI';
 import {FlowAiResponse, FlowDisplayerProps} from '../../types';
@@ -104,15 +104,13 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
   }, [lastScale, scale]);
 
   // 回到画布中心
+  //FIXME 实际是偏到不知道哪里去了
   const handleCenter = useCallback(() => {
     // 计算需要平移的距离，使内容居中
-    const centerX = (SCREEN_WIDTH - DRAFT_LENGTH) / 2;
-    const centerY = (SCREEN_WIDTH - DRAFT_LENGTH) / 2;
-
-    translateX.value = centerX;
-    translateY.value = centerY;
-    lastTranslateX.value = centerX;
-    lastTranslateY.value = centerY;
+    translateX.value = 0;
+    translateY.value = 0;
+    lastTranslateX.value = 0;
+    lastTranslateY.value = 0;
   }, [lastTranslateX, lastTranslateY, translateX, translateY]);
 
   // 重置缩放
@@ -148,12 +146,12 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
           onResetScale={handleResetScale}
           scale={saveScale}
         />
-        <Searchbar
+        {/* <Searchbar
           style={{ marginHorizontal:10 }}
           value={input}
           right={() => <IconButton onPress={handleSend} icon={'send'} />}
           onChangeText={setInput}
-        />
+        /> */}
       </View>
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.canvas, animatedStyle]}>
@@ -206,9 +204,8 @@ const styles = StyleSheet.create({
   },
   toolbarContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    right: 10,
+    top: 10,
     zIndex: 1000,
   },
   nodeInfoCard: {

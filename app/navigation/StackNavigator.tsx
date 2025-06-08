@@ -22,7 +22,7 @@ export const Header: React.FC<StackHeaderProps> = ({
   const title = getHeaderTitle(options, route.name);
 
   return (
-    <Appbar.Header  >
+    <Appbar.Header>
       {back && <Appbar.BackAction onPress={navigation.goBack} />}
 
       <Appbar.Content title={title} />

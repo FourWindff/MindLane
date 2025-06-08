@@ -23,14 +23,14 @@ export default function FlowToolbar({
     <View style={styles.container}>
       <IconButton
         icon="delete"
-        size={24}
+        size={20}
         onPress={onClear}
         mode="contained"
         style={styles.button}
       />
       <IconButton
         icon="magnify-plus"
-        size={24}
+        size={20}
         onPress={onZoomIn}
         mode="contained"
         style={styles.button}
@@ -40,21 +40,21 @@ export default function FlowToolbar({
       </View>
       <IconButton
         icon="magnify-minus"
-        size={24}
+        size={20}
         onPress={onZoomOut}
         mode="contained"
         style={styles.button}
       />
       <IconButton
         icon="crosshairs"
-        size={24}
+        size={20}
         onPress={onCenter}
         mode="contained"
         style={styles.button}
       />
       <IconButton
         icon="restore"
-        size={24}
+        size={20}
         onPress={onResetScale}
         mode="contained"
         style={styles.button}
@@ -65,12 +65,12 @@ export default function FlowToolbar({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    padding: 8,
+    padding: 4,
     backgroundColor: '#ffffff',
     borderRadius: 8,
-    margin: 8,
+    margin: 4,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -81,16 +81,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   button: {
-    marginHorizontal: 4,
+    marginVertical: 2,
   },
   scaleContainer: {
-    minWidth: 60,
+    minWidth: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   scaleText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
   },
 }); 
