@@ -1,6 +1,9 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
-import { Gesture, GestureDetector, Pressable } from 'react-native-gesture-handler';
+import { StyleSheet, View, Text } from 'react-native';
+import {
+  Gesture,
+  GestureDetector,
+} from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -34,8 +37,6 @@ function FlowNode({
   const lastTranslateX = useSharedValue(0);
   const lastTranslateY = useSharedValue(0);
 
-  console.log(`${Date.now()}id:${id}-${label}节点更新`)
-
   // 拖动手势
   const dragGesture = Gesture.Pan()
     .onStart(() => {
@@ -52,6 +53,22 @@ function FlowNode({
       }
     });
 
+  // 新增点击手势，增加对微小移动的容忍度
+  const tapGesture = Gesture.Tap()
+    .maxDeltaX(5) // 允许水平方向有5个像素的微小移动
+    .maxDeltaY(5) // 允许垂直方向有5个像素的微小移动
+    .onEnd(() => {
+      if (onPress) {
+        runOnJS(onPress)(id, label, content || '');
+      }
+    });
+
+  // 组合手势：拖动优先于点击
+  const composedGestures = Gesture.Race(
+    dragGesture,
+    tapGesture
+  );
+
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
@@ -62,16 +79,14 @@ function FlowNode({
   });
 
   return (
-    <GestureDetector gesture={dragGesture}>
+    <GestureDetector gesture={composedGestures}>
       <Animated.View style={[styles.container, animatedStyle]}>
-        <Pressable onPress={() => onPress && onPress(id, label, content || '')}>
-          <View style={styles.node}>
-            <Text style={styles.label}>{label}</Text>
-            <Text style={styles.content}
-              ellipsizeMode="tail"
-              numberOfLines={2}>{content}</Text>
-          </View>
-        </Pressable>
+        <View style={styles.node}>
+          <Text style={styles.label}>{label}</Text>
+          <Text style={styles.content}
+            ellipsizeMode="tail"
+            numberOfLines={2}>{content}</Text>
+        </View>
       </Animated.View>
     </GestureDetector>
   );
