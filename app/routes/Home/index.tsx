@@ -27,7 +27,7 @@ import {
 } from "react-native-paper";
 import { useStore } from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
-import {  loadJsonDataSync  } from "@/utils/filesystem/file";
+import { loadJsonDataSync } from "@/utils/filesystem/file";
 import UploadOptionsSheet from "@/components/UploadOptionsSheet";
 import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
 import { STATIC_SHEET_SNAP_POINTS } from "@/components/ui/BottomSheet/bottomSheetConfig";
@@ -35,13 +35,12 @@ import { HomeStackProps } from "@/types/navigationTypes";
 import { FlowAiResponse, FlowDisplayerProps } from "@/features/flow/types";
 import flowAI from "@/features/gemini/flowAI";
 
-
 const HomeRoute = ({ navigation, route }: HomeStackProps) => {
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
   const [Dialog, showDialog] = useDialog();
   const bottomMapModalRef = useRef<BottomSheetModal>(null);
   const uploadOptionsRef = useRef<BottomSheetModal>(null);
-  const {  saveMap , saveFlow } = useStore();
+  const { saveMap, saveFlow } = useStore();
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
   const [flow, setFlow] = useState<FlowDisplayerProps | undefined>(undefined);
   const [input, setInput] = useState<string>("如何记忆算法的五大特性");
@@ -65,8 +64,8 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
 
     console.log("用户发送：", input);
     console.log("发送附件：", selectedImageBase64?.slice(0, 100));
-    bottomMapModalRef.current?.present();
     if (isMapMode) {
+      bottomMapModalRef.current?.present();
       setLoading(true);
       try {
         const res = await GeminiClient.sendMessage(input, selectedImageBase64);
@@ -96,6 +95,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
     } else {
       // TODO: 发送flow请求并本地跳转产生记录， 目前主页理论上能够完成演示，能够在提问后跳转到flowDetail中，
       //  然后主页scroll能够看到生成的卡片，虽然没有实现缩略图的内容
+      setLoading(true);
       try {
         await flowAI.sendMessage(input).then((res) => {
           if (res.text) {
@@ -117,9 +117,19 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
       } catch (err) {
         console.log("Error out of try:", err);
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
+      } finally {
+        setLoading(false);
       }
     }
-  }, [isMapMode, saveMap,saveFlow, navigation,showDialog, input]);
+  }, [
+    input,
+    selectedImageBase64,
+    isMapMode,
+    saveMap,
+    showDialog,
+    saveFlow,
+    navigation,
+  ]);
   // 为Gallery区分map与flow，可能需优化
   const handlePressFlow = (itemData: FlowDisplayerProps) => {
     navigation.navigate("Flows", { flowData: itemData });

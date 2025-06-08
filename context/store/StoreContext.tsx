@@ -1,7 +1,7 @@
 import React from "react";
 import { MapDisplayerProps } from "@/features/map";
 import { Paths } from "expo-file-system/next";
-import { APP_DIR, isFileExist, MAP_DIR } from "@/utils/filesystem/path";
+import { APP_DIR, FLOW_DIR, isFileExist, MAP_DIR } from "@/utils/filesystem/path";
 import { saveImage } from "@/utils/filesystem/image";
 import {
   loadJsonDataSync,
@@ -9,8 +9,8 @@ import {
   unlinkFile,
 } from "@/utils/filesystem/file";
 import useDataLoader from "@/hooks/useDataLoader";
-import { FlowDisplayerProps } from "@/features/flow/FlowDisplayer";
 import { Card } from "@/types/types";
+import { FlowDisplayerProps } from "@/features/flow/types";
 
 type Store = {
   [title: string]: Card[];

@@ -20,11 +20,11 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import { DEFAULT_GROUP, useStore } from "@/context/store/StoreContext";
 import { Card } from "@/types/types";
 import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { loadJsonDataSync } from "@/utils/filesystem/file";
 import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
+import { DEFAULT_GROUP, useStore } from "@/context/store/StoreContext";
 
 export default function StorageRoute() {
   const newMap = {} as MapDisplayerProps;

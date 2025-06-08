@@ -12,11 +12,7 @@ import MapDisplayer, { MapDisplayerProps } from "@/features/map";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { DEFAULT_GROUP, useStore } from "@/context/store/StoreContext";
 import { Card } from "@/types/types";
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { loadJsonDataSync } from "@/utils/filesystem/file";
 import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
 
@@ -26,8 +22,7 @@ export default function HistoryRoute() {
   const theme = useTheme();
   //状态管理
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
-  let [showtypes, setButtons] = useState<string[]>(["history"]);
-  let [recordtypes, updatetypes] = useState<string[]>([]);
+  const [showtypes, setButtons] = useState<string[]>(["history"]);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [isChangeModalOpen, setIsChangeModalOpen] = useState(false);
@@ -35,7 +30,7 @@ export default function HistoryRoute() {
   const [foldersnackbarVisible, setfolderSnackbarVisible] = useState(false);
   //获取数据
   const { data, removeCard, addCard } = useStore();
-  recordtypes = Object.keys(data);
+  const recordtypes = Object.keys(data);
 
   //抽屉初始化
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -47,6 +42,7 @@ export default function HistoryRoute() {
   const removeButton = (index: number) => {
     setButtons(showtypes.filter((_, i) => i !== index));
   };
+
   const toggleSheet = () => {
     if (!isSheetOpen) {
       bottomSheetModalRef.current?.present();
@@ -56,6 +52,7 @@ export default function HistoryRoute() {
       setIsSheetOpen(false);
     }
   };
+
   const cardchangeshow = () => {
     if (!isChangeModalOpen) {
       bottomChangeModalRef.current?.present();
@@ -73,6 +70,7 @@ export default function HistoryRoute() {
       setButtons([...showtypes, category]);
     }
   };
+  
   const handleReviewCard = (cardPath: string) => {
     const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
     setMap(data);
@@ -85,6 +83,7 @@ export default function HistoryRoute() {
     }
     console.log("handleSheetChanges", index);
   }, []);
+
   const BottomMapModal = () => {
     return (
       <View
@@ -312,7 +311,6 @@ export default function HistoryRoute() {
         snapPoints={snapPoints}
         index={1}
         onChange={handleSheetChanges}
-        backgroundComponent={CustomBackdrop}
       >
         <BottomSheetView>
           <BottomMapModal />
