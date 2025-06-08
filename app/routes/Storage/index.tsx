@@ -22,13 +22,9 @@ import React, {
 } from "react";
 import { DEFAULT_GROUP, useStore } from "@/context/store/StoreContext";
 import { Card } from "@/types/types";
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetModalProvider,
-  BottomSheetView,
-} from "@gorhom/bottom-sheet";
+import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { loadJsonDataSync } from "@/utils/filesystem/file";
+import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
 
 export default function StorageRoute() {
   const newMap = {} as MapDisplayerProps;
@@ -53,16 +49,18 @@ export default function StorageRoute() {
     (folder) => folder !== DEFAULT_GROUP
   );
   const recordtypes = Object.keys(data);
-  console.log(recordtypes)
   //抽屉初始化
   const bottomMapModalRef = useRef<BottomSheetModal>(null);
   const bottomChangeModalRef = useRef<BottomSheetModal>(null);
   const bottomFolderModalRef = useRef<BottomSheetModal>(null);
   const bottomnewFolderModalRef = useRef<BottomSheetModal>(null);
+
   const snapPoints = useMemo(() => ["65", "70"], []);
   const toggleExpand = (name: string) => {
     setExpanded((prev) => ({ ...prev, [name]: !prev[name] }));
   };
+
+
   const handleAddGroup = () => {
     if (newGroupName.trim()) {
       addGroup(newGroupName.trim());
@@ -76,20 +74,6 @@ export default function StorageRoute() {
     setMap(data);
     bottomMapModalRef.current?.present();
   };
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        pressBehavior="close"
-        appearsOnIndex={1}
-        style={{
-          backgroundColor: "(0,0,0,0.5)",
-        }}
-      />
-    ),
-    []
-  );
 
   const cardchangeshow = () => {
     if (!isChangeModalOpen) {
@@ -106,6 +90,7 @@ export default function StorageRoute() {
     }
     console.log("handleSheetChanges", index);
   }, []);
+
   const BottomMapModal = () => {
     return (
       <View
@@ -127,9 +112,10 @@ export default function StorageRoute() {
       bottomFolderModalRef.current?.present();
     }
   }, [isFolderActionSheetOpen]);
+
   return (
-    <BottomSheetModalProvider>
-      <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollViewContainer}>
         <Text
           variant="titleLarge"
           style={{
@@ -288,6 +274,8 @@ export default function StorageRoute() {
           </Chip>
         </View>
       </ScrollView>
+
+
       <Portal>
         <Dialog
           visible={renameDialogVisible}
@@ -354,15 +342,22 @@ export default function StorageRoute() {
           </Dialog.Actions>
         </Dialog>
       </Portal>
+      
       <BottomSheetModal //对收藏夹的操作
         ref={bottomFolderModalRef}
         index={0}
         snapPoints={["25%"]}
         onDismiss={() => setIsFolderActionSheetOpen(false)}
-        enableDynamicSizing={true}
+        backdropComponent={CustomBackdrop}
+        style={{}}
       >
-        <BottomSheetView style={{ gap: 12, padding: 16 }}>
-          <Text>对{selectedFolder}的操作</Text>
+        <BottomSheetView
+          style={{
+            gap: 12,
+            padding: 16,
+          }}
+        >
+          <Text>{selectedFolder}</Text>
           <Button
             icon="pencil"
             mode="outlined"
@@ -392,12 +387,11 @@ export default function StorageRoute() {
         </BottomSheetView>
       </BottomSheetModal>
       <BottomSheetModal //记忆宫殿展示设计
-        backdropComponent={renderBackdrop}
+        backdropComponent={CustomBackdrop}
         ref={bottomMapModalRef}
         snapPoints={snapPoints}
         index={1}
         onChange={handleSheetChanges}
-        enableDynamicSizing={true}
       >
         <BottomSheetView>
           <BottomMapModal />
@@ -409,6 +403,7 @@ export default function StorageRoute() {
         ref={bottomChangeModalRef}
         snapPoints={["30%", "65%"]}
         enableDynamicSizing={true}
+        backdropComponent={CustomBackdrop}
       >
         <BottomSheetView
           style={{
@@ -441,6 +436,7 @@ export default function StorageRoute() {
         style={styles.bottomSheetContainer}
         index={1}
         ref={bottomnewFolderModalRef}
+        backdropComponent={CustomBackdrop}
         snapPoints={["30%", "65%"]}
         enableDynamicSizing={true}
       >
@@ -477,6 +473,7 @@ export default function StorageRoute() {
             ))}
         </BottomSheetView>
       </BottomSheetModal>
+
       <Snackbar
         visible={deletesnackbarVisible}
         onDismiss={() => setdeleteSnackbarVisible(false)}
@@ -491,11 +488,14 @@ export default function StorageRoute() {
       >
         删除成功
       </Snackbar>
-    </BottomSheetModalProvider>
+    </View>
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, width: "100%" },
+  container: {
+    flex: 1,
+  },
+  scrollViewContainer: { flex: 1, width: "100%" },
   chip: { marginBottom: 4 },
   content: {
     backgroundColor: "#f0f0f0",

@@ -42,7 +42,8 @@
             "../assets/images/ai-test-image.png"
           ]
         }
-      ]
+      ],
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
