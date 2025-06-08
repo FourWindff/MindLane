@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { Gesture, GestureDetector, Pressable } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,9 +13,10 @@ interface FlowNodeProps {
   initialX: number;
   initialY: number;
   scale: number;
-  label?: string;
+  label: string;
   content?: string;
-  onPositionChange?: (id: string, x: number, y: number) => void;
+  onPositionChange?: (id: string, newX: number, newY: number) => void;
+  onPress?: (id: string, label: string, content: string) => void;
 }
 
 function FlowNode({
@@ -25,7 +26,8 @@ function FlowNode({
   scale,
   label,
   content,
-  onPositionChange
+  onPositionChange,
+  onPress
 }: FlowNodeProps) {
   const translateX = useSharedValue(initialX);
   const translateY = useSharedValue(initialY);
@@ -62,12 +64,14 @@ function FlowNode({
   return (
     <GestureDetector gesture={dragGesture}>
       <Animated.View style={[styles.container, animatedStyle]}>
-        <View style={styles.node}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.content}
-            ellipsizeMode="tail"
-            numberOfLines={2}>{content}</Text>
-        </View>
+        <Pressable onPress={() => onPress && onPress(id, label, content || '')}>
+          <View style={styles.node}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={styles.content}
+              ellipsizeMode="tail"
+              numberOfLines={2}>{content}</Text>
+          </View>
+        </Pressable>
       </Animated.View>
     </GestureDetector>
   );

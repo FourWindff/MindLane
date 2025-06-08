@@ -10,8 +10,9 @@ import { DRAFT_LENGTH } from "../constants";
 interface FlowGraphProps {
   initalNodes: FlowNodeAIMeta[];
   scale: number;
+  onNodePress: (id: string, label: string, content: string) => void;
 }
-export default function FlowGraph({ initalNodes, scale }: FlowGraphProps) {
+export default function FlowGraph({ initalNodes, scale, onNodePress }: FlowGraphProps) {
   const [nodes, setNodes] = useState<FlowNodeMeta[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [svgBounds, setSvgBounds] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -199,9 +200,9 @@ export default function FlowGraph({ initalNodes, scale }: FlowGraphProps) {
           />
         ))}
       </Svg>
-      {nodes.map((node) => (
+      {nodes.map(node => (
         <FlowNode
-          key={node.id + node.label}
+          key={node.id}
           id={node.id}
           initialX={node.x}
           initialY={node.y}
@@ -209,6 +210,7 @@ export default function FlowGraph({ initalNodes, scale }: FlowGraphProps) {
           label={node.label}
           content={node.content}
           onPositionChange={handleNodePositionChange}
+          onPress={onNodePress}
         />
       ))}
     </View>

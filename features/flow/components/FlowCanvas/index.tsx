@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { IconButton, Searchbar } from 'react-native-paper'
+import { IconButton, Searchbar, Text, Card } from 'react-native-paper'
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -33,6 +33,9 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
   const scale = useSharedValue(1);
   const lastScale = useSharedValue(1);
   const [saveScale, setSavaScale] = useState(1);
+
+  // 新增状态用于存储选定的节点信息
+  const [selectedNode, setSelectedNode] = useState<{ id: string; label: string; content: string } | null>(null);
 
   // 传入实际Flow数据，若无传入的数据则默认 {flowData} : {flowData : FlowDisplayerProps} = FlowExampleData;
   const [data, setData] = useState(flowData);
@@ -90,7 +93,7 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
     scale.value = newScale;
     lastScale.value = newScale;
     setSavaScale(newScale);
-  }, []);
+  }, [lastScale, scale]);
 
   // 缩小画布
   const handleZoomOut = useCallback(() => {
@@ -98,7 +101,7 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
     scale.value = newScale;
     lastScale.value = newScale;
     setSavaScale(newScale);
-  }, []);
+  }, [lastScale, scale]);
 
   // 回到画布中心
   const handleCenter = useCallback(() => {
@@ -110,14 +113,14 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
     translateY.value = centerY;
     lastTranslateX.value = centerX;
     lastTranslateY.value = centerY;
-  }, []);
+  }, [lastTranslateX, lastTranslateY, translateX, translateY]);
 
   // 重置缩放
   const handleResetScale = useCallback(() => {
     scale.value = 1;
     lastScale.value = 1;
     setSavaScale(1);
-  }, []);
+  }, [lastScale, scale]);
 
   const handleSend = () => {
     flowAI.sendMessage(input)
@@ -128,6 +131,11 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
         }
       })
   }
+
+  // 处理节点点击事件
+  const handleNodePress = useCallback((id: string, label: string, content: string) => {
+    setSelectedNode({ id, label, content });
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -152,11 +160,19 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
           <View style={styles.graphContainer}>
             {/* <CoordinateSystem /> */}
             <GridLines />
-            <FlowGraph initalNodes={nodes} scale={saveScale} />
+            <FlowGraph initalNodes={nodes} scale={saveScale} onNodePress={handleNodePress} />
           </View>
         </Animated.View>
       </GestureDetector>
 
+      {selectedNode && (
+        <Card style={styles.nodeInfoCard}>
+          <Card.Title title={selectedNode.label} />
+          <Card.Content>
+            <Text>{selectedNode.content}</Text>
+          </Card.Content>
+        </Card>
+      )}
     </View>
   );
 }
@@ -194,5 +210,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+  },
+  nodeInfoCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    margin: 16,
+    padding: 8,
+    zIndex: 999,
   },
 });
