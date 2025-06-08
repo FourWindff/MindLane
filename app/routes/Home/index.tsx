@@ -43,7 +43,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
   const { saveMap, saveFlow } = useStore();
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
   const [flow, setFlow] = useState<FlowDisplayerProps | undefined>(undefined);
-  const [input, setInput] = useState<string>("如何记忆算法的五大特性");
+  const [input, setInput] = useState<string>("");
   const [selectedImageBase64, setSelectedImageBase64] = useState<
     string | undefined
   >(undefined);
@@ -351,10 +351,8 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
 
 const styles = StyleSheet.create({
   hello: {
-    width: "100%",
     marginBottom: 5,
     paddingBottom: 5,
-    flexDirection: "column",
     gap: 10,
     height: 70,
   },
