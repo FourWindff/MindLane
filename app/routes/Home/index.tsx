@@ -27,18 +27,23 @@ import {
 } from "react-native-paper";
 import { useStore } from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
-import { loadJsonDataSync } from "@/utils/filesystem/file";
+import {  loadJsonDataSync  } from "@/utils/filesystem/file";
 import UploadOptionsSheet from "@/components/UploadOptionsSheet";
 import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
 import { STATIC_SHEET_SNAP_POINTS } from "@/components/ui/BottomSheet/bottomSheetConfig";
+import { HomeStackProps } from "@/types/navigationTypes";
+import { FlowAiResponse, FlowDisplayerProps } from "@/features/flow/types";
+import flowAI from "@/features/gemini/flowAI";
 
-const HomeRoute = () => {
+
+const HomeRoute = ({ navigation, route }: HomeStackProps) => {
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
   const [Dialog, showDialog] = useDialog();
   const bottomMapModalRef = useRef<BottomSheetModal>(null);
   const uploadOptionsRef = useRef<BottomSheetModal>(null);
-  const { saveMap } = useStore();
+  const {  saveMap , saveFlow } = useStore();
   const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
+  const [flow, setFlow] = useState<FlowDisplayerProps | undefined>(undefined);
   const [input, setInput] = useState<string>("如何记忆算法的五大特性");
   const [selectedImageBase64, setSelectedImageBase64] = useState<
     string | undefined
@@ -67,6 +72,10 @@ const HomeRoute = () => {
         const res = await GeminiClient.sendMessage(input, selectedImageBase64);
         const obj: MapAiResponse = JSON.parse(res.text);
         const base64Data = res.image;
+        console.log("---------------------------");
+        console.log(obj.nodes);
+        console.log(obj.title);
+        console.log("---------------------------");
         const map: MapDisplayerProps = {
           imageUri: `data:image/png;base64,${base64Data}`,
           title: obj.title,
@@ -85,14 +94,51 @@ const HomeRoute = () => {
         setLoading(false);
       }
     } else {
-      console.log("生成可视化流程", input);
+      // TODO: 发送flow请求并本地跳转产生记录， 目前主页理论上能够完成演示，能够在提问后跳转到flowDetail中，
+      //  然后主页scroll能够看到生成的卡片，虽然没有实现缩略图的内容
+      try {
+        await flowAI.sendMessage(input).then((res) => {
+          if (res.text) {
+            const result: FlowAiResponse = JSON.parse(res.text);
+            setFlow(result);
+            // 直接复制FlowCanvas中的请求方式了
+            // setFlow(FlowExampleData); // 用于测试能否正常跳转；测试saveFlow能否正常运作
+            console.log("---------------------------");
+            console.log(result);
+            console.log("---------------------------");
+            if (result) {
+              saveFlow(result); // TODO: 在进入flow中修改后仍然是使用此处的状态，需要在组件change调用update
+              navigation.navigate("Flows", { flowData: result }); // 跳转到Flows页面 理论能够正常跳转
+            } else {
+              showDialog("ERROR", () => <Text>生成流程失败</Text>);
+            }
+          }
+        });
+      } catch (err) {
+        console.log("Error out of try:", err);
+        showDialog("ERROR", () => <Text>{String(err)}</Text>);
+      }
     }
-  }, [input, isMapMode, saveMap, selectedImageBase64, showDialog]);
-
-  const handleReviewCard = (cardPath: string) => {
-    const data = loadJsonDataSync(cardPath, {} as MapDisplayerProps);
-    setMap(data);
+  }, [isMapMode, saveMap,saveFlow, navigation,showDialog, input]);
+  // 为Gallery区分map与flow，可能需优化
+  const handlePressFlow = (itemData: FlowDisplayerProps) => {
+    navigation.navigate("Flows", { flowData: itemData });
+  };
+  const handlePressMap = (itemData: MapDisplayerProps) => {
+    setMap(itemData);
     bottomMapModalRef.current?.present();
+  };
+
+  type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
+  const handleReviewCard = (cardPath: string) => {
+    const data = loadJsonDataSync<GalleryProps>(cardPath, {} as GalleryProps);
+    if ("imageUri" in data) {
+      // 为MapDisplayerProps
+      handlePressMap(data);
+    } else if ("answer" in data) {
+      // 为FlowDisplayerProps
+      handlePressFlow(data);
+    }
   };
   const handleUploadOptions = useCallback(() => {
     uploadOptionsRef.current?.present();

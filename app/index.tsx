@@ -2,9 +2,9 @@ import React from "react";
 import { BottomNavigation } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import HistoryRoute from "./routes/History";
-import HomeRoute from "./routes/Home";
 import SettingsRoute from "./routes/Settings";
 import StorageRoute from "./routes/Storage";
+import { HomeStack } from "./navigation/StackNavigator";
 
 export default function Index() {
   const [index, setIndex] = React.useState(0);
@@ -18,7 +18,7 @@ export default function Index() {
   ]);
 
   const renderScene = BottomNavigation.SceneMap({
-    home: HomeRoute,
+    home: HomeStack,
     storage: StorageRoute,
     history: HistoryRoute,
     settings: SettingsRoute,
@@ -26,12 +26,13 @@ export default function Index() {
 
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <BottomNavigation
-        navigationState={{ index, routes }}
-        onIndexChange={setIndex}
-        renderScene={renderScene}
-      />
-    </SafeAreaView>
+      <SafeAreaView style={{ flex: 1 }}>
+        <BottomNavigation
+          navigationState={{ index, routes }}
+          onIndexChange={setIndex}
+          renderScene={renderScene}
+          
+        />
+      </SafeAreaView>
   );
 }
