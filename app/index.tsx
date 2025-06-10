@@ -9,7 +9,6 @@ import { HomeStack } from "./navigation/StackNavigator";
 export default function Index() {
   const [index, setIndex] = React.useState(0);
 
-
   const [routes] = React.useState([
     { key: "home", title: "Home", focusedIcon: "home", unfocusedIcon: "home-outline" },
     { key: "storage", title: "Storage", focusedIcon: "inbox" },
@@ -31,7 +30,6 @@ export default function Index() {
           navigationState={{ index, routes }}
           onIndexChange={setIndex}
           renderScene={renderScene}
-          
         />
       </SafeAreaView>
   );

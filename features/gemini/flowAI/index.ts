@@ -31,7 +31,8 @@ class FlowAI extends GeminiAI {
       });
     }
 
-    console.log("FlowAI:send",message)
+    console.log("FlowAI:send",message);
+    console.log("FlowAI:send",base64Image?.slice(0,100))
     const response = await this.genAI.models.generateContent({
       model: this.modelName,
       contents: content,

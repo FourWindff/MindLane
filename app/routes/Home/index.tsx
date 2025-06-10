@@ -24,6 +24,7 @@ import {
   IconButton,
   Searchbar,
   Text,
+  useTheme,
 } from "react-native-paper";
 import { useStore } from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
@@ -48,7 +49,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
     string | undefined
   >(undefined);
   const [loading, setLoading] = useState<boolean>(false);
-
+  const theme = useTheme();
   const bottomSheetConfig = useBottomSheetSpringConfigs({
     damping: 80,
     overshootClamping: true,
@@ -97,7 +98,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
       //  然后主页scroll能够看到生成的卡片，虽然没有实现缩略图的内容
       setLoading(true);
       try {
-        await flowAI.sendMessage(input).then((res) => {
+        await flowAI.sendMessage(input,selectedImageBase64).then((res) => {
           if (res.text) {
             const result: FlowAiResponse = JSON.parse(res.text);
             setFlow(result);
@@ -119,6 +120,8 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
         showDialog("ERROR", () => <Text>{String(err)}</Text>);
       } finally {
         setLoading(false);
+        setInput("");
+        setSelectedImageBase64(undefined);
       }
     }
   }, [
@@ -209,7 +212,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container,{backgroundColor:theme.colors.background}]}>
       <View style={styles.hello}>
         <View style={styles.titleGroup}>
           <Text

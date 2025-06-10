@@ -35,10 +35,10 @@ export const UserProfileProvider = ({children}: { children: React.ReactNode }) =
   );
 };
 
-export const useAppContextProfile = () => {
+export const useUserProfile = () => {
   const context = useContext(UserProfileContext);
   if (!context) {
-    throw new Error('useAppContextProfile must be used within a UserProfileProvider');
+    throw new Error('useUserProfile must be used within a UserProfileProvider');
   }
   return context;
 };

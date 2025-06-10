@@ -1,2 +1,0 @@
-启动在终端输入npx expo start 
-安装依赖是npm install

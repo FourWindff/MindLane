@@ -9,7 +9,7 @@ import {
   TextInput,
   useTheme,
 } from "react-native-paper";
-import { useAppContextPreference } from "@/context/store/AppPreferenceContext";
+import { useAppPreference } from "@/context/store/AppPreferenceContext";
 import useDialog from "@/hooks/useDialog";
 import { useStore } from "@/context/store/StoreContext";
 
@@ -17,11 +17,12 @@ export default function SettingsRoute() {
   const {
     preference: { apiKey, theme },
     updatePreference,
-  } = useAppContextPreference();
+  } = useAppPreference();
   const globalTheme = useTheme();
   const [apiKeyInput, setApiKeyInput] = useState<string>(apiKey);
   const [dialog, showDialog] = useDialog();
   const { removeHistory, removeAll } = useStore();
+  
   const handleSaveApiKey = () => {
     updatePreference("apiKey", apiKeyInput);
     console.log("API 密钥已保存：", apiKey);

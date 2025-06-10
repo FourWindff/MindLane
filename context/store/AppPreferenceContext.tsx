@@ -35,8 +35,8 @@ export const AppPreferenceProvider = ({children}: { children: React.ReactNode })
   );
 };
 
-export const useAppContextPreference = () => {
+export const useAppPreference = () => {
   const context = useContext(AppPreferenceContext);
-  if (!context) throw new Error("useAppContextPreference must be used within a AppPreferenceProvider");
+  if (!context) throw new Error("useAppPreference must be used within a AppPreferenceProvider");
   return context;
 }
