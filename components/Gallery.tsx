@@ -1,18 +1,18 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { Icon, Text } from "react-native-paper";
 import { DEFAULT_GROUP, useStore } from "@/context/store/StoreContext";
-import { Card } from "@/types/types";
+import { Card, CardType } from "@/types/types";
 import MindCard from "@/components/MindCard";
 
 interface GalleryProps {
-  onPressCard: (cardPath: string) => void;
+  onPressCard: (cardType: CardType, cardPath: string) => void;
 }
 
 export default function Gallery({ onPressCard }: GalleryProps) {
   const { data } = useStore();
   const historyData: Card[] = data?.[DEFAULT_GROUP] || [];
   const historyDataSoeted = [...historyData].sort(
-    (a, b) =>  b.createAt-a.createAt
+    (a, b) => b.createAt - a.createAt
   );
 
   if (historyDataSoeted.length === 0) {
@@ -31,15 +31,21 @@ export default function Gallery({ onPressCard }: GalleryProps) {
 
   //TODO 使用虚拟列表渲染，避免长度过长渲染了看不见的。
   return (
-    <ScrollView
+    <FlatList
       horizontal={true}
-      style={styles.scrollView}
+      data={historyDataSoeted}
+      renderItem={({ item: card }) => (
+        <MindCard
+          key={card.filepath}
+          path={card.filepath}
+          onPress={onPressCard}
+          type={card.type}
+        />
+      )}
+      keyExtractor={(item) => item.filepath}
+      ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
       contentContainerStyle={styles.scrollContent}
-    >
-      {historyDataSoeted.map((card, index) => (
-        <MindCard key={index} cardPath={card.filepath} onPress={onPressCard} />
-      ))}
-    </ScrollView>
+    />
   );
 }
 
@@ -48,7 +54,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     marginLeft: 20,
     alignItems: "center",
-    gap: 12,
     padding: 20,
   },
   emptyContainer: {
