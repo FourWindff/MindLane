@@ -1,11 +1,16 @@
-import React, {useEffect, useMemo} from 'react';
-import {Easing, useSharedValue, withRepeat, withTiming} from 'react-native-reanimated';
-import Svg, {Defs, Marker as SvgMarker, Polygon} from 'react-native-svg';
-import Arrow from './Arrow'; // Import ArrowProps
-import {Node} from "./index";
+import React, { useEffect, useMemo } from "react";
+import {
+  Easing,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
+import Svg, { Defs, Marker as SvgMarker, Polygon } from "react-native-svg";
+import Arrow from "./Arrow"; // Import ArrowProps
+import { MapNode } from "../types";
 
 export interface ArrowsGroupProps {
-  nodes: Node[];
+  nodes: MapNode[];
   scaleX: number;
   scaleY: number;
   color?: string;
@@ -18,7 +23,7 @@ export default function ArrowsGroup({
   nodes = [],
   scaleX = 1,
   scaleY = 1,
-  color = '#4A90E2',
+  color = "#4A90E2",
   strokeWidth = 2,
   markerSize = 7,
   beamLengthRatio = 0.1, // Add prop for beam length ratio
@@ -47,7 +52,7 @@ export default function ArrowsGroup({
     }));
   }, [sortedNodes, scaleX, scaleY]);
 
-  const markerId = 'arrowhead' + Math.random().toString(36).slice(2, 11);
+  const markerId = "arrowhead" + Math.random().toString(36).slice(2, 11);
   const markerHeight = markerSize * 0.7; // 箭头高度与宽度的比例
   const hasConnections = connections.length > 0;
 
@@ -57,7 +62,7 @@ export default function ArrowsGroup({
 
     // Reset progress
     progress.value = 0;
-    
+
     // Create smooth continuous animation
     // Start animation
     progress.value = withRepeat(
@@ -76,7 +81,10 @@ export default function ArrowsGroup({
   }, [progress, hasConnections]); // Removed connections.length from dependency array
 
   // 计算路径总长度
-  const calculatePathLength = (start: {x: number, y: number}, end: {x: number, y: number}) => {
+  const calculatePathLength = (
+    start: { x: number; y: number },
+    end: { x: number; y: number }
+  ) => {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     return Math.sqrt(dx * dx + dy * dy);
@@ -98,7 +106,8 @@ export default function ArrowsGroup({
     return connections.map((conn, index) => {
       const length = calculatePathLength(conn.start, conn.end);
       const startRatio = totalLength > 0 ? currentLength / totalLength : 0;
-      const endRatio = totalLength > 0 ? (currentLength + length) / totalLength : 0;
+      const endRatio =
+        totalLength > 0 ? (currentLength + length) / totalLength : 0;
       currentLength += length;
 
       // 确保每条线都有唯一的ID
@@ -109,12 +118,13 @@ export default function ArrowsGroup({
         id,
         startRatio,
         endRatio,
-        length: length // Use actual length
+        length: length, // Use actual length
       };
     });
   }, [connections, totalLength, hasConnections]);
 
-  if (!hasConnections || connectionsWithRatio.length === 0 || totalLength === 0) return null; // Handle totalLength being 0
+  if (!hasConnections || connectionsWithRatio.length === 0 || totalLength === 0)
+    return null; // Handle totalLength being 0
 
   const beamLength = totalLength * beamLengthRatio; // Calculate beam length
 
@@ -159,4 +169,4 @@ export default function ArrowsGroup({
       ))}
     </Svg>
   );
-};
+}

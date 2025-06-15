@@ -2,48 +2,73 @@ import { UserProfileProvider } from "@/context/store/UserProfileContext";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
-import { AppPreferenceProvider, useAppPreference } from "@/context/store/AppPreferenceContext";
+import { Appbar, useTheme } from "react-native-paper";
+import { AppPreferenceProvider } from "@/context/store/AppPreferenceContext";
 import { StoreProvider } from "@/context/store/StoreContext";
-//TODO 项目使用了react-native-paper的导航，我创建项目用的expo的默认组合，有多余的expo-router的Stack导航，考虑一下删除不必要的包
-const App = () => {
-  const colorSchema = useColorScheme();
-  const { preference } = useAppPreference();
-
-  const realTheme = preference.theme === "system" ?
-    colorSchema === 'light' ? MD3LightTheme : MD3DarkTheme
-    : preference.theme === "light" ? MD3LightTheme : MD3DarkTheme;
-  const StatusBarStyle = realTheme.dark ? "light" : "dark";
-
+import ThemeProvider from "@/context/theme/ThemeContext";
+import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+//TODO: Appbar组件右上方功能实现
+function App() {
+  const theme = useTheme();
+  const StatusBarStyle = theme.dark ? "light" : "dark";
   return (
-    <PaperProvider theme={realTheme}>
-      <Stack screenOptions={{
-        headerShown: false,
-        contentStyle: {
-          backgroundColor: realTheme.colors.background
-        }
-      }} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
+      <Stack
+        screenOptions={{
+          header: ({ navigation, route }) => {
+            return (
+              <Appbar.Header statusBarHeight={0}>
+                <Appbar.BackAction onPress={navigation.goBack} />
+                <Appbar.Content title={route.name} />
+                <Appbar.Action icon="calendar" onPress={() => {}} />
+                <Appbar.Action icon="magnify" onPress={() => {}} />
+              </Appbar.Header>
+            );
+          },
+          contentStyle:{
+            backgroundColor:theme.colors.background
+          }
+        }}
+      >
+        <Stack.Screen
+          name="(tabs)"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="flowDetail"
+          options={{
+            presentation: "fullScreenModal",
+          }}
+        />
+        <Stack.Screen
+          name="mapDetail"
+          options={{
+            presentation: "fullScreenModal",
+          }}
+        />
+      </Stack>
       <StatusBar style={StatusBarStyle} />
-    </PaperProvider>
-  )
-
+    </SafeAreaView>
+  );
 }
 export default function RootLayout() {
-
-
   return (
     <GestureHandlerRootView>
       <BottomSheetModalProvider>
         <AppPreferenceProvider>
           <UserProfileProvider>
             <StoreProvider>
-              <App />
+              <ThemeProvider>
+                <App />
+              </ThemeProvider>
             </StoreProvider>
           </UserProfileProvider>
         </AppPreferenceProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>
-  )
+  );
 }

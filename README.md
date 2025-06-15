@@ -93,24 +93,26 @@ MindLane
 
 ## [♻️](https://github.com/FourWindff/MindLane/commit/7d34b5e19c5d55e2a83f922b3a90ea8fae350270 ":recycle: Refactor: Update Gallery sorting mechanism")重构
 
-- [ ] 使用 React Navigation导航
-- [ ] History、Storage页面
+- [X] 使用 React Navigation导航
+- [X] History、Storage页面
 
 ## 🆕功能
 
 - [ ] 使用工厂模式支持多种AI
 - [ ] 用户输入API（目前是写死的）
 - [ ] AI内容生成失败重试机制
+- [ ] flowDetail、mapDeatail页面的header右侧按钮功能
 - [ ] Flow节点支持对话
 - [ ] FlowCanvas截图
 - [ ] FlowCanvas添加工具给Ai操作节点
+
   - [ ] 标记节点类型
   - [ ] 操作节点
 
 ## ⚡性能
 
 - [ ] Flow页面节点拖动卡顿
-- [ ] 使用虚拟列表渲染列表（主页、History、Storage）
+- [X] 使用虚拟列表渲染列表（主页、History、Storage）
 
 ## 🔨调整
 
@@ -119,11 +121,12 @@ MindLane
 - [ ] 主页上传选项的BottomSheetModal退出效果
 - [ ] FlowCanvas拖动视角限定在手机屏幕范围内
 - [ ] FlowCanvas画布宽高动态跳转
-- [ ] Flow页面需要全屏显示（遮住底部tab）
-- [ ] useDataLoader初始值
+- [X] Flow页面需要全屏显示（遮住底部tab）
+- [X] useDataLoader初始值
 
 ## 🐛Bug
 
 - [ ] Map标记点有时会超出图片范围
-- [ ] History、Storage打开Flow会报错
+- [X] History、Storage打开Flow会报错
 - [ ] FlowCanvas界面缩放会往原点靠近
+- [X] 主页输入框输入完毕后会跳动一下

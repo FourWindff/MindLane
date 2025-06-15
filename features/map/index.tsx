@@ -1,58 +1,49 @@
 import { Image, useImage } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LayoutChangeEvent, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
 import { createShimmerPlaceholder } from "react-native-shimmer-placeholder";
-import ArrowsGroup from "./ArrowsGroup";
-import Marker from "./Marker";
-
-export type Node = {
-  order: number;
-  x: number;
-  y: number;
-  data: {
-    label: string;
-    content: string;
-    lane: string;
-  };
-};
-export type MapAiResponse = {
-  title: string | undefined;
-  nodes: Node[] | undefined;
-};
-export type MapDisplayerProps = {
-  imageUri: string | undefined;
-} & MapAiResponse;
+import { MapDisplayerProps, MapNode } from "./types";
+import ArrowsGroup from "./components/ArrowsGroup";
+import Marker from "./components/Marker";
 
 const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 const blurhash =
   "|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXofj[ayj[j[fQayWCoeoeaya}j[ayfQa{oLj?j[WVj[ayayj[fQoff7azayj[ayj[j[ayofayayayj[fQj[ayayj[ayfjj[j[ayjuayj[";
 
 export default function MapDisplayer({
-  imageUri,
-  title,
-  nodes,
-}: MapDisplayerProps) {
+  mapData,
+}: {
+  mapData: MapDisplayerProps | null;
+}) {
   //TODO 节点坐标在容器角落会超出容器范围
-  const [selectedNode, setSelectedNode] = useState<Node | undefined>(undefined);
+  const [selectedNode, setSelectedNode] = useState<MapNode | undefined>(
+    undefined
+  );
   const [layout, setLayout] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
   });
+  const [map, setMap] = useState<MapDisplayerProps | null>(null);
 
-  const image = useImage(imageUri ? { uri: imageUri } : { blurhash }, {
+  useEffect(() => {
+    setMap(mapData);
+  }, [mapData]);
+
+  const image = useImage(map?.imageUri ?? { blurhash }, {
     onError: (e, retry) => {
       console.log(e.message);
       retry();
     },
   });
+  
   const handleLayout = (e: LayoutChangeEvent) => {
     setLayout({
       width: e.nativeEvent.layout.width,
       height: e.nativeEvent.layout.height,
     });
-    setSelectedNode(nodes?.[0]);
+    setSelectedNode(map?.nodes?.[0]);
   };
 
   // 计算图片缩放比例
@@ -88,19 +79,13 @@ export default function MapDisplayer({
   //TODO 占位效果间隙没调整好
   return (
     <View style={styles.container}>
-      <ShimmerPlaceholder
-        visible={title !== undefined}
-        style={styles.titleShimmer}
-      >
+      <ShimmerPlaceholder visible={map !== null} style={styles.titleShimmer}>
         <Text variant={"titleLarge"} style={{ fontWeight: "bold" }}>
-          {title}
+          {map?.title}
         </Text>
       </ShimmerPlaceholder>
       <View style={styles.imageContainer}>
-        <ShimmerPlaceholder
-          visible={imageUri !== undefined}
-          style={styles.imageShimmer}
-        >
+        <ShimmerPlaceholder visible={map !== null} style={styles.imageShimmer}>
           <Image
             style={styles.image}
             source={image}
@@ -109,54 +94,53 @@ export default function MapDisplayer({
             onLayout={handleLayout}
           />
           <View style={styles.svgOverlay}>
-            <ArrowsGroup nodes={nodes || []} scaleX={scaleX} scaleY={scaleY} />
+            <ArrowsGroup
+              nodes={map?.nodes || []}
+              scaleX={scaleX}
+              scaleY={scaleY}
+            />
           </View>
         </ShimmerPlaceholder>
-        {nodes &&
-          nodes.map((item, index) => (
-            <Marker
-              key={`${item.data.label}-${index}`}
-              node={item}
-              offsetX={item.x * scaleX}
-              offsetY={item.y * scaleY}
-              isSelected={selectedNode === item}
-              onSelect={setSelectedNode}
-            />
-          ))}
+        {map?.nodes.map((item, index) => (
+          <Marker
+            key={`${item.data.label}-${index}`}
+            node={item}
+            offsetX={item.x * scaleX}
+            offsetY={item.y * scaleY}
+            isSelected={selectedNode === item}
+            onSelect={setSelectedNode}
+          />
+        ))}
       </View>
 
-      <ShimmerPlaceholder
-        visible={nodes !== undefined}
-        style={styles.progressShimmer}
-      >
+      <ShimmerPlaceholder visible={map !== null} style={styles.progressShimmer}>
         <View style={styles.progressContainer}>
-          {nodes &&
-            nodes.map((item, index) => (
-              <View key={index}>
-                <Pressable
-                  style={[
-                    styles.progressCircle,
-                    selectedNode === item && styles.progressCircleSelected,
-                  ]}
-                  onPress={() => setSelectedNode(item)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Text style={styles.progressText}>{index + 1}</Text>
-                </Pressable>
-              </View>
-            ))}
+          {map?.nodes.map((item, index) => (
+            <View key={index}>
+              <Pressable
+                style={[
+                  styles.progressCircle,
+                  selectedNode === item && styles.progressCircleSelected,
+                ]}
+                onPress={() => setSelectedNode(item)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.progressText}>{index + 1}</Text>
+              </Pressable>
+            </View>
+          ))}
         </View>
       </ShimmerPlaceholder>
 
       <View style={styles.contentContainer}>
         <ShimmerPlaceholder
-          visible={nodes !== undefined}
+          visible={map !== null}
           style={[styles.textShimmer, styles.labelShimmer]}
         >
           <Text style={styles.contentLabel}>{selectedNode?.data.label}</Text>
         </ShimmerPlaceholder>
         <ShimmerPlaceholder
-          visible={nodes !== undefined}
+          visible={map !== null}
           style={[styles.textShimmer, styles.contentShimmer]}
         >
           <Text style={styles.content} variant="labelLarge">
@@ -164,7 +148,7 @@ export default function MapDisplayer({
           </Text>
         </ShimmerPlaceholder>
         <ShimmerPlaceholder
-          visible={nodes !== undefined}
+          visible={map !== null}
           style={[styles.textShimmer, styles.contentShimmer]}
         >
           <Text style={styles.contentLane}>{selectedNode?.data.lane}</Text>

@@ -1,20 +1,22 @@
-import React, {ReactNode, useCallback, useMemo, useState} from "react";
-import {Portal, Dialog as PPDialog, Button} from "react-native-paper";
+import React, { ReactNode, useCallback, useMemo, useState } from "react";
+import { Portal, Dialog as PPDialog, Button } from "react-native-paper";
 
 type Action = {
-  label: string,
-  onPress: () => void
-}
+  label: string;
+  onPress?: () => void;
+};
 export default function useDialog(): [
-    ReactNode | null,
-  (title: string,
-   showDialog: (onClose: () => void) => ReactNode,
-   actions?: Action[]) => void,
+  ReactNode | null,
+  (
+    title: string,
+    getContent: (onClose: () => void) => ReactNode,
+    actions?: Action[]
+  ) => void
 ] {
   const [dialogContent, setDialogContent] = useState<null | {
-    title: string,
-    content: ReactNode,
-    actions?: Action[]
+    title: string;
+    content: ReactNode;
+    actions?: Action[];
   }>(null);
 
   const onClose = useCallback(() => {
@@ -25,7 +27,7 @@ export default function useDialog(): [
     if (dialogContent === null) {
       return null;
     }
-    const {title, content} = dialogContent;
+    const { title, content } = dialogContent;
     return (
       <Portal>
         <PPDialog visible={true} onDismiss={onClose}>
@@ -33,23 +35,33 @@ export default function useDialog(): [
           <PPDialog.Content>{content}</PPDialog.Content>
           <PPDialog.Actions>
             {dialogContent.actions?.map((action, index) => (
-              <Button key={index} onPress={() => {
-                action.onPress();
-                onClose()
-              }}>{action.label}</Button>))}
+              <Button
+                key={index}
+                onPress={() => {
+                  action.onPress?.();
+                  onClose();
+                }}
+              >
+                {action.label}
+              </Button>
+            ))}
           </PPDialog.Actions>
         </PPDialog>
       </Portal>
-    )
+    );
   }, [dialogContent, onClose]);
 
-  const showDialog = useCallback((
+  const showDialog = (
     title: string,
     getContent: (onClose: () => void) => ReactNode,
-    actions?: Action[],
+    actions?: Action[]
   ) => {
-    setDialogContent({title, actions: actions, content: getContent(onClose)})
-  }, [onClose])
+    setDialogContent({
+      title,
+      content: getContent(onClose),
+      actions: actions,
+    });
+  };
 
   return [Dialog, showDialog];
 }

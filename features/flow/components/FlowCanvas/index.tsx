@@ -1,28 +1,35 @@
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { IconButton, Searchbar, Text, Card } from 'react-native-paper'
+import React, { useState, useCallback } from "react";
+import { StyleSheet, View } from "react-native";
+import { Text, Card, Searchbar } from "react-native-paper";
 import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 import {
   Gesture,
   GestureDetector,
-} from 'react-native-gesture-handler';
-import FlowToolbar from '../FlowToolbar';
-import { EXTRA_SPACE, MIN_SCALE, MAX_SCALE, BOX_LENGTH, DRAFT_LENGTH, SCREEN_WIDTH, DRAFT_ORIGIN_X, DRAFT_ORIGIN_Y } from '../constants';
-import GridLines from './GridLines';
-import flowAI from '@/features/gemini/flowAI';
-import {FlowAiResponse, FlowDisplayerProps} from '../../types';
-import FlowGraph from '../FlowGraph';
-import { FlowExampleData } from '../../utils/exampleData';
-
+  ScrollView,
+} from "react-native-gesture-handler";
+import FlowToolbar from "../FlowToolbar";
+import {
+  EXTRA_SPACE,
+  MIN_SCALE,
+  MAX_SCALE,
+  BOX_LENGTH,
+  DRAFT_LENGTH,
+  SCREEN_WIDTH,
+} from "../constants";
+import GridLines from "./GridLines";
+import { FlowDisplayerProps } from "../../types";
+import FlowGraph from "../FlowGraph";
 
 // TODO: 可能需要标准化传入参数
-export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : FlowDisplayerProps}) {
-
-
+export default function FlowCanvas({
+  flowData,
+}: {
+  flowData?: FlowDisplayerProps;
+}) {
   // 平移相关的状态
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -35,14 +42,13 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
   const [saveScale, setSavaScale] = useState(1);
 
   // 新增状态用于存储选定的节点信息
-  const [selectedNode, setSelectedNode] = useState<{ id: string; label: string; content: string } | null>(null);
+  const [selectedNode, setSelectedNode] = useState<{
+    id: string;
+    label: string;
+    content: string;
+  } | null>(null);
 
   // 传入实际Flow数据，若无传入的数据则默认 {flowData} : {flowData : FlowDisplayerProps} = FlowExampleData;
-  const [data, setData] = useState(flowData);
-  const nodes = data.nodes;
-  const [input, setInput] = useState('如何造一台火箭');
-
-
 
   // 平移手势
   const panGesture = Gesture.Pan()
@@ -70,7 +76,6 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
   // 组合手势
   const composed = Gesture.Simultaneous(panGesture, pinchGesture);
 
-
   // 动画样式
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -83,9 +88,7 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
   });
 
   // 清除所有节点
-  const handleClear = useCallback(() => {
-
-  }, []);
+  const handleClear = useCallback(() => {}, []);
 
   // 放大画布
   const handleZoomIn = useCallback(() => {
@@ -120,21 +123,15 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
     setSavaScale(1);
   }, [lastScale, scale]);
 
-  const handleSend = () => {
-    flowAI.sendMessage(input)
-      .then(res => {
-        if (res.text) {
-          const result: FlowAiResponse = JSON.parse(res.text);
-          setData(result);
-        }
-      })
-  }
-
   // 处理节点点击事件
-  const handleNodePress = useCallback((id: string, label: string, content: string) => {
-    setSelectedNode({ id, label, content });
-  }, []);
-
+  const handleNodePress = useCallback(
+    (id: string, label: string, content: string) => {
+      setSelectedNode({ id, label, content });
+    },
+    []
+  );
+  if (!flowData) return;
+  const nodes = flowData.nodes;
   return (
     <View style={styles.container}>
       <View style={styles.toolbarContainer}>
@@ -146,31 +143,36 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
           onResetScale={handleResetScale}
           scale={saveScale}
         />
-        {/* <Searchbar
-          style={{ marginHorizontal:10 }}
-          value={input}
-          right={() => <IconButton onPress={handleSend} icon={'send'} />}
-          onChangeText={setInput}
-        /> */}
       </View>
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.canvas, animatedStyle]}>
           <View style={styles.graphContainer}>
             {/* <CoordinateSystem /> */}
             <GridLines />
-            <FlowGraph initalNodes={nodes} scale={saveScale} onNodePress={handleNodePress} />
+            <FlowGraph
+              initalNodes={nodes}
+              scale={saveScale}
+              onNodePress={handleNodePress}
+            />
           </View>
         </Animated.View>
       </GestureDetector>
 
       {selectedNode && (
         <Card style={styles.nodeInfoCard}>
-          <Card.Title title={selectedNode.label} />
-          <Card.Content>
-            <Text>{selectedNode.content}</Text>
-          </Card.Content>
+          <ScrollView>
+            <Card.Title title={selectedNode.label} />
+            {/*TODO: 以markdown格式渲染 */}
+            <Card.Content>
+              <Text>{selectedNode.content}</Text>
+            </Card.Content>
+          </ScrollView>
         </Card>
       )}
+
+      <Card style={{ position: "absolute", bottom: 0 }}>
+        <Searchbar value={"12313"} />
+      </Card>
     </View>
   );
 }
@@ -178,43 +180,37 @@ export default function FlowCanvas({flowData  = FlowExampleData} : {flowData? : 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    overflow: 'hidden',
+    backgroundColor: "#f5f5f5",
+    overflow: "hidden",
   },
   canvas: {
     width: DRAFT_LENGTH,
     height: DRAFT_LENGTH,
-    backgroundColor: '#ffffff',
-    position: 'absolute',
+    backgroundColor: "#ffffff",
+    position: "absolute",
     left: -EXTRA_SPACE - (BOX_LENGTH - SCREEN_WIDTH) / 2,
     top: -EXTRA_SPACE,
   },
   graphContainer: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
   },
   toolbarContainer: {
-    position: 'absolute',
+    position: "absolute",
     right: 10,
     top: 10,
     zIndex: 1000,
   },
   nodeInfoCard: {
-    position: 'absolute',
-    bottom: 0,
+    position: "absolute",
+    bottom: 30,
     left: 0,
     right: 0,
     margin: 16,
     padding: 8,
     zIndex: 999,
+    height: "40%",
   },
 });

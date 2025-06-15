@@ -169,7 +169,8 @@ class MapAI extends GeminiAI {
   }
 
   async mock(
-    message: string
+    message: string,
+    base64Image?: string
   ): Promise<{ text: string; image: string; mimeType: string }> {
     const size = 1024;
     const nodeSize = Math.floor(Math.random() * 6 + 1);

@@ -13,7 +13,7 @@ import { useAppPreference } from "@/context/store/AppPreferenceContext";
 import useDialog from "@/hooks/useDialog";
 import { useStore } from "@/context/store/StoreContext";
 
-export default function SettingsRoute() {
+export default function SettingsScreen() {
   const {
     preference: { apiKey, theme },
     updatePreference,
@@ -22,7 +22,7 @@ export default function SettingsRoute() {
   const [apiKeyInput, setApiKeyInput] = useState<string>(apiKey);
   const [dialog, showDialog] = useDialog();
   const { removeHistory, removeAll } = useStore();
-  
+
   const handleSaveApiKey = () => {
     updatePreference("apiKey", apiKeyInput);
     console.log("API 密钥已保存：", apiKey);
@@ -33,7 +33,7 @@ export default function SettingsRoute() {
   };
   const handleClearData = () => {
     removeAll();
-    console.log("清理所有记录")
+    console.log("清理所有记录");
   };
   const handleCancelClear = () => {
     console.log("取消清理数据");

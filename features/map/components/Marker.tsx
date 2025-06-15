@@ -2,14 +2,14 @@ import React, { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming, interpolate } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { Node } from "./index";
+import { MapNode } from '../types';
 
 interface MarkerProps {
   isSelected: boolean;
   offsetX: number;
   offsetY: number;
-  onSelect: (node: Node) => void;
-  node: Node;
+  onSelect: (node: MapNode) => void;
+  node: MapNode;
 }
 
 export default function Marker({ isSelected, offsetX, offsetY, onSelect, node }: MarkerProps) {

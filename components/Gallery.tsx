@@ -29,7 +29,6 @@ export default function Gallery({ onPressCard }: GalleryProps) {
     );
   }
 
-  //TODO 使用虚拟列表渲染，避免长度过长渲染了看不见的。
   return (
     <FlatList
       horizontal={true}

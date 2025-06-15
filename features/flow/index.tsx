@@ -1,17 +1,20 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import FlowCanvas from "./components/FlowCanvas";
-import {FlowDisplayerProps} from "@/features/flow/types";
+import { FlowDisplayerProps } from "@/features/flow/types";
 
-
-export default function FlowRoute( {flowData} : {flowData? : FlowDisplayerProps} ) {
+export default function FlowDisplayer({
+  flowData,
+}: {
+  flowData?: FlowDisplayerProps;
+}) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.canvasContainer}>
         <FlowCanvas flowData={flowData} />
       </View>
-    </GestureHandlerRootView> 
+    </GestureHandlerRootView>
   );
 }
 
@@ -27,16 +30,16 @@ const styles = StyleSheet.create({
   },
   canvasContainer: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   node: {
-    position: 'absolute',
-    backgroundColor: '#fff',
+    position: "absolute",
+    backgroundColor: "#fff",
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#2196f3',
-    shadowColor: '#000',
+    borderColor: "#2196f3",
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,

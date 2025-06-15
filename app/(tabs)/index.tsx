@@ -1,12 +1,11 @@
 import GeminiClient from "@/features/gemini/mapAI";
-import MapDisplayer, { MapAiResponse, MapDisplayerProps } from "@/features/map";
 import useDialog from "@/hooks/useDialog";
 import {
   BottomSheetModal,
   BottomSheetView,
   useBottomSheetSpringConfigs,
 } from "@gorhom/bottom-sheet";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -24,32 +23,30 @@ import {
   IconButton,
   Searchbar,
   Text,
-  useTheme,
 } from "react-native-paper";
 import { useStore } from "@/context/store/StoreContext";
 import Gallery from "@/components/Gallery";
-import { loadJsonDataSync } from "@/utils/filesystem/file";
 import UploadOptionsSheet from "@/components/UploadOptionsSheet";
 import CustomBackdrop from "@/components/ui/BottomSheet/CustomBackdrop";
 import { STATIC_SHEET_SNAP_POINTS } from "@/components/ui/BottomSheet/bottomSheetConfig";
-import { HomeStackProps } from "@/types/navigationTypes";
-import { FlowAiResponse, FlowDisplayerProps } from "@/features/flow/types";
+import { FlowAiResponse } from "@/features/flow/types";
 import flowAI from "@/features/gemini/flowAI";
+import { router } from "expo-router";
+import { CardType } from "@/types/types";
+import { testFlowImage } from "@/utils/testFlowImage";
+import { MapAiResponse, MapDisplayerProps } from "@/features/map/types";
 
-const HomeRoute = ({ navigation, route }: HomeStackProps) => {
+export default function HomeScreen() {
   const [isMapMode, setIsMapMode] = useState<boolean>(true);
   const [Dialog, showDialog] = useDialog();
-  const bottomMapModalRef = useRef<BottomSheetModal>(null);
   const uploadOptionsRef = useRef<BottomSheetModal>(null);
   const { saveMap, saveFlow } = useStore();
-  const [map, setMap] = useState<MapDisplayerProps | undefined>(undefined);
-  const [flow, setFlow] = useState<FlowDisplayerProps | undefined>(undefined);
   const [input, setInput] = useState<string>("");
   const [selectedImageBase64, setSelectedImageBase64] = useState<
     string | undefined
   >(undefined);
+
   const [loading, setLoading] = useState<boolean>(false);
-  const theme = useTheme();
   const bottomSheetConfig = useBottomSheetSpringConfigs({
     damping: 80,
     overshootClamping: true,
@@ -58,7 +55,6 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
     stiffness: 500,
   });
   //FIXME 键盘输入完发送后键盘不会自动关闭
-  //TODO 发送失败不清除用户输入
   const handleSend = useCallback(async () => {
     if (!input.trim() && !selectedImageBase64)
       throw new Error("输入不可以为空");
@@ -66,50 +62,47 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
     console.log("用户发送：", input);
     console.log("发送附件：", selectedImageBase64?.slice(0, 100));
     if (isMapMode) {
-      bottomMapModalRef.current?.present();
       setLoading(true);
       try {
         const res = await GeminiClient.sendMessage(input, selectedImageBase64);
         const obj: MapAiResponse = JSON.parse(res.text);
-        const base64Data = res.image;
-        console.log("---------------------------");
-        console.log(obj.nodes);
-        console.log(obj.title);
-        console.log("---------------------------");
         const map: MapDisplayerProps = {
-          imageUri: `data:image/png;base64,${base64Data}`,
+          imageUri: res.image,
           title: obj.title,
           nodes: obj.nodes,
         };
-        setMap(map);
         setSelectedImageBase64(undefined);
-        await saveMap({ ...map, imageUri: res.image }, res.mimeType);
-      } catch (err) {
-        console.error("Error in handleSend:", err);
-        bottomMapModalRef.current?.dismiss();
-        showDialog("ERROR", () => <Text>{String(err)}</Text>);
-      } finally {
+        saveMap(map, res.mimeType).then((path) => {
+          router.push({
+            pathname: "/mapDetail",
+            params: { path },
+          });
+        });
         setInput("");
         setSelectedImageBase64(undefined);
+      } catch (err) {
+        console.error("Error in handleSend:", err);
+        showDialog("ERROR", () => <Text>{String(err)}</Text>);
+      } finally {
         setLoading(false);
       }
     } else {
-      // TODO: 发送flow请求并本地跳转产生记录， 目前主页理论上能够完成演示，能够在提问后跳转到flowDetail中，
       //  然后主页scroll能够看到生成的卡片，虽然没有实现缩略图的内容
       setLoading(true);
       try {
-        await flowAI.sendMessage(input,selectedImageBase64).then((res) => {
+        await flowAI.sendMessage(input, selectedImageBase64).then((res) => {
           if (res.text) {
             const result: FlowAiResponse = JSON.parse(res.text);
-            setFlow(result);
-            // 直接复制FlowCanvas中的请求方式了
-            // setFlow(FlowExampleData); // 用于测试能否正常跳转；测试saveFlow能否正常运作
-            console.log("---------------------------");
-            console.log(result);
-            console.log("---------------------------");
             if (result) {
-              saveFlow(result); // TODO: 在进入flow中修改后仍然是使用此处的状态，需要在组件change调用update
-              navigation.navigate("Flows", { flowData: result }); // 跳转到Flows页面 理论能够正常跳转
+              //TODO: 替换图片
+              saveFlow({ ...result, imageUri: testFlowImage }).then((path) => {
+                if (path) {
+                  router.push({
+                    pathname: "/flowDetail",
+                    params: { path },
+                  });
+                }
+              }); // TODO: 在进入flow中修改后仍然是使用此处的状态，需要在组件change调用update
             } else {
               showDialog("ERROR", () => <Text>生成流程失败</Text>);
             }
@@ -124,35 +117,20 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
         setSelectedImageBase64(undefined);
       }
     }
-  }, [
-    input,
-    selectedImageBase64,
-    isMapMode,
-    saveMap,
-    showDialog,
-    saveFlow,
-    navigation,
-  ]);
-  // 为Gallery区分map与flow，可能需优化
-  const handlePressFlow = (itemData: FlowDisplayerProps) => {
-    navigation.navigate("Flows", { flowData: itemData });
-  };
-  const handlePressMap = (itemData: MapDisplayerProps) => {
-    setMap(itemData);
-    bottomMapModalRef.current?.present();
-  };
+  }, [input, selectedImageBase64, isMapMode, saveMap, showDialog, saveFlow]);
 
-  type GalleryProps = MapDisplayerProps | FlowDisplayerProps;
-  const handleReviewCard = (cardPath: string) => {
-    const data = loadJsonDataSync<GalleryProps>(cardPath, {} as GalleryProps);
-    if ("imageUri" in data) {
-      // 为MapDisplayerProps
-      handlePressMap(data);
-    } else if ("answer" in data) {
-      // 为FlowDisplayerProps
-      handlePressFlow(data);
-    }
-  };
+  const handleReviewCard = useCallback(
+    (cardType: CardType, cardPath: string) => {
+      router.push({
+        pathname: cardType === "map" ? "/mapDetail" : "/flowDetail",
+        params: {
+          path: cardPath,
+        },
+      });
+    },
+    []
+  );
+
   const handleUploadOptions = useCallback(() => {
     uploadOptionsRef.current?.present();
   }, []);
@@ -171,33 +149,6 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
     setSelectedImageBase64(undefined);
   }, []);
 
-  //TODO 如果backdrop出现的index似乎只能大于1。如果让它在0出现，背景不会出现
-  const snapPoints = useMemo(() => ["80", "80"], []);
-
-  const BottomMapModal = () => {
-    return (
-      <View
-        style={{
-          width: "100%",
-          height: "100%",
-        }}
-      >
-        <MapDisplayer
-          title={map?.title}
-          nodes={map?.nodes}
-          imageUri={map?.imageUri}
-        />
-      </View>
-    );
-  };
-
-  const handleSheetChanges = useCallback((index: number) => {
-    if (index === -1) {
-      setMap(undefined);
-    }
-    console.log("handleSheetChanges", index);
-  }, []);
-
   const renderSearchbarRight = (props: any) => {
     return loading ? (
       <ActivityIndicator {...props} />
@@ -212,7 +163,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
   };
 
   return (
-    <View style={[styles.container,{backgroundColor:theme.colors.background}]}>
+    <View style={styles.container}>
       <View style={styles.hello}>
         <View style={styles.titleGroup}>
           <Text
@@ -295,7 +246,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
             elevation={2}
             onChangeText={setInput}
             submitBehavior="blurAndSubmit"
-            icon="plus"
+            icon="tune"
             onIconPress={handleUploadOptions}
             right={renderSearchbarRight}
             value={input}
@@ -322,19 +273,6 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
       </KeyboardAvoidingView>
       {Dialog}
       <BottomSheetModal
-        backdropComponent={CustomBackdrop}
-        ref={bottomMapModalRef}
-        snapPoints={snapPoints}
-        index={1}
-        onChange={handleSheetChanges}
-        animationConfigs={bottomSheetConfig}
-      >
-        <BottomSheetView>
-          <BottomMapModal />
-        </BottomSheetView>
-      </BottomSheetModal>
-
-      <BottomSheetModal
         ref={uploadOptionsRef}
         snapPoints={STATIC_SHEET_SNAP_POINTS}
         backdropComponent={CustomBackdrop}
@@ -350,7 +288,7 @@ const HomeRoute = ({ navigation, route }: HomeStackProps) => {
       </BottomSheetModal>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   hello: {
@@ -440,5 +378,3 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
   },
 });
-
-export default HomeRoute;
