@@ -1,0 +1,70 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import type { AppSettings } from './types.js'
+import { DEFAULT_SETTINGS } from './types.js'
+
+export class SettingsManager {
+  private filePath: string
+  private cache: AppSettings | null = null
+
+  constructor(userDataPath: string) {
+    this.filePath = path.join(userDataPath, 'settings.json')
+  }
+
+  async load(): Promise<AppSettings> {
+    if (this.cache) return this.cache
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const raw = await fs.promises.readFile(this.filePath, 'utf-8')
+        const parsed = JSON.parse(raw) as Partial<AppSettings>
+        this.cache = this.merge(parsed)
+        return this.cache
+      }
+    } catch {
+      /* fall through to defaults */
+    }
+    this.cache = { ...DEFAULT_SETTINGS }
+    return this.cache
+  }
+
+  async update(partial: Partial<AppSettings>): Promise<void> {
+    const current = await this.load()
+    this.cache = this.merge({ ...current, ...partial })
+    await this.atomicWrite(JSON.stringify(this.cache, null, 2))
+  }
+
+  async reset(): Promise<void> {
+    this.cache = { ...DEFAULT_SETTINGS }
+    await this.atomicWrite(JSON.stringify(this.cache, null, 2))
+  }
+
+  private merge(partial: Partial<AppSettings>): AppSettings {
+    return {
+      apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
+      chatModel: partial.chatModel ?? DEFAULT_SETTINGS.chatModel,
+      activeProviders: {
+        ...DEFAULT_SETTINGS.activeProviders,
+        ...partial.activeProviders,
+      },
+      providerConfigs: partial.providerConfigs ?? DEFAULT_SETTINGS.providerConfigs,
+      editor: {
+        ...DEFAULT_SETTINGS.editor,
+        ...partial.editor,
+      },
+      recentFilesMax: partial.recentFilesMax ?? DEFAULT_SETTINGS.recentFilesMax,
+      lastWorkspacePath: partial.lastWorkspacePath ?? DEFAULT_SETTINGS.lastWorkspacePath,
+      recentWorkspacePaths: partial.recentWorkspacePaths ?? DEFAULT_SETTINGS.recentWorkspacePaths,
+      lastOpenedFilePath: partial.lastOpenedFilePath ?? DEFAULT_SETTINGS.lastOpenedFilePath,
+      restoreLastWorkspaceOnLaunch:
+        partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
+    }
+  }
+
+  private async atomicWrite(content: string): Promise<void> {
+    const dir = path.dirname(this.filePath)
+    await fs.promises.mkdir(dir, { recursive: true })
+    const tmpPath = this.filePath + '.tmp.' + Date.now()
+    await fs.promises.writeFile(tmpPath, content, 'utf-8')
+    await fs.promises.rename(tmpPath, this.filePath)
+  }
+}

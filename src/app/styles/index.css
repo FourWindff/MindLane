@@ -1,0 +1,58 @@
+:root {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --ml-bg: #f4f4f5;
+  --ml-bg-elevated: #ffffff;
+  --ml-bg-subtle: #ebebed;
+  --ml-text: #0a0a0a;
+  --ml-text-muted: rgba(10, 10, 10, 0.52);
+  --ml-text-faint: rgba(10, 10, 10, 0.38);
+  --ml-border: rgba(0, 0, 0, 0.1);
+  --ml-border-strong: rgba(0, 0, 0, 0.16);
+  --ml-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --ml-shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --ml-fill-soft: rgba(0, 0, 0, 0.04);
+  --ml-fill-medium: rgba(0, 0, 0, 0.07);
+  --ml-accent: #111111;
+  --ml-danger: #1a1a1a;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--ml-bg);
+  color: var(--ml-text);
+}
+
+#root {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#root input,
+#root textarea,
+#root select,
+#root [contenteditable='true'],
+#root [contenteditable=''],
+#root [contenteditable='plaintext-only'] {
+  user-select: text;
+  -webkit-user-select: text;
+}
