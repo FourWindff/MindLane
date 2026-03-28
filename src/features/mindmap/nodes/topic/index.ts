@@ -9,6 +9,11 @@ export const topicDescriptor: NodeTypeDescriptor<TopicNodeData> = {
   component: TopicNodeComponent,
   defaultData: () => ({ label: '新主题' }),
   userCreatable: true,
+  serialize: (data) => ({
+    label: data.label,
+    ...(data.palaceId != null && { palaceId: data.palaceId }),
+  }),
+  deserialize: (raw) => raw as TopicNodeData,
   contextMenuItems: [
     { id: 'add-child', label: '添加子主题' },
     { id: 'add-sibling', label: '添加同级' },

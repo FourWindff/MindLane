@@ -9,6 +9,13 @@ export const palaceDescriptor: NodeTypeDescriptor<PalaceNodeData> = {
   component: PalaceNodeComponent,
   defaultData: () => ({ label: '', imageUrl: '', stations: [], sourceNodeIds: [] }),
   userCreatable: false,
+  serialize: (data) => ({
+    label: data.label,
+    imageUrl: data.imageUrl,
+    stations: data.stations,
+    sourceNodeIds: data.sourceNodeIds,
+  }),
+  deserialize: (raw) => raw as PalaceNodeData,
   contextMenuItems: [
     { id: 'view-palace', label: '查看宫殿详情' },
     { id: 'regenerate', label: '重新生成图片' },

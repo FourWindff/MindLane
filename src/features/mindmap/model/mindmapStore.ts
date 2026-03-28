@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
+import { nodeRegistry } from '@/features/mindmap/nodes'
 
 interface MindmapState {
   nodes: Node[]
@@ -84,8 +85,12 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   markClean: () => set({ dirty: false }),
 
   loadFile: (filePath, data) => {
+    const hydratedNodes = data.mindmap.nodes.map((n) => ({
+      ...n,
+      data: nodeRegistry.deserializeNodeData(n.type, n.data),
+    }))
     set({
-      nodes: data.mindmap.nodes as Node[],
+      nodes: hydratedNodes as Node[],
       edges: data.mindmap.edges as Edge[],
       hasDocumentOpen: true,
       filePath,
@@ -128,9 +133,9 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       mindmap: {
         nodes: nodes.map((n) => ({
           id: n.id,
-          type: (n.type ?? 'topic') as 'topic' | 'palace' | 'document',
+          type: n.type!,
           position: n.position,
-          data: n.data as Record<string, unknown>,
+          data: nodeRegistry.serializeNodeData(n.type!, n.data as Record<string, unknown>),
         })) as MindLaneFile['mindmap']['nodes'],
         edges: edges.map((e) => ({
           id: e.id,

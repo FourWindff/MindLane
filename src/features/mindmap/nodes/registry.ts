@@ -42,6 +42,16 @@ class NodeRegistry {
   getContextMenuItems(typeId: string): ContextMenuItem[] {
     return this.descriptors.get(typeId)?.contextMenuItems ?? []
   }
+
+  serializeNodeData(typeId: string, data: Record<string, unknown>): unknown {
+    const d = this.descriptors.get(typeId)
+    return d?.serialize ? d.serialize(data) : data
+  }
+
+  deserializeNodeData(typeId: string, raw: unknown): Record<string, unknown> {
+    const d = this.descriptors.get(typeId)
+    return d?.deserialize ? d.deserialize(raw) : (raw as Record<string, unknown>)
+  }
 }
 
 export const nodeRegistry = new NodeRegistry()

@@ -9,4 +9,10 @@ export const documentDescriptor: NodeTypeDescriptor<DocumentNodeData> = {
   component: DocumentNodeComponent,
   defaultData: () => ({ filename: '', excerpt: '' }),
   userCreatable: false,
+  serialize: (data) => ({
+    filename: data.filename,
+    excerpt: data.excerpt,
+    ...(data.fullTextPath != null && { fullTextPath: data.fullTextPath }),
+  }),
+  deserialize: (raw) => raw as DocumentNodeData,
 }
