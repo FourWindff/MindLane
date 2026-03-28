@@ -7,6 +7,17 @@ declare namespace NodeJS {
   }
 }
 
+type _WorkspaceTreeEntry = {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  lastModifiedAt: string
+  children?: _WorkspaceTreeEntry[]
+}
+
+type _FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
+type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
@@ -83,6 +94,9 @@ interface Window {
         chat: { id: string; displayName: string; models: { id: string; displayName: string }[] }[]
         image: { id: string; displayName: string }[]
       }>
+      urlToDataUrl: (payload: { url: string }) => Promise<
+        _FsResult<{ dataUrl: string }>
+      >
     }
     file: {
       importDocument: () => Promise<
@@ -151,6 +165,26 @@ interface Window {
           }
         | { ok: false; error: string }
       >
+      listTree: (payload: { workspacePath: string }) => Promise<_FsResult<_WorkspaceTreeEntry[]>>
+      createSubfolder: (payload: {
+        parentPath: string
+        name: string
+        workspacePath: string
+      }) => Promise<_FsResult<{ path: string }>>
+      deleteItem: (payload: {
+        targetPath: string
+        workspacePath: string
+      }) => Promise<_FsResult>
+      renameItem: (payload: {
+        oldPath: string
+        newName: string
+        workspacePath: string
+      }) => Promise<_FsResult<{ newPath: string }>>
+      moveItem: (payload: {
+        sourcePath: string
+        targetDirPath: string
+        workspacePath: string
+      }) => Promise<_FsResult<{ newPath: string }>>
     }
     settings: {
       load: () => Promise<{

@@ -291,3 +291,39 @@ export function createDashScopeRuntime(config: {
     },
   }
 }
+
+const MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml',
+  '.bmp': 'image/bmp',
+}
+
+function guessMime(url: string, contentType: string | null): string {
+  if (contentType) {
+    const cleaned = contentType.split(';')[0]?.trim().toLowerCase()
+    if (cleaned && cleaned.startsWith('image/')) return cleaned
+  }
+  try {
+    const pathname = new URL(url).pathname.toLowerCase()
+    for (const [ext, mime] of Object.entries(MIME_BY_EXT)) {
+      if (pathname.endsWith(ext)) return mime
+    }
+  } catch { /* ignore */ }
+  return 'image/png'
+}
+
+export async function urlToDataUrl(remoteUrl: string): Promise<string> {
+  if (!remoteUrl.trim() || remoteUrl.startsWith('data:')) return remoteUrl
+
+  const res = await fetch(remoteUrl)
+  if (!res.ok) {
+    throw new Error(`下载图片失败：HTTP ${res.status}`)
+  }
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const mime = guessMime(remoteUrl, res.headers.get('content-type'))
+  return `data:${mime};base64,${buffer.toString('base64')}`
+}

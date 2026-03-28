@@ -40,6 +40,7 @@ export type {
   FsResult,
   RecentFileEntry,
   WorkspaceFileEntry,
+  WorkspaceTreeEntry,
   WorkspaceSession,
   AppSettings,
   ProviderConfig,

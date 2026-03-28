@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { DEFAULT_CHAT_MODELS, createDashScopeRuntime } from './ai/runtime.js'
+import { DEFAULT_CHAT_MODELS, createDashScopeRuntime, urlToDataUrl } from './ai/runtime.js'
 import { FileSystemService } from './fs/index.js'
 import { runNodesToPalace, type SelectedNodeContent } from './workflows/nodesToPalace.js'
 import { runDocToMindmap } from './workflows/docToMindmap.js'
@@ -67,7 +67,13 @@ function dedupeWorkspacePaths(paths: string[], maxEntries: number): string[] {
 
 async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Promise<void> {
   const settings = await fsService.settings.load()
-  const workspacePath = path.dirname(filePath)
+
+  const currentWorkspace = settings.lastWorkspacePath ? path.resolve(settings.lastWorkspacePath) : null
+  const fileIsInCurrentWorkspace =
+    currentWorkspace && fsService.workspace.isWithinWorkspace(filePath, currentWorkspace)
+
+  const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
+
   const recentWorkspacePaths = dedupeWorkspacePaths(
     [workspacePath, ...settings.recentWorkspacePaths],
     settings.recentFilesMax,
@@ -237,6 +243,16 @@ function registerIpcHandlers() {
       }
     },
   )
+
+  // -- Image URL to base64 data URL --
+  ipcMain.handle('image:url-to-data-url', async (_e, payload: { url: string }) => {
+    try {
+      const dataUrl = await urlToDataUrl(payload.url)
+      return { ok: true, data: { dataUrl } }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
 
   // -- Doc to MindMap pipeline --
   ipcMain.handle(
@@ -446,6 +462,77 @@ function registerIpcHandlers() {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
+
+  ipcMain.handle('workspace:list-tree', async (_e, payload: { workspacePath: string }) => {
+    try {
+      return {
+        ok: true,
+        data: await fsService.workspace.listTree(payload.workspacePath),
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  ipcMain.handle(
+    'workspace:create-subfolder',
+    async (_e, payload: { parentPath: string; name: string; workspacePath: string }) => {
+      try {
+        const createdPath = await fsService.workspace.createSubdirectory(
+          payload.parentPath,
+          payload.name,
+          payload.workspacePath,
+        )
+        return { ok: true, data: { path: createdPath } }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'workspace:delete-item',
+    async (_e, payload: { targetPath: string; workspacePath: string }) => {
+      try {
+        await fsService.workspace.deleteItem(payload.targetPath, payload.workspacePath)
+        return { ok: true }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'workspace:rename-item',
+    async (_e, payload: { oldPath: string; newName: string; workspacePath: string }) => {
+      try {
+        const newPath = await fsService.workspace.rename(
+          payload.oldPath,
+          payload.newName,
+          payload.workspacePath,
+        )
+        return { ok: true, data: { newPath } }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    'workspace:move-item',
+    async (_e, payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) => {
+      try {
+        const newPath = await fsService.workspace.move(
+          payload.sourcePath,
+          payload.targetDirPath,
+          payload.workspacePath,
+        )
+        return { ok: true, data: { newPath } }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
 
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {

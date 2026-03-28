@@ -14,6 +14,14 @@ export interface WorkspaceFileEntry {
   lastModifiedAt: string
 }
 
+export interface WorkspaceTreeEntry {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  lastModifiedAt: string
+  children?: WorkspaceTreeEntry[]
+}
+
 export interface WorkspaceSession {
   workspacePath: string | null
   recentWorkspacePaths: string[]

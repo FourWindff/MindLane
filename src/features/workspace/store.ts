@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
-import type { WorkspaceFileEntry, WorkspaceSessionState } from './types'
+import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
 interface WorkspaceStore {
   initialized: boolean
@@ -9,6 +9,8 @@ interface WorkspaceStore {
   busy: boolean
   workspacePath: string | null
   files: WorkspaceFileEntry[]
+  tree: WorkspaceTreeEntry[]
+  expandedFolders: Set<string>
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
   lastError: string | null
@@ -18,10 +20,16 @@ interface WorkspaceStore {
   createWorkspaceDirectory: (name: string) => Promise<boolean>
   switchWorkspace: (workspacePath: string) => Promise<boolean>
   openWorkspaceFile: (filePath: string) => Promise<boolean>
-  createMindlaneFile: (name: string) => Promise<boolean>
+  createMindlaneFile: (name: string, parentPath?: string) => Promise<boolean>
   refreshWorkspaceFiles: (workspacePath?: string | null) => Promise<void>
+  refreshTree: () => Promise<void>
   syncAfterFileSaved: (filePath: string) => Promise<void>
   setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => Promise<void>
+  toggleFolder: (folderPath: string) => void
+  createSubfolder: (parentPath: string, name: string) => Promise<boolean>
+  deleteItem: (targetPath: string) => Promise<boolean>
+  renameItem: (oldPath: string, newName: string) => Promise<string | null>
+  moveItem: (sourcePath: string, targetDirPath: string) => Promise<string | null>
   clearError: () => void
 }
 
@@ -33,6 +41,19 @@ function dirname(filePath: string): string {
   const normalizedPath = filePath.replace(/\\/g, '/')
   const index = normalizedPath.lastIndexOf('/')
   return index <= 0 ? normalizedPath : normalizedPath.slice(0, index)
+}
+
+function flattenTreeFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileEntry[] {
+  const result: WorkspaceFileEntry[] = []
+  for (const entry of entries) {
+    if (entry.type === 'file') {
+      result.push({ filePath: entry.path, name: entry.name, lastModifiedAt: entry.lastModifiedAt })
+    }
+    if (entry.children) {
+      result.push(...flattenTreeFiles(entry.children))
+    }
+  }
+  return result
 }
 
 function updateWorkspaceState(
@@ -61,6 +82,17 @@ async function listWorkspaceFiles(workspacePath: string | null): Promise<Workspa
   const api = window.mindlane?.workspace
   if (!api) return []
   const result = await api.listFiles({ workspacePath })
+  if (!result.ok) {
+    throw new Error(result.error)
+  }
+  return result.data
+}
+
+async function listWorkspaceTree(workspacePath: string | null): Promise<WorkspaceTreeEntry[]> {
+  if (!workspacePath) return []
+  const api = window.mindlane?.workspace
+  if (!api) return []
+  const result = await api.listTree({ workspacePath })
   if (!result.ok) {
     throw new Error(result.error)
   }
@@ -149,7 +181,8 @@ async function applySessionState(
   files: WorkspaceFileEntry[]
 }> {
   const files = await listWorkspaceFiles(session.workspacePath)
-  useWorkspaceStore.setState(updateWorkspaceState(session, files))
+  const tree = await listWorkspaceTree(session.workspacePath)
+  useWorkspaceStore.setState({ ...updateWorkspaceState(session, files), tree })
   if (!session.workspacePath && options?.clearMindmapWhenEmpty) {
     clearMindLaneFile()
   }
@@ -162,6 +195,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   busy: false,
   workspacePath: null,
   files: [],
+  tree: [],
+  expandedFolders: new Set<string>(),
   recentWorkspacePaths: [],
   restoreLastWorkspaceOnLaunch: true,
   lastError: null,
@@ -198,6 +233,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         initializing: false,
         workspacePath: null,
         files: [],
+        tree: [],
         lastError: error instanceof Error ? error.message : String(error),
       })
     }
@@ -219,16 +255,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
+      const sessionData = session ?? {
+        workspacePath: result.data.workspacePath,
+        recentWorkspacePaths: [result.data.workspacePath],
+        lastOpenedFilePath: null,
+        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
+      }
+      const tree = await listWorkspaceTree(sessionData.workspacePath)
       useWorkspaceStore.setState({
-        ...updateWorkspaceState(
-          session ?? {
-            workspacePath: result.data.workspacePath,
-            recentWorkspacePaths: [result.data.workspacePath],
-            lastOpenedFilePath: null,
-            restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-          },
-          result.data.files,
-        ),
+        ...updateWorkspaceState(sessionData, result.data.files),
+        tree,
+        expandedFolders: new Set<string>(),
       })
       clearMindLaneFile()
       return true
@@ -253,16 +290,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
+      const sessionData = session ?? {
+        workspacePath: result.data.workspacePath,
+        recentWorkspacePaths: [result.data.workspacePath],
+        lastOpenedFilePath: null,
+        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
+      }
+      const tree = await listWorkspaceTree(sessionData.workspacePath)
       useWorkspaceStore.setState({
-        ...updateWorkspaceState(
-          session ?? {
-            workspacePath: result.data.workspacePath,
-            recentWorkspacePaths: [result.data.workspacePath],
-            lastOpenedFilePath: null,
-            restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-          },
-          result.data.files,
-        ),
+        ...updateWorkspaceState(sessionData, result.data.files),
+        tree,
+        expandedFolders: new Set<string>(),
       })
       clearMindLaneFile()
       return true
@@ -285,16 +323,17 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
+      const sessionData = session ?? {
+        workspacePath: result.data.workspacePath,
+        recentWorkspacePaths: [result.data.workspacePath],
+        lastOpenedFilePath: null,
+        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
+      }
+      const tree = await listWorkspaceTree(sessionData.workspacePath)
       useWorkspaceStore.setState({
-        ...updateWorkspaceState(
-          session ?? {
-            workspacePath: result.data.workspacePath,
-            recentWorkspacePaths: [result.data.workspacePath],
-            lastOpenedFilePath: null,
-            restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-          },
-          result.data.files,
-        ),
+        ...updateWorkspaceState(sessionData, result.data.files),
+        tree,
+        expandedFolders: new Set<string>(),
       })
       clearMindLaneFile()
       return true
@@ -319,18 +358,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       loadMindLaneFile(result.data.filePath, result.data.data)
-      const session = await loadSessionFromBackend()
-      if (session) {
-        const files = await listWorkspaceFiles(session.workspacePath)
-        useWorkspaceStore.setState(updateWorkspaceState(session, files))
-      }
       return true
     } finally {
       set({ busy: false })
     }
   },
 
-  createMindlaneFile: async (name: string) => {
+  createMindlaneFile: async (name: string, parentPath?: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
       set({ lastError: '请先打开工作区' })
@@ -340,11 +374,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return false
     }
 
+    const targetDir = parentPath ?? workspacePath
+
     set({ busy: true, lastError: null })
     try {
       const data = createEmptyFile(name.trim())
       const result = await window.mindlane?.workspace.createFile({
-        workspacePath,
+        workspacePath: targetDir,
         name,
         data,
       })
@@ -356,6 +392,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       loadMindLaneFile(result.data.filePath, result.data.data)
       const session = await loadSessionFromBackend()
       const files = await listWorkspaceFiles(workspacePath)
+      const tree = await listWorkspaceTree(workspacePath)
       set({
         ...updateWorkspaceState(
           session ?? {
@@ -366,6 +403,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           },
           files,
         ),
+        tree,
       })
       return true
     } finally {
@@ -376,33 +414,194 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   refreshWorkspaceFiles: async (workspacePath) => {
     const targetWorkspacePath = workspacePath ?? get().workspacePath
     if (!targetWorkspacePath) {
-      set({ files: [] })
+      set({ files: [], tree: [] })
       return
     }
 
     try {
       const files = await listWorkspaceFiles(targetWorkspacePath)
-      set({ files, workspacePath: targetWorkspacePath })
+      const tree = await listWorkspaceTree(targetWorkspacePath)
+      set({ files, tree, workspacePath: targetWorkspacePath })
+    } catch (error) {
+      set({ lastError: error instanceof Error ? error.message : String(error) })
+    }
+  },
+
+  refreshTree: async () => {
+    const workspacePath = get().workspacePath
+    if (!workspacePath) return
+    try {
+      const tree = await listWorkspaceTree(workspacePath)
+      const files = flattenTreeFiles(tree)
+      set({ tree, files })
     } catch (error) {
       set({ lastError: error instanceof Error ? error.message : String(error) })
     }
   },
 
   syncAfterFileSaved: async (filePath: string) => {
+    const currentWorkspacePath = get().workspacePath
     const session = await loadSessionFromBackend()
     const fallbackSession: WorkspaceSessionState = session ?? {
-      workspacePath: dirname(filePath),
-      recentWorkspacePaths: [dirname(filePath)],
+      workspacePath: currentWorkspacePath ?? dirname(filePath),
+      recentWorkspacePaths: [currentWorkspacePath ?? dirname(filePath)],
       lastOpenedFilePath: filePath,
       restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
     }
+    if (currentWorkspacePath && fallbackSession.workspacePath !== currentWorkspacePath) {
+      fallbackSession.workspacePath = currentWorkspacePath
+    }
     const files = await listWorkspaceFiles(fallbackSession.workspacePath)
-    set(updateWorkspaceState(fallbackSession, files))
+    const tree = await listWorkspaceTree(fallbackSession.workspacePath)
+    set({ ...updateWorkspaceState(fallbackSession, files), tree })
   },
 
   setRestoreLastWorkspaceOnLaunch: async (enabled: boolean) => {
     set({ restoreLastWorkspaceOnLaunch: enabled })
     await window.mindlane?.settings.update({ restoreLastWorkspaceOnLaunch: enabled })
+  },
+
+  toggleFolder: (folderPath: string) => {
+    const expanded = new Set(get().expandedFolders)
+    if (expanded.has(folderPath)) {
+      expanded.delete(folderPath)
+    } else {
+      expanded.add(folderPath)
+    }
+    set({ expandedFolders: expanded })
+  },
+
+  createSubfolder: async (parentPath: string, name: string) => {
+    const workspacePath = get().workspacePath
+    if (!workspacePath) {
+      set({ lastError: '请先打开工作区' })
+      return false
+    }
+
+    set({ busy: true, lastError: null })
+    try {
+      const result = await window.mindlane?.workspace.createSubfolder({
+        parentPath,
+        name,
+        workspacePath,
+      })
+      if (!result?.ok) {
+        set({ lastError: result?.error ?? '创建文件夹失败' })
+        return false
+      }
+      const expanded = new Set(get().expandedFolders)
+      expanded.add(parentPath)
+      const tree = await listWorkspaceTree(workspacePath)
+      set({ tree, expandedFolders: expanded })
+      return true
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  deleteItem: async (targetPath: string) => {
+    const workspacePath = get().workspacePath
+    if (!workspacePath) {
+      set({ lastError: '请先打开工作区' })
+      return false
+    }
+
+    set({ busy: true, lastError: null })
+    try {
+      const result = await window.mindlane?.workspace.deleteItem({
+        targetPath,
+        workspacePath,
+      })
+      if (!result?.ok) {
+        set({ lastError: result?.error ?? '删除失败' })
+        return false
+      }
+
+      const currentFilePath = useMindmapStore.getState().filePath
+      if (currentFilePath === targetPath || (currentFilePath && currentFilePath.startsWith(targetPath + '/'))) {
+        clearMindLaneFile()
+      }
+
+      const tree = await listWorkspaceTree(workspacePath)
+      const files = flattenTreeFiles(tree)
+      set({ tree, files })
+      return true
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  renameItem: async (oldPath: string, newName: string) => {
+    const workspacePath = get().workspacePath
+    if (!workspacePath) {
+      set({ lastError: '请先打开工作区' })
+      return null
+    }
+
+    set({ busy: true, lastError: null })
+    try {
+      const result = await window.mindlane?.workspace.renameItem({
+        oldPath,
+        newName,
+        workspacePath,
+      })
+      if (!result?.ok) {
+        set({ lastError: result?.error ?? '重命名失败' })
+        return null
+      }
+
+      const currentFilePath = useMindmapStore.getState().filePath
+      if (currentFilePath === oldPath) {
+        useMindmapStore.getState().setFilePath(result.data.newPath)
+      }
+
+      const expanded = new Set(get().expandedFolders)
+      if (expanded.has(oldPath)) {
+        expanded.delete(oldPath)
+        expanded.add(result.data.newPath)
+        set({ expandedFolders: expanded })
+      }
+
+      const tree = await listWorkspaceTree(workspacePath)
+      const files = flattenTreeFiles(tree)
+      set({ tree, files })
+      return result.data.newPath
+    } finally {
+      set({ busy: false })
+    }
+  },
+
+  moveItem: async (sourcePath: string, targetDirPath: string) => {
+    const workspacePath = get().workspacePath
+    if (!workspacePath) {
+      set({ lastError: '请先打开工作区' })
+      return null
+    }
+
+    set({ busy: true, lastError: null })
+    try {
+      const result = await window.mindlane?.workspace.moveItem({
+        sourcePath,
+        targetDirPath,
+        workspacePath,
+      })
+      if (!result?.ok) {
+        set({ lastError: result?.error ?? '移动失败' })
+        return null
+      }
+
+      const currentFilePath = useMindmapStore.getState().filePath
+      if (currentFilePath === sourcePath) {
+        useMindmapStore.getState().setFilePath(result.data.newPath)
+      }
+
+      const tree = await listWorkspaceTree(workspacePath)
+      const files = flattenTreeFiles(tree)
+      set({ tree, files })
+      return result.data.newPath
+    } finally {
+      set({ busy: false })
+    }
   },
 
   clearError: () => set({ lastError: null }),

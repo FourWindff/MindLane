@@ -43,6 +43,18 @@ type WorkspaceFileEntry = {
   lastModifiedAt: string
 }
 
+type WorkspaceTreeEntry = {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  lastModifiedAt: string
+  children?: WorkspaceTreeEntry[]
+}
+
+type FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
+type FsErr = { ok: false; error: string }
+type FsResult<T = void> = FsOk<T> | FsErr
+
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
     chat: (payload: { apiKey: string; model: string; messages: BailianChatMessage[] }) =>
@@ -54,6 +66,8 @@ contextBridge.exposeInMainWorld('mindlane', {
     docToMindmap: (payload: { apiKey: string; model: string; documentText: string; documentFilename: string }) =>
       ipcRenderer.invoke('ai:doc-to-mindmap', payload),
     listProviders: () => ipcRenderer.invoke('ai:list-providers'),
+    urlToDataUrl: (payload: { url: string }) =>
+      ipcRenderer.invoke('image:url-to-data-url', payload) as Promise<FsResult<{ dataUrl: string }>>,
   },
   file: {
     open: () => ipcRenderer.invoke('file:open'),
@@ -92,6 +106,16 @@ contextBridge.exposeInMainWorld('mindlane', {
         | { ok: true; data: { workspacePath: string; files: WorkspaceFileEntry[] } }
         | { ok: false; error: string }
       >,
+    listTree: (payload: { workspacePath: string }) =>
+      ipcRenderer.invoke('workspace:list-tree', payload) as Promise<FsResult<WorkspaceTreeEntry[]>>,
+    createSubfolder: (payload: { parentPath: string; name: string; workspacePath: string }) =>
+      ipcRenderer.invoke('workspace:create-subfolder', payload) as Promise<FsResult<{ path: string }>>,
+    deleteItem: (payload: { targetPath: string; workspacePath: string }) =>
+      ipcRenderer.invoke('workspace:delete-item', payload) as Promise<FsResult>,
+    renameItem: (payload: { oldPath: string; newName: string; workspacePath: string }) =>
+      ipcRenderer.invoke('workspace:rename-item', payload) as Promise<FsResult<{ newPath: string }>>,
+    moveItem: (payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) =>
+      ipcRenderer.invoke('workspace:move-item', payload) as Promise<FsResult<{ newPath: string }>>,
   },
   settings: {
     load: () => ipcRenderer.invoke('file:settings-load'),

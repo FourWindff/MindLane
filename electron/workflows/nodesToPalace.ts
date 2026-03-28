@@ -6,7 +6,7 @@
 
 import { StateGraph, END, START } from '@langchain/langgraph'
 import { Annotation } from '@langchain/langgraph'
-import { createDashScopeRuntime, type AiRuntime, type DetectedAnchor } from '../ai/runtime.js'
+import { createDashScopeRuntime, urlToDataUrl, type AiRuntime, type DetectedAnchor } from '../ai/runtime.js'
 import {
   buildAnalyzeAndPlanMessages,
   buildPalaceImagePrompt,
@@ -427,11 +427,18 @@ export async function runNodesToPalace(params: {
       return { ok: false, error: result.error }
     }
 
+    let imageUrl = result.imageUrl || ''
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      try {
+        imageUrl = await urlToDataUrl(imageUrl)
+      } catch { /* keep original URL as fallback */ }
+    }
+
     return {
       ok: true,
       label: result.theme || `记忆宫殿 (${selectedNodes.length} 站)`,
       stations: result.stations,
-      imageUrl: result.imageUrl || '',
+      imageUrl,
       sourceNodeIds: selectedNodes.map((n) => n.id),
     }
   } catch (e) {

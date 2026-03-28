@@ -7,7 +7,6 @@ import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/m
 import { ChatPanel } from '@/features/chat/components/ChatPanel'
 import { DocumentImportPanel } from '@/features/document-import/components/DocumentImportPanel'
 import { ReviewPanel } from '@/features/review/components/ReviewPanel'
-import { CreateMindlaneFileButton } from '@/features/workspace/components/CreateMindlaneFileButton'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { WorkspaceSidebar } from '@/features/workspace/components/WorkspaceSidebar'
 import {
@@ -24,21 +23,25 @@ import '@/features/mindmap/styles/mindmap.css'
 function WorkspaceEmptyState() {
   const busy = useWorkspaceStore((s) => s.busy)
   const openWorkspaceDirectory = useWorkspaceStore((s) => s.openWorkspaceDirectory)
+  const createMindlaneFile = useWorkspaceStore((s) => s.createMindlaneFile)
 
   return (
     <div className="workspace-empty">
       <div className="workspace-empty__card">
         <div className="workspace-empty__label">工作区已就绪</div>
-        <h2 className="workspace-empty__title">选择一个 `.mindlane` 文件开始编辑</h2>
+        <h2 className="workspace-empty__title">选择一个 .mindlane 文件开始编辑</h2>
         <p className="workspace-empty__subtitle">
-          左侧显示当前工作目录中的文档。你也可以先在空白画布上编辑，再通过“另存为”保存到当前仓库。
+          左侧显示当前工作目录中的文档。你也可以先在空白画布上编辑，再通过"另存为"保存到当前仓库。
         </p>
         <div className="workspace-empty__actions">
-          <CreateMindlaneFileButton
-            label="新建 `.mindlane` 文件"
+          <button
+            type="button"
             className="workspace-empty__action workspace-empty__action--primary"
+            onClick={() => void createMindlaneFile('未命名')}
             disabled={busy}
-          />
+          >
+            新建 .mindlane 文件
+          </button>
           <button
             type="button"
             className="workspace-empty__action"

@@ -3,6 +3,7 @@ import { z } from 'zod/v3'
 
 import {
   createDashScopeRuntime,
+  urlToDataUrl,
   type AiRuntime,
   type DetectedAnchor,
 } from '../ai/runtime.js'
@@ -403,10 +404,21 @@ export async function runTextToPalace(params: {
       return { ok: false, error: result.error }
     }
 
+    let imageUrls = result.imageUrls
+    if (imageUrls.length > 0) {
+      const converted = await Promise.all(
+        imageUrls.map(async (url) => {
+          if (url.startsWith('data:')) return url
+          try { return await urlToDataUrl(url) } catch { return url }
+        }),
+      )
+      imageUrls = converted
+    }
+
     return {
       ok: true,
-      content: result.summary || buildFallbackSummary(result.memoryRoute, result.imageUrls.length > 0),
-      ...(result.imageUrls.length > 0 ? { imageUrls: result.imageUrls } : {}),
+      content: result.summary || buildFallbackSummary(result.memoryRoute, imageUrls.length > 0),
+      ...(imageUrls.length > 0 ? { imageUrls } : {}),
       ...(result.memoryRoute.length > 0 ? { memoryRoute: result.memoryRoute } : {}),
     }
   } catch (error) {
