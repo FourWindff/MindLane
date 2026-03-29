@@ -123,7 +123,7 @@ export function KnowledgeBasePanel() {
                 style={{
                   height: '100%',
                   width: `${Math.round(currentProgress.progress * 100)}%`,
-                  background: currentProgress.phase === 'error' ? '#b91c1c' : 'var(--ml-accent, #3b82f6)',
+                  background: currentProgress.phase === 'error' ? 'var(--ml-danger)' : 'var(--ml-accent)',
                   borderRadius: 2,
                   transition: 'width 0.3s ease',
                 }}

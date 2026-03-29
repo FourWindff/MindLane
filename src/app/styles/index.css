@@ -7,20 +7,22 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --ml-bg: #f4f4f5;
+  --ml-bg: #f5f5f5;
   --ml-bg-elevated: #ffffff;
-  --ml-bg-subtle: #ebebed;
-  --ml-text: #0a0a0a;
-  --ml-text-muted: rgba(10, 10, 10, 0.52);
-  --ml-text-faint: rgba(10, 10, 10, 0.38);
-  --ml-border: rgba(0, 0, 0, 0.1);
+  --ml-bg-subtle: #ececec;
+  --ml-text: #171717;
+  --ml-text-muted: rgba(23, 23, 23, 0.52);
+  --ml-text-faint: rgba(23, 23, 23, 0.34);
+  --ml-border: rgba(0, 0, 0, 0.09);
   --ml-border-strong: rgba(0, 0, 0, 0.16);
   --ml-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --ml-shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.08);
-  --ml-fill-soft: rgba(0, 0, 0, 0.04);
-  --ml-fill-medium: rgba(0, 0, 0, 0.07);
-  --ml-accent: #111111;
-  --ml-danger: #1a1a1a;
+  --ml-shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.09);
+  --ml-fill-soft: rgba(0, 0, 0, 0.035);
+  --ml-fill-medium: rgba(0, 0, 0, 0.065);
+  --ml-accent: #202020;
+  --ml-accent-soft: rgba(0, 0, 0, 0.045);
+  --ml-accent-hover: #0a0a0a;
+  --ml-danger: #e5484d;
 }
 
 *,

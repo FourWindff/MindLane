@@ -12,8 +12,8 @@
   inset: 0;
   background:
     radial-gradient(circle at 20% 20%, rgba(0, 0, 0, 0.04), transparent 28%),
-    radial-gradient(circle at 82% 22%, rgba(0, 0, 0, 0.035), transparent 24%),
-    radial-gradient(circle at 50% 80%, rgba(0, 0, 0, 0.03), transparent 22%);
+    radial-gradient(circle at 82% 22%, rgba(0, 0, 0, 0.03), transparent 24%),
+    radial-gradient(circle at 50% 80%, rgba(0, 0, 0, 0.025), transparent 22%);
   pointer-events: none;
 }
 
@@ -175,11 +175,13 @@
 .workspace-empty__action--primary {
   background: var(--ml-accent);
   color: #fff;
+  border-color: var(--ml-accent);
 }
 
 .workspace-home__action--primary:hover,
 .workspace-empty__action--primary:hover {
-  background: #222;
+  background: var(--ml-accent-hover);
+  border-color: var(--ml-accent-hover);
 }
 
 .workspace-home__error,
@@ -396,8 +398,8 @@
 }
 
 .workspace-sidebar__file--active {
-  border-color: var(--ml-accent);
-  background: rgba(0, 0, 0, 0.04);
+  border-color: var(--ml-border-strong);
+  background: var(--ml-accent-soft);
 }
 
 /* --- File Tree --- */
@@ -431,12 +433,12 @@
 }
 
 .file-tree__item--active {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--ml-accent-soft);
   font-weight: 600;
 }
 
 .file-tree__item--active:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.07);
 }
 
 .file-tree__item--folder {
@@ -538,24 +540,24 @@
 }
 
 .context-menu__item--danger {
-  color: #d93025;
+  color: var(--ml-danger);
 }
 
 .context-menu__item--danger:hover {
-  background: rgba(217, 48, 37, 0.08);
+  background: rgba(229, 72, 77, 0.07);
 }
 
 /* --- Danger button variant for confirm dialog --- */
 
 .workspace-home__action--danger {
-  background: #d93025;
+  background: var(--ml-danger);
   color: #fff;
-  border-color: #d93025;
+  border-color: var(--ml-danger);
 }
 
 .workspace-home__action--danger:hover {
-  background: #b71c1c;
-  border-color: #b71c1c;
+  background: #dc3d43;
+  border-color: #dc3d43;
 }
 
 .workspace-empty {

@@ -123,13 +123,6 @@ export function MindMapHeader({
         </div>
       </nav>
 
-      <p className="mindmap-header__hint">
-        <span className="mindmap-header__hint-dot" aria-hidden />
-        中键拖画布 · 左键选择 · 右键菜单 · 双击编辑 · 滚轮缩放 ·{' '}
-        <kbd className="mindmap-header__kbd">Mod</kbd>
-        <span className="mindmap-header__kbd-plus">+</span>
-        <kbd className="mindmap-header__kbd">/</kbd> 帮助
-      </p>
     </header>
   )
 }

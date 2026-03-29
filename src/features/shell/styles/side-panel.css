@@ -100,7 +100,7 @@
 .panel-field__input:focus,
 .panel-field__select:focus {
   border-color: var(--ml-border-strong);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
 }
 
 .panel-btn {
@@ -131,12 +131,12 @@
 
 .panel-btn--primary {
   color: #ffffff;
-  background: #111111;
-  border-color: #000000;
+  background: var(--ml-accent);
+  border-color: var(--ml-accent);
 }
 
 .panel-btn--primary:hover:not(:disabled) {
-  background: #000000;
+  background: var(--ml-accent-hover);
 }
 
 .panel-btn--full {
@@ -600,7 +600,7 @@
 }
 
 .chat-bubble--user {
-  background: #111;
+  background: var(--ml-accent);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
@@ -764,12 +764,12 @@
 }
 
 .chat-action-btn--send {
-  background: #111;
+  background: var(--ml-accent);
   color: #fff;
 }
 
 .chat-action-btn--send:hover:not(:disabled) {
-  background: #000;
+  background: var(--ml-accent-hover);
 }
 
 .chat-action-btn--stop {
@@ -844,7 +844,7 @@
   margin: 0.4em 0;
   padding: 0.55em 0.7em;
   border-radius: 8px;
-  background: #1a1a1a;
+  background: #1c1c1c;
   color: #e0e0e0;
   overflow-x: auto;
   font-size: 0.82em;
