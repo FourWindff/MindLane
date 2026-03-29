@@ -21,21 +21,66 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 
 type BailianChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
-type MemoryPalaceStation = {
-  order: number
-  content: string
-  x: number
-  y: number
-  anchorVisual?: string
-  mnemonicMethod?: string
-  association?: string
+type ContextNodeInfo = {
+  id: string
+  type: 'topic' | 'palace' | 'document'
+  label: string
+  extra?: Record<string, unknown>
 }
 
-type PalaceChatResponse =
-  | { ok: true; content: string; imageUrls?: string[]; memoryRoute?: MemoryPalaceStation[] }
+type ChatContext = {
+  mindmapSummary?: string
+  selectedNodes?: ContextNodeInfo[]
+  filePath?: string
+  fileTitle?: string
+}
+
+type ChatToolCall = {
+  name: string
+  args: Record<string, unknown>
+  result: string
+}
+
+type ChatResponse =
+  | {
+      ok: true
+      content: string
+      toolCalls?: ChatToolCall[]
+      mindmapData?: {
+        nodes: Array<{
+          id: string
+          type: 'topic' | 'palace' | 'document'
+          position: { x: number; y: number }
+          data: Record<string, unknown>
+        }>
+        edges: Array<{
+          id: string
+          source: string
+          target: string
+          type?: string
+          className?: string
+        }>
+        title: string
+      }
+    }
   | { ok: false; error: string }
 
 type SelectedNodeContent = { id: string; label: string }
+
+type IndexedDocMeta = {
+  id: string
+  filename: string
+  filePath: string
+  indexedAt: string
+  chunkCount: number
+}
+
+type IndexProgress = {
+  phase: 'loading' | 'splitting' | 'embedding' | 'done' | 'error'
+  filename: string
+  progress: number
+  error?: string
+}
 
 type WorkspaceFileEntry = {
   filePath: string
@@ -57,8 +102,44 @@ type FsResult<T = void> = FsOk<T> | FsErr
 
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
-    chat: (payload: { apiKey: string; model: string; messages: BailianChatMessage[] }) =>
-      ipcRenderer.invoke('ai:chat', payload) as Promise<PalaceChatResponse>,
+    chat: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
+      ipcRenderer.invoke('ai:chat', payload) as Promise<ChatResponse>,
+    chatStream: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
+      ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
+    stopStream: () => ipcRenderer.invoke('ai:chat-stream-stop') as Promise<void>,
+    onStreamToken: (callback: (token: string) => void) => {
+      const handler = (_event: unknown, token: string) => callback(token)
+      ipcRenderer.on('ai:chat-stream-token', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-token', handler) }
+    },
+    onStreamToolStart: (callback: (data: { name: string; input: Record<string, unknown> }) => void) => {
+      const handler = (_event: unknown, data: { name: string; input: Record<string, unknown> }) => callback(data)
+      ipcRenderer.on('ai:chat-stream-tool-start', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-tool-start', handler) }
+    },
+    onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => {
+      const handler = (_event: unknown, data: { name: string; output: string }) => callback(data)
+      ipcRenderer.on('ai:chat-stream-tool-end', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-tool-end', handler) }
+    },
+    onStreamEnd: (callback: (response: {
+      content: string
+      toolCalls?: ChatToolCall[]
+      mindmapData?: {
+        nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown> }>
+        edges: Array<{ id: string; source: string; target: string; type?: string; className?: string }>
+        title: string
+      }
+    }) => void) => {
+      const handler = (_event: unknown, response: Parameters<typeof callback>[0]) => callback(response)
+      ipcRenderer.on('ai:chat-stream-end', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-end', handler) }
+    },
+    onStreamError: (callback: (error: string) => void) => {
+      const handler = (_event: unknown, error: string) => callback(error)
+      ipcRenderer.on('ai:chat-stream-error', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-error', handler) }
+    },
     text2image: (payload: { apiKey: string; prompt: string; size?: string; n?: number }) =>
       ipcRenderer.invoke('ai:text2image', payload),
     nodesToPalace: (payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] }) =>
@@ -116,6 +197,45 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke('workspace:rename-item', payload) as Promise<FsResult<{ newPath: string }>>,
     moveItem: (payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) =>
       ipcRenderer.invoke('workspace:move-item', payload) as Promise<FsResult<{ newPath: string }>>,
+  },
+  chat: {
+    loadHistory: (payload: { workspacePath: string }) =>
+      ipcRenderer.invoke('chat:load-history', payload) as Promise<{
+        ok: true
+        data: {
+          threadId: string
+          messages: Array<{
+            role: 'user' | 'assistant' | 'system'
+            content: string
+            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+          }>
+        }
+      }>,
+    saveHistory: (payload: {
+      workspacePath: string
+      messages: Array<{
+        role: string
+        content: string
+        toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+      }>
+    }) => ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
+  },
+  kb: {
+    uploadDocuments: () =>
+      ipcRenderer.invoke('kb:upload-documents') as Promise<
+        { ok: true; data: { indexed: IndexedDocMeta[] } } | { ok: false; error: string }
+      >,
+    listDocuments: () =>
+      ipcRenderer.invoke('kb:list-documents') as Promise<IndexedDocMeta[]>,
+    deleteDocument: (payload: { docId: string }) =>
+      ipcRenderer.invoke('kb:delete-document', payload) as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
+    onIndexProgress: (callback: (progress: IndexProgress) => void) => {
+      const handler = (_event: unknown, progress: IndexProgress) => callback(progress)
+      ipcRenderer.on('kb:index-progress', handler)
+      return () => { ipcRenderer.off('kb:index-progress', handler) }
+    },
   },
   settings: {
     load: () => ipcRenderer.invoke('file:settings-load'),

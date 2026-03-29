@@ -1,0 +1,64 @@
+import {
+  trimMessages,
+  type BaseMessage,
+  SystemMessage,
+  HumanMessage,
+  AIMessage,
+} from '@langchain/core/messages'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+
+const MAX_TOKENS = 4000
+const SUMMARY_TRIGGER_COUNT = 20
+
+export async function compressMessages(
+  messages: BaseMessage[],
+  model: BaseChatModel,
+): Promise<BaseMessage[]> {
+  if (messages.length <= SUMMARY_TRIGGER_COUNT) {
+    return trimMessages(messages, {
+      maxTokens: MAX_TOKENS,
+      strategy: 'last',
+      tokenCounter: (msgs) => {
+        const arr = Array.isArray(msgs) ? msgs : [msgs]
+        return arr.reduce((sum, m) => {
+          const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+          return sum + Math.ceil(content.length / 3)
+        }, 0)
+      },
+      startOn: 'human',
+      includeSystem: true,
+    })
+  }
+
+  const systemMsgs = messages.filter((m) => m._getType() === 'system')
+  const nonSystem = messages.filter((m) => m._getType() !== 'system')
+
+  const olderMessages = nonSystem.slice(0, -10)
+  const recentMessages = nonSystem.slice(-10)
+
+  const conversationText = olderMessages
+    .map((m) => {
+      const role = m._getType() === 'human' ? '用户' : '助手'
+      const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+      return `${role}: ${content}`
+    })
+    .join('\n')
+
+  const summaryResponse = await model.invoke([
+    new SystemMessage(
+      '你是对话摘要助手。请将以下对话内容压缩为简洁的摘要，保留关键信息、用户偏好和重要结论。用中文输出，不超过 300 字。',
+    ),
+    new HumanMessage(conversationText),
+  ])
+
+  const summaryText =
+    typeof summaryResponse.content === 'string'
+      ? summaryResponse.content
+      : String(summaryResponse.content)
+
+  return [
+    ...systemMsgs,
+    new AIMessage(`[对话摘要] ${summaryText.trim()}`),
+    ...recentMessages,
+  ]
+}

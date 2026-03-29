@@ -178,7 +178,7 @@ function AiProgressOverlay() {
     )
   }
 
-  if (!busy || step === 'idle') return null
+  if (!busy || step === 'idle' || step === 'chatting') return null
 
   return (
     <div className="ai-progress-overlay">

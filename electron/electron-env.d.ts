@@ -18,31 +18,87 @@ type _WorkspaceTreeEntry = {
 type _FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
 type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
 
+type _ContextNodeInfo = {
+  id: string
+  type: 'topic' | 'palace' | 'document'
+  label: string
+  extra?: Record<string, unknown>
+}
+
+type _ChatContext = {
+  mindmapSummary?: string
+  selectedNodes?: _ContextNodeInfo[]
+  allNodes?: import('../src/shared/lib/fileFormat').MindLaneNode[]
+  allEdges?: import('../src/shared/lib/fileFormat').MindLaneEdge[]
+  filePath?: string
+  fileTitle?: string
+}
+
+type _ChatToolCall = {
+  name: string
+  args: Record<string, unknown>
+  result: string
+}
+
+type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
+type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge
+
+type _ChatResponse =
+  | {
+      ok: true
+      content: string
+      toolCalls?: _ChatToolCall[]
+      mindmapData?: {
+        nodes: _MindLaneNode[]
+        edges: _MindLaneEdge[]
+        title: string
+      }
+    }
+  | { ok: false; error: string }
+
+type _IndexedDocMeta = {
+  id: string
+  filename: string
+  filePath: string
+  indexedAt: string
+  chunkCount: number
+}
+
+type _IndexProgress = {
+  phase: 'loading' | 'splitting' | 'embedding' | 'done' | 'error'
+  filename: string
+  progress: number
+  error?: string
+}
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
     ai: {
       chat: (payload: {
-        apiKey: string
-        model: string
+        threadId: string
         messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
-      }) => Promise<
-        | {
-            ok: true
-            content: string
-            imageUrls?: string[]
-            memoryRoute?: {
-              order: number
-              content: string
-              x: number
-              y: number
-              anchorVisual?: string
-            mnemonicMethod?: string
-            association?: string
-            }[]
-          }
-        | { ok: false; error: string }
-      >
+        context?: _ChatContext
+      }) => Promise<_ChatResponse>
+      chatStream: (payload: {
+        threadId: string
+        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+        context?: _ChatContext
+      }) => Promise<void>
+      stopStream: () => Promise<void>
+      onStreamToken: (callback: (token: string) => void) => () => void
+      onStreamToolStart: (callback: (data: { name: string; input: Record<string, unknown> }) => void) => () => void
+      onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => () => void
+      onStreamEnd: (callback: (response: {
+        content: string
+        toolCalls?: _ChatToolCall[]
+        mindmapData?: {
+          nodes: _MindLaneNode[]
+          edges: _MindLaneEdge[]
+          title: string
+        }
+      }) => void) => () => void
+      onStreamError: (callback: (error: string) => void) => () => void
       text2image: (payload: {
         apiKey: string
         prompt: string
@@ -185,6 +241,33 @@ interface Window {
         targetDirPath: string
         workspacePath: string
       }) => Promise<_FsResult<{ newPath: string }>>
+    }
+    chat: {
+      loadHistory: (payload: { workspacePath: string }) => Promise<{
+        ok: true
+        data: {
+          threadId: string
+          messages: Array<{
+            role: 'user' | 'assistant' | 'system'
+            content: string
+            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+          }>
+        }
+      }>
+      saveHistory: (payload: {
+        workspacePath: string
+        messages: Array<{
+          role: string
+          content: string
+          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+        }>
+      }) => Promise<{ ok: true } | { ok: false; error: string }>
+    }
+    kb: {
+      uploadDocuments: () => Promise<_FsResult<{ indexed: _IndexedDocMeta[] }>>
+      listDocuments: () => Promise<_IndexedDocMeta[]>
+      deleteDocument: (payload: { docId: string }) => Promise<_FsResult>
+      onIndexProgress: (callback: (progress: _IndexProgress) => void) => () => void
     }
     settings: {
       load: () => Promise<{

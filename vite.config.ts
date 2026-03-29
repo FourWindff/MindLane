@@ -14,8 +14,25 @@ export default defineConfig({
     react(),
     electron({
       main: {
-        // Shortcut of `build.lib.entry`.
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: (id) => {
+                if (id.startsWith('node:') || id === 'electron') return true
+                const nativeOrProblematic = [
+                  'better-sqlite3',
+                  'hnswlib-node',
+                  'pdf-parse',
+                  'mammoth',
+                ]
+                return nativeOrProblematic.some(
+                  (pkg) => id === pkg || id.startsWith(pkg + '/'),
+                )
+              },
+            },
+          },
+        },
       },
       preload: {
         // Shortcut of `build.rollupOptions.input`.

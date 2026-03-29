@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react'
 import { MindMapView } from '@/features/mindmap/components/MindMapView'
-import { PropertiesPanel } from '@/features/mindmap/components/PropertiesPanel'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ChatPanel } from '@/features/chat/components/ChatPanel'
-import { DocumentImportPanel } from '@/features/document-import/components/DocumentImportPanel'
-import { ReviewPanel } from '@/features/review/components/ReviewPanel'
+import { KnowledgeBasePanel } from '@/features/knowledge-base/components/KnowledgeBasePanel'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { WorkspaceSidebar } from '@/features/workspace/components/WorkspaceSidebar'
 import {
@@ -60,7 +58,7 @@ function WorkspaceEmptyState() {
 function AppContent() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true)
   const [sidePanelOpen, setSidePanelOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<SidePanelTab>('properties')
+  const [activeTab, setActiveTab] = useState<SidePanelTab>('chat')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
   const workspaceInitialized = useWorkspaceStore((s) => s.initialized)
@@ -146,10 +144,8 @@ function AppContent() {
                 onTabChange={setActiveTab}
               >
                 {{
-                  properties: <PropertiesPanel />,
                   chat: <ChatPanel />,
-                  import: <DocumentImportPanel />,
-                  review: <ReviewPanel />,
+                  kb: <KnowledgeBasePanel />,
                 }}
               </SidePanel>
             </div>

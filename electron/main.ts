@@ -3,7 +3,6 @@ import { DEFAULT_CHAT_MODELS, createDashScopeRuntime, urlToDataUrl } from './ai/
 import { FileSystemService } from './fs/index.js'
 import { runNodesToPalace, type SelectedNodeContent } from './workflows/nodesToPalace.js'
 import { runDocToMindmap } from './workflows/docToMindmap.js'
-import { runTextToPalace } from './workflows/textToPalace.js'
 import {
   loadWindowBounds,
   resolveWindowBounds,
@@ -14,8 +13,15 @@ import {
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
+import nodeCrypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
+
+import { initVectorStore } from './ai/vectorstore/store.js'
+import { initIndexer, indexDocument, listIndexedDocuments, removeIndexedDocument } from './ai/vectorstore/indexer.js'
+import { initCheckpointer, getCheckpointer } from './ai/memory/checkpointer.js'
+import { initUserProfile } from './ai/memory/userProfile.js'
+import { runAgent, streamAgent, type ChatRequest } from './ai/agent.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -214,26 +220,178 @@ function registerIpcHandlers() {
     })
   }
 
-  // -- AI chat --
+  // -- AI chat (ReAct Agent) --
   ipcMain.handle(
     'ai:chat',
     async (
       _e,
-      payload: { apiKey: string; model: string; messages: { role: string; content: string }[] },
+      payload: {
+        threadId: string
+        messages: { role: string; content: string }[]
+        context?: {
+          mindmapSummary?: string
+          selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
+          filePath?: string
+          fileTitle?: string
+        }
+      },
     ) => {
-      const messages = (payload.messages ?? []).map((m) => ({
-        role: m.role as 'system' | 'user' | 'assistant',
-        content: String(m.content ?? ''),
-      }))
-      const runtime = await createRuntimeForRequest(payload.apiKey, payload.model)
-      return runTextToPalace({
-        apiKey: payload.apiKey,
-        model: payload.model,
-        messages,
-        runtime,
-      })
+      try {
+        const settings = await fsService.settings.load()
+        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+        const modelName = settings.chatModel || 'qwen-turbo'
+
+        if (!apiKey.trim()) return { ok: false, error: '未填写 API Key' }
+
+        const runtime = createDashScopeRuntime({
+          apiKey,
+          chatModel: modelName,
+          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+        })
+
+        const request: ChatRequest = {
+          threadId: payload.threadId || crypto.randomUUID(),
+          messages: (payload.messages ?? []).map((m) => ({
+            role: m.role as 'user' | 'assistant' | 'system',
+            content: String(m.content ?? ''),
+          })),
+          context: payload.context
+            ? {
+                ...payload.context,
+                selectedNodes: payload.context.selectedNodes?.map((n) => ({
+                  ...n,
+                  type: n.type as 'topic' | 'palace' | 'document',
+                })),
+              }
+            : undefined,
+        }
+
+        const result = await runAgent({
+          request,
+          model: runtime.reasoningModel,
+          runtime,
+          checkpointer: getCheckpointer(),
+          apiKey,
+          modelName,
+        })
+
+        return { ok: true, ...result }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
     },
   )
+
+  // -- AI chat stream (with abort support) --
+  let streamAbortController: AbortController | null = null
+
+  ipcMain.handle(
+    'ai:chat-stream',
+    async (
+      _e,
+      payload: {
+        threadId: string
+        messages: { role: string; content: string }[]
+        context?: {
+          mindmapSummary?: string
+          selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
+          filePath?: string
+          fileTitle?: string
+        }
+      },
+    ) => {
+      streamAbortController?.abort()
+      const abortController = new AbortController()
+      streamAbortController = abortController
+
+      try {
+        const settings = await fsService.settings.load()
+        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+        const modelName = settings.chatModel || 'qwen-turbo'
+
+        if (!apiKey.trim()) {
+          win?.webContents.send('ai:chat-stream-error', '未填写 API Key')
+          return
+        }
+
+        const runtime = createDashScopeRuntime({
+          apiKey,
+          chatModel: modelName,
+          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+        })
+
+        const request: ChatRequest = {
+          threadId: payload.threadId || crypto.randomUUID(),
+          messages: (payload.messages ?? []).map((m) => ({
+            role: m.role as 'user' | 'assistant' | 'system',
+            content: String(m.content ?? ''),
+          })),
+          context: payload.context
+            ? {
+                ...payload.context,
+                selectedNodes: payload.context.selectedNodes?.map((n) => ({
+                  ...n,
+                  type: n.type as 'topic' | 'palace' | 'document',
+                })),
+              }
+            : undefined,
+        }
+
+        await streamAgent(
+          {
+            request,
+            model: runtime.reasoningModel,
+            runtime,
+            checkpointer: getCheckpointer(),
+            apiKey,
+            modelName,
+            signal: abortController.signal,
+          },
+          {
+            onToken: (token) => {
+              if (!abortController.signal.aborted) {
+                win?.webContents.send('ai:chat-stream-token', token)
+              }
+            },
+            onToolStart: (name, input) => {
+              if (!abortController.signal.aborted) {
+                win?.webContents.send('ai:chat-stream-tool-start', { name, input })
+              }
+            },
+            onToolEnd: (name, output) => {
+              if (!abortController.signal.aborted) {
+                win?.webContents.send('ai:chat-stream-tool-end', { name, output })
+              }
+            },
+            onEnd: (response) => {
+              win?.webContents.send('ai:chat-stream-end', response)
+            },
+            onError: (error) => {
+              if (!abortController.signal.aborted) {
+                win?.webContents.send('ai:chat-stream-error', error)
+              }
+            },
+          },
+        )
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          win?.webContents.send(
+            'ai:chat-stream-error',
+            error instanceof Error ? error.message : String(error),
+          )
+        }
+      } finally {
+        if (streamAbortController === abortController) {
+          streamAbortController = null
+        }
+      }
+    },
+  )
+
+  ipcMain.handle('ai:chat-stream-stop', () => {
+    streamAbortController?.abort()
+    streamAbortController = null
+  })
 
   // -- Direct text2image via runtime --
   ipcMain.handle(
@@ -539,6 +697,128 @@ function registerIpcHandlers() {
     },
   )
 
+  // -- Chat History --
+  const chatHistoryDir = path.join(app.getPath('userData'), 'chat-history')
+  fs.mkdirSync(chatHistoryDir, { recursive: true })
+
+  function workspaceThreadId(workspacePath: string): string {
+    return 'ws_' + nodeCrypto.createHash('md5').update(workspacePath).digest('hex').slice(0, 12)
+  }
+
+  function chatHistoryPath(workspacePath: string): string {
+    const threadId = workspaceThreadId(workspacePath)
+    return path.join(chatHistoryDir, `${threadId}.json`)
+  }
+
+  ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
+    const filePath = chatHistoryPath(payload.workspacePath)
+    try {
+      if (fs.existsSync(filePath)) {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+        return {
+          ok: true,
+          data: {
+            threadId: workspaceThreadId(payload.workspacePath),
+            messages: Array.isArray(data.messages) ? data.messages : [],
+          },
+        }
+      }
+    } catch { /* corrupted file, return empty */ }
+    return {
+      ok: true,
+      data: {
+        threadId: workspaceThreadId(payload.workspacePath),
+        messages: [],
+      },
+    }
+  })
+
+  ipcMain.handle(
+    'chat:save-history',
+    async (
+      _e,
+      payload: {
+        workspacePath: string
+        messages: Array<{
+          role: string
+          content: string
+          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+        }>
+      },
+    ) => {
+      try {
+        const filePath = chatHistoryPath(payload.workspacePath)
+        fs.writeFileSync(
+          filePath,
+          JSON.stringify({ messages: payload.messages, updatedAt: new Date().toISOString() }, null, 2),
+          'utf-8',
+        )
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  // -- Knowledge Base --
+  ipcMain.handle('kb:upload-documents', async () => {
+    if (!win) return { ok: false, error: 'No window' }
+    const settings = await fsService.settings.load()
+    const result = await dialog.showOpenDialog(win, {
+      title: '导入知识库文档',
+      defaultPath: settings.lastWorkspacePath ?? undefined,
+      filters: [
+        { name: '支持的文档', extensions: ['md', 'txt', 'pdf', 'docx', 'mindlane', 'png', 'jpg', 'jpeg', 'webp'] },
+        { name: '所有文件', extensions: ['*'] },
+      ],
+      properties: ['openFile', 'multiSelections'],
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, error: '已取消' }
+    }
+
+    const indexed = []
+    let visionModel = undefined as ReturnType<typeof createDashScopeRuntime>['visionModel']
+    try {
+      const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+      if (apiKey) {
+        const runtime = createDashScopeRuntime({
+          apiKey,
+          chatModel: settings.chatModel || 'qwen-turbo',
+          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+        })
+        visionModel = runtime.visionModel
+      }
+    } catch { /* no vision model available */ }
+
+    for (const filePath of result.filePaths) {
+      try {
+        const meta = await indexDocument(filePath, visionModel, (progress) => {
+          win?.webContents.send('kb:index-progress', progress)
+        })
+        indexed.push(meta)
+      } catch (err) {
+        win?.webContents.send('kb:index-progress', {
+          phase: 'error',
+          filename: path.basename(filePath),
+          progress: 0,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    return { ok: true, data: { indexed } }
+  })
+
+  ipcMain.handle('kb:list-documents', async () => {
+    return listIndexedDocuments()
+  })
+
+  ipcMain.handle('kb:delete-document', async (_e, payload: { docId: string }) => {
+    const success = await removeIndexedDocument(payload.docId)
+    return success ? { ok: true } : { ok: false, error: '文档不存在' }
+  })
+
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {
     return fsService.settings.load()
@@ -577,8 +857,29 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(async () => {
-  fsService = new FileSystemService(app.getPath('userData'))
+  const userDataPath = app.getPath('userData')
+  fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
+
+  // Initialize AI subsystems
+  initIndexer(userDataPath)
+  initUserProfile(userDataPath)
+
+  try {
+    await initCheckpointer(userDataPath)
+  } catch (err) {
+    console.error('Checkpointer init failed:', err)
+  }
+
+  try {
+    const settings = await fsService.settings.load()
+    const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+    if (apiKey) {
+      await initVectorStore(userDataPath, apiKey, settings.providerConfigs['dashscope']?.baseUrl)
+    }
+  } catch (err) {
+    console.error('Vector store init failed:', err)
+  }
 
   registerIpcHandlers()
   setupApplicationMenu()
