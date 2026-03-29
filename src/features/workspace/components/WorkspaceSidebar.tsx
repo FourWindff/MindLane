@@ -64,7 +64,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
 
-  const { files: fileCount, folders: folderCount } = countEntries(tree)
+  const { folders: folderCount } = countEntries(tree)
 
   const handleContextMenu = useCallback((e: MouseEvent, entry: WorkspaceTreeEntry | null) => {
     e.preventDefault()
@@ -139,10 +139,6 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
     setDialog({ type: 'new-folder', parentPath: workspacePath })
   }
 
-  const summaryText = folderCount > 0
-    ? `${fileCount} 个文件 · ${folderCount} 个文件夹`
-    : `${fileCount} 个文档`
-
   return (
     <aside className="workspace-sidebar">
       <div className="workspace-sidebar__header">
@@ -181,7 +177,6 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
       </div>
 
       <div className="workspace-sidebar__tools">
-        <span className="workspace-sidebar__count">{summaryText}</span>
         <div className="workspace-sidebar__tool-actions">
           <button
             type="button"

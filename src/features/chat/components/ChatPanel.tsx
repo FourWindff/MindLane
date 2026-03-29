@@ -73,6 +73,15 @@ export function ChatPanel() {
   const [activeTools, setActiveTools] = useState<string[]>([])
   const streamTextRef = useRef('')
 
+  const scrollToBottom = useCallback((instant?: boolean) => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: instant ? 'instant' : 'smooth',
+      })
+    })
+  }, [])
+
   // Load chat history when workspace changes
   useEffect(() => {
     if (workspacePath) {
@@ -85,17 +94,9 @@ export function ChatPanel() {
   // Scroll to bottom on initial load
   useEffect(() => {
     if (messages.length > 0) {
-      requestAnimationFrame(() => {
-        scrollRef.current?.scrollTo({ top: scrollRef.current!.scrollHeight })
-      })
+      scrollToBottom(true)
     }
-  }, [threadId])
-
-  const scrollToBottom = useCallback(() => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-    })
-  }, [])
+  }, [threadId, scrollToBottom])
 
   const finishStream = useCallback(() => {
     streamTextRef.current = ''

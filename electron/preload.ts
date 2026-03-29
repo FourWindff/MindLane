@@ -247,6 +247,7 @@ contextBridge.exposeInMainWorld('mindlane', {
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
     closeConfirmed: () => ipcRenderer.invoke('window:close-confirmed'),
     onBeforeClose: (callback: () => void) => {

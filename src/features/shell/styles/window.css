@@ -15,6 +15,7 @@
 }
 
 .window-bar__lead,
+.window-bar__trail,
 .window-bar__window-actions,
 .window-bar__sidebar-actions {
   display: flex;
@@ -23,6 +24,12 @@
 
 .window-bar__lead {
   min-width: 0;
+  gap: 0.85rem;
+}
+
+.window-bar__trail {
+  display: flex;
+  align-items: center;
   gap: 0.85rem;
 }
 

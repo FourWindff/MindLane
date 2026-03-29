@@ -1,4 +1,4 @@
-import { PanelLeft, PanelRight, Minus, X } from 'lucide-react'
+import { PanelLeft, PanelRight, Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
@@ -36,6 +36,11 @@ export function AppWindowBar({
           >
             <PanelLeft size={16} strokeWidth={1.5} />
           </button>
+        </div>
+      </div>
+
+      <div className="window-bar__trail">
+        <div className="window-bar__sidebar-actions">
           <button
             type="button"
             className={`window-bar__tool${rightSidebarOpen ? ' window-bar__tool--active' : ''}`}
@@ -47,27 +52,36 @@ export function AppWindowBar({
             <PanelRight size={16} strokeWidth={1.5} />
           </button>
         </div>
-      </div>
 
-      <div className="window-bar__window-actions">
-        <button
-          type="button"
-          className="window-bar__control"
-          onClick={() => void window.mindlane?.window.minimize()}
-          title="最小化"
-          aria-label="最小化"
-        >
-          <Minus size={16} strokeWidth={1.7} />
-        </button>
-        <button
-          type="button"
-          className="window-bar__control window-bar__control--danger"
-          onClick={() => void window.mindlane?.window.close()}
-          title="关闭"
-          aria-label="关闭"
-        >
-          <X size={16} strokeWidth={1.7} />
-        </button>
+        <div className="window-bar__window-actions">
+          <button
+            type="button"
+            className="window-bar__control"
+            onClick={() => void window.mindlane?.window.minimize()}
+            title="最小化"
+            aria-label="最小化"
+          >
+            <Minus size={16} strokeWidth={1.7} />
+          </button>
+          <button
+            type="button"
+            className="window-bar__control"
+            onClick={() => void window.mindlane?.window.toggleMaximize()}
+            title="最大化"
+            aria-label="最大化"
+          >
+            <Square size={13} strokeWidth={1.7} />
+          </button>
+          <button
+            type="button"
+            className="window-bar__control window-bar__control--danger"
+            onClick={() => void window.mindlane?.window.close()}
+            title="关闭"
+            aria-label="关闭"
+          >
+            <X size={16} strokeWidth={1.7} />
+          </button>
+        </div>
       </div>
     </header>
   )
