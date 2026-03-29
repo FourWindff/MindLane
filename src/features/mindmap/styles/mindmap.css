@@ -601,8 +601,35 @@
   font-weight: 700;
 }
 
-/* —— Palace Node —— */
+/* —— Palace Node (collapsed) —— */
+.palace-node-collapsed {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  background: var(--ml-bg-elevated);
+  border: 2px solid #3b82f6;
+  box-shadow: var(--ml-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #3b82f6;
+  transition: box-shadow 0.18s, transform 0.18s;
+}
+.palace-node-collapsed:hover {
+  box-shadow: var(--ml-shadow-strong);
+  transform: scale(1.06);
+}
+.palace-node-collapsed--selected {
+  border-color: #2563eb;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.18),
+    var(--ml-shadow-strong);
+}
+
+/* —— Palace Node (expanded) —— */
 .palace-node {
+  position: relative;
   min-width: 160px;
   max-width: 260px;
   border-radius: 12px;
@@ -612,6 +639,30 @@
   transform-origin: center center;
   cursor: pointer;
   transition: box-shadow 0.15s;
+}
+.palace-node__collapse-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 3;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+.palace-node:hover .palace-node__collapse-btn {
+  opacity: 1;
+}
+.palace-node__collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
 }
 .palace-node:hover {
   box-shadow: var(--ml-shadow-strong);

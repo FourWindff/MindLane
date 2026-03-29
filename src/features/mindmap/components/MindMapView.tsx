@@ -303,7 +303,18 @@ function MindMapCanvas({
   const onNodeClick = useCallback(
     (_event: ReactMouseEvent, node: Node) => {
       if (node.type === 'palace') {
-        setPalaceModal(node.data as import('@/shared/lib/fileFormat').PalaceNodeData)
+        const pd = node.data as import('@/shared/lib/fileFormat').PalaceNodeData
+        if (pd.expanded) {
+          setPalaceModal(pd)
+        } else {
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === node.id
+                ? { ...n, data: { ...n.data, expanded: true } }
+                : n,
+            ),
+          )
+        }
         return
       }
       const now = Date.now()
@@ -315,7 +326,7 @@ function MindMapCanvas({
         lastClickRef.current = { id: node.id, time: now }
       }
     },
-    [startEditing],
+    [startEditing, setNodes],
   )
 
   useEffect(() => {

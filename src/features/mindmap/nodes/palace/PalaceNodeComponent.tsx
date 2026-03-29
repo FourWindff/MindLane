@@ -1,15 +1,42 @@
-import { memo } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Landmark } from 'lucide-react'
+import { memo, useCallback } from 'react'
+import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
+import { Image, Landmark, Minimize2 } from 'lucide-react'
 import type { PalaceNodeData } from '@/shared/lib/fileFormat'
 
-function PalaceNodeInner({ data: rawData, selected }: NodeProps) {
+function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as PalaceNodeData
   const stations = data.stations ?? []
+  const expanded = !!data.expanded
+  const { setNodes } = useReactFlow()
+
+  const collapse = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, expanded: false } } : n,
+        ),
+      )
+    },
+    [id, setNodes],
+  )
+
+  if (!expanded) {
+    return (
+      <div className={`palace-node-collapsed${selected ? ' palace-node-collapsed--selected' : ''}`}>
+        <Handle type="target" position={Position.Left} />
+        <Image size={28} strokeWidth={1.5} />
+        <Handle type="source" position={Position.Right} />
+      </div>
+    )
+  }
 
   return (
     <div className={`palace-node${selected ? ' palace-node--selected' : ''}`}>
       <Handle type="target" position={Position.Left} />
+      <button className="palace-node__collapse-btn" onClick={collapse} aria-label="收起">
+        <Minimize2 size={14} strokeWidth={2} />
+      </button>
       <div className="palace-node__thumb">
         {data.imageUrl ? (
           <img
