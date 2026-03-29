@@ -1,5 +1,5 @@
 import { useCallback, useState, type MouseEvent } from 'react'
-import { Settings, FolderInput, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
+import { Settings, FolderInput, FilePlus, FolderPlus, RefreshCw, UnfoldVertical, FoldVertical } from 'lucide-react'
 import { useWorkspaceStore } from '../store'
 import { FileTree } from './FileTree'
 import { FileContextMenu } from './FileContextMenu'
@@ -58,6 +58,8 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
   const deleteItem = useWorkspaceStore((s) => s.deleteItem)
   const renameItem = useWorkspaceStore((s) => s.renameItem)
   const openWorkspaceFile = useWorkspaceStore((s) => s.openWorkspaceFile)
+  const expandAllFolders = useWorkspaceStore((s) => s.expandAllFolders)
+  const collapseAllFolders = useWorkspaceStore((s) => s.collapseAllFolders)
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
@@ -210,6 +212,26 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
             aria-label="刷新文件列表"
           >
             <RefreshCw className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            className="workspace-sidebar__refresh workspace-sidebar__icon-btn"
+            onClick={expandAllFolders}
+            disabled={busy || !workspacePath || folderCount === 0}
+            title="展开全部文件夹"
+            aria-label="展开全部文件夹"
+          >
+            <UnfoldVertical className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            className="workspace-sidebar__refresh workspace-sidebar__icon-btn"
+            onClick={collapseAllFolders}
+            disabled={busy || !workspacePath || folderCount === 0}
+            title="收起全部文件夹"
+            aria-label="收起全部文件夹"
+          >
+            <FoldVertical className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>

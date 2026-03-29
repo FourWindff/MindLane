@@ -33,6 +33,9 @@ type ChatContext = {
   selectedNodes?: ContextNodeInfo[]
   filePath?: string
   fileTitle?: string
+  hasDocumentOpen?: boolean
+  workspacePath?: string
+  workspaceFiles?: { name: string; filePath: string }[]
 }
 
 type ChatToolCall = {

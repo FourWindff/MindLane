@@ -233,6 +233,9 @@ function registerIpcHandlers() {
           selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
           filePath?: string
           fileTitle?: string
+          hasDocumentOpen?: boolean
+          workspacePath?: string
+          workspaceFiles?: { name: string; filePath: string }[]
         }
       },
     ) => {
@@ -297,6 +300,9 @@ function registerIpcHandlers() {
           selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
           filePath?: string
           fileTitle?: string
+          hasDocumentOpen?: boolean
+          workspacePath?: string
+          workspaceFiles?: { name: string; filePath: string }[]
         }
       },
     ) => {

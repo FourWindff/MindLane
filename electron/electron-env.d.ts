@@ -32,6 +32,9 @@ type _ChatContext = {
   allEdges?: import('../src/shared/lib/fileFormat').MindLaneEdge[]
   filePath?: string
   fileTitle?: string
+  hasDocumentOpen?: boolean
+  workspacePath?: string
+  workspaceFiles?: { name: string; filePath: string }[]
 }
 
 type _ChatToolCall = {
@@ -281,6 +284,7 @@ interface Window {
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
         restoreLastWorkspaceOnLaunch: boolean
+        expandedFolderPaths: string[]
       }>
       update: (partial: Record<string, unknown>) => Promise<void>
     }

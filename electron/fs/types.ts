@@ -47,6 +47,7 @@ export interface AppSettings {
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
   restoreLastWorkspaceOnLaunch: boolean
+  expandedFolderPaths: string[]
 }
 
 export interface ProviderConfig {
@@ -69,4 +70,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recentWorkspacePaths: [],
   lastOpenedFilePath: null,
   restoreLastWorkspaceOnLaunch: true,
+  expandedFolderPaths: [],
 }

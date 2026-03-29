@@ -57,6 +57,7 @@ export class SettingsManager {
       lastOpenedFilePath: partial.lastOpenedFilePath ?? DEFAULT_SETTINGS.lastOpenedFilePath,
       restoreLastWorkspaceOnLaunch:
         partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
+      expandedFolderPaths: partial.expandedFolderPaths ?? DEFAULT_SETTINGS.expandedFolderPaths,
     }
   }
 

@@ -9,6 +9,11 @@ export interface ContextNodeInfo {
   extra?: Record<string, unknown>
 }
 
+export interface WorkspaceFileInfo {
+  name: string
+  filePath: string
+}
+
 export interface MindmapContextData {
   mindmapSummary?: string
   selectedNodes?: ContextNodeInfo[]
@@ -16,6 +21,9 @@ export interface MindmapContextData {
   allEdges?: MindLaneEdge[]
   filePath?: string
   fileTitle?: string
+  hasDocumentOpen?: boolean
+  workspacePath?: string
+  workspaceFiles?: WorkspaceFileInfo[]
 }
 
 let currentContext: MindmapContextData = {}
@@ -50,13 +58,26 @@ function formatNodeForLLM(n: ContextNodeInfo): string {
 export const getMindmapContextTool = tool(
   async () => {
     const ctx = currentContext
-    if (!ctx.mindmapSummary && (!ctx.allNodes || ctx.allNodes.length === 0)) {
-      return '当前没有打开的思维导图，或导图为空。'
+    const parts: string[] = []
+
+    if (ctx.workspacePath) {
+      parts.push(`工作区路径: ${ctx.workspacePath}`)
+      if (ctx.workspaceFiles && ctx.workspaceFiles.length > 0) {
+        parts.push(`工作区文件列表:\n${ctx.workspaceFiles.map((f) => `- ${f.name} (${f.filePath})`).join('\n')}`)
+      } else {
+        parts.push('工作区中没有文件。')
+      }
+    } else {
+      parts.push('当前没有打开任何工作区。')
     }
 
-    const parts: string[] = []
-    if (ctx.fileTitle) parts.push(`文件标题: ${ctx.fileTitle}`)
-    if (ctx.filePath) parts.push(`文件路径: ${ctx.filePath}`)
+    if (!ctx.hasDocumentOpen && !ctx.mindmapSummary && (!ctx.allNodes || ctx.allNodes.length === 0)) {
+      parts.push('\n当前没有打开的思维导图。')
+      return parts.join('\n\n')
+    }
+
+    if (ctx.fileTitle) parts.push(`当前文件标题: ${ctx.fileTitle}`)
+    if (ctx.filePath) parts.push(`当前文件路径: ${ctx.filePath}`)
     if (ctx.mindmapSummary) parts.push(`导图结构:\n${ctx.mindmapSummary}`)
     if (ctx.selectedNodes && ctx.selectedNodes.length > 0) {
       parts.push(`当前选中节点:\n${ctx.selectedNodes.map(formatNodeForLLM).join('\n')}`)
@@ -65,7 +86,24 @@ export const getMindmapContextTool = tool(
   },
   {
     name: 'getMindmapContext',
-    description: '获取用户当前打开的思维导图的完整内容和结构，包括所有节点类型（主题/记忆宫殿/文档）及其层级关系。',
+    description: '获取用户当前的完整上下文，包括：工作区路径和文件列表、当前打开的思维导图内容和结构、选中的节点。',
+    schema: z.object({}),
+  },
+)
+
+export const listWorkspaceFilesTool = tool(
+  async () => {
+    const ctx = currentContext
+    if (!ctx.workspacePath) return '当前没有打开任何工作区。'
+    if (!ctx.workspaceFiles || ctx.workspaceFiles.length === 0) {
+      return `工作区（${ctx.workspacePath}）中没有 .mindlane 文件。`
+    }
+    const lines = ctx.workspaceFiles.map((f) => `- ${f.name} (${f.filePath})`)
+    return `工作区: ${ctx.workspacePath}\n共 ${ctx.workspaceFiles.length} 个文件:\n${lines.join('\n')}`
+  },
+  {
+    name: 'listWorkspaceFiles',
+    description: '列出当前工作区目录中的所有文件，包括文件名和路径。',
     schema: z.object({}),
   },
 )

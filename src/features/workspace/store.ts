@@ -26,6 +26,8 @@ interface WorkspaceStore {
   syncAfterFileSaved: (filePath: string) => Promise<void>
   setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => Promise<void>
   toggleFolder: (folderPath: string) => void
+  expandAllFolders: () => void
+  collapseAllFolders: () => void
   createSubfolder: (parentPath: string, name: string) => Promise<boolean>
   deleteItem: (targetPath: string) => Promise<boolean>
   renameItem: (oldPath: string, newName: string) => Promise<string | null>
@@ -54,6 +56,23 @@ function flattenTreeFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileEntry[] {
     }
   }
   return result
+}
+
+function collectAllFolderPaths(entries: WorkspaceTreeEntry[]): string[] {
+  const result: string[] = []
+  for (const entry of entries) {
+    if (entry.type === 'directory') {
+      result.push(entry.path)
+      if (entry.children) {
+        result.push(...collectAllFolderPaths(entry.children))
+      }
+    }
+  }
+  return result
+}
+
+function saveExpandedFolders(folders: Set<string>) {
+  void window.mindlane?.settings.update({ expandedFolderPaths: [...folders] })
 }
 
 function updateWorkspaceState(
@@ -212,6 +231,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       await applySessionState(session, { clearMindmapWhenEmpty: true })
 
+      const settings = await window.mindlane?.settings.load()
+      if (settings?.expandedFolderPaths?.length) {
+        const tree = get().tree
+        const validPaths = new Set(collectAllFolderPaths(tree))
+        const restored = new Set(
+          settings.expandedFolderPaths.filter((p: string) => validPaths.has(p)),
+        )
+        set({ expandedFolders: restored })
+      }
+
       if (session.lastOpenedFilePath) {
         const result = await window.mindlane?.workspace.openFilePath({
           filePath: session.lastOpenedFilePath,
@@ -262,11 +291,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
+      const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
         ...updateWorkspaceState(sessionData, result.data.files),
         tree,
-        expandedFolders: new Set<string>(),
+        expandedFolders: emptyExpanded,
       })
+      saveExpandedFolders(emptyExpanded)
       clearMindLaneFile()
       return true
     } finally {
@@ -297,11 +328,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
+      const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
         ...updateWorkspaceState(sessionData, result.data.files),
         tree,
-        expandedFolders: new Set<string>(),
+        expandedFolders: emptyExpanded,
       })
+      saveExpandedFolders(emptyExpanded)
       clearMindLaneFile()
       return true
     } finally {
@@ -330,11 +363,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
+      const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
         ...updateWorkspaceState(sessionData, result.data.files),
         tree,
-        expandedFolders: new Set<string>(),
+        expandedFolders: emptyExpanded,
       })
+      saveExpandedFolders(emptyExpanded)
       clearMindLaneFile()
       return true
     } finally {
@@ -469,6 +504,20 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       expanded.add(folderPath)
     }
     set({ expandedFolders: expanded })
+    saveExpandedFolders(expanded)
+  },
+
+  expandAllFolders: () => {
+    const allPaths = collectAllFolderPaths(get().tree)
+    const expanded = new Set(allPaths)
+    set({ expandedFolders: expanded })
+    saveExpandedFolders(expanded)
+  },
+
+  collapseAllFolders: () => {
+    const expanded = new Set<string>()
+    set({ expandedFolders: expanded })
+    saveExpandedFolders(expanded)
   },
 
   createSubfolder: async (parentPath: string, name: string) => {
@@ -493,6 +542,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       expanded.add(parentPath)
       const tree = await listWorkspaceTree(workspacePath)
       set({ tree, expandedFolders: expanded })
+      saveExpandedFolders(expanded)
       return true
     } finally {
       set({ busy: false })
@@ -560,6 +610,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         expanded.delete(oldPath)
         expanded.add(result.data.newPath)
         set({ expandedFolders: expanded })
+        saveExpandedFolders(expanded)
       }
 
       const tree = await listWorkspaceTree(workspacePath)

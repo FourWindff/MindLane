@@ -161,24 +161,37 @@ export function ChatPanel() {
   }, [addMessage, scrollToBottom, finishStream])
 
   const buildContext = useCallback(() => {
-    const state = useMindmapStore.getState()
+    const mindmapState = useMindmapStore.getState()
+    const wsState = useWorkspaceStore.getState()
     const ctx: {
       mindmapSummary?: string
       selectedNodes?: ContextNodeInfo[]
       filePath?: string
       fileTitle?: string
+      hasDocumentOpen?: boolean
+      workspacePath?: string
+      workspaceFiles?: { name: string; filePath: string }[]
     } = {}
 
-    if (state.filePath) ctx.filePath = state.filePath
-    if (state.fileTitle) ctx.fileTitle = state.fileTitle
+    if (mindmapState.filePath) ctx.filePath = mindmapState.filePath
+    if (mindmapState.fileTitle) ctx.fileTitle = mindmapState.fileTitle
+    ctx.hasDocumentOpen = mindmapState.hasDocumentOpen
 
-    if (typeof state.getContextSummary === 'function') {
-      ctx.mindmapSummary = state.getContextSummary()
+    if (typeof mindmapState.getContextSummary === 'function') {
+      ctx.mindmapSummary = mindmapState.getContextSummary()
     }
 
-    const selected = state.nodes.filter((n) => n.selected)
+    const selected = mindmapState.nodes.filter((n) => n.selected)
     if (selected.length > 0) {
       ctx.selectedNodes = selected.map(extractNodeInfo)
+    }
+
+    if (wsState.workspacePath) {
+      ctx.workspacePath = wsState.workspacePath
+      ctx.workspaceFiles = wsState.files.map((f) => ({
+        name: f.name,
+        filePath: f.filePath,
+      }))
     }
 
     return ctx
@@ -410,6 +423,7 @@ function toolDisplayName(name: string): string {
     generatePalace: '生成记忆宫殿',
     getMindmapContext: '读取导图',
     getSelectedNodes: '读取选中节点',
+    listWorkspaceFiles: '查看工作区文件',
   }
   return map[name] ?? name
 }
