@@ -7,6 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type RefObject,
 } from 'react'
+import { AlertCircle, Landmark } from 'lucide-react'
 import { useShortcut } from '@/shared/shortcuts'
 import {
   Background,
@@ -167,10 +168,7 @@ function AiProgressOverlay() {
     return (
       <div className="ai-progress-overlay">
         <div className="ai-progress-overlay__card ai-progress-overlay__card--error" onClick={clearError}>
-          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden>
-            <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
-            <path d="M10 6v5M10 13v1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
+          <AlertCircle size={16} strokeWidth={1.6} />
           <span className="ai-progress-overlay__text">{errorMessage}</span>
           <span className="ai-progress-overlay__dismiss">点击关闭</span>
         </div>
@@ -209,10 +207,7 @@ function SelectionActionBar({
         className="selection-bar__btn"
         onClick={onGeneratePalace}
       >
-        <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden>
-          <path fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
-            d="M2 16h16M4 16V6l6-3.5L16 6v10M8 16v-5h4v5" />
-        </svg>
+        <Landmark size={14} strokeWidth={1.6} />
         生成记忆宫殿
       </button>
     </div>

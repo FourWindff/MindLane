@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Info, HelpCircle, Sparkles, Check, Square, Send } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Node, Edge } from '@xyflow/react'
@@ -273,10 +274,7 @@ export function ChatPanel() {
       <div className="chat-panel">
         <div className="chat-empty">
           <div className="chat-empty__icon">
-            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10A10 10 0 0 1 2 12 10 10 0 0 1 12 2z" />
-              <path d="M12 16v-4M12 8h.01" />
-            </svg>
+            <Info size={32} strokeWidth={1.5} />
           </div>
           <p>请先在「设置」中填写 API Key</p>
         </div>
@@ -291,11 +289,7 @@ export function ChatPanel() {
         {messages.length === 0 && !streamingText && (
           <div className="chat-empty">
             <div className="chat-empty__icon">
-              <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
+              <HelpCircle size={28} strokeWidth={1.5} />
             </div>
             <p>输入消息开始对话</p>
             <span className="chat-empty__hint">AI 助手可以检索知识库、生成思维导图和记忆宫殿</span>
@@ -306,9 +300,7 @@ export function ChatPanel() {
           <div key={i} className={`chat-bubble-row ${msg.role === 'user' ? 'chat-bubble-row--user' : 'chat-bubble-row--ai'}`}>
             {msg.role !== 'user' && (
               <div className="chat-avatar chat-avatar--ai">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-                </svg>
+                <Sparkles size={14} strokeWidth={1.8} />
               </div>
             )}
             <div className={`chat-bubble ${msg.role === 'user' ? 'chat-bubble--user' : 'chat-bubble--ai'}`}>
@@ -322,9 +314,7 @@ export function ChatPanel() {
               <div className="chat-tool-calls">
                 {msg.toolCalls.map((tc, j) => (
                   <div key={j} className="chat-tool-tag">
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                    <Check size={11} strokeWidth={2} />
                     <span>{toolDisplayName(tc.name)}</span>
                   </div>
                 ))}
@@ -337,9 +327,7 @@ export function ChatPanel() {
         {busy && (
           <div className="chat-bubble-row chat-bubble-row--ai">
             <div className="chat-avatar chat-avatar--ai">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-              </svg>
+              <Sparkles size={14} strokeWidth={1.8} />
             </div>
             <div className="chat-streaming-group">
               {activeTools.length > 0 && (
@@ -386,9 +374,7 @@ export function ChatPanel() {
               onClick={stop}
               title="停止生成"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
+              <Square size={18} fill="currentColor" strokeWidth={0} />
             </button>
           ) : (
             <button
@@ -398,10 +384,7 @@ export function ChatPanel() {
               disabled={!apiKey}
               title="发送 (Enter)"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
+              <Send size={18} strokeWidth={2} />
             </button>
           )}
         </div>

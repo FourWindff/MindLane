@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Landmark } from 'lucide-react'
 import type { PalaceNodeData } from '@/shared/lib/fileFormat'
 
 function PalaceNodeInner({ data: rawData, selected }: NodeProps) {
@@ -19,16 +20,7 @@ function PalaceNodeInner({ data: rawData, selected }: NodeProps) {
           />
         ) : (
           <div className="palace-node__placeholder">
-            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden>
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"
-              />
-            </svg>
+            <Landmark size={24} strokeWidth={1.5} />
           </div>
         )}
       </div>

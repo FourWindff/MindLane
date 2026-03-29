@@ -1,4 +1,5 @@
 import { useCallback, useState, type MouseEvent } from 'react'
+import { Settings, FolderInput, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 import { useWorkspaceStore } from '../store'
 import { FileTree } from './FileTree'
 import { FileContextMenu } from './FileContextMenu'
@@ -6,106 +7,6 @@ import { RenameDialog } from './RenameDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InputDialog } from './InputDialog'
 import type { WorkspaceTreeEntry } from '../types'
-
-function IconSettings() {
-  return (
-    <svg className="workspace-sidebar__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M10 3.5l1.2.3.7 1.6 1.7.3 1.2 1.3-.5 1.7 1 1.4-1 1.4.5 1.7-1.2 1.3-1.7.3-.7 1.6-1.2.3-1.2-.3-.7-1.6-1.7-.3-1.2-1.3.5-1.7-1-1.4 1-1.4-.5-1.7 1.2-1.3 1.7-.3.7-1.6L10 3.5z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="10" cy="10" r="2.4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  )
-}
-
-function IconFolderSwitch() {
-  return (
-    <svg className="workspace-sidebar__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M3 5.5h5l1.5 2H17v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 14.5v-9z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11.5 10H16M14 7.5l2.5 2.5L14 12.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function IconAddFile() {
-  return (
-    <svg className="workspace-sidebar__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M6 3.5h5.5L15 7v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-11a1 1 0 011-1z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11.5 3.5V7H15M10 9.5v5M7.5 12h5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function IconAddFolder() {
-  return (
-    <svg className="workspace-sidebar__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M3 5.5h5l1.5 2H17v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 14.5v-9z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10 9.5v4M8 11.5h4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function IconRefresh() {
-  return (
-    <svg className="workspace-sidebar__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M16 9.5A6.5 6.5 0 119 4.2V2.5M9 2.5L6 5.5M9 2.5l3 3"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 function workspaceName(workspacePath: string | null): string {
   if (!workspacePath) return '未打开仓库'
@@ -257,7 +158,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
               title="打开设置"
               aria-label="打开设置"
             >
-              <IconSettings />
+              <Settings className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
             </button>
           )}
           <button
@@ -268,7 +169,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
             title="切换仓库"
             aria-label="切换仓库"
           >
-            <IconFolderSwitch />
+            <FolderInput className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>
@@ -288,7 +189,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
             title="新建文件"
             aria-label="新建文件"
           >
-            <IconAddFile />
+            <FilePlus className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
           </button>
           <button
             type="button"
@@ -298,7 +199,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
             title="新建文件夹"
             aria-label="新建文件夹"
           >
-            <IconAddFolder />
+            <FolderPlus className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
           </button>
           <button
             type="button"
@@ -308,7 +209,7 @@ export function WorkspaceSidebar({ onOpenSettings }: { onOpenSettings?: () => vo
             title="刷新文件列表"
             aria-label="刷新文件列表"
           >
-            <IconRefresh />
+            <RefreshCw className="workspace-sidebar__icon" size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>

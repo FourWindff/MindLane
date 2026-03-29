@@ -1,86 +1,8 @@
 import type { MouseEvent } from 'react'
+import { ChevronRight, Folder, FolderOpen, File } from 'lucide-react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useWorkspaceStore } from '../store'
 import type { WorkspaceTreeEntry } from '../types'
-
-function IconChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      className={`file-tree__chevron${open ? ' file-tree__chevron--open' : ''}`}
-      viewBox="0 0 16 16"
-      aria-hidden
-    >
-      <path
-        d="M6 4l4 4-4 4"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function IconFolder({ open }: { open: boolean }) {
-  if (open) {
-    return (
-      <svg className="file-tree__icon" viewBox="0 0 20 20" aria-hidden>
-        <path
-          d="M3 6.5h14v1H4.5L3 14.5V6.5z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M3 5.5h5l1.5 1.5H17v8a1 1 0 01-1 1H4a1 1 0 01-1-1V5.5z"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    )
-  }
-  return (
-    <svg className="file-tree__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M3 5.5h5l1.5 2H17v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 14.5v-9z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function IconFile() {
-  return (
-    <svg className="file-tree__icon" viewBox="0 0 20 20" aria-hidden>
-      <path
-        d="M6 3.5h5.5L15 7v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-11a1 1 0 011-1z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11.5 3.5V7H15"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 interface FileTreeItemProps {
   entry: WorkspaceTreeEntry
@@ -127,9 +49,9 @@ function FileTreeItem({ entry, depth, onContextMenu }: FileTreeItemProps) {
         disabled={busy}
         title={entry.path}
       >
-        {isFolder && <IconChevron open={isExpanded} />}
+        {isFolder && <ChevronRight className={`file-tree__chevron${isExpanded ? ' file-tree__chevron--open' : ''}`} size={14} strokeWidth={1.5} />}
         {!isFolder && <span className="file-tree__chevron-placeholder" />}
-        {isFolder ? <IconFolder open={isExpanded} /> : <IconFile />}
+        {isFolder ? (isExpanded ? <FolderOpen className="file-tree__icon" size={16} strokeWidth={1.4} /> : <Folder className="file-tree__icon" size={16} strokeWidth={1.4} />) : <File className="file-tree__icon" size={16} strokeWidth={1.4} />}
         <span className="file-tree__name">{displayName}</span>
       </button>
       {isFolder && isExpanded && entry.children && (
