@@ -1,18 +1,29 @@
-import type { NodeTypeDescriptor } from '../types'
+import { NodeTypeDescriptor } from '../types'
 import type { DocumentNodeData } from '@/shared/lib/fileFormat'
 import { DocumentNodeComponent } from './DocumentNodeComponent'
 
-export const documentDescriptor: NodeTypeDescriptor<DocumentNodeData> = {
-  typeId: 'document',
-  displayName: '文档',
-  group: 'core',
-  component: DocumentNodeComponent,
-  defaultData: () => ({ filename: '', excerpt: '' }),
-  userCreatable: false,
-  serialize: (data) => ({
-    filename: data.filename,
-    excerpt: data.excerpt,
-    ...(data.fullTextPath != null && { fullTextPath: data.fullTextPath }),
-  }),
-  deserialize: (raw) => raw as DocumentNodeData,
+class DocumentDescriptor extends NodeTypeDescriptor<DocumentNodeData> {
+  readonly typeId = 'document'
+  readonly displayName = '文档'
+  readonly group = 'core' as const
+  readonly component = DocumentNodeComponent
+  readonly userCreatable = false
+
+  defaultData(): DocumentNodeData {
+    return { filename: '', excerpt: '' }
+  }
+
+  serialize(data: DocumentNodeData) {
+    return {
+      filename: data.filename,
+      excerpt: data.excerpt,
+      ...(data.fullTextPath != null && { fullTextPath: data.fullTextPath }),
+    }
+  }
+
+  deserialize(raw: unknown): DocumentNodeData {
+    return raw as DocumentNodeData
+  }
 }
+
+export const documentDescriptor = new DocumentDescriptor()

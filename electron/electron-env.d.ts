@@ -204,6 +204,8 @@ interface Window {
     window: {
       minimize: () => Promise<void>
       close: () => Promise<void>
+      closeConfirmed: () => Promise<void>
+      onBeforeClose: (callback: () => void) => () => void
     }
   }
 }

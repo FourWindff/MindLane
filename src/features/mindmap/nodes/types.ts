@@ -7,17 +7,19 @@ export interface ContextMenuItem {
   danger?: boolean
 }
 
-export interface NodeTypeDescriptor<
+export abstract class NodeTypeDescriptor<
   TData extends Record<string, unknown> = Record<string, unknown>,
 > {
-  typeId: string
-  displayName: string
-  group: 'core' | 'community'
-  component: ComponentType<NodeProps>
+  abstract readonly typeId: string
+  abstract readonly displayName: string
+  abstract readonly group: 'core' | 'community'
+  abstract readonly component: ComponentType<NodeProps>
+  abstract readonly userCreatable: boolean
+
   propertiesPanel?: ComponentType<{ nodeId: string; data: TData }>
-  defaultData: () => TData
   contextMenuItems?: ContextMenuItem[]
-  serialize?: (data: TData) => unknown
-  deserialize?: (raw: unknown) => TData
-  userCreatable: boolean
+
+  abstract defaultData(): TData
+  abstract serialize(data: TData): unknown
+  abstract deserialize(raw: unknown): TData
 }

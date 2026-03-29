@@ -11,6 +11,7 @@ import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { WorkspaceSidebar } from '@/features/workspace/components/WorkspaceSidebar'
 import {
   initializeWorkspaceSession,
+  saveCurrentDocumentSilently,
   useWorkspaceStore,
 } from '@/features/workspace/store'
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
@@ -72,6 +73,14 @@ function AppContent() {
 
   useEffect(() => {
     void loadSettingsFromBackend()
+  }, [])
+
+  useEffect(() => {
+    return window.mindlane?.window.onBeforeClose(() => {
+      void saveCurrentDocumentSilently().finally(() => {
+        window.mindlane?.window.closeConfirmed()
+      })
+    })
   }, [])
 
   useEffect(() => {

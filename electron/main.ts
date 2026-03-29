@@ -30,6 +30,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   : RENDERER_DIST
 
 let win: BrowserWindow | null
+let forceClose = false
 
 let fsService: FileSystemService
 
@@ -181,9 +182,13 @@ function createWindow() {
   })
 
   const browserWindow = win
-  browserWindow.on('close', () => {
+  browserWindow.on('close', (event) => {
     if (!browserWindow.isDestroyed()) {
       saveWindowBounds(browserWindow.getBounds())
+    }
+    if (!forceClose) {
+      event.preventDefault()
+      browserWindow.webContents.send('app:before-close')
     }
   })
 
@@ -548,6 +553,11 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('window:close', () => {
+    win?.close()
+  })
+
+  ipcMain.handle('window:close-confirmed', () => {
+    forceClose = true
     win?.close()
   })
 

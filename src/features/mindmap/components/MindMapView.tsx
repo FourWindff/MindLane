@@ -501,13 +501,18 @@ function MindMapCanvas({
   )
 
   const doSave = useCallback(async () => {
-    const store = useMindmapStore.getState()
-    const data = store.toMindLaneFile()
-    const result = await window.mindlane?.file.save({ filePath: store.filePath, data })
-    if (result?.ok) {
-      store.setFilePath(result.data.filePath)
-      store.markClean()
-      await syncAfterFileSaved(result.data.filePath)
+    try {
+      const store = useMindmapStore.getState()
+      const data = store.toMindLaneFile()
+      const result = await window.mindlane?.file.save({ filePath: store.filePath, data })
+      if (result?.ok) {
+        store.setFilePath(result.data.filePath)
+        store.markClean()
+        await syncAfterFileSaved(result.data.filePath)
+      }
+    } catch (e) {
+      console.error('[MindLane] 保存失败：', e)
+      useAiStore.getState().setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [syncAfterFileSaved])
 

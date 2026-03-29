@@ -8,4 +8,4 @@ nodeRegistry.register(palaceDescriptor)
 nodeRegistry.register(documentDescriptor)
 
 export { nodeRegistry } from './registry'
-export type { NodeTypeDescriptor, ContextMenuItem } from './types'
+export { NodeTypeDescriptor, type ContextMenuItem } from './types'

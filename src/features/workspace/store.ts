@@ -131,7 +131,7 @@ async function createUniqueWorkspaceFile(
   return { ok: false, error: '自动命名失败，请手动整理工作区中的重名文件' }
 }
 
-async function saveCurrentDocumentSilently(): Promise<boolean> {
+export async function saveCurrentDocumentSilently(): Promise<boolean> {
   const workspaceState = useWorkspaceStore.getState()
   const mindmapState = useMindmapStore.getState()
 

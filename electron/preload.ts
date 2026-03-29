@@ -125,5 +125,11 @@ contextBridge.exposeInMainWorld('mindlane', {
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     close: () => ipcRenderer.invoke('window:close'),
+    closeConfirmed: () => ipcRenderer.invoke('window:close-confirmed'),
+    onBeforeClose: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('app:before-close', handler)
+      return () => { ipcRenderer.off('app:before-close', handler) }
+    },
   },
 })

@@ -87,7 +87,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   loadFile: (filePath, data) => {
     const hydratedNodes = data.mindmap.nodes.map((n) => ({
       ...n,
-      data: nodeRegistry.deserializeNodeData(n.type, n.data),
+      data: nodeRegistry.get(n.type)!.deserialize(n.data),
     }))
     set({
       nodes: hydratedNodes as Node[],
@@ -135,7 +135,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
           id: n.id,
           type: n.type!,
           position: n.position,
-          data: nodeRegistry.serializeNodeData(n.type!, n.data as Record<string, unknown>),
+          data: nodeRegistry.get(n.type!)!.serialize(n.data),
         })) as MindLaneFile['mindmap']['nodes'],
         edges: edges.map((e) => ({
           id: e.id,
