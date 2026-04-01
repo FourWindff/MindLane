@@ -96,7 +96,7 @@ export function ChatPanel() {
     if (messages.length > 0) {
       scrollToBottom(true)
     }
-  }, [threadId, scrollToBottom])
+  }, [threadId, messages.length, scrollToBottom])
 
   const finishStream = useCallback(() => {
     streamTextRef.current = ''
@@ -105,6 +105,42 @@ export function ChatPanel() {
     useAiStore.getState().reset()
     scrollToBottom()
   }, [scrollToBottom])
+
+  const applyMindmapData = useCallback(
+    (data: { nodes: MindLaneNode[]; edges: { id: string; source: string; target: string; type?: string }[] }) => {
+      const mindmapStore = useMindmapStore.getState()
+      const existingNodes = mindmapStore.nodes
+      const existingEdges = mindmapStore.edges
+      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x), 0)
+      const offsetX = maxX + 600
+
+      const newNodes: Node[] = data.nodes.map((n) => {
+        const descriptor = nodeRegistry.get(n.type)
+        const deserializedData = descriptor
+          ? descriptor.deserialize(n.data)
+          : n.data
+
+        return {
+          id: n.id,
+          type: n.type,
+          position: { x: n.position.x + offsetX, y: n.position.y },
+          data: deserializedData,
+        }
+      })
+
+      const newEdges: Edge[] = data.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type ?? 'smoothstep',
+        className: 'mindmap-edge mindmap-edge--enter',
+      }))
+
+      mindmapStore.setNodes([...existingNodes, ...newNodes])
+      mindmapStore.setEdges([...existingEdges, ...newEdges])
+    },
+    [],
+  )
 
   useEffect(() => {
     const api = window.mindlane?.ai
@@ -159,7 +195,7 @@ export function ChatPanel() {
     )
 
     return () => unsubs.forEach((fn) => fn())
-  }, [addMessage, scrollToBottom, finishStream])
+  }, [addMessage, applyMindmapData, scrollToBottom, finishStream])
 
   const buildContext = useCallback(() => {
     const mindmapState = useMindmapStore.getState()
@@ -197,42 +233,6 @@ export function ChatPanel() {
 
     return ctx
   }, [])
-
-  const applyMindmapData = useCallback(
-    (data: { nodes: MindLaneNode[]; edges: { id: string; source: string; target: string; type?: string }[] }) => {
-      const mindmapStore = useMindmapStore.getState()
-      const existingNodes = mindmapStore.nodes
-      const existingEdges = mindmapStore.edges
-      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x), 0)
-      const offsetX = maxX + 600
-
-      const newNodes: Node[] = data.nodes.map((n) => {
-        const descriptor = nodeRegistry.get(n.type)
-        const deserializedData = descriptor
-          ? descriptor.deserialize(n.data)
-          : n.data
-
-        return {
-          id: n.id,
-          type: n.type,
-          position: { x: n.position.x + offsetX, y: n.position.y },
-          data: deserializedData,
-        }
-      })
-
-      const newEdges: Edge[] = data.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type ?? 'smoothstep',
-        className: 'mindmap-edge mindmap-edge--enter',
-      }))
-
-      mindmapStore.setNodes([...existingNodes, ...newNodes])
-      mindmapStore.setEdges([...existingEdges, ...newEdges])
-    },
-    [],
-  )
 
   const send = useCallback(async () => {
     const text = inputRef.current?.value.trim()

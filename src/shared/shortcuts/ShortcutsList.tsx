@@ -1,6 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { formatComboLabel } from './formatComboLabel'
-import { useShortcutRegistry } from './ShortcutRegistryContext'
+import { useShortcutRegistry } from './useShortcutRegistry'
 import type { ShortcutRegistration } from './types'
 import './shortcuts.css'
 

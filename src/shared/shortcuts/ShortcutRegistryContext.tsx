@@ -1,17 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  type ReactNode,
-} from 'react'
-import { createShortcutRegistry, type ShortcutRegistry } from './ShortcutRegistry'
-
-type RegistryContextValue = {
-  registry: ShortcutRegistry
-}
-
-const ShortcutRegistryContext = createContext<RegistryContextValue | null>(null)
+import { useEffect, useMemo, type ReactNode } from 'react'
+import { createShortcutRegistry } from './ShortcutRegistry'
+import { ShortcutRegistryContext } from './shortcutRegistryContext'
 
 export function ShortcutRegistryProvider({ children }: { children: ReactNode }) {
   const registry = useMemo(() => createShortcutRegistry(), [])
@@ -25,16 +14,4 @@ export function ShortcutRegistryProvider({ children }: { children: ReactNode }) 
       {children}
     </ShortcutRegistryContext.Provider>
   )
-}
-
-export function useShortcutRegistry(): ShortcutRegistry {
-  const ctx = useContext(ShortcutRegistryContext)
-  if (!ctx) {
-    throw new Error('useShortcutRegistry 须在 ShortcutRegistryProvider 内使用')
-  }
-  return ctx.registry
-}
-
-export function useOptionalShortcutRegistry(): ShortcutRegistry | null {
-  return useContext(ShortcutRegistryContext)?.registry ?? null
 }

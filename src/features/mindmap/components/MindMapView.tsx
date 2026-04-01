@@ -472,27 +472,21 @@ function MindMapCanvas({
 
   useShortcut(
     { id: 'mindmap.addChild', combo: 'mod+enter', description: '添加子主题', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { addChild() } },
-    [addChild, mindmapShortcutsEnabled],
   )
   useShortcut(
     { id: 'mindmap.addSibling', combo: 'mod+shift+enter', description: '添加同级主题', group: 'mindmap', preventWhenTyping: true, enabled: () => mindmapShortcutsEnabled() && canAddSibling, handler: () => { addSibling() } },
-    [addSibling, canAddSibling, mindmapShortcutsEnabled],
   )
   useShortcut(
     { id: 'mindmap.delete', combo: 'delete', description: '删除选中节点（含子树）', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { removeSelected() } },
-    [removeSelected, mindmapShortcutsEnabled],
   )
   useShortcut(
     { id: 'mindmap.backspace', combo: 'backspace', description: '删除选中节点（含子树）', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { removeSelected() } },
-    [removeSelected, mindmapShortcutsEnabled],
   )
   useShortcut(
     { id: 'mindmap.edit', combo: 'f2', description: '编辑选中节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { if (selectedId) startEditing(selectedId) } },
-    [selectedId, startEditing, mindmapShortcutsEnabled],
   )
   useShortcut(
     { id: 'mindmap.reset', combo: 'mod+shift+r', description: '重置为示例导图', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { reset() } },
-    [reset, mindmapShortcutsEnabled],
   )
 
   const doAutoLayout = useCallback(() => {
@@ -503,7 +497,6 @@ function MindMapCanvas({
 
   useShortcut(
     { id: 'mindmap.autoLayout', combo: 'mod+shift+l', description: '自动布局', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { doAutoLayout() } },
-    [doAutoLayout, mindmapShortcutsEnabled],
   )
 
   const doSave = useCallback(async () => {
@@ -524,7 +517,6 @@ function MindMapCanvas({
 
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
-    [doSave, mindmapShortcutsEnabled],
   )
 
   useEffect(() => {

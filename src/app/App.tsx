@@ -97,7 +97,6 @@ function AppContent() {
         setSettingsOpen(true)
       },
     },
-    [],
   )
 
   return (
