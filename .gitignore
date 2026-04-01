@@ -18,6 +18,8 @@ release
 .vscode/*
 !.vscode/extensions.json
 .cursor/
+.superpowers/
+.worktrees/
 .idea
 .DS_Store
 *.suo
