@@ -305,6 +305,7 @@ function MindMapCanvas({
     (_event: ReactMouseEvent, node: Node) => {
       if (node.type === 'palace') {
         const pd = node.data as import('@/shared/lib/fileFormat').PalaceNodeData
+        if (pd.generating) return
         if (pd.expanded) {
           setPalaceModal(pd)
         } else {
@@ -628,12 +629,60 @@ function MindMapCanvas({
       return
     }
 
-    const processingIds = new Set(selectedNodes.map((n) => n.id))
-    setNodes((nds) =>
-      nds.map((n) =>
-        processingIds.has(n.id) ? { ...n, data: { ...n.data, processing: true } } : n,
-      ),
+    const rollbackNodes = nodes
+    const rollbackEdges = edges
+
+    const palaceId = newId()
+    const parentId = findParentId(edges, selectedNodes[0]?.id ?? '') ?? 'root'
+    const parentNode = nodes.find((n) => n.id === parentId)
+    const firstSelected = nodes.find((n) => n.id === selectedNodes[0]?.id)
+
+    const placeholderNode: Node = {
+      id: palaceId,
+      type: 'palace',
+      position: {
+        x: (firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X),
+        y: (firstSelected?.position.y ?? parentNode?.position.y ?? 0),
+      },
+      data: {
+        label: '生成中…',
+        imageUrl: '',
+        stations: [],
+        sourceNodeIds: selectedNodes.map((n) => n.id),
+        generating: true,
+      },
+    }
+
+    const treeEdge: Edge = {
+      id: `e-${parentId}-${palaceId}`,
+      source: parentId,
+      target: palaceId,
+      type: 'smoothstep',
+      className: 'mindmap-edge',
+    }
+
+    const selectedIdSet = new Set(selectedNodes.map((n) => n.id))
+    const childEdges: Edge[] = selectedNodes.map((n) => ({
+      id: `e-${palaceId}-${n.id}`,
+      source: palaceId,
+      target: n.id,
+      type: 'smoothstep',
+      className: 'mindmap-edge',
+    }))
+
+    const cleanedEdges = edges.filter(
+      (e) => !(e.source === parentId && selectedIdSet.has(e.target)),
     )
+
+    const processingIds = new Set(selectedNodes.map((n) => n.id))
+    const nextNodes = [...nodes, placeholderNode].map((n) =>
+      processingIds.has(n.id) ? { ...n, data: { ...n.data, processing: true } } : n,
+    )
+    const nextEdges = [...cleanedEdges, treeEdge, ...childEdges]
+
+    const laidOut = reflowChildren(palaceId, nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
+    setNodes(laidOut)
+    setEdges(nextEdges)
 
     useAiStore.getState().setBusy(true)
     useAiStore.getState().setStep('analyzing')
@@ -650,74 +699,43 @@ function MindMapCanvas({
       ])
 
       if (!result) {
-        setNodes((nds) => nds.map((n) => (n.data.processing ? { ...n, data: { ...n.data, processing: undefined } } : n)))
+        setNodes(rollbackNodes)
+        setEdges(rollbackEdges)
         useAiStore.getState().setError('生成超时（超过 2 分钟），请检查网络后重试')
         return
       }
 
       if (!result.ok) {
-        setNodes((nds) => nds.map((n) => (n.data.processing ? { ...n, data: { ...n.data, processing: undefined } } : n)))
+        setNodes(rollbackNodes)
+        setEdges(rollbackEdges)
         const errMsg = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
         useAiStore.getState().setError(`AI 返回错误：${errMsg}`)
         return
       }
 
-      const palaceId = newId()
-
-      const parentId = findParentId(edges, selectedNodes[0]?.id ?? '') ?? 'root'
-      const parentNode = nodes.find((n) => n.id === parentId)
-      const firstSelected = nodes.find((n) => n.id === selectedNodes[0]?.id)
-
-      const palaceNode: Node = {
-        id: palaceId,
-        type: 'palace',
-        position: {
-          x: (firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X),
-          y: (firstSelected?.position.y ?? parentNode?.position.y ?? 0),
-        },
-        data: {
-          label: result.label,
-          imageUrl: result.imageUrl,
-          stations: result.stations,
-          sourceNodeIds: result.sourceNodeIds,
-        },
-      }
-
-      const treeEdge: Edge = {
-        id: `e-${parentId}-${palaceId}`,
-        source: parentId,
-        target: palaceId,
-        type: 'smoothstep',
-        className: 'mindmap-edge',
-      }
-
-      const selectedIdSet = new Set(selectedNodes.map((n) => n.id))
-      const childEdges: Edge[] = selectedNodes.map((n) => ({
-        id: `e-${palaceId}-${n.id}`,
-        source: palaceId,
-        target: n.id,
-        type: 'smoothstep',
-        className: 'mindmap-edge',
-      }))
-
-      const cleanedEdges = edges.filter(
-        (e) => !(e.source === parentId && selectedIdSet.has(e.target)),
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.id === palaceId) {
+            return {
+              ...n,
+              data: {
+                label: result.label,
+                imageUrl: result.imageUrl,
+                stations: result.stations,
+                sourceNodeIds: result.sourceNodeIds,
+              },
+            }
+          }
+          if (n.data.processing) {
+            return { ...n, data: { ...n.data, processing: undefined } }
+          }
+          return n
+        }),
       )
-
-      const clearProcessing = (nds: Node[]) =>
-        nds.map((n) => (n.data.processing ? { ...n, data: { ...n.data, processing: undefined } } : n))
-
-      const nextNodes = clearProcessing([...nodes, palaceNode])
-      const nextEdges = [...cleanedEdges, treeEdge, ...childEdges]
-
-      const laidOut = reflowChildren(palaceId, nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
-      setNodes(laidOut)
-      setEdges(nextEdges)
       useAiStore.getState().reset()
     } catch (e) {
-      setNodes((nds) =>
-        nds.map((n) => (n.data.processing ? { ...n, data: { ...n.data, processing: undefined } } : n)),
-      )
+      setNodes(rollbackNodes)
+      setEdges(rollbackEdges)
       useAiStore.getState().setError(
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )

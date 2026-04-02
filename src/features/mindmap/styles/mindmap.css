@@ -601,6 +601,68 @@
   font-weight: 700;
 }
 
+/* —— Palace Node (generating / flowing border) —— */
+@property --palace-flow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.palace-node-generating {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6;
+  pointer-events: none;
+  isolation: isolate;
+  animation: topic-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.palace-node-generating::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: conic-gradient(
+    from var(--palace-flow-angle),
+    #3b82f6 0%,
+    #a855f7 20%,
+    #ec4899 40%,
+    transparent 60%,
+    #3b82f6 100%
+  );
+  z-index: -2;
+  animation: palace-border-flow 2s linear infinite;
+}
+
+.palace-node-generating::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 10px;
+  background: var(--ml-bg-elevated);
+  z-index: -1;
+}
+
+.palace-node-generating__icon {
+  animation: palace-icon-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes palace-border-flow {
+  to {
+    --palace-flow-angle: 360deg;
+  }
+}
+
+@keyframes palace-icon-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
 /* —— Palace Node (collapsed) —— */
 .palace-node-collapsed {
   width: 72px;

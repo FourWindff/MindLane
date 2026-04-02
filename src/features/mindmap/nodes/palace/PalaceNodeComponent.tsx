@@ -21,6 +21,16 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
     [id, setNodes],
   )
 
+  if (data.generating) {
+    return (
+      <div className="palace-node-generating">
+        <Handle type="target" position={Position.Left} />
+        <Landmark size={24} strokeWidth={1.5} className="palace-node-generating__icon" />
+        <Handle type="source" position={Position.Right} />
+      </div>
+    )
+  }
+
   if (!expanded) {
     return (
       <div className={`palace-node-collapsed${selected ? ' palace-node-collapsed--selected' : ''}`}>
