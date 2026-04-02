@@ -17,10 +17,7 @@ import nodeCrypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
-import { initVectorStore } from './ai/vectorstore/store.js'
-import { initIndexer, indexDocument, listIndexedDocuments, removeIndexedDocument } from './ai/vectorstore/indexer.js'
-import { initCheckpointer, getCheckpointer } from './ai/memory/checkpointer.js'
-import { initUserProfile } from './ai/memory/userProfile.js'
+import { AiService } from './ai/service.js'
 import { runAgent, streamAgent, type ChatRequest } from './ai/agent.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -39,6 +36,7 @@ let win: BrowserWindow | null
 let forceClose = false
 
 let fsService: FileSystemService
+let aiService: AiService
 
 function pathExists(targetPath: string | null | undefined): boolean {
   if (!targetPath) return false
@@ -273,7 +271,7 @@ function registerIpcHandlers() {
           request,
           model: runtime.reasoningModel,
           runtime,
-          checkpointer: getCheckpointer(),
+          aiService,
           apiKey,
           modelName,
         })
@@ -348,7 +346,7 @@ function registerIpcHandlers() {
             request,
             model: runtime.reasoningModel,
             runtime,
-            checkpointer: getCheckpointer(),
+            aiService,
             apiKey,
             modelName,
             signal: abortController.signal,
@@ -799,7 +797,7 @@ function registerIpcHandlers() {
 
     for (const filePath of result.filePaths) {
       try {
-        const meta = await indexDocument(filePath, visionModel, (progress) => {
+        const meta = await aiService.indexer.index(filePath, visionModel, (progress) => {
           win?.webContents.send('kb:index-progress', progress)
         })
         indexed.push(meta)
@@ -817,11 +815,11 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('kb:list-documents', async () => {
-    return listIndexedDocuments()
+    return aiService.indexer.list()
   })
 
   ipcMain.handle('kb:delete-document', async (_e, payload: { docId: string }) => {
-    const success = await removeIndexedDocument(payload.docId)
+    const success = await aiService.indexer.remove(payload.docId)
     return success ? { ok: true } : { ok: false, error: '文档不存在' }
   })
 
@@ -875,24 +873,13 @@ app.whenReady().then(async () => {
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
 
-  // Initialize AI subsystems
-  initIndexer(userDataPath)
-  initUserProfile(userDataPath)
-
-  try {
-    await initCheckpointer(userDataPath)
-  } catch (err) {
-    console.error('Checkpointer init failed:', err)
-  }
-
+  aiService = new AiService()
   try {
     const settings = await fsService.settings.load()
     const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-    if (apiKey) {
-      await initVectorStore(userDataPath, apiKey, settings.providerConfigs['dashscope']?.baseUrl)
-    }
+    await aiService.init(userDataPath, apiKey || undefined, settings.providerConfigs['dashscope']?.baseUrl)
   } catch (err) {
-    console.error('Vector store init failed:', err)
+    console.error('AI service init failed:', err)
   }
 
   registerIpcHandlers()

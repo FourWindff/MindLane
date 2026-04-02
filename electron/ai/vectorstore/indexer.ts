@@ -2,7 +2,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters'
 import type { Document } from '@langchain/core/documents'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { loadDocument } from './loaders.js'
-import { getVectorStore, saveVectorStore } from './store.js'
+import type { VectorStoreManager } from './store.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
@@ -27,87 +27,91 @@ const splitter = new RecursiveCharacterTextSplitter({
   chunkOverlap: 150,
 })
 
-let indexedDocs: IndexedDocMeta[] = []
-let metaPath = ''
+export class DocumentIndexer {
+  private indexedDocs: IndexedDocMeta[] = []
+  private metaPath = ''
 
-export function initIndexer(userDataPath: string): void {
-  metaPath = path.join(userDataPath, 'vectorstore', 'indexed-docs.json')
-  try {
-    if (fs.existsSync(metaPath)) {
-      indexedDocs = JSON.parse(fs.readFileSync(metaPath, 'utf-8')) as IndexedDocMeta[]
+  constructor(private vectorStore: VectorStoreManager) {}
+
+  init(userDataPath: string): void {
+    this.metaPath = path.join(userDataPath, 'vectorstore', 'indexed-docs.json')
+    try {
+      if (fs.existsSync(this.metaPath)) {
+        this.indexedDocs = JSON.parse(fs.readFileSync(this.metaPath, 'utf-8')) as IndexedDocMeta[]
+      }
+    } catch {
+      this.indexedDocs = []
     }
-  } catch {
-    indexedDocs = []
-  }
-}
-
-function persistMeta(): void {
-  if (metaPath) {
-    fs.writeFileSync(metaPath, JSON.stringify(indexedDocs, null, 2), 'utf-8')
-  }
-}
-
-export function listIndexedDocuments(): IndexedDocMeta[] {
-  return [...indexedDocs]
-}
-
-export async function indexDocument(
-  filePath: string,
-  visionModel?: BaseChatModel,
-  onProgress?: IndexProgressCallback,
-): Promise<IndexedDocMeta> {
-  const store = getVectorStore()
-  if (!store) throw new Error('向量存储未初始化')
-
-  const filename = path.basename(filePath)
-  const docId = crypto.randomUUID()
-
-  onProgress?.({ phase: 'loading', filename, progress: 0.1 })
-  let docs: Document[]
-  try {
-    docs = await loadDocument(filePath, visionModel)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    onProgress?.({ phase: 'error', filename, progress: 0, error: msg })
-    throw err
   }
 
-  onProgress?.({ phase: 'splitting', filename, progress: 0.3 })
-  const chunks = await splitter.splitDocuments(docs)
+  private persistMeta(): void {
+    if (this.metaPath) {
+      fs.writeFileSync(this.metaPath, JSON.stringify(this.indexedDocs, null, 2), 'utf-8')
+    }
+  }
 
-  for (const chunk of chunks) {
-    chunk.metadata = {
-      ...chunk.metadata,
-      docId,
+  list(): IndexedDocMeta[] {
+    return [...this.indexedDocs]
+  }
+
+  async index(
+    filePath: string,
+    visionModel?: BaseChatModel,
+    onProgress?: IndexProgressCallback,
+  ): Promise<IndexedDocMeta> {
+    const store = this.vectorStore.get()
+    if (!store) throw new Error('向量存储未初始化')
+
+    const filename = path.basename(filePath)
+    const docId = crypto.randomUUID()
+
+    onProgress?.({ phase: 'loading', filename, progress: 0.1 })
+    let docs: Document[]
+    try {
+      docs = await loadDocument(filePath, visionModel)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      onProgress?.({ phase: 'error', filename, progress: 0, error: msg })
+      throw err
+    }
+
+    onProgress?.({ phase: 'splitting', filename, progress: 0.3 })
+    const chunks = await splitter.splitDocuments(docs)
+
+    for (const chunk of chunks) {
+      chunk.metadata = {
+        ...chunk.metadata,
+        docId,
+        filename,
+        indexedAt: new Date().toISOString(),
+      }
+    }
+
+    onProgress?.({ phase: 'embedding', filename, progress: 0.5 })
+    await store.addDocuments(chunks)
+
+    onProgress?.({ phase: 'embedding', filename, progress: 0.85 })
+    await this.vectorStore.save()
+
+    const meta: IndexedDocMeta = {
+      id: docId,
       filename,
+      filePath,
       indexedAt: new Date().toISOString(),
+      chunkCount: chunks.length,
     }
+    this.indexedDocs.push(meta)
+    this.persistMeta()
+
+    onProgress?.({ phase: 'done', filename, progress: 1 })
+    return meta
   }
 
-  onProgress?.({ phase: 'embedding', filename, progress: 0.5 })
-  await store.addDocuments(chunks)
-
-  onProgress?.({ phase: 'embedding', filename, progress: 0.85 })
-  await saveVectorStore()
-
-  const meta: IndexedDocMeta = {
-    id: docId,
-    filename,
-    filePath,
-    indexedAt: new Date().toISOString(),
-    chunkCount: chunks.length,
+  async remove(docId: string): Promise<boolean> {
+    const idx = this.indexedDocs.findIndex((d) => d.id === docId)
+    if (idx === -1) return false
+    this.indexedDocs.splice(idx, 1)
+    this.persistMeta()
+    return true
   }
-  indexedDocs.push(meta)
-  persistMeta()
-
-  onProgress?.({ phase: 'done', filename, progress: 1 })
-  return meta
-}
-
-export async function removeIndexedDocument(docId: string): Promise<boolean> {
-  const idx = indexedDocs.findIndex((d) => d.id === docId)
-  if (idx === -1) return false
-  indexedDocs.splice(idx, 1)
-  persistMeta()
-  return true
 }

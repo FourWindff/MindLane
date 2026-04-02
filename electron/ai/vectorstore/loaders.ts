@@ -1,6 +1,6 @@
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx'
 import { Document } from '@langchain/core/documents'
+import { PDFParse } from 'pdf-parse'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { HumanMessage } from '@langchain/core/messages'
 import fs from 'node:fs'
@@ -81,6 +81,46 @@ async function loadImageViaVision(
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
 
+async function loadPdfFile(filePath: string): Promise<Document[]> {
+  const data = await fs.promises.readFile(filePath)
+  const parser = new PDFParse({
+    data,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  })
+  try {
+    const textResult = await parser.getText()
+    const docs: Document[] = []
+    for (const page of textResult.pages) {
+      const pageContent = page.text.trim()
+      if (!pageContent) continue
+      docs.push(
+        new Document({
+          pageContent,
+          metadata: {
+            source: filePath,
+            type: 'pdf',
+            loc: { pageNumber: page.num },
+            pdf: { totalPages: textResult.total },
+          },
+        }),
+      )
+    }
+    if (docs.length === 0 && textResult.text.trim()) {
+      return [
+        new Document({
+          pageContent: textResult.text.trim(),
+          metadata: { source: filePath, type: 'pdf', pdf: { totalPages: textResult.total } },
+        }),
+      ]
+    }
+    return docs
+  } finally {
+    await parser.destroy()
+  }
+}
+
 export async function loadDocument(
   filePath: string,
   visionModel?: BaseChatModel,
@@ -88,8 +128,7 @@ export async function loadDocument(
   const ext = path.extname(filePath).toLowerCase()
 
   if (ext === '.pdf') {
-    const loader = new PDFLoader(filePath)
-    return loader.load()
+    return loadPdfFile(filePath)
   }
 
   if (ext === '.docx' || ext === '.doc') {

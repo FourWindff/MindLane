@@ -1,23 +1,16 @@
 import { createReactAgent } from '@langchain/langgraph/prebuilt'
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
-import type { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
 import type { AiRuntime } from './runtime.js'
+import type { AiService } from './service.js'
 import type { MindLaneNode, MindLaneEdge } from '../../src/shared/lib/fileFormat.js'
-import { searchDocumentsTool, listKnowledgeBaseTool } from './tools/searchDocuments.js'
+import { createSearchTools } from './tools/searchDocuments.js'
 import { createGenerateMindmapTool, type MindmapToolResult } from './tools/generateMindmap.js'
 import { createGeneratePalaceTool } from './tools/generatePalace.js'
-import {
-  getMindmapContextTool,
-  getSelectedNodesTool,
-  listWorkspaceFilesTool,
-  setMindmapContext,
-  type MindmapContextData,
-} from './tools/mindmapContext.js'
-import { getUserProfileText } from './memory/userProfile.js'
+import { createMindmapContextTools, type MindmapContextData } from './tools/mindmapContext.js'
 import { compressMessages } from './memory/compression.js'
 
-function buildSystemPrompt(context?: MindmapContextData): string {
+function buildSystemPrompt(profileText: string, context?: MindmapContextData): string {
   const parts = [
     '你是 MindLane 的 AI 助手，帮助用户进行思维导图创作、知识管理和记忆训练。',
     '',
@@ -51,7 +44,6 @@ function buildSystemPrompt(context?: MindmapContextData): string {
     '- 回答问题时请简洁专业，使用中文。',
   ]
 
-  const profileText = getUserProfileText()
   if (profileText) {
     parts.push('', '用户画像：', profileText)
   }
@@ -138,28 +130,33 @@ function buildAgent(params: {
   request: ChatRequest
   model: BaseChatModel
   runtime: AiRuntime
-  checkpointer: SqliteSaver | null
+  aiService: AiService
   apiKey: string
   modelName: string
 }) {
-  const { request, model, runtime, checkpointer, apiKey, modelName } = params
+  const { request, model, runtime, aiService, apiKey, modelName } = params
 
-  if (request.context) {
-    setMindmapContext(request.context)
-  }
+  const { listKnowledgeBaseTool, searchDocumentsTool } = createSearchTools(
+    aiService.vectorStore,
+    aiService.indexer,
+  )
+
+  const contextTools = createMindmapContextTools(request.context ?? {})
 
   const tools = [
     listKnowledgeBaseTool,
     searchDocumentsTool,
     createGenerateMindmapTool(apiKey, modelName),
     createGeneratePalaceTool(apiKey, modelName, runtime),
-    getMindmapContextTool,
-    getSelectedNodesTool,
-    listWorkspaceFilesTool,
+    contextTools.getMindmapContextTool,
+    contextTools.getSelectedNodesTool,
+    contextTools.listWorkspaceFilesTool,
   ]
 
-  const systemPrompt = buildSystemPrompt(request.context)
+  const profileText = aiService.userProfile.getText()
+  const systemPrompt = buildSystemPrompt(profileText, request.context)
 
+  const checkpointer = aiService.checkpointer.get()
   const agent = createReactAgent({
     llm: model,
     tools,
@@ -224,14 +221,15 @@ export async function runAgent(params: {
   request: ChatRequest
   model: BaseChatModel
   runtime: AiRuntime
-  checkpointer: SqliteSaver | null
+  aiService: AiService
   apiKey: string
   modelName: string
 }): Promise<ChatResponse> {
   const { agent } = buildAgent(params)
   const compressed = await buildInputMessages(params.request, params.model)
 
-  const config = params.checkpointer
+  const checkpointer = params.aiService.checkpointer.get()
+  const config = checkpointer
     ? { configurable: { thread_id: params.request.threadId } }
     : undefined
 
@@ -256,7 +254,7 @@ export async function streamAgent(
     request: ChatRequest
     model: BaseChatModel
     runtime: AiRuntime
-    checkpointer: SqliteSaver | null
+    aiService: AiService
     apiKey: string
     modelName: string
     signal?: AbortSignal
@@ -266,8 +264,9 @@ export async function streamAgent(
   const { agent } = buildAgent(params)
   const compressed = await buildInputMessages(params.request, params.model)
 
+  const checkpointer = params.aiService.checkpointer.get()
   const config = {
-    ...(params.checkpointer
+    ...(checkpointer
       ? { configurable: { thread_id: params.request.threadId } }
       : {}),
     version: 'v2' as const,

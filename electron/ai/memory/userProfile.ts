@@ -19,44 +19,45 @@ const DEFAULT_PROFILE: UserProfile = {
   updatedAt: new Date().toISOString(),
 }
 
-let profilePath = ''
-let cached: UserProfile | null = null
+export class UserProfileManager {
+  private profilePath = ''
+  private cached: UserProfile | null = null
 
-export function initUserProfile(userDataPath: string): void {
-  profilePath = path.join(userDataPath, 'memory', 'user-profile.json')
-}
-
-export function loadUserProfile(): UserProfile {
-  if (cached) return cached
-  try {
-    if (fs.existsSync(profilePath)) {
-      cached = JSON.parse(fs.readFileSync(profilePath, 'utf-8')) as UserProfile
-      return cached
-    }
-  } catch { /* ignore */ }
-  cached = { ...DEFAULT_PROFILE }
-  return cached
-}
-
-function saveProfile(profile: UserProfile): void {
-  cached = profile
-  if (profilePath) {
-    const dir = path.dirname(profilePath)
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(profilePath, JSON.stringify(profile, null, 2), 'utf-8')
+  init(userDataPath: string): void {
+    this.profilePath = path.join(userDataPath, 'memory', 'user-profile.json')
   }
-}
 
-export async function updateUserProfile(
-  model: BaseChatModel,
-  conversationSummary: string,
-): Promise<UserProfile> {
-  const current = loadUserProfile()
+  load(): UserProfile {
+    if (this.cached) return this.cached
+    try {
+      if (fs.existsSync(this.profilePath)) {
+        this.cached = JSON.parse(fs.readFileSync(this.profilePath, 'utf-8')) as UserProfile
+        return this.cached
+      }
+    } catch { /* ignore */ }
+    this.cached = { ...DEFAULT_PROFILE }
+    return this.cached
+  }
 
-  const currentJson = JSON.stringify(current, null, 2)
-  const response = await model.invoke([
-    new SystemMessage(
-      `你是用户画像分析师。根据最近的对话摘要，更新用户画像。
+  private save(profile: UserProfile): void {
+    this.cached = profile
+    if (this.profilePath) {
+      const dir = path.dirname(this.profilePath)
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+      fs.writeFileSync(this.profilePath, JSON.stringify(profile, null, 2), 'utf-8')
+    }
+  }
+
+  async update(
+    model: BaseChatModel,
+    conversationSummary: string,
+  ): Promise<UserProfile> {
+    const current = this.load()
+
+    const currentJson = JSON.stringify(current, null, 2)
+    const response = await model.invoke([
+      new SystemMessage(
+        `你是用户画像分析师。根据最近的对话摘要，更新用户画像。
 当前画像：
 ${currentJson}
 
@@ -67,36 +68,37 @@ ${currentJson}
 - usagePatterns: string[] (使用习惯，最多10条)
 
 只输出 JSON，不要额外文字。`,
-    ),
-    new HumanMessage(conversationSummary),
-  ])
+      ),
+      new HumanMessage(conversationSummary),
+    ])
 
-  const text = typeof response.content === 'string' ? response.content : String(response.content)
-  try {
-    const match = text.match(/\{[\s\S]*\}/)
-    if (match) {
-      const parsed = JSON.parse(match[0]) as Partial<UserProfile>
-      const updated: UserProfile = {
-        preferences: Array.isArray(parsed.preferences) ? parsed.preferences.slice(0, 10) : current.preferences,
-        thinkingStyle: typeof parsed.thinkingStyle === 'string' ? parsed.thinkingStyle : current.thinkingStyle,
-        frequentTopics: Array.isArray(parsed.frequentTopics) ? parsed.frequentTopics.slice(0, 10) : current.frequentTopics,
-        usagePatterns: Array.isArray(parsed.usagePatterns) ? parsed.usagePatterns.slice(0, 10) : current.usagePatterns,
-        updatedAt: new Date().toISOString(),
+    const text = typeof response.content === 'string' ? response.content : String(response.content)
+    try {
+      const match = text.match(/\{[\s\S]*\}/)
+      if (match) {
+        const parsed = JSON.parse(match[0]) as Partial<UserProfile>
+        const updated: UserProfile = {
+          preferences: Array.isArray(parsed.preferences) ? parsed.preferences.slice(0, 10) : current.preferences,
+          thinkingStyle: typeof parsed.thinkingStyle === 'string' ? parsed.thinkingStyle : current.thinkingStyle,
+          frequentTopics: Array.isArray(parsed.frequentTopics) ? parsed.frequentTopics.slice(0, 10) : current.frequentTopics,
+          usagePatterns: Array.isArray(parsed.usagePatterns) ? parsed.usagePatterns.slice(0, 10) : current.usagePatterns,
+          updatedAt: new Date().toISOString(),
+        }
+        this.save(updated)
+        return updated
       }
-      saveProfile(updated)
-      return updated
-    }
-  } catch { /* keep current */ }
+    } catch { /* keep current */ }
 
-  return current
-}
+    return current
+  }
 
-export function getUserProfileText(): string {
-  const profile = loadUserProfile()
-  const parts: string[] = []
-  if (profile.thinkingStyle) parts.push(`思维方式: ${profile.thinkingStyle}`)
-  if (profile.preferences.length > 0) parts.push(`偏好: ${profile.preferences.join('、')}`)
-  if (profile.frequentTopics.length > 0) parts.push(`常见话题: ${profile.frequentTopics.join('、')}`)
-  if (profile.usagePatterns.length > 0) parts.push(`使用习惯: ${profile.usagePatterns.join('、')}`)
-  return parts.length > 0 ? parts.join('\n') : ''
+  getText(): string {
+    const profile = this.load()
+    const parts: string[] = []
+    if (profile.thinkingStyle) parts.push(`思维方式: ${profile.thinkingStyle}`)
+    if (profile.preferences.length > 0) parts.push(`偏好: ${profile.preferences.join('、')}`)
+    if (profile.frequentTopics.length > 0) parts.push(`常见话题: ${profile.frequentTopics.join('、')}`)
+    if (profile.usagePatterns.length > 0) parts.push(`使用习惯: ${profile.usagePatterns.join('、')}`)
+    return parts.length > 0 ? parts.join('\n') : ''
+  }
 }

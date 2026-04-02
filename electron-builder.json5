@@ -1,15 +1,27 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.mindlane.app",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "MindLane",
   "directories": {
     "output": "release/${version}"
   },
   "files": [
     "dist",
-    "dist-electron"
+    "dist-electron",
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/hnswlib-node/**/*",
+    "node_modules/pdf-parse/**/*",
+    "node_modules/mammoth/**/*",
+    "node_modules/bindings/**/*",
+    "node_modules/file-uri-to-path/**/*",
+    "node_modules/node-addon-api/**/*",
+    "node_modules/prebuild-install/**/*"
+  ],
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**",
+    "node_modules/hnswlib-node/**"
   ],
   "mac": {
     "target": [

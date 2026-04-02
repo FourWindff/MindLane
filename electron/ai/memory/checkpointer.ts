@@ -2,17 +2,18 @@ import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
 import path from 'node:path'
 import fs from 'node:fs'
 
-let saver: SqliteSaver | null = null
+export class CheckpointerManager {
+  private saver: SqliteSaver | null = null
 
-export async function initCheckpointer(userDataPath: string): Promise<SqliteSaver> {
-  const dir = path.join(userDataPath, 'memory')
-  await fs.promises.mkdir(dir, { recursive: true })
+  async init(userDataPath: string): Promise<void> {
+    const dir = path.join(userDataPath, 'memory')
+    await fs.promises.mkdir(dir, { recursive: true })
 
-  const dbPath = path.join(dir, 'checkpoints.db')
-  saver = SqliteSaver.fromConnString(dbPath)
-  return saver
-}
+    const dbPath = path.join(dir, 'checkpoints.db')
+    this.saver = SqliteSaver.fromConnString(dbPath)
+  }
 
-export function getCheckpointer(): SqliteSaver | null {
-  return saver
+  get(): SqliteSaver | null {
+    return this.saver
+  }
 }

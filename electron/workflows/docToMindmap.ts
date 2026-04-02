@@ -51,62 +51,9 @@ const DocState = Annotation.Root({
   error: Annotation<string>,
 })
 
-let nodeCounter = 0
-function genId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${++nodeCounter}`
-}
-
 interface KeyPoint {
   title: string
   children?: KeyPoint[]
-}
-
-function layoutTree(
-  points: KeyPoint[],
-  parentId: string,
-  startX: number,
-  startY: number,
-  offsetX: number,
-  gapY: number,
-): { nodes: GeneratedNode[]; edges: GeneratedEdge[] } {
-  const nodes: GeneratedNode[] = []
-  const edges: GeneratedEdge[] = []
-
-  const totalHeight = points.length * gapY
-  let currentY = startY - totalHeight / 2 + gapY / 2
-
-  for (const point of points) {
-    const nodeId = genId('topic')
-    nodes.push({
-      id: nodeId,
-      type: 'topic',
-      position: { x: startX + offsetX, y: currentY },
-      data: { label: point.title },
-    })
-    edges.push({
-      id: `e-${parentId}-${nodeId}`,
-      source: parentId,
-      target: nodeId,
-      type: 'smoothstep',
-    })
-
-    if (point.children && point.children.length > 0) {
-      const sub = layoutTree(
-        point.children,
-        nodeId,
-        startX + offsetX,
-        currentY,
-        offsetX,
-        gapY * 0.85,
-      )
-      nodes.push(...sub.nodes)
-      edges.push(...sub.edges)
-    }
-
-    currentY += gapY
-  }
-
-  return { nodes, edges }
 }
 
 export async function runDocToMindmap(params: {
@@ -120,7 +67,59 @@ export async function runDocToMindmap(params: {
   if (!documentText.trim()) return { ok: false, error: '文档内容为空' }
 
   const modelName = model.trim() || 'qwen-turbo'
-  nodeCounter = 0
+
+  let nodeCounter = 0
+  function genId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${++nodeCounter}`
+  }
+
+  function layoutTree(
+    points: KeyPoint[],
+    parentId: string,
+    startX: number,
+    startY: number,
+    offsetX: number,
+    gapY: number,
+  ): { nodes: GeneratedNode[]; edges: GeneratedEdge[] } {
+    const nodes: GeneratedNode[] = []
+    const edges: GeneratedEdge[] = []
+
+    const totalHeight = points.length * gapY
+    let currentY = startY - totalHeight / 2 + gapY / 2
+
+    for (const point of points) {
+      const nodeId = genId('topic')
+      nodes.push({
+        id: nodeId,
+        type: 'topic',
+        position: { x: startX + offsetX, y: currentY },
+        data: { label: point.title },
+      })
+      edges.push({
+        id: `e-${parentId}-${nodeId}`,
+        source: parentId,
+        target: nodeId,
+        type: 'smoothstep',
+      })
+
+      if (point.children && point.children.length > 0) {
+        const sub = layoutTree(
+          point.children,
+          nodeId,
+          startX + offsetX,
+          currentY,
+          offsetX,
+          gapY * 0.85,
+        )
+        nodes.push(...sub.nodes)
+        edges.push(...sub.edges)
+      }
+
+      currentY += gapY
+    }
+
+    return { nodes, edges }
+  }
 
   const llm = new ChatOpenAI({
     model: modelName,
