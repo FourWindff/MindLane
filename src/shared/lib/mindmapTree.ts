@@ -40,7 +40,7 @@ export function collectSubtreeIds(edges: Edge[], rootId: string): Set<string> {
   return ids
 }
 
-function getChildIdsOrdered(
+export function getChildIdsOrdered(
   nodes: Node[],
   edges: Edge[],
   parentId: string,

@@ -36,6 +36,7 @@ import {
   createInitialNodes,
   deleteSubtree,
   findParentId,
+  getChildIdsOrdered,
   newId,
   reflowChildren,
   withNewChild,
@@ -421,6 +422,14 @@ function MindMapCanvas({
     setEdges(nextEdges)
   }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes])
 
+  const selectNode = useCallback(
+    (targetId: string) => {
+      setSelectedId(targetId)
+      setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === targetId })))
+    },
+    [setNodes],
+  )
+
   const removeSelected = useCallback(() => {
     if (aiBusy) return
     if (!selectedId || selectedId === 'root') return
@@ -443,7 +452,19 @@ function MindMapCanvas({
         return { ...e, className: [...parts].join(' ') }
       }),
     )
-    setSelectedId('root')
+
+    const parentId = findParentId(edges, selectedId)
+    let nextSelectedId = parentId ?? 'root'
+    if (parentId) {
+      const siblings = getChildIdsOrdered(nodes, edges, parentId)
+      const idx = siblings.indexOf(selectedId)
+      if (idx >= 0 && idx + 1 < siblings.length) {
+        nextSelectedId = siblings[idx + 1]!
+      } else if (idx > 0) {
+        nextSelectedId = siblings[idx - 1]!
+      }
+    }
+    selectNode(nextSelectedId)
 
     const removeRoot = selectedId
     let timeoutId = 0
@@ -456,7 +477,7 @@ function MindMapCanvas({
       setEdges(e2)
     }, NODE_EXIT_MS)
     exitTimeoutsRef.current.push(timeoutId)
-  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes])
+  }, [aiBusy, edges, nodes, selectedId, selectNode, setEdges, setNodes])
 
   const reset = useCallback(() => {
     if (aiBusy) return
@@ -464,6 +485,36 @@ function MindMapCanvas({
     setEdges(createInitialEdges())
     setSelectedId('root')
   }, [aiBusy, setEdges, setNodes])
+
+  const navigateLeft = useCallback(() => {
+    if (!selectedId) return
+    const parentId = findParentId(edges, selectedId)
+    if (parentId) selectNode(parentId)
+  }, [edges, selectedId, selectNode])
+
+  const navigateRight = useCallback(() => {
+    if (!selectedId) return
+    const children = getChildIdsOrdered(nodes, edges, selectedId)
+    if (children.length > 0) selectNode(children[0]!)
+  }, [nodes, edges, selectedId, selectNode])
+
+  const navigateUp = useCallback(() => {
+    if (!selectedId) return
+    const parentId = findParentId(edges, selectedId)
+    if (!parentId) return
+    const siblings = getChildIdsOrdered(nodes, edges, parentId)
+    const idx = siblings.indexOf(selectedId)
+    if (idx > 0) selectNode(siblings[idx - 1]!)
+  }, [nodes, edges, selectedId, selectNode])
+
+  const navigateDown = useCallback(() => {
+    if (!selectedId) return
+    const parentId = findParentId(edges, selectedId)
+    if (!parentId) return
+    const siblings = getChildIdsOrdered(nodes, edges, parentId)
+    const idx = siblings.indexOf(selectedId)
+    if (idx >= 0 && idx < siblings.length - 1) selectNode(siblings[idx + 1]!)
+  }, [nodes, edges, selectedId, selectNode])
 
   const canAddSibling = useMemo(() => {
     if (!selectedId) return false
@@ -487,6 +538,18 @@ function MindMapCanvas({
   )
   useShortcut(
     { id: 'mindmap.reset', combo: 'mod+shift+r', description: '重置为示例导图', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { reset() } },
+  )
+  useShortcut(
+    { id: 'mindmap.navLeft', combo: 'arrowleft', description: '选中父节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateLeft() } },
+  )
+  useShortcut(
+    { id: 'mindmap.navRight', combo: 'arrowright', description: '选中第一个子节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateRight() } },
+  )
+  useShortcut(
+    { id: 'mindmap.navUp', combo: 'arrowup', description: '选中上方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateUp() } },
+  )
+  useShortcut(
+    { id: 'mindmap.navDown', combo: 'arrowdown', description: '选中下方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateDown() } },
   )
 
   const doAutoLayout = useCallback(() => {
