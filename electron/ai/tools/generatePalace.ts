@@ -1,9 +1,9 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
 import { runTextToPalace } from '../../workflows/textToPalace.js'
-import type { AiRuntime } from '../runtime.js'
+import type { LLMProvider } from '../providers/index.js'
 
-export function createGeneratePalaceTool(apiKey: string, model: string, runtime: AiRuntime) {
+export function createGeneratePalaceTool(apiKey: string, model: string, runtime: LLMProvider) {
   return tool(
     async ({ content }) => {
       try {

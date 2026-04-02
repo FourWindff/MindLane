@@ -2,11 +2,11 @@ import { Annotation, END, START, StateGraph } from '@langchain/langgraph'
 import { z } from 'zod/v3'
 
 import {
-  createDashScopeRuntime,
+  DashScopeProvider,
   urlToDataUrl,
-  type AiRuntime,
+  type LLMProvider,
   type DetectedAnchor,
-} from '../ai/runtime.js'
+} from '../ai/providers/index.js'
 import {
   buildAnalyzeInputMessages,
   buildDesignMnemonicsMessages,
@@ -151,7 +151,7 @@ export async function runTextToPalace(params: {
   apiKey: string
   model: string
   messages: TextToPalaceMessage[]
-  runtime?: AiRuntime
+  runtime?: LLMProvider
 }): Promise<TextToPalaceResult> {
   const apiKey = params.apiKey.trim()
   if (!apiKey) return { ok: false, error: '未填写 API Key' }
@@ -162,7 +162,7 @@ export async function runTextToPalace(params: {
 
   const runtime =
     params.runtime ??
-    createDashScopeRuntime({
+    new DashScopeProvider({
       apiKey,
       chatModel: params.model.trim() || 'qwen-turbo',
     })

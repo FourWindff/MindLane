@@ -6,7 +6,7 @@
 
 import { StateGraph, END, START } from '@langchain/langgraph'
 import { Annotation } from '@langchain/langgraph'
-import { createDashScopeRuntime, urlToDataUrl, type AiRuntime, type DetectedAnchor } from '../ai/runtime.js'
+import { DashScopeProvider, urlToDataUrl, type LLMProvider, type DetectedAnchor } from '../ai/providers/index.js'
 import {
   buildAnalyzeAndPlanMessages,
   buildPalaceImagePrompt,
@@ -231,7 +231,7 @@ export async function runNodesToPalace(params: {
   apiKey: string
   model: string
   selectedNodes: SelectedNodeContent[]
-  runtime?: AiRuntime
+  provider?: LLMProvider
 }): Promise<NodesToPalaceResult> {
   const { apiKey, model, selectedNodes } = params
   if (!apiKey.trim()) return { ok: false, error: '未填写 API Key' }
@@ -239,8 +239,8 @@ export async function runNodesToPalace(params: {
 
   const modelName = model.trim() || 'qwen-turbo'
   const runtime =
-    params.runtime ??
-    createDashScopeRuntime({
+    params.provider ??
+    new DashScopeProvider({
       apiKey,
       chatModel: modelName,
     })

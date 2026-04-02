@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { DEFAULT_CHAT_MODELS, createDashScopeRuntime, urlToDataUrl } from './ai/runtime.js'
+import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './ai/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import { runNodesToPalace, type SelectedNodeContent } from './workflows/nodesToPalace.js'
 import { runDocToMindmap } from './workflows/docToMindmap.js'
@@ -208,10 +208,10 @@ function createWindow() {
 }
 
 function registerIpcHandlers() {
-  const createRuntimeForRequest = async (apiKey: string, model: string) => {
+  const createProviderForRequest = async (apiKey: string, model: string) => {
     const settings = await fsService.settings.load()
     const dsConfig = settings.providerConfigs['dashscope']
-    return createDashScopeRuntime({
+    return new DashScopeProvider({
       apiKey: apiKey.trim() || settings.apiKey || dsConfig?.apiKey || '',
       chatModel: model.trim() || settings.chatModel || 'qwen-turbo',
       baseUrl: dsConfig?.baseUrl,
@@ -244,7 +244,7 @@ function registerIpcHandlers() {
 
         if (!apiKey.trim()) return { ok: false, error: '未填写 API Key' }
 
-        const runtime = createDashScopeRuntime({
+        const provider = new DashScopeProvider({
           apiKey,
           chatModel: modelName,
           baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
@@ -269,8 +269,8 @@ function registerIpcHandlers() {
 
         const result = await runAgent({
           request,
-          model: runtime.reasoningModel,
-          runtime,
+          model: provider.reasoningModel,
+          provider,
           aiService,
           apiKey,
           modelName,
@@ -318,7 +318,7 @@ function registerIpcHandlers() {
           return
         }
 
-        const runtime = createDashScopeRuntime({
+        const provider = new DashScopeProvider({
           apiKey,
           chatModel: modelName,
           baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
@@ -344,8 +344,8 @@ function registerIpcHandlers() {
         await streamAgent(
           {
             request,
-            model: runtime.reasoningModel,
-            runtime,
+            model: provider.reasoningModel,
+            provider,
             aiService,
             apiKey,
             modelName,
@@ -402,8 +402,8 @@ function registerIpcHandlers() {
     'ai:text2image',
     async (_e, payload: { apiKey: string; prompt: string; size?: string; n?: number }) => {
       try {
-        const runtime = await createRuntimeForRequest(payload.apiKey, '')
-        const result = await runtime.generateImage(payload)
+        const provider = await createProviderForRequest(payload.apiKey, '')
+        const result = await provider.generateImage(payload)
         return { ok: true, urls: result.urls }
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -472,12 +472,12 @@ function registerIpcHandlers() {
       _e,
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
-      const runtime = await createRuntimeForRequest(payload.apiKey, payload.model)
+      const provider = await createProviderForRequest(payload.apiKey, payload.model)
       return runNodesToPalace({
         apiKey: payload.apiKey,
         model: payload.model,
         selectedNodes: payload.selectedNodes,
-        runtime,
+        provider,
       })
     },
   )
@@ -489,7 +489,7 @@ function registerIpcHandlers() {
         {
           id: 'dashscope',
           displayName: '通义千问 (百炼)',
-          models: DEFAULT_CHAT_MODELS.map((model) => ({ ...model })),
+          models: DashScopeProvider.defaultChatModels.map((model) => ({ ...model })),
         },
       ],
       image: [{ id: 'dashscope', displayName: '通义万相 (百炼)' }],
@@ -782,16 +782,16 @@ function registerIpcHandlers() {
     }
 
     const indexed = []
-    let visionModel = undefined as ReturnType<typeof createDashScopeRuntime>['visionModel']
+    let visionModel: LLMProvider['visionModel'] = undefined
     try {
       const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
       if (apiKey) {
-        const runtime = createDashScopeRuntime({
+        const provider = new DashScopeProvider({
           apiKey,
           chatModel: settings.chatModel || 'qwen-turbo',
           baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
         })
-        visionModel = runtime.visionModel
+        visionModel = provider.visionModel
       }
     } catch { /* no vision model available */ }
 

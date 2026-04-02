@@ -1,7 +1,7 @@
 import { createReactAgent } from '@langchain/langgraph/prebuilt'
 import { SystemMessage, HumanMessage, AIMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
-import type { AiRuntime } from './runtime.js'
+import type { LLMProvider } from './providers/index.js'
 import type { AiService } from './service.js'
 import type { MindLaneNode, MindLaneEdge } from '../../src/shared/lib/fileFormat.js'
 import { createSearchTools } from './tools/searchDocuments.js'
@@ -129,12 +129,12 @@ export interface StreamCallbacks {
 function buildAgent(params: {
   request: ChatRequest
   model: BaseChatModel
-  runtime: AiRuntime
+  provider: LLMProvider
   aiService: AiService
   apiKey: string
   modelName: string
 }) {
-  const { request, model, runtime, aiService, apiKey, modelName } = params
+  const { request, model, provider, aiService, apiKey, modelName } = params
 
   const { listKnowledgeBaseTool, searchDocumentsTool } = createSearchTools(
     aiService.vectorStore,
@@ -147,7 +147,7 @@ function buildAgent(params: {
     listKnowledgeBaseTool,
     searchDocumentsTool,
     createGenerateMindmapTool(apiKey, modelName),
-    createGeneratePalaceTool(apiKey, modelName, runtime),
+    createGeneratePalaceTool(apiKey, modelName, provider),
     contextTools.getMindmapContextTool,
     contextTools.getSelectedNodesTool,
     contextTools.listWorkspaceFilesTool,
@@ -220,7 +220,7 @@ function extractResponseData(responseMessages: BaseMessage[]): Omit<ChatResponse
 export async function runAgent(params: {
   request: ChatRequest
   model: BaseChatModel
-  runtime: AiRuntime
+  provider: LLMProvider
   aiService: AiService
   apiKey: string
   modelName: string
@@ -253,7 +253,7 @@ export async function streamAgent(
   params: {
     request: ChatRequest
     model: BaseChatModel
-    runtime: AiRuntime
+    provider: LLMProvider
     aiService: AiService
     apiKey: string
     modelName: string
