@@ -18,6 +18,7 @@ import {
   ReactFlowProvider,
   SelectionMode,
   useOnSelectionChange,
+  useStoreApi,
   type Edge,
   type Node,
 } from '@xyflow/react'
@@ -34,7 +35,6 @@ import {
   collectSubtreeIds,
   createInitialEdges,
   createInitialNodes,
-  deleteSubtree,
   findParentId,
   getChildIdsOrdered,
   newId,
@@ -223,6 +223,7 @@ function MindMapCanvas({
   onOpenSettings?: () => void
 }) {
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
+  const rfStore = useStoreApi()
 
   const nodes = useMindmapStore((s) => s.nodes)
   const edges = useMindmapStore((s) => s.edges)
@@ -427,25 +428,32 @@ function MindMapCanvas({
     (targetId: string) => {
       setSelectedId(targetId)
       setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === targetId })))
+      rfStore.setState({ nodesSelectionActive: false })
     },
-    [setNodes],
+    [setNodes, rfStore],
   )
 
   const removeSelected = useCallback(() => {
     if (aiBusy) return
-    if (!selectedId || selectedId === 'root') return
-    const target = nodes.find((n) => n.id === selectedId)
-    if (target?.data?.exiting) return
-    const ids = collectSubtreeIds(edges, selectedId)
+
+    const targets = nodes.filter(
+      (n) => n.selected && n.id !== 'root' && !n.data?.exiting,
+    )
+    if (targets.length === 0) return
+
+    const allIds = new Set<string>()
+    for (const t of targets) {
+      for (const id of collectSubtreeIds(edges, t.id)) allIds.add(id)
+    }
 
     setNodes((nds) =>
       nds.map((n) =>
-        ids.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n,
+        allIds.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n,
       ),
     )
     setEdges((eds) =>
       eds.map((e) => {
-        const touch = ids.has(e.source) || ids.has(e.target)
+        const touch = allIds.has(e.source) || allIds.has(e.target)
         if (!touch) return e
         const parts = new Set(
           [e.className, 'mindmap-edge', 'mindmap-edge--exiting'].join(' ').split(/\s+/).filter(Boolean),
@@ -454,31 +462,29 @@ function MindMapCanvas({
       }),
     )
 
-    const parentId = findParentId(edges, selectedId)
+    const primaryId = targets[0]!.id
+    const parentId = findParentId(edges, primaryId)
     let nextSelectedId = parentId ?? 'root'
     if (parentId) {
       const siblings = getChildIdsOrdered(nodes, edges, parentId)
-      const idx = siblings.indexOf(selectedId)
-      if (idx >= 0 && idx + 1 < siblings.length) {
-        nextSelectedId = siblings[idx + 1]!
-      } else if (idx > 0) {
-        nextSelectedId = siblings[idx - 1]!
-      }
+      const surviving = siblings.find((id) => !allIds.has(id))
+      if (surviving) nextSelectedId = surviving
     }
+    if (allIds.has(nextSelectedId)) nextSelectedId = 'root'
     selectNode(nextSelectedId)
 
-    const removeRoot = selectedId
     let timeoutId = 0
     timeoutId = window.setTimeout(() => {
       exitTimeoutsRef.current = exitTimeoutsRef.current.filter((tid) => tid !== timeoutId)
       const { nodes: n, edges: e } = graphRef.current
-      const { nodes: n2, edges: e2 } = deleteSubtree(n, e, removeRoot)
-      const laidOut = reflowChildren('root', n2, e2, CHILD_OFFSET_X, CHILD_GAP_Y)
+      const nextNodes = n.filter((node) => !allIds.has(node.id))
+      const nextEdges = e.filter((edge) => !allIds.has(edge.source) && !allIds.has(edge.target))
+      const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
       setNodes(laidOut)
-      setEdges(e2)
+      setEdges(nextEdges)
     }, NODE_EXIT_MS)
     exitTimeoutsRef.current.push(timeoutId)
-  }, [aiBusy, edges, nodes, selectedId, selectNode, setEdges, setNodes])
+  }, [aiBusy, edges, nodes, selectNode, setEdges, setNodes])
 
   const reset = useCallback(() => {
     if (aiBusy) return
