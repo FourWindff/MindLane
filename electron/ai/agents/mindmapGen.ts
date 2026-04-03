@@ -8,27 +8,19 @@ interface KeyPoint {
   children?: KeyPoint[]
 }
 
-function layoutTree(
+function flattenTree(
   points: KeyPoint[],
   parentId: string,
-  startX: number,
-  startY: number,
-  offsetX: number,
-  gapY: number,
   genId: (prefix: string) => string,
 ): { nodes: GeneratedNode[]; edges: GeneratedEdge[] } {
   const nodes: GeneratedNode[] = []
   const edges: GeneratedEdge[] = []
-
-  const totalHeight = points.length * gapY
-  let currentY = startY - totalHeight / 2 + gapY / 2
 
   for (const point of points) {
     const nodeId = genId('topic')
     nodes.push({
       id: nodeId,
       type: 'topic',
-      position: { x: startX + offsetX, y: currentY },
       data: { label: point.title },
     })
     edges.push({
@@ -39,20 +31,10 @@ function layoutTree(
     })
 
     if (point.children && point.children.length > 0) {
-      const sub = layoutTree(
-        point.children,
-        nodeId,
-        startX + offsetX,
-        currentY,
-        offsetX,
-        gapY * 0.85,
-        genId,
-      )
+      const sub = flattenTree(point.children, nodeId, genId)
       nodes.push(...sub.nodes)
       edges.push(...sub.edges)
     }
-
-    currentY += gapY
   }
 
   return { nodes, edges }
@@ -100,7 +82,6 @@ export class MindmapGenAgent {
       const docNode: GeneratedNode = {
         id: docNodeId,
         type: 'document',
-        position: { x: -300, y: 0 },
         data: {
           filename: state.mindmapInputTitle || '用户输入',
           excerpt: documentText.slice(0, 200),
@@ -110,7 +91,6 @@ export class MindmapGenAgent {
       const rootNode: GeneratedNode = {
         id: rootId,
         type: 'topic',
-        position: { x: 0, y: 0 },
         data: { label: title },
       }
 
@@ -121,7 +101,7 @@ export class MindmapGenAgent {
         type: 'smoothstep',
       }
 
-      const tree = layoutTree(points, rootId, 0, 0, 260, 96, genId)
+      const tree = flattenTree(points, rootId, genId)
 
       return {
         mindmapNodes: [docNode, rootNode, ...tree.nodes],

@@ -272,8 +272,16 @@ function MindMapCanvas({
         layoutTimerRef.current = null
         const { nodes: latestNodes, edges: curEdges } = useMindmapStore.getState()
         isLayoutingRef.current = true
-        const laidOut = reflowChildren('root', latestNodes, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
-        setNodes(laidOut)
+
+        const targetIds = new Set(curEdges.map((e) => e.target))
+        const roots = latestNodes.filter((n) => !targetIds.has(n.id))
+
+        let result = latestNodes
+        for (const root of roots) {
+          result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
+        }
+
+        setNodes(result)
         requestAnimationFrame(() => { isLayoutingRef.current = false })
       }, 80)
     },

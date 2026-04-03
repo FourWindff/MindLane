@@ -111,21 +111,18 @@ export function ChatPanel() {
       const mindmapStore = useMindmapStore.getState()
       const existingNodes = mindmapStore.nodes
       const existingEdges = mindmapStore.edges
-      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x), 0)
-      const offsetX = maxX + 600
 
-      const newNodes: Node[] = data.nodes.map((n) => {
+      const newTargets = new Set(data.edges.map((e) => e.target))
+      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x + (n.measured?.width ?? 200)), 0)
+      const offsetX = existingNodes.length > 0 ? maxX + 300 : 0
+
+      const rawNodes: Node[] = data.nodes.map((n) => {
         const descriptor = nodeRegistry.get(n.type)
         const deserializedData = descriptor
           ? descriptor.deserialize(n.data)
           : n.data
-
-        return {
-          id: n.id,
-          type: n.type,
-          position: { x: n.position.x + offsetX, y: n.position.y },
-          data: deserializedData,
-        }
+        const isRoot = !newTargets.has(n.id)
+        return { id: n.id, type: n.type, position: { x: offsetX, y: isRoot ? 0 : 50 }, data: deserializedData }
       })
 
       const newEdges: Edge[] = data.edges.map((e) => ({
@@ -136,7 +133,7 @@ export function ChatPanel() {
         className: 'mindmap-edge mindmap-edge--enter',
       }))
 
-      mindmapStore.setNodes([...existingNodes, ...newNodes])
+      mindmapStore.setNodes([...existingNodes, ...rawNodes])
       mindmapStore.setEdges([...existingEdges, ...newEdges])
     },
     [],
@@ -151,7 +148,7 @@ export function ChatPanel() {
     unsubs.push(
       api.onStreamToken((token) => {
         streamTextRef.current += token
-        setStreamingText(streamTextRef.current)
+        setStreamingText(stripMarkers(streamTextRef.current))
         scrollToBottom()
       }),
     )
@@ -170,7 +167,7 @@ export function ChatPanel() {
 
     unsubs.push(
       api.onStreamEnd((response) => {
-        const content = streamTextRef.current || response.content
+        const content = response.content || stripMarkers(streamTextRef.current)
         addMessage({
           role: 'assistant',
           content,
@@ -418,6 +415,13 @@ function MarkdownContent({ content }: { content: string }) {
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   )
+}
+
+const MARKER_RE = /\[(?:INTENT:\w+|PALACE_INPUT:[\s\S]*?|MINDMAP_INPUT:[\s\S]*?|MINDMAP_TITLE:[\s\S]*?)\]/g
+const PARTIAL_MARKER_RE = /\[(?:INTENT|PALACE_INPUT|MINDMAP_INPUT|MINDMAP_TITLE)[^\]]*$/i
+
+function stripMarkers(text: string): string {
+  return text.replace(MARKER_RE, '').replace(PARTIAL_MARKER_RE, '').trim()
 }
 
 function toolDisplayName(name: string): string {

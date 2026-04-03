@@ -1,12 +1,12 @@
 import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
-import { END, START, StateGraph } from '@langchain/langgraph'
+import { END, START, StateGraph, MemorySaver } from '@langchain/langgraph'
 import type { LLMProvider } from './providers/index.js'
 import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
 import { compressMessages } from './memory/compression.js'
 import { AgentState } from './state.js'
 import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge } from './state.js'
-import { SupervisorAgent } from './agents/supervisor.js'
+import { SupervisorAgent, stripIntentMarkers } from './agents/supervisor.js'
 import { AnalyzeAgent } from './agents/analyze.js'
 import { ImageGenAgent } from './agents/imageGen.js'
 import { VisionAgent } from './agents/vision.js'
@@ -96,7 +96,7 @@ export class AgentOrchestrator {
     )
 
     const response: ChatResponse = {
-      content: result.response || '抱歉，我无法生成回复。',
+      content: stripIntentMarkers(result.response || '') || '抱歉，我无法生成回复。',
       toolCalls: this.extractToolCalls(result.messages),
     }
 
@@ -122,14 +122,23 @@ export class AgentOrchestrator {
   ): Promise<void> {
     const compressed = await this.buildInputMessages(request)
     const graph = this.buildGraph(request.context)
-    const app = graph.compile()
+    const checkpointer = new MemorySaver()
+    const app = graph.compile({ checkpointer })
+    const threadId = `stream-${Date.now()}`
 
     let fullContent = ''
 
     try {
+      const streamConfig = {
+        version: 'v2' as const,
+        signal,
+        recursionLimit: 80,
+        configurable: { thread_id: threadId },
+      }
+
       const stream = app.streamEvents(
         { messages: compressed, context: request.context ?? null },
-        { version: 'v2' as const, signal, recursionLimit: 80 },
+        streamConfig,
       )
 
       for await (const event of stream) {
@@ -153,32 +162,35 @@ export class AgentOrchestrator {
         }
       }
 
-      const finalResult = await app.invoke(
-        { messages: compressed, context: request.context ?? null },
-        { recursionLimit: 80 },
-      )
+      const snapshot = await app.getState({ configurable: { thread_id: threadId } })
+      const result = snapshot.values as typeof AgentState.State
 
+      const rawContent = result.response || fullContent || '抱歉，我无法生成回复。'
       const response: ChatResponse = {
-        content: finalResult.response || fullContent || '抱歉，我无法生成回复。',
-        toolCalls: this.extractToolCalls(finalResult.messages),
+        content: stripIntentMarkers(rawContent),
+        toolCalls: this.extractToolCalls(result.messages),
       }
 
-      if (finalResult.intent === 'mindmap' && finalResult.mindmapNodes.length > 0) {
+      if (result.intent === 'mindmap' && result.mindmapNodes.length > 0) {
         response.mindmapData = this.mapMindmapResult(
-          finalResult.mindmapNodes,
-          finalResult.mindmapEdges,
-          finalResult.mindmapTitle,
+          result.mindmapNodes,
+          result.mindmapEdges,
+          result.mindmapTitle,
         )
       }
 
-      if (finalResult.intent === 'palace' && finalResult.memoryRoute.length > 0) {
-        response.palaceData = await this.mapPalaceResult(finalResult)
+      if (result.intent === 'palace' && result.memoryRoute.length > 0) {
+        response.palaceData = await this.mapPalaceResult({
+          response: rawContent,
+          imageUrls: result.imageUrls,
+          memoryRoute: result.memoryRoute,
+        })
       }
 
       callbacks.onEnd(response)
     } catch (err) {
       if (signal?.aborted) {
-        callbacks.onEnd({ content: fullContent || '（已停止生成）' })
+        callbacks.onEnd({ content: stripIntentMarkers(fullContent) || '（已停止生成）' })
         return
       }
       callbacks.onError(err instanceof Error ? err.message : String(err))
@@ -344,7 +356,7 @@ export class AgentOrchestrator {
         return {
           id: n.id,
           type: 'document' as const,
-          position: n.position,
+          position: { x: 0, y: 0 },
           data: {
             filename: (n.data as { filename?: string }).filename ?? '',
             excerpt: (n.data as { excerpt?: string }).excerpt ?? '',
@@ -355,7 +367,7 @@ export class AgentOrchestrator {
       return {
         id: n.id,
         type: 'topic' as const,
-        position: n.position,
+        position: { x: 0, y: 0 },
         data: { label: (n.data as { label?: string }).label ?? '' },
       }
     }) as MindLaneNode[]

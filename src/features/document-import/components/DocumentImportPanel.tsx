@@ -64,13 +64,15 @@ export function DocumentImportPanel() {
 
       const existingNodes = useMindmapStore.getState().nodes
       const existingEdges = useMindmapStore.getState().edges
-      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x), 0)
-      const offsetX = maxX + 600
 
-      const newNodes: Node[] = result.nodes.map((n) => ({
+      const newTargets = new Set(result.edges.map((e: { target: string }) => e.target))
+      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x + (n.measured?.width ?? 200)), 0)
+      const offsetX = existingNodes.length > 0 ? maxX + 300 : 0
+
+      const rawNodes: Node[] = result.nodes.map((n) => ({
         id: n.id,
         type: n.type,
-        position: { x: n.position.x + offsetX, y: n.position.y },
+        position: { x: offsetX, y: !newTargets.has(n.id) ? 0 : 50 },
         data: n.data,
       }))
 
@@ -82,7 +84,7 @@ export function DocumentImportPanel() {
         className: 'mindmap-edge mindmap-edge--enter',
       }))
 
-      setNodes([...existingNodes, ...newNodes])
+      setNodes([...existingNodes, ...rawNodes])
       setEdges([...existingEdges, ...newEdges])
     } catch (e) {
       setLastError(e instanceof Error ? e.message : String(e))
