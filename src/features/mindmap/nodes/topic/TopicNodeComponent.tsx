@@ -7,7 +7,7 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TopicNodeData
   const { setNodes } = useReactFlow()
   const [label, setLabel] = useState(data.label)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore((s) => s.busy)
 
   const editing = !!data.editing
@@ -46,8 +46,10 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
   useEffect(() => {
     if (!editing) return
     requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.select()
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      ta.select()
     })
   }, [editing])
 
@@ -77,20 +79,20 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
     .join(' ')
 
   return (
-    <div
-      className={className}
-      onAnimationEnd={onAnimationEnd}
-    >
+    <div className={className} onAnimationEnd={onAnimationEnd}>
       <Handle type="target" position={Position.Left} />
       {editing && !aiBusy ? (
-        <input
-          ref={inputRef}
-          className="topic-node__input"
+        <textarea
+          ref={textareaRef}
+          className="topic-node__textarea"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commit()
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              commit()
+            }
             if (e.key === 'Escape') {
               setLabel(data.label)
               clearEditing()

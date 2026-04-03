@@ -267,10 +267,6 @@ function MindMapCanvas({
       )
       if (!hasDimensionChange) return
 
-      const { nodes: curNodes } = useMindmapStore.getState()
-      const anyEditing = curNodes.some((n) => n.data.editing)
-      if (anyEditing) return
-
       if (layoutTimerRef.current) window.clearTimeout(layoutTimerRef.current)
       layoutTimerRef.current = window.setTimeout(() => {
         layoutTimerRef.current = null
@@ -279,7 +275,7 @@ function MindMapCanvas({
         const laidOut = reflowChildren('root', latestNodes, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
         setNodes(laidOut)
         requestAnimationFrame(() => { isLayoutingRef.current = false })
-      }, 60)
+      }, 80)
     },
     [onNodesChange, setNodes],
   )
