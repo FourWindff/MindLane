@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Info, HelpCircle, Sparkles, Check, Square, Send } from 'lucide-react'
+import { Info, HelpCircle, Sparkles, Check, Square, Send, Plus, History, X, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Node, Edge } from '@xyflow/react'
@@ -66,6 +66,11 @@ export function ChatPanel() {
   const busy = useAiStore((s) => s.busy)
   const addMessage = useAiStore((s) => s.addChatMessage)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
+  const sessions = useAiStore((s) => s.sessions)
+  const showSessionList = useAiStore((s) => s.showSessionList)
+  const setShowSessionList = useAiStore((s) => s.setShowSessionList)
+  const loadSession = useAiStore((s) => s.loadSession)
+  const deleteSession = useAiStore((s) => s.deleteSession)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -270,6 +275,13 @@ export function ChatPanel() {
     void api.stopStream()
   }, [])
 
+  const startNewChat = useCallback(async () => {
+    // Save current chat history first
+    await saveChatHistory()
+    // Then start new chat
+    useAiStore.getState().startNewChat()
+  }, [])
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -279,6 +291,19 @@ export function ChatPanel() {
     },
     [send],
   )
+
+  const toggleSessionList = useCallback(() => {
+    setShowSessionList(!showSessionList)
+  }, [showSessionList, setShowSessionList])
+
+  const handleLoadSession = useCallback((sessionId: string) => {
+    void loadSession(sessionId)
+  }, [loadSession])
+
+  const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    void deleteSession(sessionId)
+  }, [deleteSession])
 
   if (!apiKey) {
     return (
@@ -295,6 +320,81 @@ export function ChatPanel() {
 
   return (
     <div className="chat-panel">
+      {/* Chat Header */}
+      <div className="chat-header">
+        <button
+          type="button"
+          className={`chat-header__history-btn${showSessionList ? ' chat-header__history-btn--active' : ''}`}
+          onClick={toggleSessionList}
+          disabled={busy}
+          title="查看历史对话"
+        >
+          <History size={14} strokeWidth={2} />
+          <span>历史</span>
+        </button>
+        <button
+          type="button"
+          className="chat-header__new-btn"
+          onClick={startNewChat}
+          disabled={busy}
+          title="创建新对话"
+        >
+          <Plus size={14} strokeWidth={2} />
+          <span>新对话</span>
+        </button>
+      </div>
+
+      {/* Session List */}
+      {showSessionList && (
+        <div className="chat-session-list">
+          <div className="chat-session-list__header">
+            <span>历史对话</span>
+            <button
+              type="button"
+              className="chat-session-list__close"
+              onClick={() => setShowSessionList(false)}
+            >
+              <X size={14} strokeWidth={2} />
+            </button>
+          </div>
+          <div className="chat-session-list__content">
+            {sessions.length === 0 ? (
+              <div className="chat-session-list__empty">暂无历史对话</div>
+            ) : (
+              sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`chat-session-item${session.id === threadId ? ' chat-session-item--active' : ''}`}
+                  onClick={() => handleLoadSession(session.id)}
+                >
+                  <div className="chat-session-item__info">
+                    <span className="chat-session-item__title">{session.title}</span>
+                    <span className="chat-session-item__meta">
+                      {new Date(session.updatedAt).toLocaleString('zh-CN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                      {' · '}
+                      {session.messageCount} 条消息
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="chat-session-item__delete"
+                    onClick={(e) => handleDeleteSession(session.id, e)}
+                    title="删除对话"
+                  >
+                    <Trash2 size={14} strokeWidth={2} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div ref={scrollRef} className="chat-messages">
         {messages.length === 0 && !streamingText && (

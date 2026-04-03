@@ -1,5 +1,9 @@
 import { create } from 'zustand'
 
+function generateThreadId(): string {
+  return `thread_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
 export type AiPipelineStep =
   | 'idle'
   | 'analyzing'
@@ -11,7 +15,7 @@ export type AiPipelineStep =
   | 'generating-map'
   | 'chatting'
 
-interface ChatMessage {
+export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   toolCalls?: Array<{
@@ -19,6 +23,14 @@ interface ChatMessage {
     args: Record<string, unknown>
     result: string
   }>
+}
+
+export interface ChatSession {
+  id: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
 }
 
 interface AiState {
@@ -32,6 +44,10 @@ interface AiState {
   chatMessages: ChatMessage[]
   workspacePath: string | null
 
+  // Sessions
+  sessions: ChatSession[]
+  showSessionList: boolean
+
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
   setProgress: (progress: number) => void
@@ -44,9 +60,16 @@ interface AiState {
   setThreadId: (id: string) => void
   addChatMessage: (msg: ChatMessage) => void
   setChatMessages: (msgs: ChatMessage[]) => void
+  startNewChat: () => void
+
+  // Session management
+  setSessions: (sessions: ChatSession[]) => void
+  setShowSessionList: (show: boolean) => void
+  loadSession: (sessionId: string) => Promise<void>
+  deleteSession: (sessionId: string) => Promise<void>
 }
 
-export const useAiStore = create<AiState>((set) => ({
+export const useAiStore = create<AiState>((set, get) => ({
   busy: false,
   step: 'idle',
   progress: 0,
@@ -55,6 +78,8 @@ export const useAiStore = create<AiState>((set) => ({
   threadId: '',
   chatMessages: [],
   workspacePath: null,
+  sessions: [],
+  showSessionList: false,
 
   setBusy: (busy) => set({ busy }),
   setStep: (step) => set({ step }),
@@ -68,12 +93,109 @@ export const useAiStore = create<AiState>((set) => ({
   setThreadId: (id) => set({ threadId: id }),
   addChatMessage: (msg) => set((s) => ({ chatMessages: [...s.chatMessages, msg] })),
   setChatMessages: (msgs) => set({ chatMessages: msgs }),
+  startNewChat: () => set({
+    threadId: generateThreadId(),
+    chatMessages: [],
+    busy: false,
+    step: 'idle',
+    streamText: '',
+    errorMessage: null,
+    showSessionList: false,
+  }),
+
+  setSessions: (sessions) => set({ sessions }),
+  setShowSessionList: (show) => set({ showSessionList: show }),
+
+  loadSession: async (sessionId: string) => {
+    const state = get()
+    if (!state.workspacePath) return
+
+    const result = await window.mindlane?.chat?.loadSession({
+      workspacePath: state.workspacePath,
+      sessionId,
+    })
+
+    if (result?.ok) {
+      set({
+        threadId: result.data.sessionId,
+        chatMessages: result.data.messages as ChatMessage[],
+        showSessionList: false,
+        busy: false,
+        step: 'idle',
+        streamText: '',
+        errorMessage: null,
+      })
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    const state = get()
+    if (!state.workspacePath) return
+
+    const result = await window.mindlane?.chat?.deleteSession({
+      workspacePath: state.workspacePath,
+      sessionId,
+    })
+
+    if (result?.ok) {
+      // Refresh session list
+      const listResult = await window.mindlane?.chat?.listSessions({
+        workspacePath: state.workspacePath,
+      })
+      if (listResult?.ok) {
+        set({ sessions: listResult.data.sessions })
+      }
+      // If deleted the current session, start a new chat
+      if (state.threadId === sessionId) {
+        get().startNewChat()
+      }
+    }
+  },
 }))
+
+export async function saveChatHistory(): Promise<void> {
+  const state = useAiStore.getState()
+  if (!state.workspacePath) return
+
+  const api = window.mindlane?.chat
+  if (!api) return
+
+  // Use new saveSession API for multi-session support
+  if ('saveSession' in api && api.saveSession) {
+    await api.saveSession({
+      workspacePath: state.workspacePath,
+      sessionId: state.threadId || generateThreadId(),
+      messages: state.chatMessages,
+    })
+    // Refresh sessions list after saving
+    if ('listSessions' in api && api.listSessions) {
+      const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath })
+      if (sessionsResult?.ok && sessionsResult.data) {
+        useAiStore.setState({ sessions: sessionsResult.data.sessions })
+      }
+    }
+  } else {
+    // Fallback to legacy API
+    await api.saveHistory({
+      workspacePath: state.workspacePath,
+      messages: state.chatMessages,
+    })
+  }
+}
 
 export async function loadWorkspaceChat(workspacePath: string): Promise<void> {
   const api = window.mindlane?.chat
   if (!api) return
 
+  // Load session list first
+  if ('listSessions' in api && api.listSessions) {
+    const sessionsResult = await api.listSessions({ workspacePath })
+    if (sessionsResult?.ok && sessionsResult.data) {
+      useAiStore.setState({ sessions: sessionsResult.data.sessions })
+    }
+  }
+
+  // Then load the most recent session
   const result = await api.loadHistory({ workspacePath })
   if (result.ok) {
     useAiStore.setState({
@@ -82,17 +204,4 @@ export async function loadWorkspaceChat(workspacePath: string): Promise<void> {
       workspacePath,
     })
   }
-}
-
-export async function saveChatHistory(): Promise<void> {
-  const state = useAiStore.getState()
-  if (!state.workspacePath || state.chatMessages.length === 0) return
-
-  const api = window.mindlane?.chat
-  if (!api) return
-
-  await api.saveHistory({
-    workspacePath: state.workspacePath,
-    messages: state.chatMessages,
-  })
 }

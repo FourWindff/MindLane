@@ -699,28 +699,86 @@ function registerIpcHandlers() {
     },
   )
 
-  // -- Chat History --
+  // -- Chat History (Multi-session support) --
   const chatHistoryDir = path.join(app.getPath('userData'), 'chat-history')
   fs.mkdirSync(chatHistoryDir, { recursive: true })
 
-  function workspaceThreadId(workspacePath: string): string {
-    return 'ws_' + nodeCrypto.createHash('md5').update(workspacePath).digest('hex').slice(0, 12)
+  function workspaceChatDir(workspacePath: string): string {
+    const wsId = nodeCrypto.createHash('md5').update(workspacePath).digest('hex').slice(0, 12)
+    const dir = path.join(chatHistoryDir, wsId)
+    fs.mkdirSync(dir, { recursive: true })
+    return dir
   }
 
-  function chatHistoryPath(workspacePath: string): string {
-    const threadId = workspaceThreadId(workspacePath)
-    return path.join(chatHistoryDir, `${threadId}.json`)
+  function sessionFilePath(workspacePath: string, sessionId: string): string {
+    return path.join(workspaceChatDir(workspacePath), `${sessionId}.json`)
   }
 
-  ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
-    const filePath = chatHistoryPath(payload.workspacePath)
+  function sessionsMetaPath(workspacePath: string): string {
+    return path.join(workspaceChatDir(workspacePath), 'sessions.json')
+  }
+
+  interface ChatSessionMeta {
+    id: string
+    title: string
+    createdAt: string
+    updatedAt: string
+    messageCount: number
+  }
+
+  function loadSessionsMeta(workspacePath: string): ChatSessionMeta[] {
     try {
+      const metaPath = sessionsMetaPath(workspacePath)
+      if (fs.existsSync(metaPath)) {
+        const data = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+        return Array.isArray(data.sessions) ? data.sessions : []
+      }
+    } catch { /* ignore */ }
+    return []
+  }
+
+  function saveSessionsMeta(workspacePath: string, sessions: ChatSessionMeta[]) {
+    try {
+      const metaPath = sessionsMetaPath(workspacePath)
+      fs.writeFileSync(metaPath, JSON.stringify({ sessions }, null, 2), 'utf-8')
+    } catch (err) {
+      console.error('Failed to save sessions meta:', err)
+    }
+  }
+
+  function generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  }
+
+  function generateSessionTitle(messages: Array<{ role: string; content: string }>): string {
+    const firstUserMessage = messages.find(m => m.role === 'user')
+    if (firstUserMessage) {
+      const title = firstUserMessage.content.slice(0, 30)
+      return title.length < firstUserMessage.content.length ? title + '...' : title
+    }
+    return `新对话 ${new Date().toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+  }
+
+  // List all sessions for a workspace
+  ipcMain.handle('chat:list-sessions', async (_e, payload: { workspacePath: string }) => {
+    try {
+      const sessions = loadSessionsMeta(payload.workspacePath)
+      return { ok: true, data: { sessions } }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Load a specific session
+  ipcMain.handle('chat:load-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
+    try {
+      const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
       if (fs.existsSync(filePath)) {
         const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
         return {
           ok: true,
           data: {
-            threadId: workspaceThreadId(payload.workspacePath),
+            sessionId: payload.sessionId,
             messages: Array.isArray(data.messages) ? data.messages : [],
           },
         }
@@ -729,12 +787,113 @@ function registerIpcHandlers() {
     return {
       ok: true,
       data: {
-        threadId: workspaceThreadId(payload.workspacePath),
+        sessionId: payload.sessionId,
         messages: [],
       },
     }
   })
 
+  // Save a session
+  ipcMain.handle(
+    'chat:save-session',
+    async (
+      _e,
+      payload: {
+        workspacePath: string
+        sessionId: string
+        messages: Array<{
+          role: string
+          content: string
+          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+        }>
+      },
+    ) => {
+      try {
+        const sessions = loadSessionsMeta(payload.workspacePath)
+        const existingIndex = sessions.findIndex(s => s.id === payload.sessionId)
+        const now = new Date().toISOString()
+
+        const title = existingIndex >= 0 && sessions[existingIndex].title
+          ? sessions[existingIndex].title
+          : generateSessionTitle(payload.messages)
+
+        const sessionMeta: ChatSessionMeta = {
+          id: payload.sessionId,
+          title,
+          createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : now,
+          updatedAt: now,
+          messageCount: payload.messages.length,
+        }
+
+        if (existingIndex >= 0) {
+          sessions[existingIndex] = sessionMeta
+        } else {
+          sessions.unshift(sessionMeta)
+        }
+
+        // Sort by updatedAt desc
+        sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        saveSessionsMeta(payload.workspacePath, sessions)
+
+        const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
+        fs.writeFileSync(
+          filePath,
+          JSON.stringify({ messages: payload.messages, updatedAt: now }, null, 2),
+          'utf-8',
+        )
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  // Delete a session
+  ipcMain.handle('chat:delete-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
+    try {
+      const sessions = loadSessionsMeta(payload.workspacePath)
+      const filtered = sessions.filter(s => s.id !== payload.sessionId)
+      saveSessionsMeta(payload.workspacePath, filtered)
+
+      const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Legacy: Load history (for backward compatibility, loads the most recent session)
+  ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
+    try {
+      const sessions = loadSessionsMeta(payload.workspacePath)
+      if (sessions.length > 0) {
+        const mostRecent = sessions[0]
+        const filePath = sessionFilePath(payload.workspacePath, mostRecent.id)
+        if (fs.existsSync(filePath)) {
+          const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+          return {
+            ok: true,
+            data: {
+              threadId: mostRecent.id,
+              messages: Array.isArray(data.messages) ? data.messages : [],
+            },
+          }
+        }
+      }
+    } catch { /* corrupted file, return empty */ }
+    return {
+      ok: true,
+      data: {
+        threadId: generateSessionId(),
+        messages: [],
+      },
+    }
+  })
+
+  // Legacy: Save history (for backward compatibility)
   ipcMain.handle(
     'chat:save-history',
     async (
@@ -749,10 +908,33 @@ function registerIpcHandlers() {
       },
     ) => {
       try {
-        const filePath = chatHistoryPath(payload.workspacePath)
+        const sessions = loadSessionsMeta(payload.workspacePath)
+        const sessionId = sessions.length > 0 ? sessions[0].id : generateSessionId()
+
+        const now = new Date().toISOString()
+        const title = sessions.length > 0 && sessions[0].title
+          ? sessions[0].title
+          : generateSessionTitle(payload.messages)
+
+        const sessionMeta: ChatSessionMeta = {
+          id: sessionId,
+          title,
+          createdAt: sessions.length > 0 ? sessions[0].createdAt : now,
+          updatedAt: now,
+          messageCount: payload.messages.length,
+        }
+
+        if (sessions.length > 0) {
+          sessions[0] = sessionMeta
+        } else {
+          sessions.unshift(sessionMeta)
+        }
+        saveSessionsMeta(payload.workspacePath, sessions)
+
+        const filePath = sessionFilePath(payload.workspacePath, sessionId)
         fs.writeFileSync(
           filePath,
-          JSON.stringify({ messages: payload.messages, updatedAt: new Date().toISOString() }, null, 2),
+          JSON.stringify({ messages: payload.messages, updatedAt: now }, null, 2),
           'utf-8',
         )
         return { ok: true }

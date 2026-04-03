@@ -265,7 +265,7 @@ export class AgentOrchestrator {
     }
   }
 
-  private buildGraph(context?: MindmapContextData) {
+  private buildGraph(_context?: MindmapContextData) {
     const { listKnowledgeBaseTool, searchDocumentsTool } = createSearchTools(
       this.aiService.vectorStore,
       this.aiService.indexer,

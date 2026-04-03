@@ -265,6 +265,32 @@ interface Window {
           toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
         }>
       }) => Promise<{ ok: true } | { ok: false; error: string }>
+      // Multi-session APIs
+      listSessions: (payload: { workspacePath: string }) => Promise<
+        | { ok: true; data: { sessions: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }> } }
+        | { ok: false; error: string }
+      >
+      loadSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{
+        ok: true
+        data: {
+          sessionId: string
+          messages: Array<{
+            role: 'user' | 'assistant' | 'system'
+            content: string
+            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+          }>
+        }
+      }>
+      saveSession: (payload: {
+        workspacePath: string
+        sessionId: string
+        messages: Array<{
+          role: string
+          content: string
+          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
+        }>
+      }) => Promise<{ ok: true } | { ok: false; error: string }>
+      deleteSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{ ok: true } | { ok: false; error: string }>
     }
     kb: {
       uploadDocuments: () => Promise<_FsResult<{ indexed: _IndexedDocMeta[] }>>
