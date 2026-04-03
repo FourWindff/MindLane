@@ -630,45 +630,115 @@
   50% { opacity: 1; transform: scale(1.12); }
 }
 
-/* —— Palace Node (collapsed) —— */
-.palace-node-collapsed {
-  width: 72px;
-  height: 72px;
+/* —— Palace Node Shell (unified wrapper with transitions) —— */
+.palace-node-shell {
   border-radius: 12px;
   background: var(--ml-bg-elevated);
-  border: 2px solid #3b82f6;
   box-shadow: var(--ml-shadow);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    width 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    border-color 0.28s,
+    box-shadow 0.28s;
+}
+
+/* —— Collapsed phase —— */
+.palace-node-shell--collapsed {
+  width: 72px;
+  height: 72px;
+  border: 2px solid #3b82f6;
+}
+.palace-node-shell--collapsed:hover {
+  box-shadow: var(--ml-shadow-strong);
+  transform: scale(1.06);
+  transition:
+    width 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    border-color 0.28s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+
+.palace-node-collapsed-inner {
+  width: 72px;
+  height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
   color: #3b82f6;
-  transition: box-shadow 0.18s, transform 0.18s;
 }
-.palace-node-collapsed:hover {
+
+/* —— Expanding phase (starts at collapsed size, then grows) —— */
+.palace-node-shell--expanding {
+  width: 72px;
+  height: 72px;
+  border: 2px solid var(--ml-border-strong);
+}
+
+/* —— Expanded phase (full size) —— */
+.palace-node-shell--expanded {
+  width: 220px;
+  border: 2px solid var(--ml-border-strong);
+}
+.palace-node-shell--expanded:hover {
   box-shadow: var(--ml-shadow-strong);
-  transform: scale(1.06);
 }
-.palace-node-collapsed--selected {
+
+/* —— Collapsing phase (shrinking back) —— */
+.palace-node-shell--collapsing {
+  width: 72px;
+  height: 72px;
+  border: 2px solid #3b82f6;
+}
+
+.palace-node-expanded-inner {
+  position: relative;
+  animation: palace-content-in 0.28s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.palace-node-shell--collapsing .palace-node-expanded-inner {
+  animation: palace-content-out 0.24s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+
+@keyframes palace-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes palace-content-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+/* —— Selected state —— */
+.palace-node-shell--selected.palace-node-shell--collapsed {
   border-color: #2563eb;
   box-shadow:
     0 0 0 3px rgba(59, 130, 246, 0.18),
     var(--ml-shadow-strong);
 }
-
-/* —— Palace Node (expanded) —— */
-.palace-node {
-  position: relative;
-  min-width: 160px;
-  max-width: 260px;
-  border-radius: 12px;
-  background: var(--ml-bg-elevated);
-  border: 2px solid var(--ml-border-strong);
-  box-shadow: var(--ml-shadow);
-  transform-origin: center center;
-  cursor: pointer;
-  transition: box-shadow 0.15s;
+.palace-node-shell--selected.palace-node-shell--expanded {
+  border-color: var(--ml-accent);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.08),
+    var(--ml-shadow-strong);
 }
+
+/* —— Collapse button —— */
 .palace-node__collapse-btn {
   position: absolute;
   top: 6px;
@@ -687,21 +757,11 @@
   opacity: 0;
   transition: opacity 0.15s, background 0.15s;
 }
-.palace-node:hover .palace-node__collapse-btn {
+.palace-node-shell:hover .palace-node__collapse-btn {
   opacity: 1;
 }
 .palace-node__collapse-btn:hover {
   background: rgba(0, 0, 0, 0.65);
-}
-.palace-node:hover {
-  box-shadow: var(--ml-shadow-strong);
-}
-
-.palace-node--selected {
-  border-color: var(--ml-accent);
-  box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.08),
-    var(--ml-shadow-strong);
 }
 
 .palace-node__thumb {
