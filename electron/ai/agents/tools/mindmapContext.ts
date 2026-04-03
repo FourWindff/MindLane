@@ -1,6 +1,6 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
-import type { MindLaneNode, MindLaneEdge } from '../../../src/shared/lib/fileFormat.js'
+import type { MindLaneNode, MindLaneEdge } from '../../../../src/shared/lib/fileFormat.js'
 
 export interface ContextNodeInfo {
   id: string

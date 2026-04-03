@@ -317,21 +317,25 @@ export function ChatPanel() {
                 <Sparkles size={14} strokeWidth={1.8} />
               </div>
             )}
-            <div className={`chat-bubble ${msg.role === 'user' ? 'chat-bubble--user' : 'chat-bubble--ai'}`}>
-              {msg.role === 'user' ? (
+            {msg.role === 'user' ? (
+              <div className="chat-bubble chat-bubble--user">
                 <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
-              ) : (
-                <MarkdownContent content={msg.content} />
-              )}
-            </div>
-            {msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="chat-tool-calls">
-                {msg.toolCalls.map((tc, j) => (
-                  <div key={j} className="chat-tool-tag">
-                    <Check size={11} strokeWidth={2} />
-                    <span>{toolDisplayName(tc.name)}</span>
+              </div>
+            ) : (
+              <div className="chat-message-group">
+                <div className="chat-bubble chat-bubble--ai">
+                  <MarkdownContent content={msg.content} />
+                </div>
+                {msg.toolCalls && msg.toolCalls.length > 0 && (
+                  <div className="chat-tool-calls">
+                    {msg.toolCalls.map((tc, j) => (
+                      <div key={j} className="chat-tool-tag">
+                        <Check size={11} strokeWidth={2} />
+                        <span>{toolDisplayName(tc.name)}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -343,7 +347,7 @@ export function ChatPanel() {
             <div className="chat-avatar chat-avatar--ai">
               <Sparkles size={14} strokeWidth={1.8} />
             </div>
-            <div className="chat-streaming-group">
+            <div className={`chat-streaming-group${streamingText ? '' : ' chat-streaming-group--thinking'}`}>
               {activeTools.length > 0 && (
                 <div className="chat-tool-calls chat-tool-calls--active">
                   {activeTools.map((name, i) => (
@@ -354,7 +358,7 @@ export function ChatPanel() {
                   ))}
                 </div>
               )}
-              <div className="chat-bubble chat-bubble--ai chat-bubble--streaming">
+              <div className={`chat-bubble chat-bubble--ai chat-bubble--streaming${streamingText ? '' : ' chat-bubble--thinking'}`}>
                 {streamingText ? (
                   <MarkdownContent content={streamingText} />
                 ) : (

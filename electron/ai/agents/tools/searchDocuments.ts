@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
-import type { VectorStoreManager } from '../vectorstore/store.js'
-import type { DocumentIndexer } from '../vectorstore/indexer.js'
+import type { VectorStoreManager } from '../../vectorstore/store.js'
+import type { DocumentIndexer } from '../../vectorstore/indexer.js'
 
 export function createSearchTools(vectorStore: VectorStoreManager, indexer: DocumentIndexer) {
   const listKnowledgeBaseTool = tool(

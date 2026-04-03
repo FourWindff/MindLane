@@ -1,8 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './ai/providers/index.js'
 import { FileSystemService } from './fs/index.js'
-import { runNodesToPalace, type SelectedNodeContent } from './workflows/nodesToPalace.js'
-import { runDocToMindmap } from './workflows/docToMindmap.js'
 import {
   loadWindowBounds,
   resolveWindowBounds,
@@ -18,7 +16,11 @@ import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './ai/service.js'
-import { runAgent, streamAgent, type ChatRequest } from './ai/agent.js'
+import { runAgent, streamAgent, runPalaceFromNodes, type ChatRequest } from './ai/agent.js'
+import type { SelectedNodeContent } from './ai/state.js'
+import { StateGraph, START, END } from '@langchain/langgraph'
+import { AgentState } from './ai/state.js'
+import { createMindmapGenNode } from './ai/agents/mindmapGen.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -421,14 +423,43 @@ function registerIpcHandlers() {
     }
   })
 
-  // -- Doc to MindMap pipeline --
+  // -- Doc to MindMap pipeline (multi-agent: mindmapGen) --
   ipcMain.handle(
     'ai:doc-to-mindmap',
     async (
       _e,
       payload: { apiKey: string; model: string; documentText: string; documentFilename: string },
     ) => {
-      return runDocToMindmap(payload)
+      try {
+        const mindmapGenNode = createMindmapGenNode({
+          apiKey: payload.apiKey,
+          modelName: payload.model || 'qwen-turbo',
+        })
+
+        const graph = new StateGraph(AgentState)
+          .addNode('mindmapGen', mindmapGenNode)
+          .addEdge(START, 'mindmapGen')
+          .addEdge('mindmapGen', END)
+
+        const app = graph.compile()
+        const result = await app.invoke({
+          mindmapInputText: payload.documentText,
+          mindmapInputTitle: payload.documentFilename,
+        })
+
+        if (result.error) {
+          return { ok: false, error: result.error }
+        }
+
+        return {
+          ok: true,
+          nodes: result.mindmapNodes,
+          edges: result.mindmapEdges,
+          documentTitle: result.mindmapTitle,
+        }
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      }
     },
   )
 
@@ -465,7 +496,7 @@ function registerIpcHandlers() {
     }
   })
 
-  // -- Nodes to Palace pipeline --
+  // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
     'ai:nodes-to-palace',
     async (
@@ -473,9 +504,7 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      return runNodesToPalace({
-        apiKey: payload.apiKey,
-        model: payload.model,
+      return runPalaceFromNodes({
         selectedNodes: payload.selectedNodes,
         provider,
       })
