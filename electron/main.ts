@@ -16,11 +16,8 @@ import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './ai/service.js'
-import { runAgent, streamAgent, runPalaceFromNodes, type ChatRequest } from './ai/agent.js'
+import { AgentOrchestrator, type ChatRequest } from './ai/orchestrator.js'
 import type { SelectedNodeContent } from './ai/state.js'
-import { StateGraph, START, END } from '@langchain/langgraph'
-import { AgentState } from './ai/state.js'
-import { createMindmapGenNode } from './ai/agents/mindmapGen.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -269,14 +266,8 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        const result = await runAgent({
-          request,
-          model: provider.reasoningModel,
-          provider,
-          aiService,
-          apiKey,
-          modelName,
-        })
+        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const result = await orchestrator.run(request)
 
         return { ok: true, ...result }
       } catch (error) {
@@ -343,16 +334,9 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        await streamAgent(
-          {
-            request,
-            model: provider.reasoningModel,
-            provider,
-            aiService,
-            apiKey,
-            modelName,
-            signal: abortController.signal,
-          },
+        const orchestrator = new AgentOrchestrator(provider, aiService)
+        await orchestrator.stream(
+          request,
           {
             onToken: (token) => {
               if (!abortController.signal.aborted) {
@@ -378,6 +362,7 @@ function registerIpcHandlers() {
               }
             },
           },
+          abortController.signal,
         )
       } catch (error) {
         if (!abortController.signal.aborted) {
@@ -431,31 +416,17 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; documentText: string; documentFilename: string },
     ) => {
       try {
-        const mindmapGenNode = createMindmapGenNode({
-          apiKey: payload.apiKey,
-          modelName: payload.model || 'qwen-turbo',
-        })
-
-        const graph = new StateGraph(AgentState)
-          .addNode('mindmapGen', mindmapGenNode)
-          .addEdge(START, 'mindmapGen')
-          .addEdge('mindmapGen', END)
-
-        const app = graph.compile()
-        const result = await app.invoke({
-          mindmapInputText: payload.documentText,
-          mindmapInputTitle: payload.documentFilename,
-        })
-
-        if (result.error) {
-          return { ok: false, error: result.error }
-        }
-
+        const provider = await createProviderForRequest(payload.apiKey, payload.model)
+        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const result = await orchestrator.runMindmapFromDoc(
+          payload.documentText,
+          payload.documentFilename,
+        )
         return {
           ok: true,
-          nodes: result.mindmapNodes,
-          edges: result.mindmapEdges,
-          documentTitle: result.mindmapTitle,
+          nodes: result.nodes,
+          edges: result.edges,
+          documentTitle: result.documentTitle,
         }
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -504,10 +475,8 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      return runPalaceFromNodes({
-        selectedNodes: payload.selectedNodes,
-        provider,
-      })
+      const orchestrator = new AgentOrchestrator(provider, aiService)
+      return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
   )
 

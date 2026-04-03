@@ -1,9 +1,7 @@
-import { ChatOpenAI } from '@langchain/openai'
+import type { LLMProvider } from '../providers/index.js'
 import type { AgentState } from '../state.js'
 import type { GeneratedNode, GeneratedEdge } from '../state.js'
 import { buildExtractStructureMessages } from './prompts/docToMindmap.js'
-
-const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 
 interface KeyPoint {
   title: string
@@ -60,24 +58,14 @@ function layoutTree(
   return { nodes, edges }
 }
 
-export function createMindmapGenNode(params: {
-  apiKey: string
-  modelName: string
-}) {
-  const { apiKey, modelName } = params
+export class MindmapGenAgent {
+  constructor(private provider: LLMProvider) {}
 
-  return async (state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> => {
+  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
     const documentText = state.mindmapInputText
     if (!documentText) {
       return { error: '未提供要生成思维导图的文本内容' }
     }
-
-    const llm = new ChatOpenAI({
-      model: modelName || 'qwen-turbo',
-      apiKey,
-      temperature: 0.3,
-      configuration: { baseURL: DASHSCOPE_COMPAT_BASE },
-    })
 
     let nodeCounter = 0
     function genId(prefix: string): string {
@@ -86,7 +74,7 @@ export function createMindmapGenNode(params: {
 
     try {
       const text = documentText.slice(0, 8000)
-      const response = await llm.invoke(buildExtractStructureMessages(text))
+      const response = await this.provider.reasoningModel.invoke(buildExtractStructureMessages(text))
       const content = typeof response.content === 'string' ? response.content : ''
 
       const jsonMatch = content.match(/\{[\s\S]*\}/)

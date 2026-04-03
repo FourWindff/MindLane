@@ -1,4 +1,3 @@
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider, DetectedAnchor } from '../providers/index.js'
 import type { AgentState } from '../state.js'
 import type { MemoryPalaceStation, StationDesign } from '../state.js'
@@ -132,13 +131,10 @@ function buildFallbackSummary(route: MemoryPalaceStation[], hasImage: boolean): 
   return `${hasImage ? '已生成记忆宫殿图。' : '已生成记忆路线。'}按顺序依次经过这些地点：\n${lines.join('\n')}`
 }
 
-export function createVisionNode(params: {
-  model: BaseChatModel
-  runtime: LLMProvider
-}) {
-  const { model, runtime } = params
+export class VisionAgent {
+  constructor(private provider: LLMProvider) {}
 
-  return async (state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> => {
+  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
     if (!state.palace || state.error) return {}
 
     let memoryRoute: MemoryPalaceStation[]
@@ -146,7 +142,7 @@ export function createVisionNode(params: {
 
     if (hasImage) {
       try {
-        const detectedCoords = await runtime.locateAnchors({
+        const detectedCoords = await this.provider.locateAnchors({
           imageUrl: state.imageUrls[0]!,
           anchors: state.palace.stations.map((station) => ({
             order: station.order,
@@ -172,7 +168,7 @@ export function createVisionNode(params: {
 
     let summary: string
     try {
-      const summaryResponse = await model.invoke(
+      const summaryResponse = await this.provider.reasoningModel.invoke(
         buildSummaryMessages({
           theme: state.palace.theme,
           hasImage,

@@ -1,16 +1,12 @@
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider } from '../providers/index.js'
 import type { AgentState } from '../state.js'
 import { buildImagePromptGeneratorMessages } from './prompts/textToPalace.js'
 import { buildPalaceImagePrompt } from './prompts/nodesToPalace.js'
 
-export function createImageGenNode(params: {
-  model: BaseChatModel
-  runtime: LLMProvider
-}) {
-  const { model, runtime } = params
+export class ImageGenAgent {
+  constructor(private provider: LLMProvider) {}
 
-  return async (state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> => {
+  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
     if (!state.palace || state.error) return {}
 
     try {
@@ -24,7 +20,7 @@ export function createImageGenNode(params: {
           stations: state.palace.stations,
         })
       } else {
-        const promptResponse = await model.invoke(
+        const promptResponse = await this.provider.reasoningModel.invoke(
           buildImagePromptGeneratorMessages(state.palace),
         )
         imagePrompt =
@@ -37,7 +33,7 @@ export function createImageGenNode(params: {
         return { imagePrompt: '', imageUrls: [] }
       }
 
-      const imageResult = await runtime.generateImage({
+      const imageResult = await this.provider.generateImage({
         prompt: imagePrompt,
         size: '1024*1024',
         n: 1,

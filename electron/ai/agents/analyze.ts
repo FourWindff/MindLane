@@ -1,5 +1,5 @@
 import { z } from 'zod/v3'
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { LLMProvider } from '../providers/index.js'
 import type { AgentState } from '../state.js'
 import type { MemoryItem, StationDesign, SelectedNodeContent } from '../state.js'
 import {
@@ -113,135 +113,12 @@ function normalizeRouteStyle(value: string | undefined, stationCount: number): s
   return 's_curve'
 }
 
-async function analyzeFromText(
-  model: BaseChatModel,
-  text: string,
-  messages: Array<{ role: string; content: string }>,
-): Promise<Partial<typeof AgentState.State>> {
-  const analyzeModel = model.withStructuredOutput(analyzeSchema)
-  const designModel = model.withStructuredOutput(designSchema)
+export class AnalyzeAgent {
+  constructor(private provider: LLMProvider) {}
 
-  const conversation = messages
-    .map((m) => `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`)
-    .join('\n')
-  const inputText = conversation || text
-
-  try {
-    const analyzeResult = (await analyzeModel.invoke(
-      buildAnalyzeInputMessages(inputText),
-    )) as AnalyzeResult
-
-    const memoryItems: MemoryItem[] = analyzeResult.items
-      .map((item, index) => ({
-        order: item.order ?? index + 1,
-        content: item.content.trim(),
-      }))
-      .filter((item) => item.content.length > 0)
-      .sort((a, b) => a.order - b.order)
-      .map((item, index) => ({ ...item, order: index + 1 }))
-
-    if (memoryItems.length === 0) {
-      return { error: '未拆解出有效记忆条目' }
-    }
-
-    const designResult = (await designModel.invoke(
-      buildDesignMnemonicsMessages(memoryItems),
-    )) as DesignResult
-
-    const stations: StationDesign[] = designResult.stations
-      .map((station, index) => ({
-        order: station.order ?? index + 1,
-        content: station.content.trim(),
-        anchorVisual: station.anchorVisual.trim(),
-        mnemonicMethod: station.mnemonicMethod.trim(),
-        association: station.association.trim(),
-      }))
-      .filter((station) => station.content.length > 0 && station.anchorVisual.length > 0)
-      .sort((a, b) => a.order - b.order)
-      .map((station, index) => ({ ...station, order: index + 1 }))
-
-    if (stations.length !== memoryItems.length) {
-      return { error: '记忆站点数量与条目数量不一致' }
-    }
-
-    return {
-      memoryItems,
-      palace: {
-        theme: designResult.theme.trim(),
-        stations,
-      },
-    }
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-async function analyzeFromNodes(
-  model: BaseChatModel,
-  selectedNodes: SelectedNodeContent[],
-): Promise<Partial<typeof AgentState.State>> {
-  try {
-    const response = await model.invoke(buildAnalyzeAndPlanMessages(selectedNodes))
-    const text = typeof response.content === 'string' ? response.content : ''
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return { error: 'AI 未返回有效的 JSON 规划' }
-    }
-
-    const raw = JSON.parse(jsonMatch[0]) as {
-      theme?: string
-      scene_brief?: string
-      sceneBrief?: string
-      route_style?: string
-      routeStyle?: string
-      stations?: Array<{
-        order?: number
-        content?: string
-        anchor_visual?: string
-        anchorVisual?: string
-        linked_node_id?: string
-        linkedNodeId?: string
-        association?: string
-        visual_bridge?: string
-        visualBridge?: string
-      }>
-    }
-
-    const stations = buildPlannedStations(raw.stations ?? [], selectedNodes)
-    if (stations.length === 0) {
-      return { error: '未规划出有效站点' }
-    }
-
-    const theme = raw.theme?.trim() || `记忆宫殿 (${selectedNodes.length} 站)`
-    const sceneBrief =
-      raw.scene_brief?.trim() ||
-      raw.sceneBrief?.trim() ||
-      `围绕 ${selectedNodes.length} 个知识点展开的统一记忆场景`
-    const routeStyle = normalizeRouteStyle(raw.route_style ?? raw.routeStyle, stations.length)
-
-    const memoryItems: MemoryItem[] = stations.map((s) => ({
-      order: s.order,
-      content: s.content,
-    }))
-
-    return {
-      memoryItems,
-      palace: {
-        theme,
-        sceneBrief,
-        routeStyle,
-        stations,
-      },
-    }
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : String(error) }
-  }
-}
-
-export function createAnalyzeNode(model: BaseChatModel) {
-  return async (state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> => {
+  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
     if (state.palaceInputNodes.length > 0) {
-      return analyzeFromNodes(model, state.palaceInputNodes)
+      return this.analyzeFromNodes(state.palaceInputNodes)
     }
 
     const text = state.palaceInputText
@@ -259,6 +136,131 @@ export function createAnalyzeNode(model: BaseChatModel) {
         content: typeof m.content === 'string' ? m.content : String(m.content),
       }))
 
-    return analyzeFromText(model, text, chatMessages)
+    return this.analyzeFromText(text, chatMessages)
+  }
+
+  private async analyzeFromText(
+    text: string,
+    messages: Array<{ role: string; content: string }>,
+  ): Promise<Partial<typeof AgentState.State>> {
+    const model = this.provider.reasoningModel
+    const analyzeModel = model.withStructuredOutput(analyzeSchema)
+    const designModel = model.withStructuredOutput(designSchema)
+
+    const conversation = messages
+      .map((m) => `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`)
+      .join('\n')
+    const inputText = conversation || text
+
+    try {
+      const analyzeResult = (await analyzeModel.invoke(
+        buildAnalyzeInputMessages(inputText),
+      )) as AnalyzeResult
+
+      const memoryItems: MemoryItem[] = analyzeResult.items
+        .map((item, index) => ({
+          order: item.order ?? index + 1,
+          content: item.content.trim(),
+        }))
+        .filter((item) => item.content.length > 0)
+        .sort((a, b) => a.order - b.order)
+        .map((item, index) => ({ ...item, order: index + 1 }))
+
+      if (memoryItems.length === 0) {
+        return { error: '未拆解出有效记忆条目' }
+      }
+
+      const designResult = (await designModel.invoke(
+        buildDesignMnemonicsMessages(memoryItems),
+      )) as DesignResult
+
+      const stations: StationDesign[] = designResult.stations
+        .map((station, index) => ({
+          order: station.order ?? index + 1,
+          content: station.content.trim(),
+          anchorVisual: station.anchorVisual.trim(),
+          mnemonicMethod: station.mnemonicMethod.trim(),
+          association: station.association.trim(),
+        }))
+        .filter((station) => station.content.length > 0 && station.anchorVisual.length > 0)
+        .sort((a, b) => a.order - b.order)
+        .map((station, index) => ({ ...station, order: index + 1 }))
+
+      if (stations.length !== memoryItems.length) {
+        return { error: '记忆站点数量与条目数量不一致' }
+      }
+
+      return {
+        memoryItems,
+        palace: {
+          theme: designResult.theme.trim(),
+          stations,
+        },
+      }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  private async analyzeFromNodes(
+    selectedNodes: SelectedNodeContent[],
+  ): Promise<Partial<typeof AgentState.State>> {
+    const model = this.provider.reasoningModel
+    try {
+      const response = await model.invoke(buildAnalyzeAndPlanMessages(selectedNodes))
+      const text = typeof response.content === 'string' ? response.content : ''
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        return { error: 'AI 未返回有效的 JSON 规划' }
+      }
+
+      const raw = JSON.parse(jsonMatch[0]) as {
+        theme?: string
+        scene_brief?: string
+        sceneBrief?: string
+        route_style?: string
+        routeStyle?: string
+        stations?: Array<{
+          order?: number
+          content?: string
+          anchor_visual?: string
+          anchorVisual?: string
+          linked_node_id?: string
+          linkedNodeId?: string
+          association?: string
+          visual_bridge?: string
+          visualBridge?: string
+        }>
+      }
+
+      const stations = buildPlannedStations(raw.stations ?? [], selectedNodes)
+      if (stations.length === 0) {
+        return { error: '未规划出有效站点' }
+      }
+
+      const theme = raw.theme?.trim() || `记忆宫殿 (${selectedNodes.length} 站)`
+      const sceneBrief =
+        raw.scene_brief?.trim() ||
+        raw.sceneBrief?.trim() ||
+        `围绕 ${selectedNodes.length} 个知识点展开的统一记忆场景`
+      const routeStyle = normalizeRouteStyle(raw.route_style ?? raw.routeStyle, stations.length)
+
+      const memoryItems: MemoryItem[] = stations.map((s) => ({
+        order: s.order,
+        content: s.content,
+      }))
+
+      return {
+        memoryItems,
+        palace: {
+          theme,
+          sceneBrief,
+          routeStyle,
+          stations,
+        },
+      }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) }
+    }
   }
 }
