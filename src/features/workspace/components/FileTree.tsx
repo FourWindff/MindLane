@@ -43,14 +43,13 @@ function FileTreeItem({ entry, depth, onContextMenu }: FileTreeItemProps) {
       <button
         type="button"
         className={`file-tree__item${isActive ? ' file-tree__item--active' : ''}${isFolder ? ' file-tree__item--folder' : ''}`}
-        style={{ paddingLeft: `${12 + depth * 16}px` }}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         disabled={busy}
         title={entry.path}
       >
-        {isFolder && <ChevronRight className={`file-tree__chevron${isExpanded ? ' file-tree__chevron--open' : ''}`} size={18} strokeWidth={1.5} />}
-        {!isFolder && <span className="file-tree__chevron-placeholder" />}
+        {isFolder ? <ChevronRight className={`file-tree__chevron${isExpanded ? ' file-tree__chevron--open' : ''}`} size={18} strokeWidth={1.5} /> : null}
         {isFolder ? (isExpanded ? <FolderOpen className="file-tree__icon" size={20} strokeWidth={1.4} /> : <Folder className="file-tree__icon" size={20} strokeWidth={1.4} />) : <File className="file-tree__icon" size={20} strokeWidth={1.4} />}
         <span className="file-tree__name">{displayName}</span>
       </button>
