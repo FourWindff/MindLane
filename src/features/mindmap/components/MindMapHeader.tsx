@@ -1,4 +1,5 @@
 import { ListTree, Columns2, Trash2, RotateCcw, AlignLeft, Save, FolderInput, Settings } from 'lucide-react'
+import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 
 type Props = {
   onAddChild: () => void
@@ -25,16 +26,15 @@ export function MindMapHeader({
   canAddSibling,
   canRemove,
 }: Props) {
+  const filePath = useMindmapStore((s) => s.filePath)
+  const displayFileName = filePath
+    ? filePath.split('/').pop()!.replace(/\.mindlane$/, '')
+    : '未命名'
+
   return (
     <header className="mindmap-header">
       <div className="mindmap-header__lead">
-        <div className="mindmap-header__mark" aria-hidden>
-          <span className="mindmap-header__mark-inner" />
-        </div>
-        <div className="mindmap-header__titles">
-          <span className="mindmap-header__name">MindLane</span>
-          <span className="mindmap-header__tagline">思维导图</span>
-        </div>
+        <span className="mindmap-header__filename">{displayFileName}</span>
       </div>
 
       <nav className="mindmap-header__nav" aria-label="导图操作">

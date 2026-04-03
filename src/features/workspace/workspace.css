@@ -446,8 +446,8 @@
 }
 
 .file-tree__chevron {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   transition: transform 0.15s ease;
   color: var(--ml-text-muted);
@@ -458,14 +458,14 @@
 }
 
 .file-tree__chevron-placeholder {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
 .file-tree__icon {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   color: var(--ml-text-muted);
 }
