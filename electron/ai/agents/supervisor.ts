@@ -1,92 +1,50 @@
 import { AIMessage, SystemMessage } from '@langchain/core/messages'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import { z } from 'zod'
 import type { LLMProvider } from '../providers/index.js'
 import type { AgentState } from '../state.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
 
-const INTENT_PALACE_RE = /\[INTENT:palace\]/i
-const INTENT_MINDMAP_RE = /\[INTENT:mindmap\]/i
-const PALACE_INPUT_RE = /\[PALACE_INPUT:([\s\S]*?)\]/
-const MINDMAP_INPUT_RE = /\[MINDMAP_INPUT:([\s\S]*?)\]/
-const MINDMAP_TITLE_RE = /\[MINDMAP_TITLE:([\s\S]*?)\]/
+/**
+ * 路由决定 Schema - 使用 Zod 定义结构化输出
+ */
+const RouteDecisionSchema = z.object({
+  /** 路由目标 */
+  target: z.enum(['qa', 'mindmap', 'palace']),
+  /** 原因说明 */
+  reason: z.string().optional(),
+  /** 附带的参数 */
+  parameters: z.object({
+    /** 思维导图生成的输入内容 */
+    mindmapInput: z.string().optional(),
+    /** 思维导图标题 */
+    mindmapTitle: z.string().optional(),
+    /** 记忆宫殿的输入内容 */
+    palaceInput: z.string().optional(),
+  }).optional(),
+})
 
-export function stripIntentMarkers(text: string): string {
-  return text
-    .replace(/\[INTENT:\w+\]/gi, '')
-    .replace(/\[PALACE_INPUT:[\s\S]*?\]/g, '')
-    .replace(/\[MINDMAP_INPUT:[\s\S]*?\]/g, '')
-    .replace(/\[MINDMAP_TITLE:[\s\S]*?\]/g, '')
-    // Also strip structured intent JSON
-    .replace(/\{\s*"intent"\s*:\s*"(qa|palace|mindmap)"\s*,\s*"confidence"\s*:\s*[\d.]+\s*\}/g, '')
-    .trim()
-}
+type RouteDecision = z.infer<typeof RouteDecisionSchema>
 
-// Structured intent output
-export interface StructuredIntent {
-  intent: 'qa' | 'palace' | 'mindmap'
-  confidence: number
-  parameters?: {
-    palaceInput?: string
-    mindmapInput?: string
-    mindmapTitle?: string
-  }
-}
 
-export function parseStructuredIntent(text: string): StructuredIntent | null {
-  // Try to find JSON intent
-  const jsonMatch = text.match(/\{\s*"intent"\s*:\s*"(qa|palace|mindmap)"[^}]*\}/)
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[0])
-      if (parsed.intent && typeof parsed.confidence === 'number') {
-        return {
-          intent: parsed.intent,
-          confidence: parsed.confidence,
-          parameters: parsed.parameters,
-        }
-      }
-    } catch {
-      // Fall through to marker-based parsing
-    }
-  }
-
-  // Fall back to marker-based parsing
-  if (INTENT_PALACE_RE.test(text)) {
-    const palaceMatch = PALACE_INPUT_RE.exec(text)
-    return {
-      intent: 'palace',
-      confidence: 0.9,
-      parameters: { palaceInput: palaceMatch?.[1]?.trim() },
-    }
-  }
-
-  if (INTENT_MINDMAP_RE.test(text)) {
-    const inputMatch = MINDMAP_INPUT_RE.exec(text)
-    const titleMatch = MINDMAP_TITLE_RE.exec(text)
-    return {
-      intent: 'mindmap',
-      confidence: 0.9,
-      parameters: {
-        mindmapInput: inputMatch?.[1]?.trim(),
-        mindmapTitle: titleMatch?.[1]?.trim(),
-      },
-    }
-  }
-
-  return null
-}
-
+/**
+ * SupervisorAgent - 使用结构化输出进行路由决策
+ *
+ * 工作原理：
+ * 1. 在 system prompt 中告诉 LLM 输出 JSON 格式的路由决定
+ * 2. LLM 在回复中嵌入路由 JSON
+ * 3. SupervisorAgent 解析 JSON，提取路由决定
+ * 4. 无需复杂的正则解析，直接获得结构化输出
+ */
 export class SupervisorAgent {
-  private modelWithTools: ReturnType<NonNullable<typeof this.provider.reasoningModel.bindTools>>
   private toolNode: ToolNode
 
   constructor(
     private provider: LLMProvider,
-    tools: StructuredToolInterface[],
+    private tools: StructuredToolInterface[],
     private profileText: string,
   ) {
-    this.modelWithTools = provider.reasoningModel.bindTools!(tools)
     this.toolNode = new ToolNode(tools)
   }
 
@@ -94,80 +52,50 @@ export class SupervisorAgent {
     const systemPrompt = this.buildSystemPrompt(state.context)
     const messagesWithSystem = [new SystemMessage(systemPrompt), ...state.messages]
 
-    const response = await this.modelWithTools.invoke(messagesWithSystem)
+    // 使用带工具的模型（用于知识库搜索等）
+    const modelWithTools = this.provider.reasoningModel.bindTools!(this.tools)
 
+    const response = await modelWithTools.invoke(messagesWithSystem)
     const content = typeof response.content === 'string' ? response.content : ''
     const toolCalls = (response as AIMessage).tool_calls ?? []
 
+    // 优先检查是否是工具调用（知识库搜索等）
     if (toolCalls.length > 0) {
       return { messages: [response] }
     }
 
-    // Try structured intent parsing first
-    const structuredIntent = parseStructuredIntent(content)
-    if (structuredIntent) {
-      const cleanResponse = stripIntentMarkers(content)
-
-      if (structuredIntent.intent === 'palace') {
-        return {
-          messages: [response],
-          intent: 'palace',
-          palaceInputText: structuredIntent.parameters?.palaceInput || '',
-          response: cleanResponse,
-        }
-      }
-
-      if (structuredIntent.intent === 'mindmap') {
-        return {
-          messages: [response],
-          intent: 'mindmap',
-          mindmapInputText: structuredIntent.parameters?.mindmapInput || '',
-          mindmapInputTitle: structuredIntent.parameters?.mindmapTitle || '',
-          response: cleanResponse,
-        }
-      }
-
-      return {
-        messages: [response],
-        intent: 'qa',
-        response: cleanResponse,
-      }
+    // 使用结构化输出获取路由决定
+    const routeDecision = await this.getRouteDecision(state)
+    if (routeDecision) {
+      return this.applyRouteDecision(response, routeDecision, content)
     }
 
-    // Fall back to marker-based parsing
-    if (INTENT_PALACE_RE.test(content)) {
-      const palaceMatch = PALACE_INPUT_RE.exec(content)
-      const palaceInput = palaceMatch?.[1]?.trim() ?? ''
-      const cleanResponse = stripIntentMarkers(content)
-
-      return {
-        messages: [response],
-        intent: 'palace',
-        palaceInputText: palaceInput,
-        response: cleanResponse,
-      }
-    }
-
-    if (INTENT_MINDMAP_RE.test(content)) {
-      const inputMatch = MINDMAP_INPUT_RE.exec(content)
-      const titleMatch = MINDMAP_TITLE_RE.exec(content)
-      const mindmapInput = inputMatch?.[1]?.trim() ?? ''
-      const mindmapTitle = titleMatch?.[1]?.trim() ?? ''
-      const cleanResponse = stripIntentMarkers(content)
-
-      return {
-        messages: [response],
-        intent: 'mindmap',
-        mindmapInputText: mindmapInput,
-        mindmapInputTitle: mindmapTitle,
-        response: cleanResponse,
-      }
-    }
-
+    // 默认 QA 模式
     return {
       messages: [response],
       intent: 'qa',
       response: content,
+    }
+  }
+
+  /**
+   * 使用 LangChain 的 withStructuredOutput 获取路由决定
+   */
+  private async getRouteDecision(state: typeof AgentState.State): Promise<RouteDecision | null> {
+    try {
+      // 使用 withStructuredOutput 强制模型输出符合 schema 的结构化数据
+      const structuredModel = this.provider.reasoningModel.withStructuredOutput(RouteDecisionSchema, {
+        name: 'routeDecision',
+      })
+
+      const systemPrompt = this.buildRouteDecisionPrompt(state.context)
+      const messagesWithSystem = [new SystemMessage(systemPrompt), ...state.messages]
+
+      const decision = await structuredModel.invoke(messagesWithSystem)
+      return decision as RouteDecision
+    } catch {
+      // 如果结构化输出失败，返回 null，让调用方使用默认 QA 模式
+      return null
     }
   }
 
@@ -186,9 +114,10 @@ export class SupervisorAgent {
       }
     }
 
+    // 根据意图路由
     switch (state.intent) {
       case 'palace':
-        return 'analyze'
+        return 'palaceSubgraph'
       case 'mindmap':
         return 'mindmapGen'
       default:
@@ -196,67 +125,111 @@ export class SupervisorAgent {
     }
   }
 
+  /**
+   * 应用路由决定到状态
+   */
+  private applyRouteDecision(
+    response: AIMessage,
+    decision: RouteDecision,
+    content: string
+  ): Partial<typeof AgentState.State> {
+    const cleanResponse = content
+
+    switch (decision.target) {
+      case 'mindmap':
+        return {
+          messages: [response],
+          intent: 'mindmap',
+          mindmapInputText: decision.parameters?.mindmapInput || cleanResponse,
+          mindmapInputTitle: decision.parameters?.mindmapTitle || '思维导图',
+          response: cleanResponse,
+        }
+      case 'palace':
+        return {
+          messages: [response],
+          intent: 'palace',
+          palaceInputText: decision.parameters?.palaceInput || cleanResponse,
+          response: cleanResponse,
+        }
+      case 'qa':
+      default:
+        return {
+          messages: [response],
+          intent: 'qa',
+          response: cleanResponse,
+        }
+    }
+  }
+
+  /**
+   * 构建路由决策专用提示词
+   * 告诉模型如何决定路由，但不涉及具体输出格式（由 withStructuredOutput 处理）
+   */
+  private buildRouteDecisionPrompt(context?: MindmapContextData | null): string {
+    const parts = [
+      '你是 MindLane 的路由决策助手。根据用户的输入，决定应该路由到哪个功能模块。',
+      '',
+      '## 路由选项',
+      '',
+      '- `qa`: 普通问答、闲聊、知识库搜索、询问当前状态',
+      '- `mindmap`: 用户要求生成思维导图、大纲、或可视化概念',
+      '- `palace`: 用户要求生成记忆宫殿、使用记忆法、或记忆特定内容',
+      '',
+      '## 决策规则',
+      '',
+      '- 用户明确说"生成思维导图"、"帮我做个大纲"、"可视化这个概念" → mindmap',
+      '- 用户明确说"生成记忆宫殿"、"用这个记忆法"、"帮我记住这个" → palace',
+      '- 其他所有情况 → qa',
+      '',
+      '## 参数填充',
+      '',
+      '- mindmapInput: 用户想要生成思维导图的主题或内容',
+      '- mindmapTitle: 思维导图的标题（如果用户没指定，用主题作为标题）',
+      '- palaceInput: 用户想要记忆的内容',
+    ]
+
+    if (context?.mindmapSummary) {
+      parts.push('', '## 当前思维导图上下文', context.mindmapSummary)
+    }
+
+    return parts.join('\n')
+  }
+
   private buildSystemPrompt(context?: MindmapContextData | null): string {
     const parts = [
       '你是 MindLane 的 AI 助手，帮助用户进行思维导图创作、知识管理和记忆训练。',
       '',
-      '你的能力（你可以直接完成这些操作，不需要用户手动操作）：',
-      '1. 直接在画布上生成思维导图：你输出特定标记后，系统会自动将思维导图节点渲染到用户当前的画布上',
-      '2. 直接生成记忆宫殿：使用记忆宫殿法帮助用户记忆知识点，生成包含场景图和站点的 palace 节点',
-      '3. 检索用户导入的知识库文档，回答相关问题',
-      '4. 感知用户当前正在编辑的思维导图内容和选中的节点',
-      '5. 查看当前工作区中的文件列表',
+      '## 你的能力',
       '',
-      '重要：当用户要求生成思维导图或记忆宫殿时，你必须使用下方的意图标记来触发生成流程。系统会自动将生成结果插入到用户当前的画布上，无需用户手动操作。',
+      '1. **直接生成思维导图**：系统会自动将思维导图节点渲染到用户当前的画布上',
+      '2. **生成记忆宫殿**：系统会创建包含场景图和站点的记忆宫殿节点',
+      '3. **知识库问答**：直接回答问题，或使用 searchDocuments 工具检索用户导入的知识库文档',
+      '4. **感知当前状态**：你自动感知用户当前正在编辑的思维导图内容、选中的节点、工作区文件等',
       '',
-      '===== 意图标记规则（严格遵守） =====',
+      '## 核心原则',
       '',
-      '方式1 - 结构化JSON格式（推荐）：',
-      '当用户要求生成思维导图时，输出：',
-      '{"intent":"mindmap","confidence":0.95,"parameters":{"mindmapInput":"要生成思维导图的主题或内容","mindmapTitle":"思维导图标题"}}',
-      '',
-      '当用户要求记忆内容、使用记忆宫殿法时，输出：',
-      '{"intent":"palace","confidence":0.95,"parameters":{"palaceInput":"要记忆的内容"}}',
-      '',
-      '方式2 - 标记格式（兼容）：',
-      '当用户要求生成思维导图时，你的回复必须包含以下标记：',
-      '[INTENT:mindmap][MINDMAP_INPUT:要生成思维导图的主题或内容][MINDMAP_TITLE:思维导图标题]',
-      '',
-      '示例1 - 用户说"帮我生成一个关于机器学习的思维导图"：',
-      '好的，我来为你生成机器学习的思维导图。[INTENT:mindmap][MINDMAP_INPUT:机器学习的核心概念，包括监督学习、无监督学习、强化学习、深度学习等分支及其应用][MINDMAP_TITLE:机器学习]',
-      '',
-      '示例2 - 用户说"生成hello world的思维导图"：',
-      '好的！[INTENT:mindmap][MINDMAP_INPUT:Hello World][MINDMAP_TITLE:Hello World]',
-      '',
-      '当用户要求记忆内容、使用记忆宫殿法时，你的回复必须包含以下标记：',
-      '[INTENT:palace][PALACE_INPUT:要记忆的内容]',
-      '',
-      '其他情况为普通问答，直接回答即可，不要添加任何标记或JSON。',
-      '',
-      '===== 意图标记规则结束 =====',
-      '',
-      '核心原则：',
       '- 你拥有用户的个人知识库，里面存储了用户导入的各种文档资料。',
-      '- 关于当前状态的问题（工作区文件、打开的文件、选中的节点等），直接从下方提供的"当前状态"部分回答，不需要调用任何工具。',
+      '- 关于当前状态的问题（工作区文件、打开的文件、选中的节点等），直接根据下方提供的"当前状态"回答，不需要调用任何工具。',
       '- 如果搜索后确实没有相关结果，再如实告知用户知识库中暂无相关内容。',
       '- 当用户问你是否能生成思维导图或记忆宫殿时，你应当肯定地回答"可以"，因为你确实拥有这个能力。',
       '',
-      '工具使用规则（严格遵守，尽量少调用工具）：',
-      '- 以下场景不需要调用任何工具，直接回答：打招呼、询问你的能力、关于当前状态的问题、闲聊、生成思维导图或记忆宫殿的意图判断。',
-      '- searchDocuments：仅当用户的问题明确涉及具体知识内容（如某本书、某个概念、某篇文档的细节）时才使用，一次调用足够，不要重复搜索。',
-      '- listKnowledgeBase：仅当用户明确询问"知识库有什么"、"有哪些文档"时使用。',
-      '- 如果一个问题可以不调用工具就回答，就不要调用工具。',
+      '## 工具使用原则',
+      '',
+      '- **尽量少调用工具**：打招呼、询问能力、关于当前状态的问题、闲聊，都不需要调用工具。',
+      '- `searchDocuments`：仅当用户的问题明确涉及具体知识内容（如某本书、某个概念、某篇文档的细节）时才使用。',
+      '- `listKnowledgeBase`：仅当用户明确询问"知识库有什么"、"有哪些文档"时使用。',
+      '- 如果一个简单问题可以不调用工具就回答，就不要调用工具。',
       '- 回答问题时请简洁专业，使用中文。',
     ]
 
     if (this.profileText) {
-      parts.push('', '用户画像：', this.profileText)
+      parts.push('', '## 用户画像', this.profileText)
     }
 
-    parts.push('', '===== 当前状态 =====')
+    parts.push('', '## 当前状态')
 
     if (context?.workspacePath) {
-      parts.push(`当前工作区路径: ${context.workspacePath}`)
+      parts.push(`工作区路径: ${context.workspacePath}`)
       if (context.workspaceFiles && context.workspaceFiles.length > 0) {
         const fileLines = context.workspaceFiles.map((f) => `  - ${f.name}`)
         parts.push(`工作区文件（共 ${context.workspaceFiles.length} 个）:`, ...fileLines)
@@ -271,9 +244,9 @@ export class SupervisorAgent {
       if (context.filePath) {
         parts.push('', `当前打开的文件: ${context.filePath}`)
       }
-      parts.push('当前打开的思维导图：', context.mindmapSummary)
+      parts.push('当前思维导图概览：', context.mindmapSummary)
     } else if (context?.mindmapSummary) {
-      parts.push('', '当前打开的思维导图：', context.mindmapSummary)
+      parts.push('', '当前思维导图概览：', context.mindmapSummary)
     } else {
       parts.push('', '当前没有打开任何思维导图文件。')
     }
@@ -283,22 +256,22 @@ export class SupervisorAgent {
         switch (n.type) {
           case 'palace': {
             const sc = n.extra?.stationCount ?? 0
-            return `- [宫殿] ${n.label} (${sc}个站点, id: ${n.id})`
+            return `- [宫殿] ${n.label} (${sc}个站点)`
           }
           case 'document': {
             const exc = n.extra?.excerpt ? ` — ${String(n.extra.excerpt).slice(0, 60)}` : ''
-            return `- [文档] ${n.label}${exc} (id: ${n.id})`
+            return `- [文档] ${n.label}${exc}`
           }
           default:
-            return `- [主题] ${n.label} (id: ${n.id})`
+            return `- [主题] ${n.label}`
         }
       })
-      parts.push('', '用户当前选中的节点：', ...nodeLines)
+      parts.push('', '当前选中的节点：', ...nodeLines)
     } else {
       parts.push('', '当前没有选中任何节点。')
     }
 
-    parts.push('===== 当前状态结束 =====')
+    parts.push('', '## 当前状态结束')
 
     return parts.join('\n')
   }

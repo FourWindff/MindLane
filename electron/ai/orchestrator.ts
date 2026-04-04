@@ -5,7 +5,7 @@ import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
 import { AgentStateWithHITL } from './state.js'
 import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge } from './state.js'
-import { SupervisorAgent, stripIntentMarkers } from './agents/supervisor.js'
+import { SupervisorAgent } from './agents/supervisor.js'
 import { MindmapGenAgent } from './agents/mindmapGen.js'
 import { createSearchTools } from './agents/tools/index.js'
 import type { MindmapContextData } from './agents/tools/mindmapContext.js'
@@ -190,7 +190,7 @@ export class AgentOrchestrator {
       }
 
       if (signal?.aborted) {
-        callbacks.onEnd({ content: stripIntentMarkers(fullContent) || '（已停止生成）' })
+        callbacks.onEnd({ content: fullContent || '（已停止生成）' })
         return
       }
       callbacks.onError(err instanceof Error ? err.message : String(err))
@@ -461,7 +461,7 @@ export class AgentOrchestrator {
     const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
 
     const response: ChatResponse = {
-      content: stripIntentMarkers(rawContent),
+      content: rawContent,
       toolCalls: this.extractToolCalls(result.messages),
     }
 
