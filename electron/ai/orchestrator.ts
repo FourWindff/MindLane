@@ -1,9 +1,8 @@
-import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
+import { HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { END, START, StateGraph, MemorySaver } from '@langchain/langgraph'
 import type { LLMProvider } from './providers/index.js'
 import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
-import { compressMessages } from './memory/compression.js'
 import { AgentStateWithHITL } from './state.js'
 import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge } from './state.js'
 import { SupervisorAgent, stripIntentMarkers } from './agents/supervisor.js'
@@ -12,12 +11,22 @@ import { createSearchTools } from './agents/tools/index.js'
 import type { MindmapContextData } from './agents/tools/mindmapContext.js'
 import type { MindLaneNode, MindLaneEdge } from '../../src/shared/lib/fileFormat.js'
 import { buildPalaceSubgraph, HITLInterruptError, type HITLInterruptData } from './graphs/palaceGraph.js'
+import { ChatHistoryManager } from './context/ChatHistoryManager.js'
 
 export type { MindmapContextData }
 
+/**
+ * 聊天请求 - 后端统一管理历史消息
+ *
+ * 只需要传递：
+ * - threadId: 会话 ID，后端据此加载历史
+ * - message: 当前用户输入（单条）
+ * - context: 可选的上下文数据（工作区、思维导图等）
+ */
 export interface ChatRequest {
   threadId: string
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+  /** 当前用户输入（后端会自动加载历史） */
+  message: string
   context?: MindmapContextData
 }
 
@@ -94,18 +103,24 @@ export interface MindmapFromDocResult {
 }
 
 export class AgentOrchestrator {
+  private historyManager: ChatHistoryManager
+
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
-  ) {}
+    userDataPath: string,
+  ) {
+    this.historyManager = new ChatHistoryManager(userDataPath)
+  }
 
   async run(request: ChatRequest): Promise<ChatResponse> {
-    const compressed = await this.buildInputMessages(request)
+    // 从后端加载历史消息并构建上下文
+    const contextMessages = await this.buildContextMessages(request)
     const graph = this.buildGraph(request.context, { enableHITL: false })
     const app = graph.compile()
 
     const result = await app.invoke(
-      { messages: compressed, context: request.context ?? null },
+      { messages: contextMessages, context: request.context ?? null },
       { recursionLimit: 80 },
     )
 
@@ -119,7 +134,8 @@ export class AgentOrchestrator {
     options: { enableHITL?: boolean } = {},
   ): Promise<void> {
     const { enableHITL = false } = options
-    const compressed = await this.buildInputMessages(request)
+    // 从后端加载历史消息并构建上下文
+    const contextMessages = await this.buildContextMessages(request)
     const graph = this.buildGraph(request.context, { enableHITL })
     const checkpointer = new MemorySaver()
     const app = graph.compile({ checkpointer })
@@ -136,7 +152,7 @@ export class AgentOrchestrator {
       }
 
       const stream = app.streamEvents(
-        { messages: compressed, context: request.context ?? null },
+        { messages: contextMessages, context: request.context ?? null },
         streamConfig,
       )
 
@@ -468,18 +484,25 @@ export class AgentOrchestrator {
     return response
   }
 
-  private async buildInputMessages(request: ChatRequest): Promise<BaseMessage[]> {
-    const inputMessages: BaseMessage[] = []
-    for (const msg of request.messages) {
-      if (msg.role === 'system') {
-        inputMessages.push(new SystemMessage(msg.content))
-      } else if (msg.role === 'user') {
-        inputMessages.push(new HumanMessage(msg.content))
-      } else if (msg.role === 'assistant') {
-        inputMessages.push(new AIMessage(msg.content))
-      }
+  /**
+   * 构建上下文消息 - 从后端加载历史并压缩
+   */
+  private async buildContextMessages(request: ChatRequest): Promise<BaseMessage[]> {
+    // 从上下文中获取工作区路径
+    const workspacePath = request.context?.workspacePath
+
+    if (!workspacePath) {
+      // 没有工作区时，仅使用当前消息
+      return [new HumanMessage(request.message)]
     }
-    return compressMessages(inputMessages, this.provider.reasoningModel)
+
+    // 从后端加载历史并构建上下文消息
+    return this.historyManager.buildContextMessages(
+      workspacePath,
+      request.threadId,
+      this.provider,
+      request.message,
+    )
   }
 
   private extractToolCalls(messages: BaseMessage[]): ChatResponse['toolCalls'] {

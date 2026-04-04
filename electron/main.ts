@@ -224,7 +224,7 @@ function registerIpcHandlers() {
       _e,
       payload: {
         threadId: string
-        messages: { role: string; content: string }[]
+        message: string
         context?: {
           mindmapSummary?: string
           selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
@@ -249,12 +249,15 @@ function registerIpcHandlers() {
           baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
         })
 
+        const userDataPath = app.getPath('userData')
+
+        if (!payload.message?.trim()) {
+          return { ok: false, error: '消息不能为空' }
+        }
+
         const request: ChatRequest = {
           threadId: payload.threadId || crypto.randomUUID(),
-          messages: (payload.messages ?? []).map((m) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: String(m.content ?? ''),
-          })),
+          message: payload.message,
           context: payload.context
             ? {
                 ...payload.context,
@@ -266,7 +269,7 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
         const result = await orchestrator.run(request)
 
         return { ok: true, ...result }
@@ -285,7 +288,7 @@ function registerIpcHandlers() {
       _e,
       payload: {
         threadId: string
-        messages: { role: string; content: string }[]
+        message: string
         context?: {
           mindmapSummary?: string
           selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
@@ -317,12 +320,16 @@ function registerIpcHandlers() {
           baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
         })
 
+        const userDataPath = app.getPath('userData')
+
+        if (!payload.message?.trim()) {
+          win?.webContents.send('ai:chat-stream-error', '消息不能为空')
+          return
+        }
+
         const request: ChatRequest = {
           threadId: payload.threadId || crypto.randomUUID(),
-          messages: (payload.messages ?? []).map((m) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: String(m.content ?? ''),
-          })),
+          message: payload.message,
           context: payload.context
             ? {
                 ...payload.context,
@@ -334,7 +341,7 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
         await orchestrator.stream(
           request,
           {
@@ -417,7 +424,8 @@ function registerIpcHandlers() {
     ) => {
       try {
         const provider = await createProviderForRequest(payload.apiKey, payload.model)
-        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const userDataPath = app.getPath('userData')
+        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
         const result = await orchestrator.runMindmapFromDoc(
           payload.documentText,
           payload.documentFilename,
@@ -475,7 +483,8 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const orchestrator = new AgentOrchestrator(provider, aiService)
+      const userDataPath = app.getPath('userData')
+      const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
   )
@@ -1053,7 +1062,7 @@ app.whenReady().then(async () => {
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
 
-  aiService = new AiService()
+  aiService = new AiService(userDataPath)
   try {
     const settings = await fsService.settings.load()
     const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''

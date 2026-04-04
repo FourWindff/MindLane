@@ -259,12 +259,12 @@ export function ChatPanel() {
     const api = window.mindlane?.ai
     if (!api) return
 
-    const allMessages = [...useAiStore.getState().chatMessages]
     const context = buildContext()
 
+    // 使用新的接口：只传递当前消息，后端会自动加载历史
     await api.chatStream({
       threadId,
-      messages: allMessages.map((m) => ({ role: m.role, content: m.content })),
+      message: text,  // 当前用户输入
       context,
     })
   }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext])

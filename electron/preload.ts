@@ -19,8 +19,6 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 })
 
-type BailianChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
-
 type ContextNodeInfo = {
   id: string
   type: 'topic' | 'palace' | 'document'
@@ -113,10 +111,16 @@ type FsResult<T = void> = FsOk<T> | FsErr
 
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
-    chat: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
-      ipcRenderer.invoke('ai:chat', payload) as Promise<ChatResponse>,
-    chatStream: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
-      ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
+    chat: (payload: {
+      threadId: string;
+      message: string;
+      context?: ChatContext
+    }) => ipcRenderer.invoke('ai:chat', payload) as Promise<ChatResponse>,
+    chatStream: (payload: {
+      threadId: string;
+      message: string;
+      context?: ChatContext
+    }) => ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
     stopStream: () => ipcRenderer.invoke('ai:chat-stream-stop') as Promise<void>,
     onStreamToken: (callback: (token: string) => void) => {
       const handler = (_event: unknown, token: string) => callback(token)

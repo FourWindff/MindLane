@@ -80,12 +80,12 @@ interface Window {
     ai: {
       chat: (payload: {
         threadId: string
-        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+        message: string
         context?: _ChatContext
       }) => Promise<_ChatResponse>
       chatStream: (payload: {
         threadId: string
-        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+        message: string
         context?: _ChatContext
       }) => Promise<void>
       stopStream: () => Promise<void>
