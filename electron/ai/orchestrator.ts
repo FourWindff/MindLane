@@ -4,16 +4,14 @@ import type { LLMProvider } from './providers/index.js'
 import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
 import { compressMessages } from './memory/compression.js'
-import { AgentState } from './state.js'
+import { AgentStateWithHITL } from './state.js'
 import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge } from './state.js'
 import { SupervisorAgent, stripIntentMarkers } from './agents/supervisor.js'
-import { AnalyzeAgent } from './agents/analyze.js'
-import { ImageGenAgent } from './agents/imageGen.js'
-import { VisionAgent } from './agents/vision.js'
 import { MindmapGenAgent } from './agents/mindmapGen.js'
 import { createSearchTools } from './agents/tools/index.js'
 import type { MindmapContextData } from './agents/tools/mindmapContext.js'
 import type { MindLaneNode, MindLaneEdge } from '../../src/shared/lib/fileFormat.js'
+import { buildPalaceSubgraph, HITLInterruptError, type HITLInterruptData } from './graphs/palaceGraph.js'
 
 export type { MindmapContextData }
 
@@ -42,12 +40,28 @@ export interface ChatResponse {
   }
 }
 
+// HITL 数据类型
+export interface HITLMindmapData {
+  type: 'mindmapGen_confirmation'
+  currentStructure: {
+    nodes: GeneratedNode[]
+    edges: GeneratedEdge[]
+    title: string
+  }
+}
+
+export type HITLData = HITLInterruptData | HITLMindmapData
+
+/**
+ * 扩展的流回调接口，支持 HITL
+ */
 export interface StreamCallbacks {
   onToken: (token: string) => void
   onToolStart: (name: string, input: Record<string, unknown>) => void
   onToolEnd: (name: string, output: string) => void
   onEnd: (response: ChatResponse) => void
   onError: (error: string) => void
+  onHITL?: (data: HITLData) => void | Promise<void>
 }
 
 export interface PalaceFromNodesResult {
@@ -87,7 +101,7 @@ export class AgentOrchestrator {
 
   async run(request: ChatRequest): Promise<ChatResponse> {
     const compressed = await this.buildInputMessages(request)
-    const graph = this.buildGraph(request.context)
+    const graph = this.buildGraph(request.context, { enableHITL: false })
     const app = graph.compile()
 
     const result = await app.invoke(
@@ -95,33 +109,18 @@ export class AgentOrchestrator {
       { recursionLimit: 80 },
     )
 
-    const response: ChatResponse = {
-      content: stripIntentMarkers(result.response || '') || '抱歉，我无法生成回复。',
-      toolCalls: this.extractToolCalls(result.messages),
-    }
-
-    if (result.intent === 'mindmap' && result.mindmapNodes.length > 0) {
-      response.mindmapData = this.mapMindmapResult(
-        result.mindmapNodes,
-        result.mindmapEdges,
-        result.mindmapTitle,
-      )
-    }
-
-    if (result.intent === 'palace' && result.memoryRoute.length > 0) {
-      response.palaceData = await this.mapPalaceResult(result)
-    }
-
-    return response
+    return this.buildResponse(result as typeof AgentStateWithHITL.State)
   }
 
   async stream(
     request: ChatRequest,
     callbacks: StreamCallbacks,
     signal?: AbortSignal,
+    options: { enableHITL?: boolean } = {},
   ): Promise<void> {
+    const { enableHITL = false } = options
     const compressed = await this.buildInputMessages(request)
-    const graph = this.buildGraph(request.context)
+    const graph = this.buildGraph(request.context, { enableHITL })
     const checkpointer = new MemorySaver()
     const app = graph.compile({ checkpointer })
     const threadId = `stream-${Date.now()}`
@@ -163,32 +162,17 @@ export class AgentOrchestrator {
       }
 
       const snapshot = await app.getState({ configurable: { thread_id: threadId } })
-      const result = snapshot.values as typeof AgentState.State
+      const result = snapshot.values as typeof AgentStateWithHITL.State
 
-      const rawContent = result.response || fullContent || '抱歉，我无法生成回复。'
-      const response: ChatResponse = {
-        content: stripIntentMarkers(rawContent),
-        toolCalls: this.extractToolCalls(result.messages),
-      }
-
-      if (result.intent === 'mindmap' && result.mindmapNodes.length > 0) {
-        response.mindmapData = this.mapMindmapResult(
-          result.mindmapNodes,
-          result.mindmapEdges,
-          result.mindmapTitle,
-        )
-      }
-
-      if (result.intent === 'palace' && result.memoryRoute.length > 0) {
-        response.palaceData = await this.mapPalaceResult({
-          response: rawContent,
-          imageUrls: result.imageUrls,
-          memoryRoute: result.memoryRoute,
-        })
-      }
-
-      callbacks.onEnd(response)
+      callbacks.onEnd(this.buildResponse(result, fullContent))
     } catch (err) {
+      // 处理 HITL 中断
+      if (err instanceof HITLInterruptError && callbacks.onHITL) {
+        await callbacks.onHITL(err.data)
+        // HITL 中断不调用 onError，等待用户 resume
+        return
+      }
+
       if (signal?.aborted) {
         callbacks.onEnd({ content: stripIntentMarkers(fullContent) || '（已停止生成）' })
         return
@@ -202,12 +186,31 @@ export class AgentOrchestrator {
       return { ok: false, error: '未选中任何节点' }
     }
 
-    const graph = this.buildPalaceGraph()
-    const app = graph.compile()
+    // 使用独立的 Palace Subgraph
+    const palaceSubgraph = buildPalaceSubgraph({
+      provider: this.provider,
+      enableHITL: false,
+    })
+    const app = palaceSubgraph.compile()
 
     try {
       const result = await app.invoke(
-        { intent: 'palace' as const, palaceInputNodes: selectedNodes },
+        {
+          messages: [],
+          context: null,
+          error: '',
+          palaceInputText: '',
+          palaceInputNodes: selectedNodes,
+          memoryItems: [],
+          palace: null,
+          imagePrompt: '',
+          imageUrls: [],
+          detectedCoords: [],
+          memoryRoute: [],
+          interruptPoint: null,
+          userConfirmedPrompt: null,
+          userConfirmedStructure: null,
+        },
         { recursionLimit: 80 },
       )
 
@@ -246,13 +249,34 @@ export class AgentOrchestrator {
   }
 
   async runMindmapFromDoc(text: string, title: string): Promise<MindmapFromDocResult> {
-    const graph = this.buildMindmapGraph()
+    const graph = this.buildMindmapGraph({ enableHITL: false })
     const app = graph.compile()
 
-    const result = await app.invoke({
+    const initialState: typeof AgentStateWithHITL.State = {
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
       mindmapInputText: text,
       mindmapInputTitle: title,
-    })
+      mindmapNodes: [],
+      mindmapEdges: [],
+      mindmapTitle: '',
+      interruptPoint: null,
+      userConfirmedPrompt: null,
+      userConfirmedStructure: null,
+      palaceInputText: '',
+      palaceInputNodes: [],
+      memoryItems: [],
+      palace: null,
+      imagePrompt: '',
+      imageUrls: [],
+      detectedCoords: [],
+      memoryRoute: [],
+    }
+
+    const result = await app.invoke(initialState)
 
     if (result.error) {
       throw new Error(result.error)
@@ -265,7 +289,8 @@ export class AgentOrchestrator {
     }
   }
 
-  private buildGraph(_context?: MindmapContextData) {
+  private buildGraph(_?: MindmapContextData, options: { enableHITL?: boolean } = {}) {
+    const { enableHITL = false } = options
     const { listKnowledgeBaseTool, searchDocumentsTool } = createSearchTools(
       this.aiService.vectorStore,
       this.aiService.indexer,
@@ -274,49 +299,173 @@ export class AgentOrchestrator {
     const profileText = this.aiService.userProfile.getText()
 
     const supervisor = new SupervisorAgent(this.provider, tools, profileText)
-    const analyze = new AnalyzeAgent(this.provider)
-    const imageGen = new ImageGenAgent(this.provider)
-    const vision = new VisionAgent(this.provider)
     const mindmapGen = new MindmapGenAgent(this.provider)
 
-    return new StateGraph(AgentState)
+    // 构建 Palace Subgraph
+    const palaceSubgraph = buildPalaceSubgraph({
+      provider: this.provider,
+      enableHITL,
+    })
+
+    // 状态映射包装器：将主图状态映射到 Subgraph 状态
+    const palaceSubgraphWrapper = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
+      try {
+        // 编译并执行 Subgraph
+        const app = palaceSubgraph.compile()
+        const result = await app.invoke(state, { recursionLimit: 80 })
+
+        // 映射结果回主图状态
+        return {
+          palaceInputText: result.palaceInputText,
+          palaceInputNodes: result.palaceInputNodes,
+          memoryItems: result.memoryItems,
+          palace: result.palace,
+          imagePrompt: result.imagePrompt,
+          imageUrls: result.imageUrls,
+          detectedCoords: result.detectedCoords,
+          memoryRoute: result.memoryRoute,
+          error: result.error,
+          interruptPoint: result.interruptPoint,
+          userConfirmedPrompt: result.userConfirmedPrompt,
+        }
+      } catch (error) {
+        // 捕获 HITL 中断错误
+        if (error instanceof HITLInterruptError) {
+          // 将中断数据传递出去
+          throw error
+        }
+        // 其他错误
+        return { error: error instanceof Error ? error.message : String(error) }
+      }
+    }
+
+    const graph = new StateGraph(AgentStateWithHITL)
       .addNode('supervisor', (state) => supervisor.invoke(state))
       .addNode('tools', (state) => supervisor.invokeTools(state))
-      .addNode('analyze', (state) => analyze.invoke(state))
-      .addNode('imageGen', (state) => imageGen.invoke(state))
-      .addNode('vision', (state) => vision.invoke(state))
+      .addNode('palaceSubgraph', palaceSubgraphWrapper)
       .addNode('mindmapGen', (state) => mindmapGen.invoke(state))
+
+    // HITL 支持：mindmap 确认节点
+    if (enableHITL) {
+      const hitlMindmapNode = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
+        // 如果用户已确认结构，使用确认后的值
+        if (state.userConfirmedStructure) {
+          return {
+            mindmapNodes: state.userConfirmedStructure.nodes,
+            mindmapEdges: state.userConfirmedStructure.edges,
+            mindmapTitle: state.userConfirmedStructure.title,
+            interruptPoint: null,
+          }
+        }
+
+        // 触发 HITL 中断
+        const interruptData: HITLMindmapData = {
+          type: 'mindmapGen_confirmation',
+          currentStructure: {
+            nodes: state.mindmapNodes,
+            edges: state.mindmapEdges,
+            title: state.mindmapTitle,
+          },
+        }
+        throw new HITLInterruptError(interruptData as unknown as HITLInterruptData)
+      }
+
+      graph.addNode('hitl_mindmap_check', hitlMindmapNode)
+        .addEdge('mindmapGen', 'hitl_mindmap_check')
+        .addConditionalEdges('hitl_mindmap_check', (state) => {
+          if (state.error) return END
+          if (state.userConfirmedStructure) return END
+          return END
+        })
+    } else {
+      graph.addEdge('mindmapGen', END)
+    }
+
+    graph
       .addEdge(START, 'supervisor')
       .addConditionalEdges('supervisor', (state) => supervisor.route(state))
       .addEdge('tools', 'supervisor')
-      .addEdge('analyze', 'imageGen')
-      .addEdge('imageGen', 'vision')
-      .addEdge('vision', END)
-      .addEdge('mindmapGen', END)
+      .addEdge('palaceSubgraph', END)
+
+    return graph
   }
 
-  private buildPalaceGraph() {
-    const analyze = new AnalyzeAgent(this.provider)
-    const imageGen = new ImageGenAgent(this.provider)
-    const vision = new VisionAgent(this.provider)
-
-    return new StateGraph(AgentState)
-      .addNode('analyze', (state) => analyze.invoke(state))
-      .addNode('imageGen', (state) => imageGen.invoke(state))
-      .addNode('vision', (state) => vision.invoke(state))
-      .addEdge(START, 'analyze')
-      .addEdge('analyze', 'imageGen')
-      .addEdge('imageGen', 'vision')
-      .addEdge('vision', END)
-  }
-
-  private buildMindmapGraph() {
+  private buildMindmapGraph(options: { enableHITL?: boolean } = {}) {
+    const { enableHITL = false } = options
     const mindmapGen = new MindmapGenAgent(this.provider)
 
-    return new StateGraph(AgentState)
+    const graph = new StateGraph(AgentStateWithHITL)
       .addNode('mindmapGen', (state) => mindmapGen.invoke(state))
-      .addEdge(START, 'mindmapGen')
-      .addEdge('mindmapGen', END)
+
+    // 基础边
+    graph.addEdge(START, 'mindmapGen')
+
+    if (enableHITL) {
+      const hitlNode = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
+        if (state.userConfirmedStructure) {
+          return {
+            mindmapNodes: state.userConfirmedStructure.nodes,
+            mindmapEdges: state.userConfirmedStructure.edges,
+            mindmapTitle: state.userConfirmedStructure.title,
+            interruptPoint: null,
+          }
+        }
+
+        const interruptData: HITLMindmapData = {
+          type: 'mindmapGen_confirmation',
+          currentStructure: {
+            nodes: state.mindmapNodes,
+            edges: state.mindmapEdges,
+            title: state.mindmapTitle,
+          },
+        }
+        throw new HITLInterruptError(interruptData as unknown as HITLInterruptData)
+      }
+
+      graph.addNode('hitl_check', hitlNode)
+      ;(graph as unknown as { addEdge: (from: string, to: string) => void }).addEdge('mindmapGen', 'hitl_check')
+      graph.addConditionalEdges('hitl_check' as never, (state) => {
+        if (state.error) return END
+        return END
+      })
+    } else {
+      graph.addEdge('mindmapGen', END)
+    }
+
+    return graph
+  }
+
+  /**
+   * 构建响应对象
+   */
+  private buildResponse(
+    result: typeof AgentStateWithHITL.State,
+    streamingContent?: string,
+  ): ChatResponse {
+    const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
+
+    const response: ChatResponse = {
+      content: stripIntentMarkers(rawContent),
+      toolCalls: this.extractToolCalls(result.messages),
+    }
+
+    if (result.intent === 'mindmap' && result.mindmapNodes.length > 0) {
+      response.mindmapData = this.mapMindmapResult(
+        result.mindmapNodes,
+        result.mindmapEdges,
+        result.mindmapTitle,
+      )
+    }
+
+    if (result.intent === 'palace' && result.memoryRoute.length > 0) {
+      response.palaceData = {
+        content: rawContent,
+        imageUrls: result.imageUrls,
+        memoryRoute: result.memoryRoute,
+      }
+    }
+
+    return response
   }
 
   private async buildInputMessages(request: ChatRequest): Promise<BaseMessage[]> {
@@ -336,7 +485,7 @@ export class AgentOrchestrator {
   private extractToolCalls(messages: BaseMessage[]): ChatResponse['toolCalls'] {
     const toolCalls: ChatResponse['toolCalls'] = []
     for (const msg of messages) {
-      if (msg._getType() === 'tool') {
+      if (msg.getType() === 'tool') {
         const toolMsg = msg as BaseMessage & { name?: string; content: unknown }
         const name = toolMsg.name ?? 'unknown'
         const resultStr = typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content)
@@ -384,24 +533,4 @@ export class AgentOrchestrator {
     }
   }
 
-  private async mapPalaceResult(result: {
-    response: string
-    imageUrls: string[]
-    memoryRoute: MemoryPalaceStation[]
-  }): Promise<ChatResponse['palaceData']> {
-    let imageUrls = result.imageUrls
-    if (imageUrls.length > 0) {
-      imageUrls = await Promise.all(
-        imageUrls.map(async (url) => {
-          if (url.startsWith('data:')) return url
-          try { return await urlToDataUrl(url) } catch { return url }
-        }),
-      )
-    }
-    return {
-      content: result.response,
-      ...(imageUrls.length > 0 ? { imageUrls } : {}),
-      memoryRoute: result.memoryRoute,
-    }
-  }
 }

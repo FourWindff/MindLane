@@ -1,4 +1,5 @@
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
+import type { BaseCheckpointSaver } from '@langchain/langgraph'
 import path from 'node:path'
 import fs from 'node:fs'
 
@@ -15,5 +16,9 @@ export class CheckpointerManager {
 
   get(): SqliteSaver | null {
     return this.saver
+  }
+
+  getAdapter(): BaseCheckpointSaver | undefined {
+    return this.saver ?? undefined
   }
 }

@@ -17,7 +17,64 @@ export function stripIntentMarkers(text: string): string {
     .replace(/\[PALACE_INPUT:[\s\S]*?\]/g, '')
     .replace(/\[MINDMAP_INPUT:[\s\S]*?\]/g, '')
     .replace(/\[MINDMAP_TITLE:[\s\S]*?\]/g, '')
+    // Also strip structured intent JSON
+    .replace(/\{\s*"intent"\s*:\s*"(qa|palace|mindmap)"\s*,\s*"confidence"\s*:\s*[\d.]+\s*\}/g, '')
     .trim()
+}
+
+// Structured intent output
+export interface StructuredIntent {
+  intent: 'qa' | 'palace' | 'mindmap'
+  confidence: number
+  parameters?: {
+    palaceInput?: string
+    mindmapInput?: string
+    mindmapTitle?: string
+  }
+}
+
+export function parseStructuredIntent(text: string): StructuredIntent | null {
+  // Try to find JSON intent
+  const jsonMatch = text.match(/\{\s*"intent"\s*:\s*"(qa|palace|mindmap)"[^}]*\}/)
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0])
+      if (parsed.intent && typeof parsed.confidence === 'number') {
+        return {
+          intent: parsed.intent,
+          confidence: parsed.confidence,
+          parameters: parsed.parameters,
+        }
+      }
+    } catch {
+      // Fall through to marker-based parsing
+    }
+  }
+
+  // Fall back to marker-based parsing
+  if (INTENT_PALACE_RE.test(text)) {
+    const palaceMatch = PALACE_INPUT_RE.exec(text)
+    return {
+      intent: 'palace',
+      confidence: 0.9,
+      parameters: { palaceInput: palaceMatch?.[1]?.trim() },
+    }
+  }
+
+  if (INTENT_MINDMAP_RE.test(text)) {
+    const inputMatch = MINDMAP_INPUT_RE.exec(text)
+    const titleMatch = MINDMAP_TITLE_RE.exec(text)
+    return {
+      intent: 'mindmap',
+      confidence: 0.9,
+      parameters: {
+        mindmapInput: inputMatch?.[1]?.trim(),
+        mindmapTitle: titleMatch?.[1]?.trim(),
+      },
+    }
+  }
+
+  return null
 }
 
 export class SupervisorAgent {
@@ -46,6 +103,38 @@ export class SupervisorAgent {
       return { messages: [response] }
     }
 
+    // Try structured intent parsing first
+    const structuredIntent = parseStructuredIntent(content)
+    if (structuredIntent) {
+      const cleanResponse = stripIntentMarkers(content)
+
+      if (structuredIntent.intent === 'palace') {
+        return {
+          messages: [response],
+          intent: 'palace',
+          palaceInputText: structuredIntent.parameters?.palaceInput || '',
+          response: cleanResponse,
+        }
+      }
+
+      if (structuredIntent.intent === 'mindmap') {
+        return {
+          messages: [response],
+          intent: 'mindmap',
+          mindmapInputText: structuredIntent.parameters?.mindmapInput || '',
+          mindmapInputTitle: structuredIntent.parameters?.mindmapTitle || '',
+          response: cleanResponse,
+        }
+      }
+
+      return {
+        messages: [response],
+        intent: 'qa',
+        response: cleanResponse,
+      }
+    }
+
+    // Fall back to marker-based parsing
     if (INTENT_PALACE_RE.test(content)) {
       const palaceMatch = PALACE_INPUT_RE.exec(content)
       const palaceInput = palaceMatch?.[1]?.trim() ?? ''
@@ -122,6 +211,14 @@ export class SupervisorAgent {
       '',
       '===== 意图标记规则（严格遵守） =====',
       '',
+      '方式1 - 结构化JSON格式（推荐）：',
+      '当用户要求生成思维导图时，输出：',
+      '{"intent":"mindmap","confidence":0.95,"parameters":{"mindmapInput":"要生成思维导图的主题或内容","mindmapTitle":"思维导图标题"}}',
+      '',
+      '当用户要求记忆内容、使用记忆宫殿法时，输出：',
+      '{"intent":"palace","confidence":0.95,"parameters":{"palaceInput":"要记忆的内容"}}',
+      '',
+      '方式2 - 标记格式（兼容）：',
       '当用户要求生成思维导图时，你的回复必须包含以下标记：',
       '[INTENT:mindmap][MINDMAP_INPUT:要生成思维导图的主题或内容][MINDMAP_TITLE:思维导图标题]',
       '',
@@ -134,7 +231,7 @@ export class SupervisorAgent {
       '当用户要求记忆内容、使用记忆宫殿法时，你的回复必须包含以下标记：',
       '[INTENT:palace][PALACE_INPUT:要记忆的内容]',
       '',
-      '其他情况为普通问答，直接回答即可，不要添加任何标记。',
+      '其他情况为普通问答，直接回答即可，不要添加任何标记或JSON。',
       '',
       '===== 意图标记规则结束 =====',
       '',
