@@ -717,11 +717,11 @@
 .chat-input-wrap {
   display: flex;
   align-items: flex-end;
-  gap: 0;
+  gap: 0.5rem;
   border: 1px solid var(--ml-border);
   border-radius: 12px;
   background: var(--ml-bg-elevated);
-  padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.65rem;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -742,7 +742,17 @@
   font-size: 0.82rem;
   line-height: 1.45;
   color: var(--ml-text);
-  padding: 0.15rem 0;
+  padding: 0.15rem 0.5rem 0.15rem 0;
+  overflow-y: auto;
+}
+
+.chat-input::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-input::-webkit-scrollbar-thumb {
+  background: var(--ml-border);
+  border-radius: 4px;
 }
 
 .chat-input::placeholder {
