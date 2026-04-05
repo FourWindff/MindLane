@@ -1,7 +1,23 @@
 import { NodeTypeDescriptor } from '../types'
-import type { PalaceNodeData } from '@/shared/lib/fileFormat'
-import { PalaceNodeComponent } from './PalaceNodeComponent'
 
+import { PalaceNodeComponent } from './PalaceNodeComponent'
+export type PalaceNodeData = {
+  label: string
+  imageUrl: string
+  stations: PalaceStation[]
+  sourceNodeIds: string[]
+  [key: string]: unknown
+}
+
+export type PalaceStation = {
+  order: number
+  content: string
+  anchorVisual: string
+  association?: string
+  x: number
+  y: number
+  linkedNodeId: string
+}
 class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   readonly typeId = 'palace'
   readonly displayName = '记忆宫殿'

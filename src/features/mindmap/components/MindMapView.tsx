@@ -42,6 +42,7 @@ import {
   withNewChild,
   withNewSibling,
 } from '@/shared/lib/mindmapTree'
+import { PalaceNodeData } from '../nodes/palace'
 
 const CHILD_OFFSET_X = 260
 const CHILD_GAP_Y = 24
@@ -244,7 +245,7 @@ function MindMapCanvas({
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const [palaceModal, setPalaceModal] = useState<import('@/shared/lib/fileFormat').PalaceNodeData | null>(null)
+  const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
   const graphRef = useRef({ nodes, edges })
@@ -309,7 +310,7 @@ function MindMapCanvas({
   const onNodeClick = useCallback(
     (_event: ReactMouseEvent, node: Node) => {
       if (node.type === 'palace') {
-        const pd = node.data as import('@/shared/lib/fileFormat').PalaceNodeData
+        const pd = node.data as PalaceNodeData
         if (pd.generating) return
         if (pd.expanded) {
           setPalaceModal(pd)

@@ -1,7 +1,12 @@
 import { NodeTypeDescriptor } from '../types'
-import type { DocumentNodeData } from '@/shared/lib/fileFormat'
 import { DocumentNodeComponent } from './DocumentNodeComponent'
 
+export type DocumentNodeData = {
+  filename: string
+  excerpt: string
+  fullTextPath?: string
+  [key: string]: unknown
+}
 class DocumentDescriptor extends NodeTypeDescriptor<DocumentNodeData> {
   readonly typeId = 'document'
   readonly displayName = '文档'

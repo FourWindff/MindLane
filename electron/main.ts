@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './ai/providers/index.js'
+import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -15,9 +15,9 @@ import nodeCrypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
-import { AiService } from './ai/service.js'
-import { AgentOrchestrator, type ChatRequest } from './ai/orchestrator.js'
-import type { SelectedNodeContent } from './ai/state.js'
+import { AiService } from './agent/service.js'
+import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
+import type { SelectedNodeContent } from './agent/state.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 

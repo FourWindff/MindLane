@@ -1,7 +1,7 @@
 import { Annotation } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { DetectedAnchor } from './providers/index.js'
-import type { MindmapContextData } from './agents/tools/mindmapContext.js'
+import type { MindmapContextData } from './tools/mindmapContext.js'
 
 // ===== 基础类型定义 =====
 
@@ -172,30 +172,31 @@ export const HITLStateAnnotations = {
 // ===== 组合状态定义 =====
 
 /**
- * 主图状态 - 包含所有状态切片
- * 用于向后兼容
+ * 主图状态 - MindLaneAgent 使用
+ * 包含：基础状态 + 思维导图状态 + Palace输入 + HITL + Palace输出
  */
-export const AgentState = Annotation.Root({
+export const MainGraphState = Annotation.Root({
   ...BaseStateAnnotations,
-  ...PalaceStateAnnotations,
   ...MindmapStateAnnotations,
+  palaceInputText: PalaceStateAnnotations.palaceInputText,
+  palaceInputNodes: PalaceStateAnnotations.palaceInputNodes,
+  ...HITLStateAnnotations,
+  // Palace 子图输出（需要同步回主图用于构建响应）
+  imageUrls: PalaceStateAnnotations.imageUrls,
+  memoryRoute: PalaceStateAnnotations.memoryRoute,
 })
 
 /**
- * 带 HITL 支持的完整状态
+ * Palace 子图专用状态
+ * 包含：基础状态 + Palace 完整状态 + HITL
  */
-export const AgentStateWithHITL = Annotation.Root({
+export const PalaceSubgraphState = Annotation.Root({
   ...BaseStateAnnotations,
   ...PalaceStateAnnotations,
-  ...MindmapStateAnnotations,
   ...HITLStateAnnotations,
 })
 
-// ===== 类型导出（便于类型注解） =====
+// ===== 类型导出 =====
 
-export type BaseState = typeof BaseStateAnnotations
-export type PalaceState = typeof PalaceStateAnnotations
-export type MindmapState = typeof MindmapStateAnnotations
-export type HITLState = typeof HITLStateAnnotations
-export type AgentStateType = typeof AgentState.State
-export type AgentStateWithHITLType = typeof AgentStateWithHITL.State
+export type MainGraphStateType = typeof MainGraphState.State
+export type PalaceSubgraphStateType = typeof PalaceSubgraphState.State

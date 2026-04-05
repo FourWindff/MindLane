@@ -1,7 +1,7 @@
 import { z } from 'zod/v3'
-import type { LLMProvider } from '../providers/index.js'
-import type { AgentState } from '../state.js'
+import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryItem, StationDesign, SelectedNodeContent } from '../state.js'
+import { PalaceAgent } from './base.js'
 import {
   buildAnalyzeInputMessages,
   buildDesignMnemonicsMessages,
@@ -113,10 +113,21 @@ function normalizeRouteStyle(value: string | undefined, stationCount: number): s
   return 's_curve'
 }
 
-export class AnalyzeAgent {
-  constructor(private provider: LLMProvider) {}
-
-  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
+/**
+ * AnalyzeAgent - 记忆内容分析智能体
+ *
+ * 架构职责：
+ * 1. 分析文本内容，提取需要记忆的关键条目
+ * 2. 设计记忆宫殿的站点布局
+ * 3. 从选中的思维导图节点规划记忆宫殿
+ *
+ * 无状态设计：
+ * - 不涉及持久化记忆访问
+ * - 所有输入通过 state 传递
+ * - 输出结果写入 state 返回
+ */
+export class AnalyzeAgent extends PalaceAgent {
+  async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
     if (state.palaceInputNodes.length > 0) {
       return this.analyzeFromNodes(state.palaceInputNodes)
     }
@@ -142,7 +153,7 @@ export class AnalyzeAgent {
   private async analyzeFromText(
     text: string,
     messages: Array<{ role: string; content: string }>,
-  ): Promise<Partial<typeof AgentState.State>> {
+  ): Promise<Partial<PalaceSubgraphStateType>> {
     const model = this.provider.reasoningModel
     const analyzeModel = model.withStructuredOutput(analyzeSchema)
     const designModel = model.withStructuredOutput(designSchema)
@@ -204,7 +215,7 @@ export class AnalyzeAgent {
 
   private async analyzeFromNodes(
     selectedNodes: SelectedNodeContent[],
-  ): Promise<Partial<typeof AgentState.State>> {
+  ): Promise<Partial<PalaceSubgraphStateType>> {
     const model = this.provider.reasoningModel
     try {
       const response = await model.invoke(buildAnalyzeAndPlanMessages(selectedNodes))

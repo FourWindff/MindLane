@@ -5,7 +5,6 @@ import { NodeTypeDescriptor, type ContextMenuItem } from './types'
 class NodeRegistry {
   private descriptors = new Map<string, NodeTypeDescriptor>()
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register(descriptor: NodeTypeDescriptor<any>): void {
     this.descriptors.set(descriptor.typeId, descriptor as NodeTypeDescriptor)
   }

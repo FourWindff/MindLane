@@ -1,19 +1,22 @@
 import { HumanMessage, type BaseMessage } from '@langchain/core/messages'
 import { END, START, StateGraph, MemorySaver } from '@langchain/langgraph'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LLMProvider } from './providers/index.js'
 import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
-import { AgentStateWithHITL } from './state.js'
-import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge } from './state.js'
-import { SupervisorAgent } from './agents/supervisor.js'
-import { MindmapGenAgent } from './agents/mindmapGen.js'
-import { createSearchTools } from './agents/tools/index.js'
-import type { MindmapContextData } from './agents/tools/mindmapContext.js'
+import type { SelectedNodeContent, MemoryPalaceStation, GeneratedNode, GeneratedEdge, MainGraphStateType } from './state.js'
+import { MainGraphState } from './state.js'
+
+// 导出 MindmapContextData 供其他模块使用
+export type { MindmapContextData } from './tools/mindmapContext.js'
+import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import type { MindLaneNode, MindLaneEdge } from '../../src/shared/lib/fileFormat.js'
 import { buildPalaceSubgraph, HITLInterruptError, type HITLInterruptData } from './graphs/palaceGraph.js'
-import { ChatHistoryManager } from './context/ChatHistoryManager.js'
+import { SessionManager } from './context/sessionManager.js'
+import { MindmapContextData } from './tools/mindmapContext.js'
+import { createMindmapActionTools } from './tools/mindmapActions.js'
+import { createSearchTools } from './tools/searchDocuments.js'
 
-export type { MindmapContextData }
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -103,15 +106,23 @@ export interface MindmapFromDocResult {
 }
 
 export class AgentOrchestrator {
-  private historyManager: ChatHistoryManager
+  private sessionManager: SessionManager | null = null
+
+  /**
+   * 获取或创建 SessionManager 实例
+   */
+  private getSessionManager(workspacePath: string): SessionManager {
+    if (!this.sessionManager || this.sessionManager['workspacePath'] !== workspacePath) {
+      this.sessionManager = new SessionManager(this.userDataPath, workspacePath)
+    }
+    return this.sessionManager
+  }
 
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
-    userDataPath: string,
-  ) {
-    this.historyManager = new ChatHistoryManager(userDataPath)
-  }
+    private userDataPath: string,
+  ) {}
 
   async run(request: ChatRequest): Promise<ChatResponse> {
     // 从后端加载历史消息并构建上下文
@@ -124,7 +135,7 @@ export class AgentOrchestrator {
       { recursionLimit: 80 },
     )
 
-    return this.buildResponse(result as typeof AgentStateWithHITL.State)
+    return this.buildResponse(result as MainGraphStateType)
   }
 
   async stream(
@@ -178,7 +189,7 @@ export class AgentOrchestrator {
       }
 
       const snapshot = await app.getState({ configurable: { thread_id: threadId } })
-      const result = snapshot.values as typeof AgentStateWithHITL.State
+      const result = snapshot.values as MainGraphStateType
 
       callbacks.onEnd(this.buildResponse(result, fullContent))
     } catch (err) {
@@ -247,7 +258,7 @@ export class AgentOrchestrator {
       return {
         ok: true,
         label: result.palace?.theme || `记忆宫殿 (${selectedNodes.length} 站)`,
-        stations: result.memoryRoute.map((s) => ({
+        stations: result.memoryRoute.map((s: MemoryPalaceStation) => ({
           order: s.order,
           content: s.content,
           anchorVisual: s.anchorVisual ?? '',
@@ -268,7 +279,7 @@ export class AgentOrchestrator {
     const graph = this.buildMindmapGraph({ enableHITL: false })
     const app = graph.compile()
 
-    const initialState: typeof AgentStateWithHITL.State = {
+    const initialState: MainGraphStateType = {
       messages: [],
       context: null,
       intent: 'mindmap',
@@ -284,11 +295,7 @@ export class AgentOrchestrator {
       userConfirmedStructure: null,
       palaceInputText: '',
       palaceInputNodes: [],
-      memoryItems: [],
-      palace: null,
-      imagePrompt: '',
       imageUrls: [],
-      detectedCoords: [],
       memoryRoute: [],
     }
 
@@ -311,11 +318,27 @@ export class AgentOrchestrator {
       this.aiService.vectorStore,
       this.aiService.indexer,
     )
-    const tools = [listKnowledgeBaseTool, searchDocumentsTool]
+    const {
+      addTopicNodeTool,
+      addDocumentNodeTool,
+      addPalaceNodeTool,
+      updateNodeTool,
+      deleteNodeTool,
+      batchAddNodesTool,
+    } = createMindmapActionTools()
+    const tools = [
+      listKnowledgeBaseTool,
+      searchDocumentsTool,
+      addTopicNodeTool,
+      addDocumentNodeTool,
+      addPalaceNodeTool,
+      updateNodeTool,
+      deleteNodeTool,
+      batchAddNodesTool,
+    ]
     const profileText = this.aiService.userProfile.getText()
 
-    const supervisor = new SupervisorAgent(this.provider, tools, profileText)
-    const mindmapGen = new MindmapGenAgent(this.provider)
+    const supervisor = new MindLaneAgent(this.provider, tools, profileText)
 
     // 构建 Palace Subgraph
     const palaceSubgraph = buildPalaceSubgraph({
@@ -324,7 +347,7 @@ export class AgentOrchestrator {
     })
 
     // 状态映射包装器：将主图状态映射到 Subgraph 状态
-    const palaceSubgraphWrapper = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
+    const palaceSubgraphWrapper = async (state: MainGraphStateType): Promise<Partial<MainGraphStateType>> => {
       try {
         // 编译并执行 Subgraph
         const app = palaceSubgraph.compile()
@@ -334,11 +357,7 @@ export class AgentOrchestrator {
         return {
           palaceInputText: result.palaceInputText,
           palaceInputNodes: result.palaceInputNodes,
-          memoryItems: result.memoryItems,
-          palace: result.palace,
-          imagePrompt: result.imagePrompt,
           imageUrls: result.imageUrls,
-          detectedCoords: result.detectedCoords,
           memoryRoute: result.memoryRoute,
           error: result.error,
           interruptPoint: result.interruptPoint,
@@ -355,51 +374,27 @@ export class AgentOrchestrator {
       }
     }
 
-    const graph = new StateGraph(AgentStateWithHITL)
+    const graph = new StateGraph(MainGraphState)
       .addNode('supervisor', (state) => supervisor.invoke(state))
       .addNode('tools', (state) => supervisor.invokeTools(state))
       .addNode('palaceSubgraph', palaceSubgraphWrapper)
-      .addNode('mindmapGen', (state) => mindmapGen.invoke(state))
-
-    // HITL 支持：mindmap 确认节点
-    if (enableHITL) {
-      const hitlMindmapNode = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
-        // 如果用户已确认结构，使用确认后的值
-        if (state.userConfirmedStructure) {
-          return {
-            mindmapNodes: state.userConfirmedStructure.nodes,
-            mindmapEdges: state.userConfirmedStructure.edges,
-            mindmapTitle: state.userConfirmedStructure.title,
-            interruptPoint: null,
-          }
-        }
-
-        // 触发 HITL 中断
-        const interruptData: HITLMindmapData = {
-          type: 'mindmapGen_confirmation',
-          currentStructure: {
-            nodes: state.mindmapNodes,
-            edges: state.mindmapEdges,
-            title: state.mindmapTitle,
-          },
-        }
-        throw new HITLInterruptError(interruptData as unknown as HITLInterruptData)
-      }
-
-      graph.addNode('hitl_mindmap_check', hitlMindmapNode)
-        .addEdge('mindmapGen', 'hitl_mindmap_check')
-        .addConditionalEdges('hitl_mindmap_check', (state) => {
-          if (state.error) return END
-          if (state.userConfirmedStructure) return END
-          return END
-        })
-    } else {
-      graph.addEdge('mindmapGen', END)
-    }
 
     graph
       .addEdge(START, 'supervisor')
-      .addConditionalEdges('supervisor', (state) => supervisor.route(state))
+      .addConditionalEdges('supervisor', (state) => {
+        const route = supervisor.route(state)
+        // ReAct 循环: 工具结果回到 supervisor 继续推理
+        if (route === 'supervisor') {
+          return 'supervisor'
+        }
+        return route
+      }, {
+        // 明确指定每个目标节点
+        tools: 'tools',
+        supervisor: 'supervisor',
+        palaceSubgraph: 'palaceSubgraph',
+        __end__: END,
+      })
       .addEdge('tools', 'supervisor')
       .addEdge('palaceSubgraph', END)
 
@@ -408,16 +403,20 @@ export class AgentOrchestrator {
 
   private buildMindmapGraph(options: { enableHITL?: boolean } = {}) {
     const { enableHITL = false } = options
-    const mindmapGen = new MindmapGenAgent(this.provider)
 
-    const graph = new StateGraph(AgentStateWithHITL)
-      .addNode('mindmapGen', (state) => mindmapGen.invoke(state))
+    // 使用工具构建supervisor来生成思维导图
+    const tools: StructuredToolInterface[] = []
+    const profileText = this.aiService.userProfile.getText()
+    const supervisor = new MindLaneAgent(this.provider, tools, profileText)
+
+    const graph = new StateGraph(MainGraphState)
+      .addNode('supervisor', (state) => supervisor.invoke(state))
 
     // 基础边
-    graph.addEdge(START, 'mindmapGen')
+    graph.addEdge(START, 'supervisor')
 
     if (enableHITL) {
-      const hitlNode = async (state: typeof AgentStateWithHITL.State): Promise<Partial<typeof AgentStateWithHITL.State>> => {
+      const hitlNode = async (state: MainGraphStateType): Promise<Partial<MainGraphStateType>> => {
         if (state.userConfirmedStructure) {
           return {
             mindmapNodes: state.userConfirmedStructure.nodes,
@@ -439,13 +438,18 @@ export class AgentOrchestrator {
       }
 
       graph.addNode('hitl_check', hitlNode)
-      ;(graph as unknown as { addEdge: (from: string, to: string) => void }).addEdge('mindmapGen', 'hitl_check')
+      graph.addConditionalEdges('supervisor', (state) => {
+        if (state.intent === 'mindmap' && !state.userConfirmedStructure) {
+          return 'hitl_check'
+        }
+        return END
+      })
       graph.addConditionalEdges('hitl_check' as never, (state) => {
         if (state.error) return END
         return END
       })
     } else {
-      graph.addEdge('mindmapGen', END)
+      graph.addEdge('supervisor', END)
     }
 
     return graph
@@ -455,7 +459,7 @@ export class AgentOrchestrator {
    * 构建响应对象
    */
   private buildResponse(
-    result: typeof AgentStateWithHITL.State,
+    result: MainGraphStateType,
     streamingContent?: string,
   ): ChatResponse {
     const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
@@ -497,8 +501,8 @@ export class AgentOrchestrator {
     }
 
     // 从后端加载历史并构建上下文消息
-    return this.historyManager.buildContextMessages(
-      workspacePath,
+    const sessionManager = this.getSessionManager(workspacePath)
+    return sessionManager.buildContextMessages(
       request.threadId,
       this.provider,
       request.message,

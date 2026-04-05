@@ -1,7 +1,13 @@
 import { NodeTypeDescriptor } from '../types'
-import type { TopicNodeData } from '@/shared/lib/fileFormat'
 import { TopicNodeComponent } from './TopicNodeComponent'
 
+export type TopicNodeData = {
+  label: string
+  palaceId?: string
+  justAdded?: boolean
+  exiting?: boolean
+  [key: string]: unknown
+}
 class TopicDescriptor extends NodeTypeDescriptor<TopicNodeData> {
   readonly typeId = 'topic'
   readonly displayName = '主题'

@@ -1,9 +1,9 @@
 import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../providers/index.js'
-import { AnalyzeAgent } from '../agents/analyze.js'
-import { ImageGenAgent } from '../agents/imageGen.js'
-import { VisionAgent } from '../agents/vision.js'
-import { AgentStateWithHITL } from '../state.js'
+import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
+import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
+import { AnchorAgent } from '../agenthub/anchorAgent.js'
+import { PalaceSubgraphState } from '../state.js'
 
 // ===== HITL 中断错误 =====
 
@@ -39,10 +39,10 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
 
   const analyze = new AnalyzeAgent(provider)
   const imageGen = new ImageGenAgent(provider)
-  const vision = new VisionAgent(provider)
+  const vision = new AnchorAgent(provider)
 
-  // 使用主图的状态类型以确保兼容性
-  const graph = new StateGraph(AgentStateWithHITL)
+  // 使用 Palace 子图专用状态类型
+  const graph = new StateGraph(PalaceSubgraphState)
     .addNode('analyze', async (state) => {
       const result = await analyze.invoke(state)
       return result

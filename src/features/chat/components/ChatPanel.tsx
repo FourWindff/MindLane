@@ -183,6 +183,16 @@ export function ChatPanel() {
           applyMindmapData(response.mindmapData)
         }
 
+        // 处理 mindmap 操作工具调用
+        if (response.toolCalls) {
+          const mindmapStore = useMindmapStore.getState()
+          for (const toolCall of response.toolCalls) {
+            if (MINDMAP_ACTION_TOOLS.includes(toolCall.name)) {
+              handleMindmapToolCall(toolCall, mindmapStore)
+            }
+          }
+        }
+
         finishStream()
         void saveChatHistory()
       }),
@@ -524,6 +534,213 @@ function stripMarkers(text: string): string {
   return text.replace(MARKER_RE, '').replace(PARTIAL_MARKER_RE, '').trim()
 }
 
+// ========== AI 工具调用处理 ==========
+
+const CHILD_OFFSET_X = 260
+const CHILD_GAP_Y = 24
+
+interface ToolCallResult {
+  name: string
+  args: Record<string, unknown>
+  result: string
+}
+
+interface AddNodeAction {
+  type: 'topic' | 'document' | 'palace'
+  parentId?: string
+  nodeData: Record<string, unknown>
+}
+
+interface UpdateNodeAction {
+  nodeId: string
+  nodeType: string
+  changes: Record<string, unknown>
+}
+
+interface DeleteNodeAction {
+  nodeId: string
+  confirmDeleteSubtree: boolean
+}
+
+function handleMindmapToolCall(
+  toolCall: ToolCallResult,
+  mindmapStore: ReturnType<typeof useMindmapStore.getState>
+): boolean {
+  try {
+    const result = JSON.parse(toolCall.result) as
+      | { ok: true; action: string; data: unknown }
+      | { ok: false; error: string }
+
+    if (!result.ok) {
+      console.warn(`[AI Tool] ${toolCall.name} failed:`, result.error)
+      return false
+    }
+
+    const nodes = mindmapStore.nodes
+    const edges = mindmapStore.edges
+
+    switch (result.action) {
+      case 'addNode': {
+        const data = result.data as AddNodeAction
+        const { type, parentId, nodeData } = data
+
+        // 确定父节点 - 优先使用提供的 parentId，其次使用选中的节点，最后使用 root
+        let targetParentId = parentId
+        if (!targetParentId) {
+          // 查找选中的节点
+          const selectedNode = nodes.find((n) => n.selected)
+          if (selectedNode) {
+            targetParentId = selectedNode.id
+          } else {
+            // 默认使用 root 节点（没有父边的节点）
+            const rootNode = nodes.find((n) => !edges.some((e) => e.target === n.id))
+            targetParentId = rootNode?.id ?? 'root'
+          }
+        }
+
+        // 创建新节点
+        const newNodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        const parentNode = nodes.find((n) => n.id === targetParentId)
+
+        // 计算位置
+        let position = { x: 0, y: 0 }
+        if (parentNode) {
+          const siblings = edges
+            .filter((e) => e.source === targetParentId)
+            .map((e) => nodes.find((n) => n.id === e.target))
+            .filter(Boolean)
+
+          const siblingCount = siblings.length
+          position = {
+            x: parentNode.position.x + CHILD_OFFSET_X,
+            y: parentNode.position.y + siblingCount * (60 + CHILD_GAP_Y),
+          }
+        }
+
+        // 根据类型创建节点
+        const descriptor = nodeRegistry.get(type)
+        const deserializedData = descriptor
+          ? descriptor.deserialize(nodeData)
+          : nodeData
+
+        const newNode: Node = {
+          id: newNodeId,
+          type,
+          position,
+          data: { ...deserializedData, justAdded: true },
+        }
+
+        // 添加边
+        const newEdge: Edge = {
+          id: `e_${targetParentId}_${newNodeId}`,
+          source: targetParentId,
+          target: newNodeId,
+          type: 'smoothstep',
+          className: 'mindmap-edge',
+        }
+
+        mindmapStore.setNodes([...nodes, newNode])
+        mindmapStore.setEdges([...edges, newEdge])
+        return true
+      }
+
+      case 'updateNode': {
+        const data = result.data as UpdateNodeAction
+        const { nodeId, nodeType, changes } = data
+
+        mindmapStore.setNodes(
+          nodes.map((n) => {
+            if (n.id !== nodeId) return n
+
+            // 直接将 changes 合并到当前 data，保留临时状态（justAdded, editing 等）
+            const mergedData = { ...n.data, ...changes }
+
+            const descriptor = nodeRegistry.get(nodeType)
+            return {
+              ...n,
+              data: descriptor
+                ? descriptor.deserialize(mergedData)
+                : mergedData,
+            }
+          })
+        )
+        return true
+      }
+
+      case 'deleteNode': {
+        const data = result.data as DeleteNodeAction
+        const { nodeId, confirmDeleteSubtree } = data
+
+        if (!confirmDeleteSubtree) {
+          console.warn('[AI Tool] Delete cancelled: user did not confirm')
+          return false
+        }
+
+        // 收集要删除的节点ID（包括子树）
+        const idsToDelete = new Set<string>([nodeId])
+        const collectChildren = (parentId: string) => {
+          edges
+            .filter((e) => e.source === parentId)
+            .forEach((e) => {
+              idsToDelete.add(e.target)
+              collectChildren(e.target)
+            })
+        }
+        collectChildren(nodeId)
+
+        // 先标记为 exiting
+        mindmapStore.setNodes(
+          nodes.map((n) =>
+            idsToDelete.has(n.id)
+              ? { ...n, data: { ...n.data, exiting: true } }
+              : n
+          )
+        )
+
+        // 延迟实际删除（等待动画）
+        setTimeout(() => {
+          const currentNodes = useMindmapStore.getState().nodes
+          const currentEdges = useMindmapStore.getState().edges
+
+          useMindmapStore.getState().setNodes(
+            currentNodes.filter((n) => !idsToDelete.has(n.id))
+          )
+          useMindmapStore.getState().setEdges(
+            currentEdges.filter(
+              (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)
+            )
+          )
+        }, 300)
+
+        return true
+      }
+
+      case 'batchAddNodes': {
+        // 批量添加节点 - 用于生成完整导图
+        // 这里简化处理，实际使用时可能需要更复杂的逻辑
+        console.warn('[AI Tool] batchAddNodes not fully implemented')
+        return false
+      }
+
+      default:
+        console.warn('[AI Tool] Unknown action:', result.action)
+        return false
+    }
+  } catch (err) {
+    console.error('[AI Tool] Failed to process tool call:', err)
+    return false
+  }
+}
+
+const MINDMAP_ACTION_TOOLS = [
+  'addTopicNode',
+  'addDocumentNode',
+  'addPalaceNode',
+  'updateMindmapNode',
+  'deleteMindmapNode',
+  'batchAddMindmapNodes',
+]
+
 function toolDisplayName(name: string): string {
   const map: Record<string, string> = {
     searchDocuments: '检索知识库',
@@ -533,6 +750,13 @@ function toolDisplayName(name: string): string {
     getMindmapContext: '读取导图',
     getSelectedNodes: '读取选中节点',
     listWorkspaceFiles: '查看工作区文件',
+    // Mindmap 操作工具
+    addTopicNode: '添加主题节点',
+    addDocumentNode: '添加文档节点',
+    addPalaceNode: '添加记忆宫殿',
+    updateMindmapNode: '更新节点',
+    deleteMindmapNode: '删除节点',
+    batchAddMindmapNodes: '批量添加节点',
   }
   return map[name] ?? name
 }

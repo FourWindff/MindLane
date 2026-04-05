@@ -9,7 +9,7 @@ import type { LLMProvider } from '../providers/index.js'
 /**
  * 聊天消息格式（存储用）
  */
-export interface StoredMessage {
+export interface SessionMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   toolCalls?: Array<{
@@ -23,13 +23,14 @@ export interface StoredMessage {
 /**
  * 会话元数据
  */
-export interface ChatSessionMeta {
+export interface SessionMeta {
   id: string
   title: string
   createdAt: string
   updatedAt: string
   messageCount: number
 }
+
 
 /**
  * 聊天历史管理器 - 负责加载和管理历史消息
@@ -40,20 +41,22 @@ export interface ChatSessionMeta {
  * 3. 提供消息压缩/截断策略
  * 4. 支持会话的 CRUD 操作
  */
-export class ChatHistoryManager {
+export class SessionManager {
   private chatHistoryDir: string
+  private workspacePath: string
+  private workspaceChatDir: string
 
-  constructor(userDataPath: string) {
+  constructor(userDataPath: string, workspacePath: string) {
     this.chatHistoryDir = path.join(userDataPath, 'chat-history')
-    // 确保目录存在
-    fs.mkdirSync(this.chatHistoryDir, { recursive: true })
+    this.workspacePath = workspacePath
+    this.workspaceChatDir = this.initWorkspaceChatDir()
   }
 
   /**
-   * 获取工作区对应的聊天历史目录
+   * 初始化工作区聊天历史目录
    */
-  private getWorkspaceChatDir(workspacePath: string): string {
-    const wsId = nodeCrypto.createHash('md5').update(workspacePath).digest('hex').slice(0, 12)
+  private initWorkspaceChatDir(): string {
+    const wsId = nodeCrypto.createHash('md5').update(this.workspacePath).digest('hex').slice(0, 12)
     const dir = path.join(this.chatHistoryDir, wsId)
     fs.mkdirSync(dir, { recursive: true })
     return dir
@@ -62,27 +65,34 @@ export class ChatHistoryManager {
   /**
    * 获取会话文件路径
    */
-  private getSessionFilePath(workspacePath: string, sessionId: string): string {
-    return path.join(this.getWorkspaceChatDir(workspacePath), `${sessionId}.json`)
+  private getSessionFilePath(sessionId: string): string {
+    return path.join(this.workspaceChatDir, `${sessionId}.json`)
   }
 
   /**
    * 获取会话元数据文件路径
    */
-  private getSessionsMetaPath(workspacePath: string): string {
-    return path.join(this.getWorkspaceChatDir(workspacePath), 'sessions.json')
+  private getSessionsMetaPath(): string {
+    return path.join(this.workspaceChatDir, 'sessions.json')
+  }
+
+  /**
+   * 切换工作区（用于复用实例）
+   */
+  switchWorkspace(workspacePath: string): void {
+    this.workspacePath = workspacePath
+    this.workspaceChatDir = this.initWorkspaceChatDir()
   }
 
   /**
    * 加载指定会话的历史消息
    *
-   * @param workspacePath 工作区路径
    * @param threadId 会话/线程 ID
    * @returns 历史消息数组，如果没有则返回空数组
    */
-  async loadHistory(workspacePath: string, threadId: string): Promise<StoredMessage[]> {
+  async loadHistory(threadId: string): Promise<SessionMessage[]> {
     try {
-      const filePath = this.getSessionFilePath(workspacePath, threadId)
+      const filePath = this.getSessionFilePath(threadId)
       if (fs.existsSync(filePath)) {
         const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
         return Array.isArray(data.messages) ? data.messages : []
@@ -96,13 +106,11 @@ export class ChatHistoryManager {
   /**
    * 加载指定会话的历史消息并转换为 LangChain Message 格式
    *
-   * @param workspacePath 工作区路径
    * @param threadId 会话/线程 ID
    * @param options 转换选项
    * @returns LangChain BaseMessage 数组
    */
   async loadHistoryAsMessages(
-    workspacePath: string,
     threadId: string,
     options: {
       /** 是否包含 system 消息（默认：true） */
@@ -113,7 +121,7 @@ export class ChatHistoryManager {
   ): Promise<BaseMessage[]> {
     const { includeSystem = true, maxMessages } = options
 
-    const stored = await this.loadHistory(workspacePath, threadId)
+    const stored = await this.loadHistory(threadId)
 
     // 转换为 LangChain Message 格式
     const messages: BaseMessage[] = []
@@ -143,20 +151,18 @@ export class ChatHistoryManager {
   /**
    * 加载并压缩历史消息，用于 LLM 上下文
    *
-   * @param workspacePath 工作区路径
    * @param threadId 会话/线程 ID
    * @param provider LLM 提供者（用于压缩策略）
    * @param currentUserMessage 当前用户输入（将被添加到历史末尾）
    * @returns 压缩后的消息数组，可直接用于 LLM 调用
    */
   async buildContextMessages(
-    workspacePath: string,
     threadId: string,
     provider: LLMProvider,
     currentUserMessage?: string,
   ): Promise<BaseMessage[]> {
     // 1. 加载历史
-    const messages = await this.loadHistoryAsMessages(workspacePath, threadId, {
+    const messages = await this.loadHistoryAsMessages(threadId, {
       includeSystem: false, // system 消息由 ContextBuilder 处理
     })
 
@@ -172,9 +178,9 @@ export class ChatHistoryManager {
   /**
    * 加载所有会话列表
    */
-  async listSessions(workspacePath: string): Promise<ChatSessionMeta[]> {
+  async listSessions(): Promise<SessionMeta[]> {
     try {
-      const metaPath = this.getSessionsMetaPath(workspacePath)
+      const metaPath = this.getSessionsMetaPath()
       if (fs.existsSync(metaPath)) {
         const data = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
         return Array.isArray(data.sessions) ? data.sessions : []
@@ -189,12 +195,10 @@ export class ChatHistoryManager {
    * 保存会话历史
    */
   async saveSession(
-    workspacePath: string,
     sessionId: string,
-    messages: StoredMessage[],
+    messages: SessionMessage[],
   ): Promise<void> {
-    const dir = this.getWorkspaceChatDir(workspacePath)
-    const filePath = path.join(dir, `${sessionId}.json`)
+    const filePath = this.getSessionFilePath(sessionId)
     const now = new Date().toISOString()
 
     // 保存消息
@@ -205,19 +209,18 @@ export class ChatHistoryManager {
     )
 
     // 更新元数据
-    await this.updateSessionMeta(workspacePath, sessionId, messages, now)
+    await this.updateSessionMeta(sessionId, messages, now)
   }
 
   /**
    * 更新会话元数据
    */
   private async updateSessionMeta(
-    workspacePath: string,
     sessionId: string,
-    messages: StoredMessage[],
+    messages: SessionMessage[],
     now: string,
   ): Promise<void> {
-    const sessions = await this.listSessions(workspacePath)
+    const sessions = await this.listSessions()
     const existingIndex = sessions.findIndex((s) => s.id === sessionId)
 
     const firstUserMessage = messages.find((m) => m.role === 'user')
@@ -231,7 +234,7 @@ export class ChatHistoryManager {
           minute: '2-digit',
         })}`
 
-    const sessionMeta: ChatSessionMeta = {
+    const sessionMeta: SessionMeta = {
       id: sessionId,
       title: existingIndex >= 0 ? sessions[existingIndex].title : title,
       createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : now,
@@ -248,21 +251,21 @@ export class ChatHistoryManager {
     // 按更新时间排序
     sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
-    const metaPath = this.getSessionsMetaPath(workspacePath)
+    const metaPath = this.getSessionsMetaPath()
     fs.writeFileSync(metaPath, JSON.stringify({ sessions }, null, 2), 'utf-8')
   }
 
   /**
    * 删除会话
    */
-  async deleteSession(workspacePath: string, sessionId: string): Promise<void> {
-    const sessions = await this.listSessions(workspacePath)
+  async deleteSession(sessionId: string): Promise<void> {
+    const sessions = await this.listSessions()
     const filtered = sessions.filter((s) => s.id !== sessionId)
 
-    const metaPath = this.getSessionsMetaPath(workspacePath)
+    const metaPath = this.getSessionsMetaPath()
     fs.writeFileSync(metaPath, JSON.stringify({ sessions: filtered }, null, 2), 'utf-8')
 
-    const filePath = this.getSessionFilePath(workspacePath, sessionId)
+    const filePath = this.getSessionFilePath(sessionId)
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath)
     }
@@ -271,8 +274,8 @@ export class ChatHistoryManager {
   /**
    * 获取最近使用的会话 ID
    */
-  async getMostRecentSessionId(workspacePath: string): Promise<string | null> {
-    const sessions = await this.listSessions(workspacePath)
+  async getMostRecentSessionId(): Promise<string | null> {
+    const sessions = await this.listSessions()
     return sessions.length > 0 ? sessions[0].id : null
   }
 }

@@ -1,8 +1,9 @@
 import { HumanMessage } from '@langchain/core/messages'
 import type { LLMProvider, DetectedAnchor } from '../providers/index.js'
-import type { AgentState } from '../state.js'
+import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryPalaceStation, StationDesign } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
+import { PalaceAgent } from './base.js'
 
 const COORD_PAD = 0.05
 const MIN_DISTANCE = 0.12
@@ -279,10 +280,21 @@ async function locateAnchors(
   return normalizeDetectedAnchors(parsed, input.anchors)
 }
 
-export class VisionAgent {
-  constructor(private provider: LLMProvider) {}
-
-  async invoke(state: typeof AgentState.State): Promise<Partial<typeof AgentState.State>> {
+/**
+ * VisionAgent - 视觉定位智能体
+ *
+ * 架构职责：
+ * 1. 在生成的记忆宫殿图像中定位锚点位置
+ * 2. 应用标准布局作为回退方案
+ * 3. 生成记忆路线总结
+ *
+ * 无状态设计：
+ * - 不涉及持久化记忆访问
+ * - 所有输入通过 state.palace 和 state.imageUrls 传递
+ * - 输出 memoryRoute 和 response 总结
+ */
+export class AnchorAgent extends PalaceAgent {
+  async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
     if (!state.palace || state.error) return {}
 
     let memoryRoute: MemoryPalaceStation[]

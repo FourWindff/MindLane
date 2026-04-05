@@ -1,3 +1,8 @@
+import { DocumentNodeData } from "@/features/mindmap/nodes/document"
+import { PalaceNodeData } from "@/features/mindmap/nodes/palace"
+import { TopicNodeData } from "@/features/mindmap/nodes/topic"
+
+
 export interface MindLaneFile {
   version: '1.0'
   metadata: {
@@ -31,38 +36,6 @@ export interface XY {
   y: number
 }
 
-export type TopicNodeData = {
-  label: string
-  palaceId?: string
-  justAdded?: boolean
-  exiting?: boolean
-  [key: string]: unknown
-}
-
-export type PalaceNodeData = {
-  label: string
-  imageUrl: string
-  stations: PalaceStation[]
-  sourceNodeIds: string[]
-  [key: string]: unknown
-}
-
-export type PalaceStation = {
-  order: number
-  content: string
-  anchorVisual: string
-  association?: string
-  x: number
-  y: number
-  linkedNodeId: string
-}
-
-export type DocumentNodeData = {
-  filename: string
-  excerpt: string
-  fullTextPath?: string
-  [key: string]: unknown
-}
 
 export interface DocumentRef {
   id: string
@@ -99,3 +72,4 @@ export function serializeFile(file: MindLaneFile): string {
     2,
   )
 }
+
