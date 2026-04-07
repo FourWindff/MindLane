@@ -9,6 +9,7 @@ import { QueryRewriter } from './retrieval/core/query-rewriter.js'
 import { CitationFormatter } from './retrieval/post/citation-formatter.js'
 import { DocumentIndexer, type IndexedDocMeta, type IndexProgressCallback } from './indexer.js'
 import { loadDocument } from './prepare/loaders.js'
+import { logger } from '../../shared/logger.js'
 
 export class RAGManager {
   private vectorStore = new VectorStoreManager()
@@ -19,6 +20,8 @@ export class RAGManager {
   private provider: LLMProvider | null = null
 
   async init(userDataPath: string, provider?: LLMProvider): Promise<void> {
+    logger.info('正在初始化 RAGManager...')
+
     this.provider = provider ?? null
 
     this.documentStore.init(userDataPath)
@@ -26,10 +29,12 @@ export class RAGManager {
 
     const allChunks = this.documentStore.getAllChunks()
     if (allChunks.length > 0) {
+      logger.info(`加载了 ${allChunks.length} 个已有文档片段`)
       this.bm25Engine.buildIndex(allChunks)
     }
 
     if (provider) {
+      logger.info('正在初始化向量存储...')
       const embeddings = provider.createEmbeddings()
       await this.vectorStore.init(userDataPath, embeddings)
 
@@ -37,6 +42,7 @@ export class RAGManager {
         vectorStore: this.vectorStore,
         bm25Engine: this.bm25Engine,
       })
+      logger.info('混合检索器已初始化')
     }
 
     this.indexer = new DocumentIndexer(
@@ -45,6 +51,8 @@ export class RAGManager {
       this.bm25Engine,
     )
     this.indexer.init(userDataPath)
+
+    logger.info('RAGManager 初始化完成')
   }
 
   async index(
@@ -53,15 +61,19 @@ export class RAGManager {
   ): Promise<IndexedDocMeta> {
     if (!this.indexer) throw new Error('RAG 未初始化')
 
+    logger.info(`开始索引文档: ${filePath}`)
+
     const visionModel = this.provider?.visionModel
     const llm = this.provider?.reasoningModel
 
-    return this.indexer.index(
+    const result = await this.indexer.index(
       filePath,
       (fp) => loadDocument(fp, visionModel),
       llm,
       onProgress,
     )
+    logger.info(`文档索引完成: ${result.filename} (${result.chunkCount} 个片段)`)
+    return result
   }
 
   list(): IndexedDocMeta[] {
@@ -101,26 +113,34 @@ export class RAGManager {
     const searchDocumentsTool = tool(
       async ({ query, k }) => {
         if (documentStore.count === 0) {
+          logger.warn('搜索时知识库为空')
           return '知识库为空，用户尚未导入任何文档。'
         }
 
         if (!hybridRetriever || !provider) {
+          logger.error('搜索时知识库检索未初始化')
           return '知识库检索未初始化。'
         }
 
         try {
+          logger.debug(`开始检索查询: "${query}" (k=${k ?? 4})`)
+
           const queryRewriter = new QueryRewriter({ model: provider.reasoningModel, maxQueries: 3 })
           const citationFormatter = new CitationFormatter()
 
           const { searchQueries } = await queryRewriter.rewrite(query)
+          logger.debug(`查询重写结果: ${searchQueries.length} 个查询`)
 
           const chunks = await hybridRetriever.searchMultiple(searchQueries, {
             topK: k ?? 4,
           })
 
           if (chunks.length === 0) {
+            logger.info(`未找到相关文档内容，查询: "${query}"`)
             return '未找到相关文档内容。'
           }
+
+          logger.debug(`检索完成，找到 ${chunks.length} 个片段`)
 
           const { context, citations } = citationFormatter.formatWithCitations(chunks)
 
@@ -137,7 +157,9 @@ export class RAGManager {
 
           return `${context}\n\n---\n引用列表:\n${citationInfo}`
         } catch (err) {
-          return `检索失败: ${err instanceof Error ? err.message : String(err)}`
+          const errorMsg = err instanceof Error ? err.message : String(err)
+          logger.error(`检索失败: ${errorMsg}`)
+          return `检索失败: ${errorMsg}`
         }
       },
       {

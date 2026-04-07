@@ -2,6 +2,8 @@ import type { Document } from '@langchain/core/documents'
 import type { Chunk, ChunkMetadata } from '../../types.js'
 import crypto from 'node:crypto'
 import path from 'node:path'
+import { logger } from '../../../../shared/logger.js'
+
 
 export interface HierarchicalChunkerOptions {
   maxChunkSize?: number      // Maximum chunk size (default: 1000)
@@ -42,9 +44,13 @@ export class HierarchicalChunker {
   ): Chunk[] {
     const content = doc.pageContent
     const sourcePath = doc.metadata.source ?? 'unknown'
+    const filename = doc.metadata.filename ?? path.basename(sourcePath)
+
+    logger.debug(`开始分块: ${filename}，内容长度: ${content.length}`)
+
     const metadata: Omit<ChunkMetadata, 'charCount' | 'indexedAt'> = {
       docId,
-      filename: doc.metadata.filename ?? path.basename(sourcePath),
+      filename,
       source: sourcePath,
       pageNumber: options?.pageNumber ?? doc.metadata.loc?.pageNumber,
       sectionTitle: options?.sectionTitle ?? doc.metadata.sectionTitle,
@@ -55,6 +61,7 @@ export class HierarchicalChunker {
 
     // If content is small enough, return as single chunk
     if (content.length <= this.options.maxChunkSize) {
+      logger.debug(`内容较小，单块处理: ${filename}`)
       return [this.createChunk(content, metadata, options?.level ?? 2, undefined)]
     }
 
@@ -74,6 +81,7 @@ export class HierarchicalChunker {
       }
     }
 
+    logger.debug(`分块完成: ${filename}，段落数: ${paragraphs.length}，生成 chunks: ${chunks.length}`)
     return chunks
   }
 
@@ -89,8 +97,11 @@ export class HierarchicalChunker {
     const chunks: Chunk[] = []
     const filename = path.basename(filePath)
 
+    logger.debug(`开始 PDF 分块: ${filename}，页数: ${pages.length}`)
+
     // Collect all text content first
     const allText = pages.map(p => p.text).join('\n')
+    logger.debug(`PDF 总文本长度: ${allText.length}`)
 
     // Split into paragraphs
     const paragraphs = this.splitIntoParagraphs(allText)
@@ -173,6 +184,7 @@ export class HierarchicalChunker {
       )
     }
 
+    logger.debug(`PDF 分块完成: ${filename}，生成 chunks: ${chunks.length}`)
     return chunks
   }
 
@@ -192,6 +204,8 @@ export class HierarchicalChunker {
   ): Chunk[] {
     const chunks: Chunk[] = []
     const filename = path.basename(filePath)
+
+    logger.debug(`开始 MindLane 分块: ${filename}，节点数: ${nodes.length}`)
 
     // Build parent mapping
     const nodeMap = new Map(nodes.map((n) => [n.id, n]))
@@ -246,6 +260,7 @@ export class HierarchicalChunker {
       )
     }
 
+    logger.debug(`MindLane 分块完成: ${filename}，生成 chunks: ${chunks.length}`)
     return chunks
   }
 

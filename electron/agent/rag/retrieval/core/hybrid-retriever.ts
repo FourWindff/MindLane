@@ -2,6 +2,7 @@ import type { VectorStoreManager } from '../../storage/vector-store.js'
 import type { BM25SearchEngine } from './bm25.js'
 import type { ScoredChunk, SearchOptions } from '../../types.js'
 import { reciprocalRankFusion } from '../utils/rrf.js'
+import { logger } from '../../../../shared/logger.js'
 
 interface HybridRetrieverOptions {
   vectorStore: VectorStoreManager
@@ -19,11 +20,14 @@ export class HybridRetriever {
 
   async search(query: string, options: SearchOptions = {}): Promise<ScoredChunk[]> {
     const topK = options.topK ?? 5
+    logger.debug(`混合检索: "${query}" (k=${topK})`)
 
     const [vectorResults, bm25Results] = await Promise.all([
       this.vectorStore.similaritySearch(query, topK),
       Promise.resolve(this.bm25Engine.search(query, topK)),
     ])
+
+    logger.debug(`向量检索: ${vectorResults.length} 个结果, BM25: ${bm25Results.length} 个结果`)
 
     const rrfInput = [
       ...vectorResults.map((r, i) => ({
@@ -38,10 +42,14 @@ export class HybridRetriever {
       })),
     ]
 
-    return reciprocalRankFusion(rrfInput, 60).slice(0, topK)
+    const fusedResults = reciprocalRankFusion(rrfInput, 60).slice(0, topK)
+    logger.debug(`RRF 融合后: ${fusedResults.length} 个结果`)
+
+    return fusedResults
   }
 
   async searchMultiple(queries: string[], options: SearchOptions = {}): Promise<ScoredChunk[]> {
+    logger.debug(`多查询检索: ${queries.length} 个查询`)
     const allResults: ScoredChunk[] = []
     for (const query of queries) {
       const results = await this.search(query, options)
@@ -49,10 +57,13 @@ export class HybridRetriever {
     }
 
     const seen = new Set<string>()
-    return allResults.filter((r) => {
+    const dedupedResults = allResults.filter((r) => {
       if (seen.has(r.chunk.id)) return false
       seen.add(r.chunk.id)
       return true
     })
+
+    logger.debug(`多查询去重后: ${dedupedResults.length} 个结果`)
+    return dedupedResults
   }
 }

@@ -8,6 +8,7 @@ import type { Chunk } from './types.js'
 import path from 'node:path'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
+import { logger } from '../../shared/logger.js'
 
 export interface IndexedDocMeta {
   id: string
@@ -68,7 +69,9 @@ export class DocumentIndexer {
     const filename = path.basename(filePath)
     const docId = crypto.randomUUID()
 
+    logger.info(`开始索引文档: ${filename}`)
     onProgress?.({ phase: 'loading', filename, progress: 0.1 })
+    logger.debug(`[${filename}] 正在加载文档...`)
 
     let docs: Document[]
     try {
@@ -80,6 +83,7 @@ export class DocumentIndexer {
     }
 
     onProgress?.({ phase: 'chunking', filename, progress: 0.3 })
+    logger.debug(`[${filename}] 正在分块...`)
 
     const chunker = new HierarchicalChunker()
     let chunks: Chunk[] = []
@@ -89,9 +93,13 @@ export class DocumentIndexer {
       chunks.push(...docChunks)
     }
 
+    logger.debug(`[${filename}] 分块完成，共 ${chunks.length} 个片段`)
+
     if (llm) {
       onProgress?.({ phase: 'summarizing', filename, progress: 0.5 })
+      logger.debug(`[${filename}] 正在生成父级摘要...`)
       chunks = await generateParentSummaries(chunks, llm)
+      logger.debug(`[${filename}] 父级摘要生成完成`)
     }
 
     for (const chunk of chunks) {
@@ -123,6 +131,7 @@ export class DocumentIndexer {
     this.indexedDocs.push(meta)
     this.persistMeta()
 
+    logger.info(`[${filename}] 索引完成: ${chunks.length} 个片段已保存`)
     onProgress?.({ phase: 'done', filename, progress: 1 })
     return meta
   }

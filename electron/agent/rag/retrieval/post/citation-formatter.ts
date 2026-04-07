@@ -1,7 +1,11 @@
 import type { ScoredChunk, Citation } from '../../types.js'
+import { logger } from '../../../../shared/logger.js'
+
 
 export class CitationFormatter {
   formatWithCitations(chunks: ScoredChunk[]): { context: string; citations: Citation[] } {
+    logger.debug(`开始格式化引用，输入 ${chunks.length} 个 chunks`)
+
     const citations: Citation[] = []
     const contextParts: string[] = []
 
@@ -19,6 +23,9 @@ export class CitationFormatter {
 
       contextParts.push(`[${citationId}] ${chunk.content}`)
     }
+
+    const totalLength = contextParts.join('\n\n').length
+    logger.debug(`引用格式化完成，生成 ${citations.length} 个引用，总内容长度: ${totalLength}`)
 
     return {
       context: contextParts.join('\n\n'),
