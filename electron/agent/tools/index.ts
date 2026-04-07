@@ -1,4 +1,3 @@
-export { createSearchTools } from './searchDocuments.js'
 export {
   type MindmapContextData,
   type ContextNodeInfo,

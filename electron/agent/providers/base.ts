@@ -1,4 +1,5 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 
 export type ChatModelOption = { id: string; displayName: string }
 
@@ -19,6 +20,8 @@ export abstract class LLMProvider {
   }
 
   abstract get chatModels(): ChatModelOption[]
+
+  abstract createEmbeddings(): EmbeddingsInterface
 
   abstract generateImage(input: {
     prompt: string

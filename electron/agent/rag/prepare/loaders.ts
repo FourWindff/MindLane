@@ -1,10 +1,9 @@
 import { DocxLoader } from '@langchain/community/document_loaders/fs/docx'
 import { Document } from '@langchain/core/documents'
-import { PDFParse } from 'pdf-parse'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { HumanMessage } from '@langchain/core/messages'
-import fs from 'node:fs'
-import path from 'node:path'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 
 function contentToString(content: unknown): string {
   if (typeof content === 'string') return content
@@ -38,7 +37,7 @@ async function loadMindLaneFile(filePath: string): Promise<Document[]> {
   return [
     new Document({
       pageContent: `# ${title}\n\n${textParts.join('\n')}`,
-      metadata: { source: filePath, type: 'mindlane', title },
+      metadata: { source: filePath, filename: path.basename(filePath), type: 'mindlane', title },
     }),
   ]
 }
@@ -74,51 +73,49 @@ async function loadImageViaVision(
   return [
     new Document({
       pageContent: text || '(图片内容无法识别)',
-      metadata: { source: filePath, type: 'image' },
+      metadata: { source: filePath, filename: path.basename(filePath), type: 'image' },
     }),
   ]
 }
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp'])
 
+async function parsePDF(data: Buffer): Promise<{ text: string; numpages: number }> {
+  const pdfParse = await import('pdf-parse')
+
+  const PDFParseClass = (pdfParse as unknown as { PDFParse: new (options: { data: Buffer }) => { getText: () => Promise<{ text: string; total: number; pages: unknown[] }>; destroy: () => Promise<void> } }).PDFParse
+
+  if (PDFParseClass) {
+    const parser = new PDFParseClass({ data })
+    try {
+      const result = await parser.getText()
+      return { text: result.text, numpages: result.total ?? result.pages?.length ?? 0 }
+    } finally {
+      await parser.destroy()
+    }
+  }
+
+  const parseFn = (pdfParse as unknown as { default?: (data: Buffer) => Promise<{ text: string; numpages: number }> }).default
+    || (pdfParse as unknown as (data: Buffer) => Promise<{ text: string; numpages: number }>)
+
+  if (typeof parseFn === 'function') {
+    return parseFn(data)
+  }
+
+  throw new Error('Unable to find pdf-parse API')
+}
+
 async function loadPdfFile(filePath: string): Promise<Document[]> {
   const data = await fs.promises.readFile(filePath)
-  const parser = new PDFParse({
-    data,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    useSystemFonts: true,
-  })
-  try {
-    const textResult = await parser.getText()
-    const docs: Document[] = []
-    for (const page of textResult.pages) {
-      const pageContent = page.text.trim()
-      if (!pageContent) continue
-      docs.push(
-        new Document({
-          pageContent,
-          metadata: {
-            source: filePath,
-            type: 'pdf',
-            loc: { pageNumber: page.num },
-            pdf: { totalPages: textResult.total },
-          },
-        }),
-      )
-    }
-    if (docs.length === 0 && textResult.text.trim()) {
-      return [
-        new Document({
-          pageContent: textResult.text.trim(),
-          metadata: { source: filePath, type: 'pdf', pdf: { totalPages: textResult.total } },
-        }),
-      ]
-    }
-    return docs
-  } finally {
-    await parser.destroy()
-  }
+
+  const result = await parsePDF(data)
+
+  return [
+    new Document({
+      pageContent: result.text.trim() || '(PDF 内容无法提取)',
+      metadata: { source: filePath, filename: path.basename(filePath), type: 'pdf', pdf: { totalPages: result.numpages } },
+    }),
+  ]
 }
 
 export async function loadDocument(
@@ -145,19 +142,18 @@ export async function loadDocument(
       return [
         new Document({
           pageContent: `(图片文件：${path.basename(filePath)}，未配置视觉模型无法解析)`,
-          metadata: { source: filePath, type: 'image' },
+          metadata: { source: filePath, filename: path.basename(filePath), type: 'image' },
         }),
       ]
     }
     return loadImageViaVision(filePath, visionModel)
   }
 
-  // Default: treat as text (md, txt, etc.)
   const content = await fs.promises.readFile(filePath, 'utf-8')
   return [
     new Document({
       pageContent: content,
-      metadata: { source: filePath, type: ext.replace('.', '') || 'text' },
+      metadata: { source: filePath, filename: path.basename(filePath), type: ext.replace('.', '') || 'text' },
     }),
   ]
 }

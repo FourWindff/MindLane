@@ -1,4 +1,5 @@
-import { ChatOpenAI } from '@langchain/openai'
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
+import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 import { LLMProvider, type ChatModelOption } from './base.js'
 
 const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
@@ -38,6 +39,7 @@ function sleep(ms: number): Promise<void> {
 
 export class DashScopeProvider extends LLMProvider {
   private readonly apiKey: string
+  private readonly baseURL: string
 
   static readonly defaultChatModels: ChatModelOption[] = [
     { id: 'qwen-turbo', displayName: 'qwen-turbo' },
@@ -79,6 +81,16 @@ export class DashScopeProvider extends LLMProvider {
       }),
     )
     this.apiKey = key
+    this.baseURL = baseURL
+  }
+
+  createEmbeddings(): EmbeddingsInterface {
+    return new OpenAIEmbeddings({
+      model: 'text-embedding-v3',
+      apiKey: this.apiKey,
+      batchSize: 10,
+      configuration: { baseURL: this.baseURL },
+    })
   }
 
   async generateImage(input: {

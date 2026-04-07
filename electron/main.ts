@@ -971,22 +971,10 @@ function registerIpcHandlers() {
     }
 
     const indexed = []
-    let visionModel: LLMProvider['visionModel'] = undefined
-    try {
-      const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-      if (apiKey) {
-        const provider = new DashScopeProvider({
-          apiKey,
-          chatModel: settings.chatModel || 'qwen-turbo',
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
-        })
-        visionModel = provider.visionModel
-      }
-    } catch { /* no vision model available */ }
 
     for (const filePath of result.filePaths) {
       try {
-        const meta = await aiService.indexer.index(filePath, visionModel, (progress) => {
+        const meta = await aiService.rag.index(filePath, (progress) => {
           win?.webContents.send('kb:index-progress', progress)
         })
         indexed.push(meta)
@@ -1004,11 +992,11 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('kb:list-documents', async () => {
-    return aiService.indexer.list()
+    return aiService.rag.list()
   })
 
   ipcMain.handle('kb:delete-document', async (_e, payload: { docId: string }) => {
-    const success = await aiService.indexer.remove(payload.docId)
+    const success = await aiService.rag.remove(payload.docId)
     return success ? { ok: true } : { ok: false, error: '文档不存在' }
   })
 
@@ -1062,11 +1050,19 @@ app.whenReady().then(async () => {
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
 
-  aiService = new AiService(userDataPath)
+  aiService = new AiService()
   try {
     const settings = await fsService.settings.load()
     const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-    await aiService.init(userDataPath, apiKey || undefined, settings.providerConfigs['dashscope']?.baseUrl)
+    let provider: LLMProvider | undefined
+    if (apiKey) {
+      provider = new DashScopeProvider({
+        apiKey,
+        chatModel: settings.chatModel || 'qwen-turbo',
+        baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+      })
+    }
+    await aiService.init(userDataPath, provider)
   } catch (err) {
     console.error('AI service init failed:', err)
   }
