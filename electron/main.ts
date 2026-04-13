@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './agent/providers/index.js'
+import { type LLMProvider, urlToDataUrl, createProvider, getRegisteredProviders } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -209,11 +209,12 @@ function createWindow() {
 function registerIpcHandlers() {
   const createProviderForRequest = async (apiKey: string, model: string) => {
     const settings = await fsService.settings.load()
-    const dsConfig = settings.providerConfigs['dashscope']
-    return new DashScopeProvider({
-      apiKey: apiKey.trim() || settings.apiKey || dsConfig?.apiKey || '',
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerConfig = settings.providerConfigs[providerId]
+    return createProvider(providerId, {
+      apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
       chatModel: model.trim() || settings.chatModel || 'qwen-turbo',
-      baseUrl: dsConfig?.baseUrl,
+      baseUrl: providerConfig?.baseUrl,
     })
   }
 
@@ -238,15 +239,17 @@ function registerIpcHandlers() {
     ) => {
       try {
         const settings = await fsService.settings.load()
-        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+        const providerId = settings.activeProviders.chat || 'dashscope'
+        const providerConfig = settings.providerConfigs[providerId]
+        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
         const modelName = settings.chatModel || 'qwen-turbo'
 
         if (!apiKey.trim()) return { ok: false, error: '未填写 API Key' }
 
-        const provider = new DashScopeProvider({
+        const provider = createProvider(providerId, {
           apiKey,
           chatModel: modelName,
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+          baseUrl: providerConfig?.baseUrl,
         })
 
         const userDataPath = app.getPath('userData')
@@ -306,7 +309,9 @@ function registerIpcHandlers() {
 
       try {
         const settings = await fsService.settings.load()
-        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+        const providerId = settings.activeProviders.chat || 'dashscope'
+        const providerConfig = settings.providerConfigs[providerId]
+        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
         const modelName = settings.chatModel || 'qwen-turbo'
 
         if (!apiKey.trim()) {
@@ -314,10 +319,10 @@ function registerIpcHandlers() {
           return
         }
 
-        const provider = new DashScopeProvider({
+        const provider = createProvider(providerId, {
           apiKey,
           chatModel: modelName,
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+          baseUrl: providerConfig?.baseUrl,
         })
 
         const userDataPath = app.getPath('userData')
@@ -492,14 +497,53 @@ function registerIpcHandlers() {
   // -- Provider management --
   ipcMain.handle('ai:list-providers', async () => {
     return {
-      chat: [
-        {
-          id: 'dashscope',
-          displayName: '通义千问 (百炼)',
-          models: DashScopeProvider.defaultChatModels.map((model) => ({ ...model })),
-        },
-      ],
-      image: [{ id: 'dashscope', displayName: '通义万相 (百炼)' }],
+      chat: getRegisteredProviders().map((meta) => ({
+        id: meta.id,
+        displayName: meta.displayName,
+        models: meta.defaultModels.map((m) => ({ ...m })),
+        capabilities: meta.capabilities,
+      })),
+      image: getRegisteredProviders()
+        .filter((meta) => meta.capabilities.includes('imageGen' as never))
+        .map((meta) => ({ id: meta.id, displayName: meta.displayName })),
+    }
+  })
+
+  ipcMain.handle('ai:get-providers', async () => {
+    return {
+      ok: true,
+      providers: getRegisteredProviders().map((meta) => ({
+        id: meta.id,
+        displayName: meta.displayName,
+        capabilities: meta.capabilities,
+        models: meta.defaultModels,
+      })),
+    }
+  })
+
+  ipcMain.handle('ai:get-capabilities', async () => {
+    try {
+      const settings = await fsService.settings.load()
+      const providerId = settings.activeProviders.chat || 'dashscope'
+      const providerConfig = settings.providerConfigs[providerId]
+      const apiKey = providerConfig?.apiKey || settings.apiKey || ''
+
+      if (!apiKey.trim()) {
+        return { ok: false, error: '未配置 API Key' }
+      }
+
+      const provider = createProvider(providerId, {
+        apiKey,
+        chatModel: settings.chatModel || 'qwen-turbo',
+        baseUrl: providerConfig?.baseUrl,
+      })
+
+      return {
+        ok: true,
+        capabilities: Array.from(provider.capabilities),
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
@@ -1053,13 +1097,15 @@ app.whenReady().then(async () => {
   aiService = new AiService()
   try {
     const settings = await fsService.settings.load()
-    const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerConfig = settings.providerConfigs[providerId]
+    const apiKey = providerConfig?.apiKey || settings.apiKey || ''
     let provider: LLMProvider | undefined
     if (apiKey) {
-      provider = new DashScopeProvider({
+      provider = createProvider(providerId, {
         apiKey,
         chatModel: settings.chatModel || 'qwen-turbo',
-        baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+        baseUrl: providerConfig?.baseUrl,
       })
     }
     await aiService.init(userDataPath, provider)

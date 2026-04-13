@@ -150,9 +150,17 @@ interface Window {
         | { ok: false; error: string }
       >
       listProviders: () => Promise<{
-        chat: { id: string; displayName: string; models: { id: string; displayName: string }[] }[]
+        chat: { id: string; displayName: string; models: { id: string; displayName: string }[]; capabilities: string[] }[]
         image: { id: string; displayName: string }[]
       }>
+      getProviders: () => Promise<{
+        ok: true
+        providers: { id: string; displayName: string; capabilities: string[]; models: { id: string; displayName: string }[] }[]
+      } | { ok: false; error: string }>
+      getCapabilities: () => Promise<{
+        ok: true
+        capabilities: string[]
+      } | { ok: false; error: string }>
       urlToDataUrl: (payload: { url: string }) => Promise<
         _FsResult<{ dataUrl: string }>
       >

@@ -1,6 +1,6 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
 import type { EmbeddingsInterface } from '@langchain/core/embeddings'
-import { LLMProvider, type ChatModelOption } from './base.js'
+import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
 
 const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 const IMAGE_SYNTH_URL =
@@ -47,6 +47,15 @@ export class DashScopeProvider extends LLMProvider {
     { id: 'qwen-max', displayName: 'qwen-max' },
     { id: 'qwen-long', displayName: 'qwen-long' },
   ]
+
+  get capabilities(): Set<ProviderCapability> {
+    return new Set([
+      ProviderCapability.Chat,
+      ProviderCapability.Vision,
+      ProviderCapability.ImageGen,
+      ProviderCapability.Embeddings,
+    ])
+  }
 
   get chatModels() {
     return DashScopeProvider.defaultChatModels

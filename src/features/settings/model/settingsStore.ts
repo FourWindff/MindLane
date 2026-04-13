@@ -4,6 +4,7 @@ interface ProviderInfo {
   id: string
   displayName: string
   models: { id: string; displayName: string }[]
+  capabilities: string[]
 }
 
 interface SettingsState {
@@ -14,6 +15,8 @@ interface SettingsState {
   chatModel: string
   autoSaveIntervalMs: number
   providers: ProviderInfo[]
+  capabilities: string[]
+  providerConfigs: Record<string, { apiKey: string; baseUrl?: string }>
 
   hydrate: (data: Partial<SettingsState>) => void
   setActiveChatProvider: (id: string) => void
@@ -22,45 +25,54 @@ interface SettingsState {
   setChatModel: (model: string) => void
   setAutoSaveIntervalMs: (ms: number) => void
   setProviders: (providers: ProviderInfo[]) => void
+  setCapabilities: (capabilities: string[]) => void
+  setProviderApiKey: (providerId: string, apiKey: string) => void
+  setProviderBaseUrl: (providerId: string, baseUrl: string) => void
 }
 
 function persistToBackend(partial: Record<string, unknown>) {
   window.mindlane?.settings.update(partial).catch(() => {})
 }
 
-export const useSettingsStore = create<SettingsState>((set) => ({
+export const useSettingsStore = create<SettingsState>((set, get) => ({
   loaded: false,
   activeChatProvider: 'dashscope',
   activeImageProvider: 'dashscope',
   apiKey: '',
   chatModel: 'qwen-turbo',
   autoSaveIntervalMs: 30_000,
-  providers: [
-    {
-      id: 'dashscope',
-      displayName: '通义千问 (百炼)',
-      models: [
-        { id: 'qwen-turbo', displayName: 'qwen-turbo' },
-        { id: 'qwen-plus', displayName: 'qwen-plus' },
-        { id: 'qwen-max', displayName: 'qwen-max' },
-        { id: 'qwen-long', displayName: 'qwen-long' },
-      ],
-    },
-  ],
+  providers: [],
+  capabilities: [],
+  providerConfigs: {},
 
   hydrate: (data) => set({ ...data, loaded: true }),
 
   setActiveChatProvider: (id) => {
-    set({ activeChatProvider: id })
-    persistToBackend({ activeProviders: { chat: id } })
+    const state = get()
+    const provider = state.providers.find((p) => p.id === id)
+    const defaultModel = provider?.models[0]?.id ?? ''
+    const providerKey = state.providerConfigs[id]?.apiKey ?? ''
+    set({ activeChatProvider: id, chatModel: defaultModel, apiKey: providerKey })
+    persistToBackend({ activeProviders: { chat: id }, chatModel: defaultModel })
+    loadCapabilities()
   },
   setActiveImageProvider: (id) => {
     set({ activeImageProvider: id })
     persistToBackend({ activeProviders: { image: id } })
   },
   setApiKey: (key) => {
-    set({ apiKey: key })
-    persistToBackend({ apiKey: key })
+    const providerId = get().activeChatProvider
+    set((state) => ({
+      apiKey: key,
+      providerConfigs: {
+        ...state.providerConfigs,
+        [providerId]: { ...state.providerConfigs[providerId], apiKey: key },
+      },
+    }))
+    persistToBackend({
+      apiKey: key,
+      providerConfigs: { [providerId]: { apiKey: key } },
+    })
   },
   setChatModel: (model) => {
     set({ chatModel: model })
@@ -71,6 +83,25 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     persistToBackend({ editor: { autoSaveIntervalMs: ms } })
   },
   setProviders: (providers) => set({ providers }),
+  setCapabilities: (capabilities) => set({ capabilities }),
+  setProviderApiKey: (providerId, apiKey) => {
+    set((state) => ({
+      providerConfigs: {
+        ...state.providerConfigs,
+        [providerId]: { ...state.providerConfigs[providerId], apiKey },
+      },
+    }))
+    persistToBackend({ providerConfigs: { [providerId]: { apiKey } } })
+  },
+  setProviderBaseUrl: (providerId, baseUrl) => {
+    set((state) => ({
+      providerConfigs: {
+        ...state.providerConfigs,
+        [providerId]: { ...state.providerConfigs[providerId], apiKey: state.providerConfigs[providerId]?.apiKey ?? '', baseUrl },
+      },
+    }))
+    persistToBackend({ providerConfigs: { [providerId]: { baseUrl } } })
+  },
 }))
 
 export async function loadSettingsFromBackend(): Promise<void> {
@@ -81,14 +112,55 @@ export async function loadSettingsFromBackend(): Promise<void> {
     apiKey?: string
     chatModel?: string
     activeProviders?: { chat?: string; image?: string }
+    providerConfigs?: Record<string, { apiKey: string; baseUrl?: string }>
     editor?: { autoSaveIntervalMs?: number }
   }
 
+  const providerId = s.activeProviders?.chat ?? 'dashscope'
+  const configs = s.providerConfigs ?? {}
+  // 显示当前 provider 的 key，若无则回退到全局 apiKey
+  const displayKey = configs[providerId]?.apiKey || s.apiKey || ''
+
   useSettingsStore.getState().hydrate({
-    apiKey: s.apiKey ?? '',
+    apiKey: displayKey,
     chatModel: s.chatModel ?? 'qwen-turbo',
     autoSaveIntervalMs: s.editor?.autoSaveIntervalMs ?? 30_000,
-    activeChatProvider: s.activeProviders?.chat ?? 'dashscope',
+    activeChatProvider: providerId,
     activeImageProvider: s.activeProviders?.image ?? 'dashscope',
+    providerConfigs: configs,
   })
+
+  // Load providers from backend
+  await loadProviders()
+  // Load capabilities for current provider
+  await loadCapabilities()
+}
+
+async function loadProviders(): Promise<void> {
+  try {
+    const result = await window.mindlane?.ai.getProviders?.()
+    if (result?.ok && result.providers) {
+      useSettingsStore.getState().setProviders(
+        result.providers.map((p: { id: string; displayName: string; capabilities: string[]; models: { id: string; displayName: string }[] }) => ({
+          id: p.id,
+          displayName: p.displayName,
+          models: p.models,
+          capabilities: p.capabilities,
+        })),
+      )
+    }
+  } catch {
+    // fallback: use existing providers
+  }
+}
+
+async function loadCapabilities(): Promise<void> {
+  try {
+    const result = await window.mindlane?.ai.getCapabilities?.()
+    if (result?.ok && result.capabilities) {
+      useSettingsStore.getState().setCapabilities(result.capabilities)
+    }
+  } catch {
+    // ignore
+  }
 }

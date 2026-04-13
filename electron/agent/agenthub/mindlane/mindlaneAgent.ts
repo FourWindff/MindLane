@@ -44,6 +44,29 @@ const RouteDecisionSchema = z.object({
 type RouteDecision = z.infer<typeof RouteDecisionSchema>;
 
 /**
+ * 从 LangChain message content 中提取文本
+ * Anthropic 格式返回 content 是数组 [{type:"text", text:"..."}]
+ * OpenAI 格式返回 content 是字符串
+ */
+function extractTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (block): block is { type: string; text: string } =>
+          typeof block === "object" &&
+          block !== null &&
+          "type" in block &&
+          block.type === "text" &&
+          "text" in block,
+      )
+      .map((block) => block.text)
+      .join("");
+  }
+  return "";
+}
+
+/**
  * 递归扁平化树形结构为节点和边
  */
 function flattenTree(
@@ -91,20 +114,28 @@ function flattenTree(
  * - 是唯一拥有持久化记忆访问权限的 Agent
  * - 通过 state.context 访问工作区、思维导图、选中节点等上下文
  */
+export interface CapabilityFlags {
+  hasEmbeddings: boolean;
+  hasPalace: boolean;
+}
+
 export class MindLaneAgent extends BaseAgent {
   private toolNode: ToolNode;
   private tools: StructuredToolInterface[];
   private userProfile?: string;
+  private capabilityFlags: CapabilityFlags;
 
   constructor(
     provider: LLMProvider,
     tools: StructuredToolInterface[],
     userProfile?: string,
+    capabilityFlags?: CapabilityFlags,
   ) {
     super(provider);
     this.tools = tools;
     this.toolNode = new ToolNode(tools);
     this.userProfile = userProfile;
+    this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
   }
 
   async invoke(
@@ -115,6 +146,7 @@ export class MindLaneAgent extends BaseAgent {
       .withMessages(state.messages)
       .withContext(state.context ?? undefined)
       .withUserProfile(this.userProfile)
+      .withCapabilityFlags(this.capabilityFlags)
       .buildSystemPrompt()
       .buildEnvironmentPrompt()
       .buildUserProfile()
@@ -131,8 +163,7 @@ export class MindLaneAgent extends BaseAgent {
     const modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
 
     const response = await modelWithTools.invoke(messagesWithSystem);
-    const content =
-      typeof response.content === "string" ? response.content : "";
+    const content = extractTextContent(response.content);
     const toolCalls = (response as AIMessage).tool_calls ?? [];
 
     // 优先检查是否是工具调用（知识库搜索等）
@@ -173,6 +204,7 @@ export class MindLaneAgent extends BaseAgent {
       // 使用路由决策专用上下文
       const systemPrompt = ContextTemplates.routeDecision(
         state.context ?? undefined,
+        this.capabilityFlags,
       ).build();
 
       const messagesWithSystem = [
@@ -283,10 +315,7 @@ export class MindLaneAgent extends BaseAgent {
       const extractResponse = await this.provider.reasoningModel.invoke(
         buildExtractStructureMessages(text),
       );
-      const extractContent =
-        typeof extractResponse.content === "string"
-          ? extractResponse.content
-          : "";
+      const extractContent = extractTextContent(extractResponse.content);
 
       const jsonMatch = extractContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {

@@ -1,0 +1,81 @@
+import { LLMProvider, ProviderCapability } from './base.js'
+import type { ProviderConfig } from '../../fs/types.js'
+
+export type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
+
+export type ProviderMeta = {
+  id: string
+  displayName: string
+  capabilities: ProviderCapability[]
+  defaultModels: { id: string; displayName: string }[]
+}
+
+const factories = new Map<string, ProviderFactory>()
+const metaMap = new Map<string, ProviderMeta>()
+
+export function registerProvider(
+  meta: ProviderMeta,
+  factory: ProviderFactory,
+): void {
+  factories.set(meta.id, factory)
+  metaMap.set(meta.id, meta)
+}
+
+export function createProvider(
+  providerId: string,
+  config: ProviderConfig & { chatModel: string },
+): LLMProvider {
+  const factory = factories.get(providerId)
+  if (!factory) {
+    throw new Error(`未知的 provider: ${providerId}`)
+  }
+  return factory(config)
+}
+
+export function getProviderMeta(providerId: string): ProviderMeta | undefined {
+  return metaMap.get(providerId)
+}
+
+export function getRegisteredProviders(): ProviderMeta[] {
+  return Array.from(metaMap.values())
+}
+
+// --- Built-in provider registrations ---
+
+import { DashScopeProvider } from './dashscope.js'
+import { KimiCodeProvider } from './kimi-code.js'
+
+registerProvider(
+  {
+    id: 'dashscope',
+    displayName: '通义千问 (百炼)',
+    capabilities: [
+      ProviderCapability.Chat,
+      ProviderCapability.Vision,
+      ProviderCapability.ImageGen,
+      ProviderCapability.Embeddings,
+    ],
+    defaultModels: DashScopeProvider.defaultChatModels,
+  },
+  (config) =>
+    new DashScopeProvider({
+      apiKey: config.apiKey,
+      chatModel: config.chatModel,
+      baseUrl: config.baseUrl,
+    }),
+)
+
+registerProvider(
+  {
+    id: 'kimi-code',
+    displayName: 'Kimi Code',
+    capabilities: [ProviderCapability.Chat],
+    defaultModels: KimiCodeProvider.defaultChatModels,
+  },
+  (config) =>
+    new KimiCodeProvider({
+      apiKey: config.apiKey,
+      chatModel: config.chatModel,
+      baseUrl: config.baseUrl,
+    }),
+)

@@ -12,6 +12,8 @@ const PHASE_LABELS: Record<string, string> = {
 
 export function KnowledgeBasePanel() {
   const apiKey = useSettingsStore((s) => s.apiKey)
+  const capabilities = useSettingsStore((s) => s.capabilities)
+  const embeddingsEnabled = capabilities.includes('embeddings')
   const documents = useKnowledgeBaseStore((s) => s.documents)
   const indexing = useKnowledgeBaseStore((s) => s.indexing)
   const currentProgress = useKnowledgeBaseStore((s) => s.currentProgress)
@@ -72,6 +74,10 @@ export function KnowledgeBasePanel() {
 
   if (!apiKey) {
     return <div className="panel-empty">请先在「设置」中填写 API Key</div>
+  }
+
+  if (!embeddingsEnabled) {
+    return <div className="panel-empty">当前模型不支持知识库功能（需要 Embeddings 能力）</div>
   }
 
   return (

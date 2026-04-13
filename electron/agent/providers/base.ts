@@ -1,6 +1,20 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 
+export enum ProviderCapability {
+  Chat = 'chat',
+  Vision = 'vision',
+  ImageGen = 'imageGen',
+  Embeddings = 'embeddings',
+}
+
+export class UnsupportedCapabilityError extends Error {
+  constructor(capability: string) {
+    super(`当前 provider 不支持 ${capability} 能力`)
+    this.name = 'UnsupportedCapabilityError'
+  }
+}
+
 export type ChatModelOption = { id: string; displayName: string }
 
 export type DetectedAnchor = {
@@ -19,15 +33,21 @@ export abstract class LLMProvider {
     this.visionModel = visionModel
   }
 
+  abstract get capabilities(): Set<ProviderCapability>
+
   abstract get chatModels(): ChatModelOption[]
 
-  abstract createEmbeddings(): EmbeddingsInterface
+  createEmbeddings(): EmbeddingsInterface {
+    throw new UnsupportedCapabilityError('embeddings')
+  }
 
-  abstract generateImage(input: {
+  generateImage(_input: {
     prompt: string
     size?: string
     n?: number
-  }): Promise<{ urls: string[] }>
+  }): Promise<{ urls: string[] }> {
+    throw new UnsupportedCapabilityError('imageGen')
+  }
 
 }
 

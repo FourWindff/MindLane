@@ -162,6 +162,8 @@ contextBridge.exposeInMainWorld('mindlane', {
     docToMindmap: (payload: { apiKey: string; model: string; documentText: string; documentFilename: string }) =>
       ipcRenderer.invoke('ai:doc-to-mindmap', payload),
     listProviders: () => ipcRenderer.invoke('ai:list-providers'),
+    getProviders: () => ipcRenderer.invoke('ai:get-providers'),
+    getCapabilities: () => ipcRenderer.invoke('ai:get-capabilities'),
     urlToDataUrl: (payload: { url: string }) =>
       ipcRenderer.invoke('image:url-to-data-url', payload) as Promise<FsResult<{ dataUrl: string }>>,
   },

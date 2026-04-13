@@ -1,6 +1,6 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
-import type { LLMProvider } from '../providers/index.js'
+import { type LLMProvider, ProviderCapability } from '../providers/index.js'
 import { VectorStoreManager } from './storage/vector-store.js'
 import { DocumentStore } from './storage/document-store.js'
 import { BM25SearchEngine } from './retrieval/core/bm25.js'
@@ -33,7 +33,7 @@ export class RAGManager {
       this.bm25Engine.buildIndex(allChunks)
     }
 
-    if (provider) {
+    if (provider?.capabilities.has(ProviderCapability.Embeddings)) {
       logger.info('正在初始化向量存储...')
       const embeddings = provider.createEmbeddings()
       await this.vectorStore.init(userDataPath, embeddings)
@@ -43,6 +43,8 @@ export class RAGManager {
         bm25Engine: this.bm25Engine,
       })
       logger.info('混合检索器已初始化')
+    } else if (provider) {
+      logger.info('当前 provider 不支持 embeddings，跳过向量存储初始化')
     }
 
     this.indexer = new DocumentIndexer(

@@ -1,21 +1,29 @@
 import { BaseMessage } from "@langchain/core/messages";
 import type { MindmapContextData } from "../../tools/mindmapContext.js";
+import type { CapabilityFlags } from "./mindlaneAgent.js";
 
 /**
  * 路由决策专用上下文构建器
  */
 export class RouteDecisionContextBuilder {
     private context: MindmapContextData | null = null;
+    private capabilityFlags: CapabilityFlags;
 
-    constructor(context?: MindmapContextData) {
+    constructor(context?: MindmapContextData, capabilityFlags?: CapabilityFlags) {
         this.context = context ?? null;
+        this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
     }
 
     build(): string {
         const parts: string[] = [];
 
         parts.push(`你是 MindLane 的路由决策器。根据用户输入决定应该执行什么操作。`);
-        parts.push(`\n可选操作：qa（问答）、mindmap（生成思维导图）、palace（生成记忆宫殿）\n`);
+
+        const routes = ['qa（问答）', 'mindmap（生成思维导图）'];
+        if (this.capabilityFlags.hasPalace) {
+            routes.push('palace（生成记忆宫殿）');
+        }
+        parts.push(`\n可选操作：${routes.join('、')}\n`);
 
         if (this.context?.hasDocumentOpen) {
             parts.push(`当前有打开的思维导图：${this.context.fileTitle || '未命名'}`);
@@ -36,6 +44,7 @@ export class ContextBuilder {
     private messages: BaseMessage[] = [];
     private context?: MindmapContextData;
     private userProfile?: string;
+    private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true };
 
     /**
      * 设置消息历史（由 Orchestrator 加载后传入）
@@ -61,9 +70,25 @@ export class ContextBuilder {
         return this;
     }
 
+    /**
+     * 设置能力标志
+     */
+    withCapabilityFlags(flags?: CapabilityFlags): this {
+        if (flags) this.capabilityFlags = flags;
+        return this;
+    }
+
     buildSystemPrompt(): this {
+        const features = ['思维导图创作'];
+        if (this.capabilityFlags.hasEmbeddings) {
+            features.push('知识管理');
+        }
+        if (this.capabilityFlags.hasPalace) {
+            features.push('记忆训练');
+        }
+
         this.prompt += `<SYSTEM_PROMPT>
-你是 MindLane 的 AI 助手，帮助用户进行思维导图创作、知识管理和记忆训练。
+你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。
 </SYSTEM_PROMPT>
 `;
         return this;
@@ -160,5 +185,6 @@ export const ContextTemplates = {
     /**
      * 路由决策专用上下文
      */
-    routeDecision: (context?: MindmapContextData) => new RouteDecisionContextBuilder(context),
+    routeDecision: (context?: MindmapContextData, capabilityFlags?: CapabilityFlags) =>
+        new RouteDecisionContextBuilder(context, capabilityFlags),
 };

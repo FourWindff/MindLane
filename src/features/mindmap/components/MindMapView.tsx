@@ -67,6 +67,7 @@ type ContextMenuProps = {
   canRemove: boolean
   aiBusy: boolean
   selectedCount: number
+  palaceEnabled: boolean
 }
 
 function MindMapContextMenu({
@@ -82,6 +83,7 @@ function MindMapContextMenu({
   canRemove,
   aiBusy,
   selectedCount,
+  palaceEnabled,
 }: ContextMenuProps) {
   const run = (fn: () => void) => {
     fn()
@@ -132,7 +134,8 @@ function MindMapContextMenu({
             className="mindmap-ctx__item mindmap-ctx__item--accent"
             role="menuitem"
             onClick={() => run(() => onGeneratePalace?.())}
-            disabled={!onGeneratePalace || aiBusy}
+            disabled={!onGeneratePalace || aiBusy || !palaceEnabled}
+            title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
           >
             生成记忆宫殿{selectedCount > 1 ? ` (${selectedCount} 节点)` : ''}
           </button>
@@ -194,10 +197,12 @@ function SelectionActionBar({
   selectedTopicCount,
   onGeneratePalace,
   aiBusy,
+  palaceEnabled,
 }: {
   selectedTopicCount: number
   onGeneratePalace: () => void
   aiBusy: boolean
+  palaceEnabled: boolean
 }) {
   if (selectedTopicCount < 1 || aiBusy) return null
 
@@ -208,6 +213,8 @@ function SelectionActionBar({
         type="button"
         className="selection-bar__btn"
         onClick={onGeneratePalace}
+        disabled={!palaceEnabled}
+        title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
       >
         <Landmark size={14} strokeWidth={1.6} />
         生成记忆宫殿
@@ -236,6 +243,8 @@ function MindMapCanvas({
   const aiBusy = useAiStore((s) => s.busy)
   const apiKey = useSettingsStore((s) => s.apiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
+  const capabilities = useSettingsStore((s) => s.capabilities)
+  const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const dirty = useMindmapStore((s) => s.dirty)
   const filePath = useMindmapStore((s) => s.filePath)
@@ -800,6 +809,7 @@ function MindMapCanvas({
           selectedTopicCount={selectedTopicIds.length}
           onGeneratePalace={generatePalace}
           aiBusy={aiBusy}
+          palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
         {contextMenu ? (
@@ -816,6 +826,7 @@ function MindMapCanvas({
             canRemove={canRemove}
             aiBusy={aiBusy}
             selectedCount={selectedTopicIds.length || 1}
+            palaceEnabled={palaceEnabled}
           />
         ) : null}
         {palaceModal && (

@@ -1,7 +1,7 @@
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { END, START, StateGraph, MemorySaver } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { LLMProvider } from "./providers/index.js";
+import { type LLMProvider, ProviderCapability } from "./providers/index.js";
 import { urlToDataUrl } from "./providers/index.js";
 import type { AiService } from "./service.js";
 import type {
@@ -235,6 +235,17 @@ export class AgentOrchestrator {
       return { ok: false, error: "未选中任何节点" };
     }
 
+    const caps = this.provider.capabilities;
+    if (
+      !caps.has(ProviderCapability.ImageGen) ||
+      !caps.has(ProviderCapability.Vision)
+    ) {
+      return {
+        ok: false,
+        error: "当前 provider 不支持记忆宫殿功能（需要文生图和视觉理解能力）",
+      };
+    }
+
     // 使用独立的 Palace Subgraph
     const palaceSubgraph = buildPalaceSubgraph({
       provider: this.provider,
@@ -342,8 +353,19 @@ export class AgentOrchestrator {
     options: { enableHITL?: boolean } = {},
   ) {
     const { enableHITL = false } = options;
-    const { listKnowledgeBaseTool, searchDocumentsTool } =
-      this.aiService.rag.createSearchTools();
+    const caps = this.provider.capabilities;
+    const hasEmbeddings = caps.has(ProviderCapability.Embeddings);
+    const hasPalace =
+      caps.has(ProviderCapability.ImageGen) &&
+      caps.has(ProviderCapability.Vision);
+
+    // 条件化注册 RAG 工具
+    const tools: StructuredToolInterface[] = [];
+    if (hasEmbeddings) {
+      const { listKnowledgeBaseTool, searchDocumentsTool } =
+        this.aiService.rag.createSearchTools();
+      tools.push(listKnowledgeBaseTool, searchDocumentsTool);
+    }
     const {
       addTopicNodeTool,
       addDocumentNodeTool,
@@ -352,85 +374,101 @@ export class AgentOrchestrator {
       deleteNodeTool,
       batchAddNodesTool,
     } = createMindmapActionTools();
-    const tools = [
-      listKnowledgeBaseTool,
-      searchDocumentsTool,
+    tools.push(
       addTopicNodeTool,
       addDocumentNodeTool,
       addPalaceNodeTool,
       updateNodeTool,
       deleteNodeTool,
       batchAddNodesTool,
-    ];
+    );
     const profileText = this.aiService.userProfile.getText();
 
-    const supervisor = new MindLaneAgent(this.provider, tools, profileText);
-
-    // 构建 Palace Subgraph
-    const palaceSubgraph = buildPalaceSubgraph({
-      provider: this.provider,
-      enableHITL,
-    });
-
-    // 状态映射包装器：将主图状态映射到 Subgraph 状态
-    const palaceSubgraphWrapper = async (
-      state: MainGraphStateType,
-    ): Promise<Partial<MainGraphStateType>> => {
-      try {
-        // 编译并执行 Subgraph
-        const app = palaceSubgraph.compile();
-        const result = await app.invoke(state, { recursionLimit: 80 });
-
-        // 映射结果回主图状态
-        return {
-          palaceInputText: result.palaceInputText,
-          palaceInputNodes: result.palaceInputNodes,
-          imageUrls: result.imageUrls,
-          memoryRoute: result.memoryRoute,
-          error: result.error,
-          interruptPoint: result.interruptPoint,
-          userConfirmedPrompt: result.userConfirmedPrompt,
-        };
-      } catch (error) {
-        // 捕获 HITL 中断错误
-        if (error instanceof HITLInterruptError) {
-          // 将中断数据传递出去
-          throw error;
-        }
-        // 其他错误
-        return {
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    };
+    const supervisor = new MindLaneAgent(
+      this.provider,
+      tools,
+      profileText,
+      { hasEmbeddings, hasPalace },
+    );
 
     const graph = new StateGraph(MainGraphState)
       .addNode("supervisor", (state) => supervisor.invoke(state))
-      .addNode("tools", (state) => supervisor.invokeTools(state))
-      .addNode("palaceSubgraph", palaceSubgraphWrapper);
+      .addNode("tools", (state) => supervisor.invokeTools(state));
 
-    graph
-      .addEdge(START, "supervisor")
-      .addConditionalEdges(
-        "supervisor",
-        (state) => {
-          const route = supervisor.route(state);
-          // ReAct 循环: 工具结果回到 supervisor 继续推理
-          if (route === "supervisor") {
-            return "supervisor";
+    // 条件化添加 palace subgraph
+    if (hasPalace) {
+      const palaceSubgraph = buildPalaceSubgraph({
+        provider: this.provider,
+        enableHITL,
+      });
+
+      const palaceSubgraphWrapper = async (
+        state: MainGraphStateType,
+      ): Promise<Partial<MainGraphStateType>> => {
+        try {
+          const app = palaceSubgraph.compile();
+          const result = await app.invoke(state, { recursionLimit: 80 });
+
+          return {
+            palaceInputText: result.palaceInputText,
+            palaceInputNodes: result.palaceInputNodes,
+            imageUrls: result.imageUrls,
+            memoryRoute: result.memoryRoute,
+            error: result.error,
+            interruptPoint: result.interruptPoint,
+            userConfirmedPrompt: result.userConfirmedPrompt,
+          };
+        } catch (error) {
+          if (error instanceof HITLInterruptError) {
+            throw error;
           }
+          return {
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      };
+
+      graph.addNode("palaceSubgraph", palaceSubgraphWrapper);
+    }
+
+    graph.addEdge(START, "supervisor");
+
+    if (hasPalace) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addConditionalEdges(
+        "supervisor",
+        (state: MainGraphStateType) => {
+          const route = supervisor.route(state);
+          if (route === "supervisor") return "supervisor";
           return route;
         },
         {
-          // 明确指定每个目标节点
           tools: "tools",
           supervisor: "supervisor",
           palaceSubgraph: "palaceSubgraph",
           __end__: END,
         },
-      )
-      .addEdge("tools", "supervisor")
-      .addEdge("palaceSubgraph", END);
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addEdge("palaceSubgraph", END);
+    } else {
+      graph.addConditionalEdges(
+        "supervisor",
+        (state) => {
+          const route = supervisor.route(state);
+          if (route === "supervisor") return "supervisor";
+          if (route === "palaceSubgraph") return "__end__";
+          return route;
+        },
+        {
+          tools: "tools",
+          supervisor: "supervisor",
+          __end__: END,
+        },
+      );
+    }
+
+    graph.addEdge("tools", "supervisor");
 
     return graph;
   }
