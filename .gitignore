@@ -27,3 +27,9 @@ release
 *.njsproj
 *.sln
 *.sw?
+
+_bmad
+_bmad-output
+.claude
+.codex
+.gitnexus
