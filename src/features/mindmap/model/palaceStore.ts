@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PalaceNodeData } from '@/shared/lib/fileFormat'
+import { PalaceNodeData } from '../nodes/palace'
 
 interface PalaceState {
   activePalaceId: string | null

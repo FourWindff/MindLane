@@ -1,5 +1,5 @@
+import { TopicNodeData } from '@/features/mindmap/nodes/topic'
 import type { Edge, Node } from '@xyflow/react'
-import type { TopicNodeData } from '../lib/fileFormat'
 
 export function newId(): string {
   return crypto.randomUUID()

@@ -1,6 +1,6 @@
-import type { PalaceNodeData } from '@/shared/lib/fileFormat'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { usePalaceStore } from '@/features/mindmap/model/palaceStore'
+import { PalaceNodeData } from '../nodes/palace'
 
 export function PropertiesPanel() {
   const nodes = useMindmapStore((s) => s.nodes)
