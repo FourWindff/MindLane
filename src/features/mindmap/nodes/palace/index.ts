@@ -6,7 +6,8 @@ export type PalaceNodeData = {
   imageUrl: string
   stations: PalaceStation[]
   sourceNodeIds: string[]
-  [key: string]: unknown
+  expanded?: boolean
+  generating?: boolean
 }
 
 export type PalaceStation = {
@@ -20,18 +21,7 @@ export type PalaceStation = {
 }
 class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   readonly typeId = 'palace'
-  readonly displayName = '记忆宫殿'
-  readonly group = 'core' as const
   readonly component = PalaceNodeComponent
-  readonly userCreatable = false
-  readonly contextMenuItems = [
-    { id: 'view-palace', label: '查看宫殿详情' },
-    { id: 'regenerate', label: '重新生成图片' },
-  ]
-
-  defaultData(): PalaceNodeData {
-    return { label: '', imageUrl: '', stations: [], sourceNodeIds: [] }
-  }
 
   serialize(data: PalaceNodeData) {
     return {
