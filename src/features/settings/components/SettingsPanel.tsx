@@ -27,6 +27,7 @@ export function SettingsPanel() {
   const setApiKey = useSettingsStore((s) => s.setApiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
   const setChatModel = useSettingsStore((s) => s.setChatModel)
+  const capabilities = useSettingsStore((s) => s.capabilities)
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const setAutoSaveIntervalMs = useSettingsStore((s) => s.setAutoSaveIntervalMs)
   const providers = useSettingsStore((s) => s.providers)
@@ -41,6 +42,10 @@ export function SettingsPanel() {
 
   const activeProvider = providers.find((p) => p.id === activeChatProvider) ?? providers[0]
   const models = activeProvider?.models ?? []
+  const chatEnabled = capabilities.includes('chat')
+  const visionEnabled = capabilities.includes('vision')
+  const imageGenEnabled = capabilities.includes('imageGen')
+  const embeddingsEnabled = capabilities.includes('embeddings')
   const activeSectionMeta = useMemo(
     () => SETTINGS_SECTIONS.find((section) => section.id === activeSection) ?? SETTINGS_SECTIONS[0],
     [activeSection],
@@ -240,15 +245,16 @@ export function SettingsPanel() {
                 ))}
               </select>
             </div>
-            {activeProvider && activeProvider.capabilities && (
+            {activeProvider && (
               <div className="settings-card__hint">
                 {activeProvider.displayName} 支持的功能：
-                {activeProvider.capabilities.includes('chat') && ' 对话'}
-                {activeProvider.capabilities.includes('vision') && ' 视觉理解'}
-                {activeProvider.capabilities.includes('imageGen') && ' 文生图'}
-                {activeProvider.capabilities.includes('embeddings') && ' 知识库检索'}
-                {!activeProvider.capabilities.includes('imageGen') && ' | 记忆宫殿不可用'}
-                {!activeProvider.capabilities.includes('embeddings') && ' | 知识库不可用'}
+                {chatEnabled && ' 对话'}
+                {visionEnabled && ' 视觉理解'}
+                {imageGenEnabled && ' 文生图'}
+                {embeddingsEnabled && ' 知识库检索'}
+                {imageGenEnabled && !visionEnabled && ' | 可文生图，但记忆宫殿不可用'}
+                {!imageGenEnabled && ' | 文生图不可用'}
+                {!embeddingsEnabled && ' | 知识库不可用'}
               </div>
             )}
             <div className="settings-card__hint">

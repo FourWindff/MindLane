@@ -7,6 +7,10 @@ interface ProviderInfo {
   capabilities: string[]
 }
 
+function capabilitiesForProvider(providers: ProviderInfo[], providerId: string): string[] {
+  return providers.find((provider) => provider.id === providerId)?.capabilities ?? []
+}
+
 interface SettingsState {
   loaded: boolean
   activeChatProvider: string
@@ -52,7 +56,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const provider = state.providers.find((p) => p.id === id)
     const defaultModel = provider?.models[0]?.id ?? ''
     const providerKey = state.providerConfigs[id]?.apiKey ?? ''
-    set({ activeChatProvider: id, chatModel: defaultModel, apiKey: providerKey })
+    set({
+      activeChatProvider: id,
+      chatModel: defaultModel,
+      apiKey: providerKey,
+      capabilities: provider?.capabilities ?? [],
+    })
     persistToBackend({ activeProviders: { chat: id }, chatModel: defaultModel })
     loadCapabilities()
   },
@@ -82,7 +91,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ autoSaveIntervalMs: ms })
     persistToBackend({ editor: { autoSaveIntervalMs: ms } })
   },
-  setProviders: (providers) => set({ providers }),
+  setProviders: (providers) =>
+    set((state) => ({
+      providers,
+      capabilities:
+        state.capabilities.length > 0
+          ? state.capabilities
+          : capabilitiesForProvider(providers, state.activeChatProvider),
+    })),
   setCapabilities: (capabilities) => set({ capabilities }),
   setProviderApiKey: (providerId, apiKey) => {
     set((state) => ({
@@ -159,8 +175,12 @@ async function loadCapabilities(): Promise<void> {
     const result = await window.mindlane?.ai.getCapabilities?.()
     if (result?.ok && result.capabilities) {
       useSettingsStore.getState().setCapabilities(result.capabilities)
+      return
     }
   } catch {
-    // ignore
+    // ignore and fall back to local metadata
   }
+
+  const state = useSettingsStore.getState()
+  state.setCapabilities(capabilitiesForProvider(state.providers, state.activeChatProvider))
 }

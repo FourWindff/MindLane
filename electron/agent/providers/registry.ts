@@ -44,6 +44,7 @@ export function getRegisteredProviders(): ProviderMeta[] {
 
 import { DashScopeProvider } from './dashscope.js'
 import { KimiCodeProvider } from './kimi-code.js'
+import { MiniMaxProvider } from './minimax.js'
 
 registerProvider(
   {
@@ -74,6 +75,21 @@ registerProvider(
   },
   (config) =>
     new KimiCodeProvider({
+      apiKey: config.apiKey,
+      chatModel: config.chatModel,
+      baseUrl: config.baseUrl,
+    }),
+)
+
+registerProvider(
+  {
+    id: 'minimax',
+    displayName: 'MiniMax',
+    capabilities: [ProviderCapability.Chat, ProviderCapability.ImageGen],
+    defaultModels: MiniMaxProvider.defaultChatModels,
+  },
+  (config) =>
+    new MiniMaxProvider({
       apiKey: config.apiKey,
       chatModel: config.chatModel,
       baseUrl: config.baseUrl,

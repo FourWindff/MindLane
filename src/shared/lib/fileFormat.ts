@@ -2,6 +2,10 @@ import { DocumentNodeData } from "@/features/mindmap/nodes/document"
 import { PalaceNodeData } from "@/features/mindmap/nodes/palace"
 import { TopicNodeData } from "@/features/mindmap/nodes/topic"
 
+export type { DocumentNodeData }
+export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace"
+export type { TopicNodeData }
+
 
 export interface MindLaneFile {
   version: '1.0'
@@ -72,4 +76,3 @@ export function serializeFile(file: MindLaneFile): string {
     2,
   )
 }
-

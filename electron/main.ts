@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { type LLMProvider, urlToDataUrl, createProvider, getRegisteredProviders } from './agent/providers/index.js'
+import { type LLMProvider, urlToDataUrl, createProvider, getProviderMeta, getRegisteredProviders } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -211,9 +211,15 @@ function registerIpcHandlers() {
     const settings = await fsService.settings.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerConfig = settings.providerConfigs[providerId]
+    const providerMeta = getProviderMeta(providerId)
+    const requestedModel = model.trim() || settings.chatModel || ''
+    const normalizedModel =
+      providerMeta?.defaultModels.some((item) => item.id === requestedModel)
+        ? requestedModel
+        : providerMeta?.defaultModels[0]?.id || requestedModel || 'qwen-turbo'
     return createProvider(providerId, {
       apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
-      chatModel: model.trim() || settings.chatModel || 'qwen-turbo',
+      chatModel: normalizedModel,
       baseUrl: providerConfig?.baseUrl,
     })
   }
@@ -525,22 +531,14 @@ function registerIpcHandlers() {
     try {
       const settings = await fsService.settings.load()
       const providerId = settings.activeProviders.chat || 'dashscope'
-      const providerConfig = settings.providerConfigs[providerId]
-      const apiKey = providerConfig?.apiKey || settings.apiKey || ''
-
-      if (!apiKey.trim()) {
-        return { ok: false, error: '未配置 API Key' }
+      const providerMeta = getProviderMeta(providerId)
+      if (!providerMeta) {
+        return { ok: false, error: `未知的 provider: ${providerId}` }
       }
-
-      const provider = createProvider(providerId, {
-        apiKey,
-        chatModel: settings.chatModel || 'qwen-turbo',
-        baseUrl: providerConfig?.baseUrl,
-      })
 
       return {
         ok: true,
-        capabilities: Array.from(provider.capabilities),
+        capabilities: providerMeta.capabilities,
       }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }

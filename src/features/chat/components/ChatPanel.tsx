@@ -61,6 +61,7 @@ function extractNodeInfo(node: Node): ContextNodeInfo {
 
 export function ChatPanel() {
   const apiKey = useSettingsStore((s) => s.apiKey)
+  const capabilities = useSettingsStore((s) => s.capabilities)
   const threadId = useAiStore((s) => s.threadId)
   const messages = useAiStore((s) => s.chatMessages)
   const busy = useAiStore((s) => s.busy)
@@ -77,6 +78,18 @@ export function ChatPanel() {
   const [streamingText, setStreamingText] = useState('')
   const [activeTools, setActiveTools] = useState<string[]>([])
   const streamTextRef = useRef('')
+  const features = ['生成思维导图']
+
+  if (capabilities.includes('embeddings')) {
+    features.unshift('检索知识库')
+  }
+  if (capabilities.includes('imageGen') && capabilities.includes('vision')) {
+    features.push('生成记忆宫殿')
+  } else if (capabilities.includes('imageGen')) {
+    features.push('生成图片')
+  }
+
+  const emptyHint = `AI 助手可以${features.join('、')}`
 
   const scrollToBottom = useCallback((instant?: boolean) => {
     requestAnimationFrame(() => {
@@ -413,7 +426,7 @@ export function ChatPanel() {
               <HelpCircle size={28} strokeWidth={1.5} />
             </div>
             <p>输入消息开始对话</p>
-            <span className="chat-empty__hint">AI 助手可以检索知识库、生成思维导图和记忆宫殿</span>
+            <span className="chat-empty__hint">{emptyHint}</span>
           </div>
         )}
 
