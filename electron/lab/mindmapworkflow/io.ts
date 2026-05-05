@@ -159,7 +159,7 @@ function serializeOutlineChildren(
 }
 
 function formatNodeTitle(node: MindmapYamlNode): string {
-  return `${node.label} [p${node.page_range}]`
+  return node.label
 }
 
 function stringifyYamlScalar(value: string): string {
