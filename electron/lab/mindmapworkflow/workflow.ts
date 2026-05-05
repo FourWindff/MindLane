@@ -243,7 +243,7 @@ async function prepareDocument(
   }
   const document: DocumentMeta = {
     pdfPath: runtime.config.pdfPath,
-    title: basenameWithoutExtension(runtime.config.pdfPath),
+    title: path.basename(runtime.config.pdfPath, path.extname(runtime.config.pdfPath)),
     totalPages: pages.length,
     totalChars,
   }
@@ -457,10 +457,6 @@ async function finalizeYaml(
     artifacts: runtime.artifacts,
     finalTree,
   }
-}
-
-function basenameWithoutExtension(filePath: string): string {
-  return path.basename(filePath, path.extname(filePath))
 }
 
 export const __test__ = {

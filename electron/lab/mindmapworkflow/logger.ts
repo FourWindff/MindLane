@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { WorkflowLogEntry } from './types.js'
 
 export class LabLogger {
-  private queue = Promise.resolve()
+  private initialized = false
 
   constructor(
     private logPath: string,
@@ -30,7 +30,14 @@ export class LabLogger {
   }
 
   async flush(): Promise<void> {
-    await this.queue
+    // No-op: writes are now synchronous with fs.appendFile
+    // Keeping this method for API compatibility
+  }
+
+  private async ensureDir(): Promise<void> {
+    if (this.initialized) return
+    await fs.mkdir(path.dirname(this.logPath), { recursive: true })
+    this.initialized = true
   }
 
   private async write(
@@ -47,11 +54,8 @@ export class LabLogger {
     const target = level === 'error' ? console.error : console.log
     target(line.trimEnd())
 
-    this.queue = this.queue.then(async () => {
-      await fs.mkdir(path.dirname(this.logPath), { recursive: true })
-      await fs.appendFile(this.logPath, line, 'utf-8')
-    })
-    await this.queue
+    await this.ensureDir()
+    await fs.appendFile(this.logPath, line, 'utf-8')
 
     return entry
   }

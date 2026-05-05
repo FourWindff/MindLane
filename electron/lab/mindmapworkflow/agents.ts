@@ -75,7 +75,7 @@ export class LeafExtractAgent {
         }
 
         await this.logger.info(
-          `${prefixForChunk(chunk)} YAML 输出:\n${serializeTreeYaml(tree)}`,
+          `${prefixForChunk(chunk)} YAML 输出:\n${serializeMindmapOutline(tree)}`,
         )
 
         return {
@@ -91,7 +91,7 @@ export class LeafExtractAgent {
       return Promise.all(chunks.map(async (chunk) => {
         const degradedTree = fallbackLeafNode(chunk)
         await this.logger.warn(
-          `${prefixForChunk(chunk)} 降级 YAML 输出:\n${serializeTreeYaml(degradedTree)}`,
+          `${prefixForChunk(chunk)} 降级 YAML 输出:\n${serializeMindmapOutline(degradedTree)}`,
         )
         return {
           tree: degradedTree,
@@ -220,7 +220,7 @@ export class MergeAgent {
         2,
       )
       await this.logger.info(
-        `${prefix} YAML 输出:\n${serializeTreeYaml(tree)}`,
+        `${prefix} YAML 输出:\n${serializeMindmapOutline(tree)}`,
       )
 
       return {
@@ -232,7 +232,7 @@ export class MergeAgent {
       const degradedTree = fallbackMergeNode(group.trees, document.title)
       await this.logger.warn(`${prefix} 合并失败，使用包裹型节点：${message}`)
       await this.logger.warn(
-        `${prefix} 降级 YAML 输出:\n${serializeTreeYaml(degradedTree)}`,
+        `${prefix} 降级 YAML 输出:\n${serializeMindmapOutline(degradedTree)}`,
       )
       return {
         tree: degradedTree,
@@ -301,10 +301,6 @@ export class MergeAgent {
     const parsed = TreeSchema.parse(sanitizeTreeCandidate(extractYaml(text)))
     return normalizeTree(parsed, inputRange)
   }
-}
-
-function serializeTreeYaml(tree: MindmapYamlNode): string {
-  return serializeMindmapOutline(tree)
 }
 
 function prefixForChunk(chunk: PdfChunk): string {
