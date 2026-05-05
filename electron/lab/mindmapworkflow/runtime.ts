@@ -72,6 +72,7 @@ function normalizeConfig(
     concurrency: config.concurrency ?? 4,
     leafChunkGroupSize: config.leafChunkGroupSize ?? 1,
     mergeBatchSize: config.mergeBatchSize ?? 8,
+    maxChunks: config.maxChunks ?? Infinity,
     debug: config.debug ?? false,
   }
 }

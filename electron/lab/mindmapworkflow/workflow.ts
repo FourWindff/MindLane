@@ -233,7 +233,14 @@ async function prepareDocument(
   await runtime.logger.info(`prepare: 读取 PDF ${runtime.config.pdfPath}`)
   const pages = await runtime.pdfLoader(runtime.config.pdfPath)
   const totalChars = pages.reduce((sum, page) => sum + page.text.length, 0)
-  const chunks = chunkPdfPages(pages, runtime.config.chunkCharLimit)
+  let chunks = chunkPdfPages(pages, runtime.config.chunkCharLimit)
+
+  if (runtime.config.maxChunks < chunks.length) {
+    await runtime.logger.info(
+      `prepare: maxChunks=${runtime.config.maxChunks}，截断 ${chunks.length} -> ${runtime.config.maxChunks} 个 chunk`,
+    )
+    chunks = chunks.slice(0, runtime.config.maxChunks)
+  }
   const document: DocumentMeta = {
     pdfPath: runtime.config.pdfPath,
     title: basenameWithoutExtension(runtime.config.pdfPath),

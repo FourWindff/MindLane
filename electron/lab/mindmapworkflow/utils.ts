@@ -145,6 +145,11 @@ export function extractYaml(text: string): unknown {
   const direct = tryParseYaml(trimmed)
   if (direct !== undefined) return direct
 
+  // Try expanding 1-space indent to 2-space indent
+  const expanded = expandIndent(trimmed)
+  const expandedResult = tryParseYaml(expanded)
+  if (expandedResult !== undefined) return expandedResult
+
   const lines = trimmed.split('\n')
   const yamlStart = lines.findIndex((line) =>
     /^\s*(label|page_range|summary|children)\s*:/.test(line)
@@ -155,9 +160,98 @@ export function extractYaml(text: string): unknown {
     const candidate = lines.slice(yamlStart).join('\n').trim()
     const parsed = tryParseYaml(candidate)
     if (parsed !== undefined) return parsed
+    const expandedCandidate = expandIndent(candidate)
+    const expandedCandidateResult = tryParseYaml(expandedCandidate)
+    if (expandedCandidateResult !== undefined) return expandedCandidateResult
   }
 
   throw new Error('无法从模型输出中提取 YAML')
+}
+
+export function parseLeafBatchText(text: string): { results: Array<{ chunk_id: string; mindmap: unknown }> } {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    throw new Error('模型返回为空')
+  }
+
+  // First try standard extractYaml path
+  try {
+    const parsed = extractYaml(trimmed)
+    if (parsed && typeof parsed === 'object' && 'results' in (parsed as Record<string, unknown>)) {
+      return parsed as { results: Array<{ chunk_id: string; mindmap: unknown }> }
+    }
+  } catch {
+    // Fall through to custom parser
+  }
+
+  // Custom parser for 1-space indent leaf batch format
+  const raw = stripCodeFence(trimmed)
+  const lines = raw.split('\n')
+  const results: Array<{ chunk_id: string; mindmap: unknown }> = []
+  let currentChunkId: string | null = null
+  let mindmapLines: string[] = []
+  let inMindmap = false
+
+  const flushCurrent = () => {
+    if (currentChunkId && mindmapLines.length > 0) {
+      const nonEmpty = mindmapLines.filter((l) => l.trim())
+      if (nonEmpty.length === 0) {
+        results.push({ chunk_id: currentChunkId, mindmap: null })
+        return
+      }
+      const minIndent = Math.min(...nonEmpty.map((l) => l.match(/^(\s*)/)![1].length))
+      const dedented = mindmapLines.map((l) => l.slice(minIndent)).join('\n')
+      const expanded = expandIndent(dedented)
+      let parsed: unknown = null
+      try {
+        parsed = YAML.parse(expanded)
+      } catch {
+        // Try without expansion
+        try {
+          parsed = YAML.parse(dedented)
+        } catch {
+          parsed = null
+        }
+      }
+      results.push({ chunk_id: currentChunkId, mindmap: parsed })
+    }
+  }
+
+  for (const line of lines) {
+    const chunkIdMatch = line.match(/^\s*-\s*chunk_id:\s*(.+)$/)
+    if (chunkIdMatch) {
+      flushCurrent()
+      currentChunkId = chunkIdMatch[1].trim()
+      mindmapLines = []
+      inMindmap = false
+      continue
+    }
+
+    if (currentChunkId && /^\s*mindmap:\s*$/.test(line)) {
+      inMindmap = true
+      continue
+    }
+
+    if (inMindmap && currentChunkId) {
+      mindmapLines.push(line)
+    }
+  }
+  flushCurrent()
+
+  if (results.length === 0) {
+    throw new Error('无法从模型输出中提取 leaf batch YAML')
+  }
+
+  return { results }
+}
+
+function stripCodeFence(text: string): string {
+  const fenced = text.match(/```ya?ml\s*([\s\S]*?)```/i)
+  return fenced?.[1]?.trim() ?? text
+}
+
+function expandIndent(text: string): string {
+  return text.replace(/^( +)/gm, (match) => '  '.repeat(match.length))
 }
 
 export function sanitizeTreeCandidate(value: unknown): unknown {

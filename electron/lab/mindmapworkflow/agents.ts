@@ -1,6 +1,6 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
-import { LeafBatchOutputSchema, LeafTaskSchema, MergeTaskSchema, TreeSchema } from './schemas.js'
+import { LeafTaskSchema, MergeTaskSchema, TreeSchema } from './schemas.js'
 import { serializeMindmapForestOutline, serializeMindmapOutline } from './io.js'
 import type {
   ChatModelLike,
@@ -18,6 +18,7 @@ import {
   formatPageRange,
   extractYaml,
   normalizeTree,
+  parseLeafBatchText,
   responseToText,
   sanitizeTreeCandidate,
   withRetries,
@@ -175,12 +176,18 @@ export class LeafExtractAgent {
     const response = await this.model.invoke(messages)
     const text = responseToText(response)
     await this.logger.debug(`${prefixForChunkGroup(chunks)} 原始 YAML 响应:\n${text.trim()}`)
-    const parsed = LeafBatchOutputSchema.parse(extractYaml(text))
+    const parsed = parseLeafBatchText(text)
     const resultMap = new Map<string, MindmapYamlNode>()
 
+    const chunkRangeMap = new Map(
+      chunks.map((chunk) => [chunk.id, formatPageRange(chunk.startPage, chunk.endPage)]),
+    )
+
     for (const item of parsed.results) {
+      if (!item.mindmap) continue
       const tree = TreeSchema.parse(sanitizeTreeCandidate(item.mindmap))
-      resultMap.set(item.chunk_id, normalizeTree(tree, ''))
+      const chunkRange = chunkRangeMap.get(item.chunk_id) ?? ''
+      resultMap.set(item.chunk_id, normalizeTree(tree, chunkRange))
     }
 
     return resultMap

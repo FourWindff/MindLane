@@ -8,6 +8,7 @@ export interface AnthropicLabConfig {
   concurrency?: number
   leafChunkGroupSize?: number
   mergeBatchSize?: number
+  maxChunks?: number
   debug?: boolean
 }
 
@@ -21,6 +22,7 @@ export interface NormalizedAnthropicLabConfig {
   concurrency: number
   leafChunkGroupSize: number
   mergeBatchSize: number
+  maxChunks: number
   debug: boolean
 }
 

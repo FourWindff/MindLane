@@ -15,6 +15,7 @@ const CONFIG: AnthropicLabConfig = {
   concurrency: 4,
   leafChunkGroupSize: 5,
   mergeBatchSize: 8,
+  maxChunks: 10,
   debug: true,
 }
 
