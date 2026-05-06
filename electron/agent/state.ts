@@ -196,7 +196,17 @@ export const PalaceSubgraphState = Annotation.Root({
   ...HITLStateAnnotations,
 })
 
+/**
+ * 思维导图子图专用状态
+ * 包含：基础状态 + 思维导图状态
+ */
+export const MindmapSubgraphState = Annotation.Root({
+  ...BaseStateAnnotations,
+  ...MindmapStateAnnotations,
+})
+
 // ===== 类型导出 =====
 
 export type MainGraphStateType = typeof MainGraphState.State
 export type PalaceSubgraphStateType = typeof PalaceSubgraphState.State
+export type MindmapSubgraphStateType = typeof MindmapSubgraphState.State

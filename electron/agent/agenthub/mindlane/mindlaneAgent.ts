@@ -3,22 +3,9 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { z } from "zod";
 import type { LLMProvider } from "../../providers/index.js";
-import type {
-  GeneratedNode,
-  GeneratedEdge,
-  MainGraphStateType,
-} from "../../state.js";
+import type { MainGraphStateType } from "../../state.js";
 import { BaseAgent } from "../base.js";
-import { buildExtractStructureMessages } from "../prompts/docToMindmap.js";
 import { ContextBuilder, ContextTemplates } from "./context.js";
-
-/**
- * 知识结构树节点
- */
-interface KeyPoint {
-  title: string;
-  children?: KeyPoint[];
-}
 
 /**
  * 路由决定 Schema - 使用 Zod 定义结构化输出
@@ -66,40 +53,6 @@ function extractTextContent(content: unknown): string {
   return "";
 }
 
-/**
- * 递归扁平化树形结构为节点和边
- */
-function flattenTree(
-  points: KeyPoint[],
-  parentId: string,
-  genId: (prefix: string) => string,
-): { nodes: GeneratedNode[]; edges: GeneratedEdge[] } {
-  const nodes: GeneratedNode[] = [];
-  const edges: GeneratedEdge[] = [];
-
-  for (const point of points) {
-    const nodeId = genId("topic");
-    nodes.push({
-      id: nodeId,
-      type: "topic",
-      data: { label: point.title },
-    });
-    edges.push({
-      id: `e-${parentId}-${nodeId}`,
-      source: parentId,
-      target: nodeId,
-      type: "smoothstep",
-    });
-
-    if (point.children && point.children.length > 0) {
-      const sub = flattenTree(point.children, nodeId, genId);
-      nodes.push(...sub.nodes);
-      edges.push(...sub.edges);
-    }
-  }
-
-  return { nodes, edges };
-}
 
 /**
  * MindLaneAgent - 中央智能体，负责路由决策和上下文管理
@@ -244,10 +197,12 @@ export class MindLaneAgent extends BaseAgent {
       return "supervisor";
     }
 
-    // 根据意图路由: 只有生成记忆宫殿时才进入子图
+    // 根据意图路由到对应子图
     switch (state.intent) {
       case "palace":
         return "palaceSubgraph";
+      case "mindmap":
+        return "mindmapSubgraph";
       default:
         return "__end__";
     }
@@ -257,7 +212,7 @@ export class MindLaneAgent extends BaseAgent {
    * 执行路由决定 - 根据目标直接执行相应操作
    */
   private async executeRouteDecision(
-    state: MainGraphStateType,
+    _state: MainGraphStateType,
     response: AIMessage,
     decision: RouteDecision,
     content: string,
@@ -266,8 +221,14 @@ export class MindLaneAgent extends BaseAgent {
 
     switch (decision.target) {
       case "mindmap":
-        // 直接生成思维导图
-        return this.generateMindmap(state, response, decision, cleanResponse);
+        // 设置意图和输入，由子图负责生成
+        return {
+          messages: [response],
+          intent: "mindmap",
+          mindmapInputText: decision.parameters?.mindmapInput || cleanResponse,
+          mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
+          response: cleanResponse,
+        };
       case "palace":
         return {
           messages: [response],
@@ -282,111 +243,6 @@ export class MindLaneAgent extends BaseAgent {
           intent: "qa",
           response: cleanResponse,
         };
-    }
-  }
-
-  /**
-   * 生成思维导图 - 从文本提取结构并生成节点/边
-   */
-  private async generateMindmap(
-    _state: MainGraphStateType,
-    response: AIMessage,
-    decision: RouteDecision,
-    content: string,
-  ): Promise<Partial<MainGraphStateType>> {
-    const documentText = decision.parameters?.mindmapInput || content;
-    const title = decision.parameters?.mindmapTitle || "思维导图";
-
-    if (!documentText) {
-      return {
-        messages: [response],
-        intent: "qa",
-        response: "请提供要生成思维导图的内容。",
-      };
-    }
-
-    let nodeCounter = 0;
-    function genId(prefix: string): string {
-      return `${prefix}-${Date.now()}-${++nodeCounter}`;
-    }
-
-    try {
-      const text = documentText.slice(0, 8000);
-      const extractResponse = await this.provider.reasoningModel.invoke(
-        buildExtractStructureMessages(text),
-      );
-      const extractContent = extractTextContent(extractResponse.content);
-
-      const jsonMatch = extractContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        return {
-          messages: [response],
-          intent: "qa",
-          error: "AI 未返回有效的 JSON 结构",
-          response: "生成思维导图失败：无法解析结构",
-        };
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        title?: string;
-        points?: KeyPoint[];
-      };
-
-      const finalTitle = parsed.title ?? title;
-      const points = parsed.points ?? [];
-
-      if (points.length === 0) {
-        return {
-          messages: [response],
-          intent: "qa",
-          error: "未提取到任何要点",
-          response: "生成思维导图失败：未提取到任何要点",
-        };
-      }
-
-      const docNodeId = genId("doc");
-      const rootId = genId("root");
-
-      const docNode: GeneratedNode = {
-        id: docNodeId,
-        type: "document",
-        data: {
-          filename: title,
-          excerpt: documentText.slice(0, 200),
-        },
-      };
-
-      const rootNode: GeneratedNode = {
-        id: rootId,
-        type: "topic",
-        data: { label: finalTitle },
-      };
-
-      const docToRootEdge: GeneratedEdge = {
-        id: `e-${docNodeId}-${rootId}`,
-        source: docNodeId,
-        target: rootId,
-        type: "smoothstep",
-      };
-
-      const tree = flattenTree(points, rootId, genId);
-
-      return {
-        messages: [response],
-        intent: "mindmap",
-        mindmapNodes: [docNode, rootNode, ...tree.nodes],
-        mindmapEdges: [docToRootEdge, ...tree.edges],
-        mindmapTitle: finalTitle,
-        response: `已生成思维导图「${finalTitle}」，共 ${tree.nodes.length + 2} 个节点。`,
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      return {
-        messages: [response],
-        intent: "qa",
-        error: `生成思维导图失败：${errorMsg}`,
-        response: `生成思维导图失败：${errorMsg}`,
-      };
     }
   }
 }

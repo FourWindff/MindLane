@@ -25,6 +25,7 @@ import {
   HITLInterruptError,
   type HITLInterruptData,
 } from "./graphs/palaceGraph.js";
+import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
@@ -339,6 +340,34 @@ export class AgentOrchestrator {
       .addNode("supervisor", (state) => supervisor.invoke(state))
       .addNode("tools", (state) => supervisor.invokeTools(state));
 
+    // 添加 mindmap subgraph（无条件，所有 provider 都支持）
+    const mindmapSubgraph = buildMindmapSubgraph({
+      provider: this.provider,
+    });
+
+    const mindmapSubgraphWrapper = async (
+      state: MainGraphStateType,
+    ): Promise<Partial<MainGraphStateType>> => {
+      try {
+        const app = mindmapSubgraph.compile();
+        const result = await app.invoke(state, { recursionLimit: 80 });
+
+        return {
+          mindmapNodes: result.mindmapNodes,
+          mindmapEdges: result.mindmapEdges,
+          mindmapTitle: result.mindmapTitle,
+          error: result.error,
+          response: result.response,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    };
+
+    graph.addNode("mindmapSubgraph", mindmapSubgraphWrapper);
+
     // 条件化添加 palace subgraph
     if (hasPalace) {
       const palaceSubgraph = buildPalaceSubgraph({
@@ -389,16 +418,20 @@ export class AgentOrchestrator {
         {
           tools: "tools",
           supervisor: "supervisor",
+          mindmapSubgraph: "mindmapSubgraph",
           palaceSubgraph: "palaceSubgraph",
           __end__: END,
         },
       );
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addEdge("mindmapSubgraph", END);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (graph as any).addEdge("palaceSubgraph", END);
     } else {
-      graph.addConditionalEdges(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addConditionalEdges(
         "supervisor",
-        (state) => {
+        (state: MainGraphStateType) => {
           const route = supervisor.route(state);
           if (route === "supervisor") return "supervisor";
           if (route === "palaceSubgraph") return "__end__";
@@ -407,9 +440,12 @@ export class AgentOrchestrator {
         {
           tools: "tools",
           supervisor: "supervisor",
+          mindmapSubgraph: "mindmapSubgraph",
           __end__: END,
         },
       );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addEdge("mindmapSubgraph", END);
     }
 
     graph.addEdge("tools", "supervisor");
