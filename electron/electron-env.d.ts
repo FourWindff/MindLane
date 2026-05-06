@@ -46,19 +46,6 @@ type _ChatToolCall = {
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
 type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge
 
-type _ChatResponse =
-  | {
-      ok: true
-      content: string
-      toolCalls?: _ChatToolCall[]
-      mindmapData?: {
-        nodes: _MindLaneNode[]
-        edges: _MindLaneEdge[]
-        title: string
-      }
-    }
-  | { ok: false; error: string }
-
 type _IndexedDocMeta = {
   id: string
   filename: string
@@ -78,11 +65,6 @@ interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
     ai: {
-      chat: (payload: {
-        threadId: string
-        message: string
-        context?: _ChatContext
-      }) => Promise<_ChatResponse>
       chatStream: (payload: {
         threadId: string
         message: string

@@ -50,30 +50,6 @@ type ChatSessionMeta = {
   messageCount: number
 }
 
-type ChatResponse =
-  | {
-      ok: true
-      content: string
-      toolCalls?: ChatToolCall[]
-      mindmapData?: {
-        nodes: Array<{
-          id: string
-          type: 'topic' | 'palace' | 'document'
-          position: { x: number; y: number }
-          data: Record<string, unknown>
-        }>
-        edges: Array<{
-          id: string
-          source: string
-          target: string
-          type?: string
-          className?: string
-        }>
-        title: string
-      }
-    }
-  | { ok: false; error: string }
-
 type SelectedNodeContent = { id: string; label: string }
 
 type IndexedDocMeta = {
@@ -111,11 +87,6 @@ type FsResult<T = void> = FsOk<T> | FsErr
 
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
-    chat: (payload: {
-      threadId: string;
-      message: string;
-      context?: ChatContext
-    }) => ipcRenderer.invoke('ai:chat', payload) as Promise<ChatResponse>,
     chatStream: (payload: {
       threadId: string;
       message: string;
