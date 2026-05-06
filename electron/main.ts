@@ -18,6 +18,12 @@ import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
+import {
+  generateFromFile as generateMindmapFromFile,
+  MindmapGenerationError,
+  type MindmapGenerationProgress,
+} from './services/mindmapGenerationService.js'
+import type { AnthropicLabConfig } from './lab/mindmapworkflow.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -867,6 +873,91 @@ function registerIpcHandlers() {
         return { ok: true }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  // -- Mindmap from file (Lab workflow) --
+  ipcMain.handle(
+    'mindmap:generate-from-file',
+    async (_e, payload: { filePath?: string | null }) => {
+      try {
+        const settings = await fsService.settings.load()
+        const providerId = 'minimax'
+        const providerConfig = settings.providerConfigs[providerId]
+        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
+
+        if (!apiKey.trim()) {
+          return {
+            ok: false,
+            error: '请先在设置中配置 API Key',
+          }
+        }
+
+        let filePath = payload.filePath?.trim() ?? ''
+        if (!filePath) {
+          if (!win) return { ok: false, error: 'No window' }
+          const result = await dialog.showOpenDialog(win, {
+            title: '选择 PDF 文件',
+            defaultPath: settings.lastWorkspacePath ?? undefined,
+            filters: [
+              { name: 'PDF 文档', extensions: ['pdf'] },
+            ],
+            properties: ['openFile'],
+          })
+          if (result.canceled || result.filePaths.length === 0) {
+            return { ok: false, error: '已取消', canceled: true }
+          }
+          filePath = result.filePaths[0]!
+        }
+
+        const userDataPath = app.getPath('userData')
+        const outputDir = path.join(userDataPath, 'mindmap-generations')
+
+        const baseUrl = providerConfig?.baseUrl?.trim()
+          || 'https://api.minimaxi.com/anthropic'
+        const labConfig: AnthropicLabConfig = {
+          apiKey,
+          baseUrl,
+          model: settings.chatModel || 'MiniMax-M2.7',
+          pdfPath: filePath,
+          outputDir,
+          chunkCharLimit: 7000,
+          concurrency: 4,
+          leafChunkGroupSize: 5,
+          mergeBatchSize: 8,
+          maxChunks: 10,
+          debug: false,
+        }
+
+        const sendProgress = (progress: MindmapGenerationProgress) => {
+          win?.webContents.send('mindmap:generation-progress', progress)
+        }
+
+        const generation = await generateMindmapFromFile({
+          filePath,
+          config: labConfig,
+          onProgress: sendProgress,
+        })
+
+        return {
+          ok: true,
+          data: {
+            yamlContent: generation.yamlContent,
+            yamlPath: generation.yamlPath,
+            documentTitle: generation.documentTitle,
+            pageCount: generation.pageCount,
+          },
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const phase = err instanceof MindmapGenerationError ? err.phase : 'error'
+        win?.webContents.send('mindmap:generation-progress', {
+          phase: 'error',
+          filename: payload.filePath ? path.basename(payload.filePath) : '',
+          error: message,
+        })
+        return { ok: false, error: message, phase }
       }
     },
   )

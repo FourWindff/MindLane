@@ -599,6 +599,82 @@ function MindMapCanvas({
     }
   }, [syncAfterFileSaved])
 
+  const [generationBusy, setGenerationBusy] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState<string | null>(null)
+
+  useEffect(() => {
+    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
+    if (!mindlane?.mindmap) return
+    const off = mindlane.mindmap.onGenerationProgress((progress) => {
+      if (progress.phase === 'error') {
+        setGenerationProgress(null)
+        return
+      }
+      if (progress.phase === 'done') {
+        setGenerationProgress(null)
+        return
+      }
+      const phaseLabel: Record<string, string> = {
+        preparing: '准备文件',
+        extracting: 'AI 提取大纲',
+        merging: '合并子树',
+        finalizing: '生成 YAML',
+        done: '完成',
+        error: '错误',
+      }
+      const label = phaseLabel[progress.phase] ?? progress.phase
+      setGenerationProgress(progress.message ? `${label} · ${progress.message}` : label)
+    })
+    return off
+  }, [])
+
+  const generateFromFile = useCallback(async () => {
+    if (aiBusy || generationBusy) return
+
+    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
+    if (!mindlane?.mindmap) {
+      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      return
+    }
+
+    const backendSettings = await mindlane.settings.load()
+    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
+    if (!currentKey?.trim()) {
+      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      return
+    }
+
+    setGenerationBusy(true)
+    setGenerationProgress('选择文件…')
+
+    try {
+      const result = await mindlane.mindmap.generateFromFile({})
+      if (!result.ok) {
+        if (!result.canceled) {
+          useAiStore.getState().setError(`生成失败：${result.error}`)
+        }
+        return
+      }
+
+      try {
+        useMindmapStore.getState().loadFromYaml(result.data.yamlContent, {
+          fileTitle: result.data.documentTitle,
+        })
+      } catch (e) {
+        useAiStore.getState().setError(
+          `YAML 解析失败：${e instanceof Error ? e.message : String(e)}`,
+        )
+      }
+    } catch (e) {
+      useAiStore.getState().setError(
+        `生成异常：${e instanceof Error ? e.message : String(e)}`,
+      )
+    } finally {
+      setGenerationBusy(false)
+      setGenerationProgress(null)
+    }
+  }, [aiBusy, apiKey, generationBusy])
+
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
   )
@@ -773,6 +849,8 @@ function MindMapCanvas({
         onSwitchWorkspace={onSwitchWorkspace}
         onAutoLayout={doAutoLayout}
         onSave={doSave}
+        onGenerateFromFile={generateFromFile}
+        generateFromFileBusy={generationBusy}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
       />
@@ -812,6 +890,14 @@ function MindMapCanvas({
           palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
+        {generationProgress && (
+          <div className="ai-progress-overlay">
+            <div className="ai-progress-overlay__card">
+              <div className="ai-progress-overlay__spinner" />
+              <span className="ai-progress-overlay__text">{generationProgress}</span>
+            </div>
+          </div>
+        )}
         {contextMenu ? (
           <MindMapContextMenu
             menu={contextMenu}

@@ -1,4 +1,4 @@
-import { ListTree, Columns2, Trash2, RotateCcw, AlignLeft, Save, FolderInput, Settings } from 'lucide-react'
+import { ListTree, Columns2, Trash2, RotateCcw, AlignLeft, Save, FolderInput, Settings, FileUp } from 'lucide-react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 
 type Props = {
@@ -10,6 +10,8 @@ type Props = {
   onSwitchWorkspace?: () => void
   onAutoLayout?: () => void
   onSave?: () => void
+  onGenerateFromFile?: () => void
+  generateFromFileBusy?: boolean
   canAddSibling: boolean
   canRemove: boolean
 }
@@ -23,6 +25,8 @@ export function MindMapHeader({
   onSwitchWorkspace,
   onAutoLayout,
   onSave,
+  onGenerateFromFile,
+  generateFromFileBusy,
   canAddSibling,
   canRemove,
 }: Props) {
@@ -68,6 +72,18 @@ export function MindMapHeader({
           </button>
         </div>
         <div className="mindmap-header__cluster mindmap-header__cluster--muted">
+          {onGenerateFromFile && (
+            <button
+              type="button"
+              className="mindmap-header__btn mindmap-header__btn--ghost"
+              onClick={onGenerateFromFile}
+              disabled={generateFromFileBusy}
+              title="从 PDF 文件生成思维导图"
+            >
+              <FileUp className="mindmap-header__icon" size={16} strokeWidth={1.5} />
+              <span>{generateFromFileBusy ? '生成中…' : '从文件生成'}</span>
+            </button>
+          )}
           {onAutoLayout && (
             <button
               type="button"

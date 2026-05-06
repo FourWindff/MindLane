@@ -61,6 +61,13 @@ type _IndexProgress = {
   error?: string
 }
 
+type _MindmapGenerationProgress = {
+  phase: 'preparing' | 'extracting' | 'merging' | 'finalizing' | 'done' | 'error'
+  filename: string
+  message?: string
+  error?: string
+}
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
@@ -264,6 +271,23 @@ interface Window {
       listDocuments: () => Promise<_IndexedDocMeta[]>
       deleteDocument: (payload: { docId: string }) => Promise<_FsResult>
       onIndexProgress: (callback: (progress: _IndexProgress) => void) => () => void
+    }
+    mindmap: {
+      generateFromFile: (payload?: { filePath?: string | null }) => Promise<
+        | {
+            ok: true
+            data: {
+              yamlContent: string
+              yamlPath: string
+              documentTitle: string
+              pageCount: number
+            }
+          }
+        | { ok: false; error: string; canceled?: boolean; phase?: string }
+      >
+      onGenerationProgress: (
+        callback: (progress: _MindmapGenerationProgress) => void,
+      ) => () => void
     }
     settings: {
       load: () => Promise<{

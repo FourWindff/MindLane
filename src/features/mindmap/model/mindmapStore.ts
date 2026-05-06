@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
+import { autoLayout } from '@/shared/lib/autoLayout'
+import { parseYamlToMindmap } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 
 interface MindmapState {
@@ -25,6 +27,7 @@ interface MindmapState {
   setFileTitle: (fileTitle: string) => void
 
   loadFile: (filePath: string, data: MindLaneFile) => void
+  loadFromYaml: (yamlString: string, options?: { fileTitle?: string; filePath?: string | null }) => void
   newFile: (title?: string) => void
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
@@ -97,6 +100,20 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       filePath,
       fileTitle: data.metadata.title,
       dirty: false,
+    })
+  },
+
+  loadFromYaml: (yamlString, options = {}) => {
+    const parsed = parseYamlToMindmap(yamlString)
+    const positioned = autoLayout(parsed.nodes, parsed.edges)
+    set({
+      nodes: positioned,
+      edges: parsed.edges,
+      hasDocumentOpen: true,
+      filePath: options.filePath ?? null,
+      fileTitle: options.fileTitle ?? parsed.title,
+      dirty: true,
+      editingNodeId: null,
     })
   },
 

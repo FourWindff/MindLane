@@ -67,6 +67,13 @@ type IndexProgress = {
   error?: string
 }
 
+type MindmapGenerationProgress = {
+  phase: 'preparing' | 'extracting' | 'merging' | 'finalizing' | 'done' | 'error'
+  filename: string
+  message?: string
+  error?: string
+}
+
 type WorkspaceFileEntry = {
   filePath: string
   name: string
@@ -249,6 +256,26 @@ contextBridge.exposeInMainWorld('mindlane', {
       const handler = (_event: unknown, progress: IndexProgress) => callback(progress)
       ipcRenderer.on('kb:index-progress', handler)
       return () => { ipcRenderer.off('kb:index-progress', handler) }
+    },
+  },
+  mindmap: {
+    generateFromFile: (payload: { filePath?: string | null } = {}) =>
+      ipcRenderer.invoke('mindmap:generate-from-file', payload) as Promise<
+        | {
+            ok: true
+            data: {
+              yamlContent: string
+              yamlPath: string
+              documentTitle: string
+              pageCount: number
+            }
+          }
+        | { ok: false; error: string; canceled?: boolean; phase?: string }
+      >,
+    onGenerationProgress: (callback: (progress: MindmapGenerationProgress) => void) => {
+      const handler = (_event: unknown, progress: MindmapGenerationProgress) => callback(progress)
+      ipcRenderer.on('mindmap:generation-progress', handler)
+      return () => { ipcRenderer.off('mindmap:generation-progress', handler) }
     },
   },
   settings: {

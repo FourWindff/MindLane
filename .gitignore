@@ -35,3 +35,4 @@ _bmad-output
 .gitnexus
 
 electron/lab/output
+tsconfig.node.tsbuildinfo
