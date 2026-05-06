@@ -74,6 +74,9 @@ export function ChatPanel() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  const [inputRows, setInputRows] = useState(1)
+  const MAX_ROWS = 4
+
   const [streamingText, setStreamingText] = useState('')
   const [activeTools, setActiveTools] = useState<string[]>([])
   const streamTextRef = useRef('')
@@ -244,6 +247,7 @@ export function ChatPanel() {
     const userMsg = { role: 'user' as const, content: text }
     addMessage(userMsg)
     if (inputRef.current) inputRef.current.value = ''
+    setInputRows(1)
 
     streamTextRef.current = ''
     setStreamingText('')
@@ -291,6 +295,18 @@ export function ChatPanel() {
     },
     [send],
   )
+
+  const handleInputChange = useCallback(() => {
+    const textarea = inputRef.current
+    if (!textarea) return
+
+    // 计算行数
+    const lineHeight = 20 // 估算的行高
+    const scrollHeight = textarea.scrollHeight
+    const rows = Math.min(MAX_ROWS, Math.max(1, Math.round(scrollHeight / lineHeight)))
+
+    setInputRows(rows)
+  }, [])
 
   const toggleSessionList = useCallback(() => {
     setShowSessionList(!showSessionList)
@@ -477,9 +493,10 @@ export function ChatPanel() {
           <textarea
             ref={inputRef}
             onKeyDown={handleKeyDown}
+            onChange={handleInputChange}
             placeholder="输入消息…"
             disabled={busy}
-            rows={1}
+            rows={inputRows}
             className="chat-input"
           />
           {busy ? (
