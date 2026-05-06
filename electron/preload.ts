@@ -19,8 +19,6 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 })
 
-type BailianChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
-
 type ContextNodeInfo = {
   id: string
   type: 'topic' | 'palace' | 'document'
@@ -52,30 +50,6 @@ type ChatSessionMeta = {
   messageCount: number
 }
 
-type ChatResponse =
-  | {
-      ok: true
-      content: string
-      toolCalls?: ChatToolCall[]
-      mindmapData?: {
-        nodes: Array<{
-          id: string
-          type: 'topic' | 'palace' | 'document'
-          position: { x: number; y: number }
-          data: Record<string, unknown>
-        }>
-        edges: Array<{
-          id: string
-          source: string
-          target: string
-          type?: string
-          className?: string
-        }>
-        title: string
-      }
-    }
-  | { ok: false; error: string }
-
 type SelectedNodeContent = { id: string; label: string }
 
 type IndexedDocMeta = {
@@ -90,6 +64,13 @@ type IndexProgress = {
   phase: 'loading' | 'splitting' | 'embedding' | 'done' | 'error'
   filename: string
   progress: number
+  error?: string
+}
+
+type MindmapGenerationProgress = {
+  phase: 'preparing' | 'extracting' | 'merging' | 'finalizing' | 'done' | 'error'
+  filename: string
+  message?: string
   error?: string
 }
 
@@ -113,10 +94,11 @@ type FsResult<T = void> = FsOk<T> | FsErr
 
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
-    chat: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
-      ipcRenderer.invoke('ai:chat', payload) as Promise<ChatResponse>,
-    chatStream: (payload: { threadId: string; messages: BailianChatMessage[]; context?: ChatContext }) =>
-      ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
+    chatStream: (payload: {
+      threadId: string;
+      message: string;
+      context?: ChatContext
+    }) => ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
     stopStream: () => ipcRenderer.invoke('ai:chat-stream-stop') as Promise<void>,
     onStreamToken: (callback: (token: string) => void) => {
       const handler = (_event: unknown, token: string) => callback(token)
@@ -155,15 +137,14 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke('ai:text2image', payload),
     nodesToPalace: (payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] }) =>
       ipcRenderer.invoke('ai:nodes-to-palace', payload),
-    docToMindmap: (payload: { apiKey: string; model: string; documentText: string; documentFilename: string }) =>
-      ipcRenderer.invoke('ai:doc-to-mindmap', payload),
     listProviders: () => ipcRenderer.invoke('ai:list-providers'),
+    getProviders: () => ipcRenderer.invoke('ai:get-providers'),
+    getCapabilities: () => ipcRenderer.invoke('ai:get-capabilities'),
     urlToDataUrl: (payload: { url: string }) =>
       ipcRenderer.invoke('image:url-to-data-url', payload) as Promise<FsResult<{ dataUrl: string }>>,
   },
   file: {
     open: () => ipcRenderer.invoke('file:open'),
-    importDocument: () => ipcRenderer.invoke('file:import-document'),
     save: (payload: { filePath: string | null; data: unknown }) =>
       ipcRenderer.invoke('file:save', payload),
     saveAs: (payload: { data: unknown }) =>
@@ -275,6 +256,26 @@ contextBridge.exposeInMainWorld('mindlane', {
       const handler = (_event: unknown, progress: IndexProgress) => callback(progress)
       ipcRenderer.on('kb:index-progress', handler)
       return () => { ipcRenderer.off('kb:index-progress', handler) }
+    },
+  },
+  mindmap: {
+    generateFromFile: (payload: { filePath?: string | null } = {}) =>
+      ipcRenderer.invoke('mindmap:generate-from-file', payload) as Promise<
+        | {
+            ok: true
+            data: {
+              yamlContent: string
+              yamlPath: string
+              documentTitle: string
+              pageCount: number
+            }
+          }
+        | { ok: false; error: string; canceled?: boolean; phase?: string }
+      >,
+    onGenerationProgress: (callback: (progress: MindmapGenerationProgress) => void) => {
+      const handler = (_event: unknown, progress: MindmapGenerationProgress) => callback(progress)
+      ipcRenderer.on('mindmap:generation-progress', handler)
+      return () => { ipcRenderer.off('mindmap:generation-progress', handler) }
     },
   },
   settings: {

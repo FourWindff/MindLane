@@ -29,7 +29,16 @@ export class SettingsManager {
 
   async update(partial: Partial<AppSettings>): Promise<void> {
     const current = await this.load()
-    this.cache = this.merge({ ...current, ...partial })
+    const merged = { ...current, ...partial }
+    // Deep merge providerConfigs to preserve existing provider configurations
+    if (partial.providerConfigs) {
+      const mergedConfigs = { ...current.providerConfigs }
+      for (const [key, value] of Object.entries(partial.providerConfigs)) {
+        mergedConfigs[key] = { ...mergedConfigs[key], ...value }
+      }
+      merged.providerConfigs = mergedConfigs
+    }
+    this.cache = this.merge(merged)
     await this.atomicWrite(JSON.stringify(this.cache, null, 2))
   }
 

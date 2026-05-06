@@ -1,7 +1,8 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { Image, Landmark, Minimize2 } from 'lucide-react'
-import type { PalaceNodeData } from '@/shared/lib/fileFormat'
+import { PalaceNodeData } from '.'
+
 
 type TransitionPhase = 'collapsed' | 'expanding' | 'expanded' | 'collapsing'
 

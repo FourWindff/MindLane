@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "title": "AI 学习笔记",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-15T00:00:00.000Z"
+  },
+  "mindmap": {
+    "nodes": [
+      {
+        "id": "root",
+        "data": { "label": "人工智能" },
+        "type": "topic",
+        "position": { "x": 0, "y": 0 }
+      },
+      {
+        "id": "ml",
+        "data": { "label": "机器学习是人工智能的一个重要分支，通过数据驱动的方式让计算机自动学习规律" },
+        "type": "topic",
+        "parentId": "root",
+        "position": { "x": 200, "y": -100 }
+      },
+      {
+        "id": "dl",
+        "data": { "label": "深度学习使用多层神经网络进行特征提取和模式识别" },
+        "type": "topic",
+        "parentId": "ml",
+        "position": { "x": 400, "y": -150 }
+      },
+      {
+        "id": "nlp",
+        "data": { "label": "自然语言处理让计算机理解和生成人类语言" },
+        "type": "topic",
+        "parentId": "root",
+        "position": { "x": 200, "y": 100 }
+      },
+      {
+        "id": "cv",
+        "data": { "label": "计算机视觉使机器能够识别和理解图像与视频内容" },
+        "type": "topic",
+        "parentId": "root",
+        "position": { "x": 200, "y": 0 }
+      },
+      {
+        "id": "rl",
+        "data": { "label": "强化学习通过与环境交互来学习最优策略" },
+        "type": "topic",
+        "parentId": "ml",
+        "position": { "x": 400, "y": -50 }
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "root", "target": "ml" },
+      { "id": "e2", "source": "ml", "target": "dl" },
+      { "id": "e3", "source": "root", "target": "nlp" },
+      { "id": "e4", "source": "root", "target": "cv" },
+      { "id": "e5", "source": "ml", "target": "rl" }
+    ]
+  },
+  "documents": []
+}

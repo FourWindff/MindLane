@@ -28,3 +28,12 @@ release
 *.sln
 *.sw?
 .mcp.json
+
+_bmad
+_bmad-output
+.claude
+.codex
+.gitnexus
+
+electron/lab/output
+tsconfig.node.tsbuildinfo

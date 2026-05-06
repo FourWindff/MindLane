@@ -25,6 +25,7 @@ export default defineConfig({
                   'hnswlib-node',
                   'pdf-parse',
                   'mammoth',
+                  '@anthropic-ai/sdk',
                 ]
                 return nativeOrProblematic.some(
                   (pkg) => id === pkg || id.startsWith(pkg + '/'),

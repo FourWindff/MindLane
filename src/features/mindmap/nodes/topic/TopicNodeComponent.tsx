@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
-import type { TopicNodeData } from '@/shared/lib/fileFormat'
 import { useAiStore } from '@/features/chat/model/aiStore'
+import { TopicNodeData } from '.'
 
 function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TopicNodeData

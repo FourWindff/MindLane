@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { DashScopeProvider, type LLMProvider, urlToDataUrl } from './ai/providers/index.js'
+import { type LLMProvider, urlToDataUrl, createProvider, getProviderMeta, getRegisteredProviders } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -15,9 +15,15 @@ import nodeCrypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
-import { AiService } from './ai/service.js'
-import { AgentOrchestrator, type ChatRequest } from './ai/orchestrator.js'
-import type { SelectedNodeContent } from './ai/state.js'
+import { AiService } from './agent/service.js'
+import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
+import type { SelectedNodeContent } from './agent/state.js'
+import {
+  generateFromFile as generateMindmapFromFile,
+  MindmapGenerationError,
+  type MindmapGenerationProgress,
+} from './services/mindmapGenerationService.js'
+import type { AnthropicLabConfig } from './lab/mindmapworkflow.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -209,72 +215,20 @@ function createWindow() {
 function registerIpcHandlers() {
   const createProviderForRequest = async (apiKey: string, model: string) => {
     const settings = await fsService.settings.load()
-    const dsConfig = settings.providerConfigs['dashscope']
-    return new DashScopeProvider({
-      apiKey: apiKey.trim() || settings.apiKey || dsConfig?.apiKey || '',
-      chatModel: model.trim() || settings.chatModel || 'qwen-turbo',
-      baseUrl: dsConfig?.baseUrl,
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerConfig = settings.providerConfigs[providerId]
+    const providerMeta = getProviderMeta(providerId)
+    const requestedModel = model.trim() || settings.chatModel || ''
+    const normalizedModel =
+      providerMeta?.defaultModels.some((item) => item.id === requestedModel)
+        ? requestedModel
+        : providerMeta?.defaultModels[0]?.id || requestedModel || 'qwen-turbo'
+    return createProvider(providerId, {
+      apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
+      chatModel: normalizedModel,
+      baseUrl: providerConfig?.baseUrl,
     })
   }
-
-  // -- AI chat (ReAct Agent) --
-  ipcMain.handle(
-    'ai:chat',
-    async (
-      _e,
-      payload: {
-        threadId: string
-        messages: { role: string; content: string }[]
-        context?: {
-          mindmapSummary?: string
-          selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
-          filePath?: string
-          fileTitle?: string
-          hasDocumentOpen?: boolean
-          workspacePath?: string
-          workspaceFiles?: { name: string; filePath: string }[]
-        }
-      },
-    ) => {
-      try {
-        const settings = await fsService.settings.load()
-        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-        const modelName = settings.chatModel || 'qwen-turbo'
-
-        if (!apiKey.trim()) return { ok: false, error: '未填写 API Key' }
-
-        const provider = new DashScopeProvider({
-          apiKey,
-          chatModel: modelName,
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
-        })
-
-        const request: ChatRequest = {
-          threadId: payload.threadId || crypto.randomUUID(),
-          messages: (payload.messages ?? []).map((m) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: String(m.content ?? ''),
-          })),
-          context: payload.context
-            ? {
-                ...payload.context,
-                selectedNodes: payload.context.selectedNodes?.map((n) => ({
-                  ...n,
-                  type: n.type as 'topic' | 'palace' | 'document',
-                })),
-              }
-            : undefined,
-        }
-
-        const orchestrator = new AgentOrchestrator(provider, aiService)
-        const result = await orchestrator.run(request)
-
-        return { ok: true, ...result }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
-    },
-  )
 
   // -- AI chat stream (with abort support) --
   let streamAbortController: AbortController | null = null
@@ -285,7 +239,7 @@ function registerIpcHandlers() {
       _e,
       payload: {
         threadId: string
-        messages: { role: string; content: string }[]
+        message: string
         context?: {
           mindmapSummary?: string
           selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
@@ -303,7 +257,9 @@ function registerIpcHandlers() {
 
       try {
         const settings = await fsService.settings.load()
-        const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
+        const providerId = settings.activeProviders.chat || 'dashscope'
+        const providerConfig = settings.providerConfigs[providerId]
+        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
         const modelName = settings.chatModel || 'qwen-turbo'
 
         if (!apiKey.trim()) {
@@ -311,18 +267,22 @@ function registerIpcHandlers() {
           return
         }
 
-        const provider = new DashScopeProvider({
+        const provider = createProvider(providerId, {
           apiKey,
           chatModel: modelName,
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
+          baseUrl: providerConfig?.baseUrl,
         })
+
+        const userDataPath = app.getPath('userData')
+
+        if (!payload.message?.trim()) {
+          win?.webContents.send('ai:chat-stream-error', '消息不能为空')
+          return
+        }
 
         const request: ChatRequest = {
           threadId: payload.threadId || crypto.randomUUID(),
-          messages: (payload.messages ?? []).map((m) => ({
-            role: m.role as 'user' | 'assistant' | 'system',
-            content: String(m.content ?? ''),
-          })),
+          message: payload.message,
           context: payload.context
             ? {
                 ...payload.context,
@@ -334,7 +294,7 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
         await orchestrator.stream(
           request,
           {
@@ -408,65 +368,6 @@ function registerIpcHandlers() {
     }
   })
 
-  // -- Doc to MindMap pipeline (multi-agent: mindmapGen) --
-  ipcMain.handle(
-    'ai:doc-to-mindmap',
-    async (
-      _e,
-      payload: { apiKey: string; model: string; documentText: string; documentFilename: string },
-    ) => {
-      try {
-        const provider = await createProviderForRequest(payload.apiKey, payload.model)
-        const orchestrator = new AgentOrchestrator(provider, aiService)
-        const result = await orchestrator.runMindmapFromDoc(
-          payload.documentText,
-          payload.documentFilename,
-        )
-        return {
-          ok: true,
-          nodes: result.nodes,
-          edges: result.edges,
-          documentTitle: result.documentTitle,
-        }
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) }
-      }
-    },
-  )
-
-  // -- Document import --
-  ipcMain.handle('file:import-document', async () => {
-    if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
-    const result = await dialog.showOpenDialog(win, {
-      title: '导入文档',
-      defaultPath: settings.lastWorkspacePath ?? undefined,
-      filters: [
-        { name: '文本文档', extensions: ['txt', 'md', 'text'] },
-        { name: '所有文件', extensions: ['*'] },
-      ],
-      properties: ['openFile'],
-    })
-    if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
-    }
-    const filePath = result.filePaths[0]!
-    try {
-      const fs = await import('node:fs')
-      const pathMod = await import('node:path')
-      const content = await fs.promises.readFile(filePath, 'utf-8')
-      const filename = pathMod.default.basename(filePath)
-      const docId = crypto.randomUUID()
-      await fsService.cache.cacheDocumentText(docId, content)
-      return {
-        ok: true,
-        data: { docId, filename, content, filePath },
-      }
-    } catch (e) {
-      return { ok: false, error: `读取失败：${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
   // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
     'ai:nodes-to-palace',
@@ -475,7 +376,8 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const orchestrator = new AgentOrchestrator(provider, aiService)
+      const userDataPath = app.getPath('userData')
+      const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
   )
@@ -483,14 +385,45 @@ function registerIpcHandlers() {
   // -- Provider management --
   ipcMain.handle('ai:list-providers', async () => {
     return {
-      chat: [
-        {
-          id: 'dashscope',
-          displayName: '通义千问 (百炼)',
-          models: DashScopeProvider.defaultChatModels.map((model) => ({ ...model })),
-        },
-      ],
-      image: [{ id: 'dashscope', displayName: '通义万相 (百炼)' }],
+      chat: getRegisteredProviders().map((meta) => ({
+        id: meta.id,
+        displayName: meta.displayName,
+        models: meta.defaultModels.map((m) => ({ ...m })),
+        capabilities: meta.capabilities,
+      })),
+      image: getRegisteredProviders()
+        .filter((meta) => meta.capabilities.includes('imageGen' as never))
+        .map((meta) => ({ id: meta.id, displayName: meta.displayName })),
+    }
+  })
+
+  ipcMain.handle('ai:get-providers', async () => {
+    return {
+      ok: true,
+      providers: getRegisteredProviders().map((meta) => ({
+        id: meta.id,
+        displayName: meta.displayName,
+        capabilities: meta.capabilities,
+        models: meta.defaultModels,
+      })),
+    }
+  })
+
+  ipcMain.handle('ai:get-capabilities', async () => {
+    try {
+      const settings = await fsService.settings.load()
+      const providerId = settings.activeProviders.chat || 'dashscope'
+      const providerMeta = getProviderMeta(providerId)
+      if (!providerMeta) {
+        return { ok: false, error: `未知的 provider: ${providerId}` }
+      }
+
+      return {
+        ok: true,
+        capabilities: providerMeta.capabilities,
+      }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 
@@ -944,6 +877,91 @@ function registerIpcHandlers() {
     },
   )
 
+  // -- Mindmap from file (Lab workflow) --
+  ipcMain.handle(
+    'mindmap:generate-from-file',
+    async (_e, payload: { filePath?: string | null }) => {
+      try {
+        const settings = await fsService.settings.load()
+        const providerId = 'minimax'
+        const providerConfig = settings.providerConfigs[providerId]
+        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
+
+        if (!apiKey.trim()) {
+          return {
+            ok: false,
+            error: '请先在设置中配置 API Key',
+          }
+        }
+
+        let filePath = payload.filePath?.trim() ?? ''
+        if (!filePath) {
+          if (!win) return { ok: false, error: 'No window' }
+          const result = await dialog.showOpenDialog(win, {
+            title: '选择 PDF 文件',
+            defaultPath: settings.lastWorkspacePath ?? undefined,
+            filters: [
+              { name: 'PDF 文档', extensions: ['pdf'] },
+            ],
+            properties: ['openFile'],
+          })
+          if (result.canceled || result.filePaths.length === 0) {
+            return { ok: false, error: '已取消', canceled: true }
+          }
+          filePath = result.filePaths[0]!
+        }
+
+        const userDataPath = app.getPath('userData')
+        const outputDir = path.join(userDataPath, 'mindmap-generations')
+
+        const baseUrl = providerConfig?.baseUrl?.trim()
+          || 'https://api.minimaxi.com/anthropic'
+        const labConfig: AnthropicLabConfig = {
+          apiKey,
+          baseUrl,
+          model: settings.chatModel || 'MiniMax-M2.7',
+          pdfPath: filePath,
+          outputDir,
+          chunkCharLimit: 7000,
+          concurrency: 4,
+          leafChunkGroupSize: 5,
+          mergeBatchSize: 8,
+          maxChunks: 10,
+          debug: false,
+        }
+
+        const sendProgress = (progress: MindmapGenerationProgress) => {
+          win?.webContents.send('mindmap:generation-progress', progress)
+        }
+
+        const generation = await generateMindmapFromFile({
+          filePath,
+          config: labConfig,
+          onProgress: sendProgress,
+        })
+
+        return {
+          ok: true,
+          data: {
+            yamlContent: generation.yamlContent,
+            yamlPath: generation.yamlPath,
+            documentTitle: generation.documentTitle,
+            pageCount: generation.pageCount,
+          },
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const phase = err instanceof MindmapGenerationError ? err.phase : 'error'
+        win?.webContents.send('mindmap:generation-progress', {
+          phase: 'error',
+          filename: payload.filePath ? path.basename(payload.filePath) : '',
+          error: message,
+        })
+        return { ok: false, error: message, phase }
+      }
+    },
+  )
+
   // -- Knowledge Base --
   ipcMain.handle('kb:upload-documents', async () => {
     if (!win) return { ok: false, error: 'No window' }
@@ -962,22 +980,10 @@ function registerIpcHandlers() {
     }
 
     const indexed = []
-    let visionModel: LLMProvider['visionModel'] = undefined
-    try {
-      const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-      if (apiKey) {
-        const provider = new DashScopeProvider({
-          apiKey,
-          chatModel: settings.chatModel || 'qwen-turbo',
-          baseUrl: settings.providerConfigs['dashscope']?.baseUrl,
-        })
-        visionModel = provider.visionModel
-      }
-    } catch { /* no vision model available */ }
 
     for (const filePath of result.filePaths) {
       try {
-        const meta = await aiService.indexer.index(filePath, visionModel, (progress) => {
+        const meta = await aiService.rag.index(filePath, (progress) => {
           win?.webContents.send('kb:index-progress', progress)
         })
         indexed.push(meta)
@@ -995,11 +1001,11 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('kb:list-documents', async () => {
-    return aiService.indexer.list()
+    return aiService.rag.list()
   })
 
   ipcMain.handle('kb:delete-document', async (_e, payload: { docId: string }) => {
-    const success = await aiService.indexer.remove(payload.docId)
+    const success = await aiService.rag.remove(payload.docId)
     return success ? { ok: true } : { ok: false, error: '文档不存在' }
   })
 
@@ -1056,8 +1062,18 @@ app.whenReady().then(async () => {
   aiService = new AiService()
   try {
     const settings = await fsService.settings.load()
-    const apiKey = settings.apiKey || settings.providerConfigs['dashscope']?.apiKey || ''
-    await aiService.init(userDataPath, apiKey || undefined, settings.providerConfigs['dashscope']?.baseUrl)
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerConfig = settings.providerConfigs[providerId]
+    const apiKey = providerConfig?.apiKey || settings.apiKey || ''
+    let provider: LLMProvider | undefined
+    if (apiKey) {
+      provider = createProvider(providerId, {
+        apiKey,
+        chatModel: settings.chatModel || 'qwen-turbo',
+        baseUrl: providerConfig?.baseUrl,
+      })
+    }
+    await aiService.init(userDataPath, provider)
   } catch (err) {
     console.error('AI service init failed:', err)
   }

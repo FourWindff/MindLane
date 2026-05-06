@@ -46,19 +46,6 @@ type _ChatToolCall = {
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
 type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge
 
-type _ChatResponse =
-  | {
-      ok: true
-      content: string
-      toolCalls?: _ChatToolCall[]
-      mindmapData?: {
-        nodes: _MindLaneNode[]
-        edges: _MindLaneEdge[]
-        title: string
-      }
-    }
-  | { ok: false; error: string }
-
 type _IndexedDocMeta = {
   id: string
   filename: string
@@ -74,18 +61,20 @@ type _IndexProgress = {
   error?: string
 }
 
+type _MindmapGenerationProgress = {
+  phase: 'preparing' | 'extracting' | 'merging' | 'finalizing' | 'done' | 'error'
+  filename: string
+  message?: string
+  error?: string
+}
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
     ai: {
-      chat: (payload: {
-        threadId: string
-        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
-        context?: _ChatContext
-      }) => Promise<_ChatResponse>
       chatStream: (payload: {
         threadId: string
-        messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
+        message: string
         context?: _ChatContext
       }) => Promise<void>
       stopStream: () => Promise<void>
@@ -130,38 +119,23 @@ interface Window {
           }
         | { ok: false; error: string }
       >
-      docToMindmap: (payload: {
-        apiKey: string
-        model: string
-        documentText: string
-        documentFilename: string
-      }) => Promise<
-        | {
-            ok: true
-            nodes: {
-              id: string
-              type: string
-              position: { x: number; y: number }
-              data: Record<string, unknown>
-            }[]
-            edges: { id: string; source: string; target: string; type: string }[]
-            documentTitle: string
-          }
-        | { ok: false; error: string }
-      >
       listProviders: () => Promise<{
-        chat: { id: string; displayName: string; models: { id: string; displayName: string }[] }[]
+        chat: { id: string; displayName: string; models: { id: string; displayName: string }[]; capabilities: string[] }[]
         image: { id: string; displayName: string }[]
       }>
+      getProviders: () => Promise<{
+        ok: true
+        providers: { id: string; displayName: string; capabilities: string[]; models: { id: string; displayName: string }[] }[]
+      } | { ok: false; error: string }>
+      getCapabilities: () => Promise<{
+        ok: true
+        capabilities: string[]
+      } | { ok: false; error: string }>
       urlToDataUrl: (payload: { url: string }) => Promise<
         _FsResult<{ dataUrl: string }>
       >
     }
     file: {
-      importDocument: () => Promise<
-        | { ok: true; data: { docId: string; filename: string; content: string; filePath: string } }
-        | { ok: false; error: string }
-      >
       open: () => Promise<
         | { ok: true; data: { filePath: string; data: unknown } }
         | { ok: false; error: string }
@@ -297,6 +271,23 @@ interface Window {
       listDocuments: () => Promise<_IndexedDocMeta[]>
       deleteDocument: (payload: { docId: string }) => Promise<_FsResult>
       onIndexProgress: (callback: (progress: _IndexProgress) => void) => () => void
+    }
+    mindmap: {
+      generateFromFile: (payload?: { filePath?: string | null }) => Promise<
+        | {
+            ok: true
+            data: {
+              yamlContent: string
+              yamlPath: string
+              documentTitle: string
+              pageCount: number
+            }
+          }
+        | { ok: false; error: string; canceled?: boolean; phase?: string }
+      >
+      onGenerationProgress: (
+        callback: (progress: _MindmapGenerationProgress) => void,
+      ) => () => void
     }
     settings: {
       load: () => Promise<{

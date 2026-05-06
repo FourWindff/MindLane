@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { FileText } from 'lucide-react'
-import type { DocumentNodeData } from '@/shared/lib/fileFormat'
+import { DocumentNodeData } from '.'
 
 function DocumentNodeInner({ data: rawData, selected }: NodeProps) {
   const data = rawData as DocumentNodeData

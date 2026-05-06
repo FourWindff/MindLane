@@ -27,9 +27,12 @@ export function SettingsPanel() {
   const setApiKey = useSettingsStore((s) => s.setApiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
   const setChatModel = useSettingsStore((s) => s.setChatModel)
+  const capabilities = useSettingsStore((s) => s.capabilities)
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const setAutoSaveIntervalMs = useSettingsStore((s) => s.setAutoSaveIntervalMs)
   const providers = useSettingsStore((s) => s.providers)
+  const activeChatProvider = useSettingsStore((s) => s.activeChatProvider)
+  const setActiveChatProvider = useSettingsStore((s) => s.setActiveChatProvider)
   const currentFilePath = useMindmapStore((s) => s.filePath)
   const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
   const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.setRestoreLastWorkspaceOnLaunch)
@@ -37,8 +40,12 @@ export function SettingsPanel() {
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
 
-  const activeProvider = providers.find((p) => p.id === 'dashscope')
+  const activeProvider = providers.find((p) => p.id === activeChatProvider) ?? providers[0]
   const models = activeProvider?.models ?? []
+  const chatEnabled = capabilities.includes('chat')
+  const visionEnabled = capabilities.includes('vision')
+  const imageGenEnabled = capabilities.includes('imageGen')
+  const embeddingsEnabled = capabilities.includes('embeddings')
   const activeSectionMeta = useMemo(
     () => SETTINGS_SECTIONS.find((section) => section.id === activeSection) ?? SETTINGS_SECTIONS[0],
     [activeSection],
@@ -189,6 +196,25 @@ export function SettingsPanel() {
             className={`settings-card${activeSection === 'ai' ? '' : ' settings-card--hidden'}`}
           >
             <div className="settings-card__title">AI 配置</div>
+            {providers.length > 1 && (
+              <div className="panel-field">
+                <label className="panel-field__label" htmlFor="settings-provider">
+                  AI 服务商
+                </label>
+                <select
+                  id="settings-provider"
+                  className="panel-field__select"
+                  value={activeChatProvider}
+                  onChange={(e) => setActiveChatProvider(e.target.value)}
+                >
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="panel-field">
               <label className="panel-field__label" htmlFor="settings-apikey">
                 API Key
@@ -199,7 +225,7 @@ export function SettingsPanel() {
                 className="panel-field__input"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="输入百炼 API Key"
+                placeholder={`输入 ${activeProvider?.displayName ?? 'API'} Key`}
               />
             </div>
             <div className="panel-field">
@@ -219,6 +245,18 @@ export function SettingsPanel() {
                 ))}
               </select>
             </div>
+            {activeProvider && (
+              <div className="settings-card__hint">
+                {activeProvider.displayName} 支持的功能：
+                {chatEnabled && ' 对话'}
+                {visionEnabled && ' 视觉理解'}
+                {imageGenEnabled && ' 文生图'}
+                {embeddingsEnabled && ' 知识库检索'}
+                {imageGenEnabled && !visionEnabled && ' | 可文生图，但记忆宫殿不可用'}
+                {!imageGenEnabled && ' | 文生图不可用'}
+                {!embeddingsEnabled && ' | 知识库不可用'}
+              </div>
+            )}
             <div className="settings-card__hint">
               当前文件：{currentFilePath ?? '未绑定文件'}，AI 流程会优先使用这里配置的模型。
             </div>

@@ -1,21 +1,27 @@
 import { NodeTypeDescriptor } from '../types'
-import type { PalaceNodeData } from '@/shared/lib/fileFormat'
-import { PalaceNodeComponent } from './PalaceNodeComponent'
 
+import { PalaceNodeComponent } from './PalaceNodeComponent'
+export type PalaceNodeData = {
+  label: string
+  imageUrl: string
+  stations: PalaceStation[]
+  sourceNodeIds: string[]
+  expanded?: boolean
+  generating?: boolean
+}
+
+export type PalaceStation = {
+  order: number
+  content: string
+  anchorVisual: string
+  association?: string
+  x: number
+  y: number
+  linkedNodeId: string
+}
 class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   readonly typeId = 'palace'
-  readonly displayName = '记忆宫殿'
-  readonly group = 'core' as const
   readonly component = PalaceNodeComponent
-  readonly userCreatable = false
-  readonly contextMenuItems = [
-    { id: 'view-palace', label: '查看宫殿详情' },
-    { id: 'regenerate', label: '重新生成图片' },
-  ]
-
-  defaultData(): PalaceNodeData {
-    return { label: '', imageUrl: '', stations: [], sourceNodeIds: [] }
-  }
 
   serialize(data: PalaceNodeData) {
     return {

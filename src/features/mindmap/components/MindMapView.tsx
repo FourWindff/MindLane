@@ -42,6 +42,7 @@ import {
   withNewChild,
   withNewSibling,
 } from '@/shared/lib/mindmapTree'
+import { PalaceNodeData } from '../nodes/palace'
 
 const CHILD_OFFSET_X = 260
 const CHILD_GAP_Y = 24
@@ -66,6 +67,7 @@ type ContextMenuProps = {
   canRemove: boolean
   aiBusy: boolean
   selectedCount: number
+  palaceEnabled: boolean
 }
 
 function MindMapContextMenu({
@@ -81,6 +83,7 @@ function MindMapContextMenu({
   canRemove,
   aiBusy,
   selectedCount,
+  palaceEnabled,
 }: ContextMenuProps) {
   const run = (fn: () => void) => {
     fn()
@@ -131,7 +134,8 @@ function MindMapContextMenu({
             className="mindmap-ctx__item mindmap-ctx__item--accent"
             role="menuitem"
             onClick={() => run(() => onGeneratePalace?.())}
-            disabled={!onGeneratePalace || aiBusy}
+            disabled={!onGeneratePalace || aiBusy || !palaceEnabled}
+            title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
           >
             生成记忆宫殿{selectedCount > 1 ? ` (${selectedCount} 节点)` : ''}
           </button>
@@ -193,10 +197,12 @@ function SelectionActionBar({
   selectedTopicCount,
   onGeneratePalace,
   aiBusy,
+  palaceEnabled,
 }: {
   selectedTopicCount: number
   onGeneratePalace: () => void
   aiBusy: boolean
+  palaceEnabled: boolean
 }) {
   if (selectedTopicCount < 1 || aiBusy) return null
 
@@ -207,6 +213,8 @@ function SelectionActionBar({
         type="button"
         className="selection-bar__btn"
         onClick={onGeneratePalace}
+        disabled={!palaceEnabled}
+        title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
       >
         <Landmark size={14} strokeWidth={1.6} />
         生成记忆宫殿
@@ -235,6 +243,8 @@ function MindMapCanvas({
   const aiBusy = useAiStore((s) => s.busy)
   const apiKey = useSettingsStore((s) => s.apiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
+  const capabilities = useSettingsStore((s) => s.capabilities)
+  const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const dirty = useMindmapStore((s) => s.dirty)
   const filePath = useMindmapStore((s) => s.filePath)
@@ -244,7 +254,7 @@ function MindMapCanvas({
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const [palaceModal, setPalaceModal] = useState<import('@/shared/lib/fileFormat').PalaceNodeData | null>(null)
+  const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
   const graphRef = useRef({ nodes, edges })
@@ -309,7 +319,7 @@ function MindMapCanvas({
   const onNodeClick = useCallback(
     (_event: ReactMouseEvent, node: Node) => {
       if (node.type === 'palace') {
-        const pd = node.data as import('@/shared/lib/fileFormat').PalaceNodeData
+        const pd = node.data as PalaceNodeData
         if (pd.generating) return
         if (pd.expanded) {
           setPalaceModal(pd)
@@ -589,6 +599,82 @@ function MindMapCanvas({
     }
   }, [syncAfterFileSaved])
 
+  const [generationBusy, setGenerationBusy] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState<string | null>(null)
+
+  useEffect(() => {
+    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
+    if (!mindlane?.mindmap) return
+    const off = mindlane.mindmap.onGenerationProgress((progress) => {
+      if (progress.phase === 'error') {
+        setGenerationProgress(null)
+        return
+      }
+      if (progress.phase === 'done') {
+        setGenerationProgress(null)
+        return
+      }
+      const phaseLabel: Record<string, string> = {
+        preparing: '准备文件',
+        extracting: 'AI 提取大纲',
+        merging: '合并子树',
+        finalizing: '生成 YAML',
+        done: '完成',
+        error: '错误',
+      }
+      const label = phaseLabel[progress.phase] ?? progress.phase
+      setGenerationProgress(progress.message ? `${label} · ${progress.message}` : label)
+    })
+    return off
+  }, [])
+
+  const generateFromFile = useCallback(async () => {
+    if (aiBusy || generationBusy) return
+
+    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
+    if (!mindlane?.mindmap) {
+      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      return
+    }
+
+    const backendSettings = await mindlane.settings.load()
+    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
+    if (!currentKey?.trim()) {
+      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      return
+    }
+
+    setGenerationBusy(true)
+    setGenerationProgress('选择文件…')
+
+    try {
+      const result = await mindlane.mindmap.generateFromFile({})
+      if (!result.ok) {
+        if (!result.canceled) {
+          useAiStore.getState().setError(`生成失败：${result.error}`)
+        }
+        return
+      }
+
+      try {
+        useMindmapStore.getState().loadFromYaml(result.data.yamlContent, {
+          fileTitle: result.data.documentTitle,
+        })
+      } catch (e) {
+        useAiStore.getState().setError(
+          `YAML 解析失败：${e instanceof Error ? e.message : String(e)}`,
+        )
+      }
+    } catch (e) {
+      useAiStore.getState().setError(
+        `生成异常：${e instanceof Error ? e.message : String(e)}`,
+      )
+    } finally {
+      setGenerationBusy(false)
+      setGenerationProgress(null)
+    }
+  }, [aiBusy, apiKey, generationBusy])
+
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
   )
@@ -763,6 +849,8 @@ function MindMapCanvas({
         onSwitchWorkspace={onSwitchWorkspace}
         onAutoLayout={doAutoLayout}
         onSave={doSave}
+        onGenerateFromFile={generateFromFile}
+        generateFromFileBusy={generationBusy}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
       />
@@ -799,8 +887,17 @@ function MindMapCanvas({
           selectedTopicCount={selectedTopicIds.length}
           onGeneratePalace={generatePalace}
           aiBusy={aiBusy}
+          palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
+        {generationProgress && (
+          <div className="ai-progress-overlay">
+            <div className="ai-progress-overlay__card">
+              <div className="ai-progress-overlay__spinner" />
+              <span className="ai-progress-overlay__text">{generationProgress}</span>
+            </div>
+          </div>
+        )}
         {contextMenu ? (
           <MindMapContextMenu
             menu={contextMenu}
@@ -815,6 +912,7 @@ function MindMapCanvas({
             canRemove={canRemove}
             aiBusy={aiBusy}
             selectedCount={selectedTopicIds.length || 1}
+            palaceEnabled={palaceEnabled}
           />
         ) : null}
         {palaceModal && (
