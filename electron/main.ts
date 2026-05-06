@@ -426,66 +426,6 @@ function registerIpcHandlers() {
     }
   })
 
-  // -- Doc to MindMap pipeline (multi-agent: mindmapGen) --
-  ipcMain.handle(
-    'ai:doc-to-mindmap',
-    async (
-      _e,
-      payload: { apiKey: string; model: string; documentText: string; documentFilename: string },
-    ) => {
-      try {
-        const provider = await createProviderForRequest(payload.apiKey, payload.model)
-        const userDataPath = app.getPath('userData')
-        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
-        const result = await orchestrator.runMindmapFromDoc(
-          payload.documentText,
-          payload.documentFilename,
-        )
-        return {
-          ok: true,
-          nodes: result.nodes,
-          edges: result.edges,
-          documentTitle: result.documentTitle,
-        }
-      } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : String(e) }
-      }
-    },
-  )
-
-  // -- Document import --
-  ipcMain.handle('file:import-document', async () => {
-    if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
-    const result = await dialog.showOpenDialog(win, {
-      title: '导入文档',
-      defaultPath: settings.lastWorkspacePath ?? undefined,
-      filters: [
-        { name: '文本文档', extensions: ['txt', 'md', 'text'] },
-        { name: '所有文件', extensions: ['*'] },
-      ],
-      properties: ['openFile'],
-    })
-    if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
-    }
-    const filePath = result.filePaths[0]!
-    try {
-      const fs = await import('node:fs')
-      const pathMod = await import('node:path')
-      const content = await fs.promises.readFile(filePath, 'utf-8')
-      const filename = pathMod.default.basename(filePath)
-      const docId = crypto.randomUUID()
-      await fsService.cache.cacheDocumentText(docId, content)
-      return {
-        ok: true,
-        data: { docId, filename, content, filePath },
-      }
-    } catch (e) {
-      return { ok: false, error: `读取失败：${e instanceof Error ? e.message : String(e)}` }
-    }
-  })
-
   // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
     'ai:nodes-to-palace',

@@ -130,25 +130,6 @@ interface Window {
           }
         | { ok: false; error: string }
       >
-      docToMindmap: (payload: {
-        apiKey: string
-        model: string
-        documentText: string
-        documentFilename: string
-      }) => Promise<
-        | {
-            ok: true
-            nodes: {
-              id: string
-              type: string
-              position: { x: number; y: number }
-              data: Record<string, unknown>
-            }[]
-            edges: { id: string; source: string; target: string; type: string }[]
-            documentTitle: string
-          }
-        | { ok: false; error: string }
-      >
       listProviders: () => Promise<{
         chat: { id: string; displayName: string; models: { id: string; displayName: string }[]; capabilities: string[] }[]
         image: { id: string; displayName: string }[]
@@ -166,10 +147,6 @@ interface Window {
       >
     }
     file: {
-      importDocument: () => Promise<
-        | { ok: true; data: { docId: string; filename: string; content: string; filePath: string } }
-        | { ok: false; error: string }
-      >
       open: () => Promise<
         | { ok: true; data: { filePath: string; data: unknown } }
         | { ok: false; error: string }

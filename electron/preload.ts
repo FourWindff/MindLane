@@ -159,8 +159,6 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke('ai:text2image', payload),
     nodesToPalace: (payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] }) =>
       ipcRenderer.invoke('ai:nodes-to-palace', payload),
-    docToMindmap: (payload: { apiKey: string; model: string; documentText: string; documentFilename: string }) =>
-      ipcRenderer.invoke('ai:doc-to-mindmap', payload),
     listProviders: () => ipcRenderer.invoke('ai:list-providers'),
     getProviders: () => ipcRenderer.invoke('ai:get-providers'),
     getCapabilities: () => ipcRenderer.invoke('ai:get-capabilities'),
@@ -169,7 +167,6 @@ contextBridge.exposeInMainWorld('mindlane', {
   },
   file: {
     open: () => ipcRenderer.invoke('file:open'),
-    importDocument: () => ipcRenderer.invoke('file:import-document'),
     save: (payload: { filePath: string | null; data: unknown }) =>
       ipcRenderer.invoke('file:save', payload),
     saveAs: (payload: { data: unknown }) =>

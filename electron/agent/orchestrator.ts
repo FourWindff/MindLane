@@ -63,17 +63,7 @@ export interface ChatResponse {
   };
 }
 
-// HITL 数据类型
-export interface HITLMindmapData {
-  type: "mindmapGen_confirmation";
-  currentStructure: {
-    nodes: GeneratedNode[];
-    edges: GeneratedEdge[];
-    title: string;
-  };
-}
-
-export type HITLData = HITLInterruptData | HITLMindmapData;
+export type HITLData = HITLInterruptData;
 
 /**
  * 扩展的流回调接口，支持 HITL
@@ -109,12 +99,6 @@ export interface PalaceFromNodesError {
 }
 
 export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
-
-export interface MindmapFromDocResult {
-  nodes: GeneratedNode[];
-  edges: GeneratedEdge[];
-  documentTitle: string;
-}
 
 export class AgentOrchestrator {
   private sessionManager: SessionManager | null = null;
@@ -308,46 +292,6 @@ export class AgentOrchestrator {
     }
   }
 
-  async runMindmapFromDoc(
-    text: string,
-    title: string,
-  ): Promise<MindmapFromDocResult> {
-    const graph = this.buildMindmapGraph({ enableHITL: false });
-    const app = graph.compile();
-
-    const initialState: MainGraphStateType = {
-      messages: [],
-      context: null,
-      intent: "mindmap",
-      response: "",
-      error: "",
-      mindmapInputText: text,
-      mindmapInputTitle: title,
-      mindmapNodes: [],
-      mindmapEdges: [],
-      mindmapTitle: "",
-      interruptPoint: null,
-      userConfirmedPrompt: null,
-      userConfirmedStructure: null,
-      palaceInputText: "",
-      palaceInputNodes: [],
-      imageUrls: [],
-      memoryRoute: [],
-    };
-
-    const result = await app.invoke(initialState);
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    return {
-      nodes: result.mindmapNodes,
-      edges: result.mindmapEdges,
-      documentTitle: result.mindmapTitle,
-    };
-  }
-
   private buildGraph(
     _?: MindmapContextData,
     options: { enableHITL?: boolean } = {},
@@ -469,66 +413,6 @@ export class AgentOrchestrator {
     }
 
     graph.addEdge("tools", "supervisor");
-
-    return graph;
-  }
-
-  private buildMindmapGraph(options: { enableHITL?: boolean } = {}) {
-    const { enableHITL = false } = options;
-
-    // 使用工具构建supervisor来生成思维导图
-    const tools: StructuredToolInterface[] = [];
-    const profileText = this.aiService.userProfile.getText();
-    const supervisor = new MindLaneAgent(this.provider, tools, profileText);
-
-    const graph = new StateGraph(MainGraphState).addNode(
-      "supervisor",
-      (state) => supervisor.invoke(state),
-    );
-
-    // 基础边
-    graph.addEdge(START, "supervisor");
-
-    if (enableHITL) {
-      const hitlNode = async (
-        state: MainGraphStateType,
-      ): Promise<Partial<MainGraphStateType>> => {
-        if (state.userConfirmedStructure) {
-          return {
-            mindmapNodes: state.userConfirmedStructure.nodes,
-            mindmapEdges: state.userConfirmedStructure.edges,
-            mindmapTitle: state.userConfirmedStructure.title,
-            interruptPoint: null,
-          };
-        }
-
-        const interruptData: HITLMindmapData = {
-          type: "mindmapGen_confirmation",
-          currentStructure: {
-            nodes: state.mindmapNodes,
-            edges: state.mindmapEdges,
-            title: state.mindmapTitle,
-          },
-        };
-        throw new HITLInterruptError(
-          interruptData as unknown as HITLInterruptData,
-        );
-      };
-
-      graph.addNode("hitl_check", hitlNode);
-      graph.addConditionalEdges("supervisor", (state) => {
-        if (state.intent === "mindmap" && !state.userConfirmedStructure) {
-          return "hitl_check";
-        }
-        return END;
-      });
-      graph.addConditionalEdges("hitl_check" as never, (state) => {
-        if (state.error) return END;
-        return END;
-      });
-    } else {
-      graph.addEdge("supervisor", END);
-    }
 
     return graph;
   }
