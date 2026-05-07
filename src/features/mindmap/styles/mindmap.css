@@ -120,13 +120,14 @@
 }
 
 .mindmap-header__btn--ghost {
-  background: transparent;
-  color: var(--ml-text-muted);
+  background: var(--ml-bg-elevated);
+  color: var(--ml-text);
+  box-shadow: 0 0 0 1px var(--ml-border);
 }
 
 .mindmap-header__btn--ghost:hover:not(:disabled) {
-  background: var(--ml-fill-soft);
-  color: var(--ml-text);
+  background: #f5f5f5;
+  box-shadow: 0 0 0 1px var(--ml-border-strong);
 }
 
 .mindmap-header__btn:disabled {
