@@ -36,3 +36,4 @@ _bmad-output
 
 electron/lab/output
 tsconfig.node.tsbuildinfo
+.playwright-mcp

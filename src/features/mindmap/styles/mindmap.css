@@ -5,6 +5,7 @@
   min-height: 0;
   background: var(--ml-bg-elevated);
   color: var(--ml-text);
+  --ml-edge-stroke: #c8c8c8;
 }
 
 /* —— 自定义顶栏 —— */
@@ -263,8 +264,13 @@
   cursor: default;
 }
 
-.mindmap-canvas-wrap .react-flow__edge-path {
-  stroke: rgba(0, 0, 0, 0.22);
+.mindmap-canvas-wrap .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selected .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.updating .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selectable:focus .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+  stroke: var(--ml-edge-stroke);
+  shape-rendering: crispEdges;
 }
 
 .mindmap-canvas-wrap .react-flow__controls {
