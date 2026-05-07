@@ -61,4 +61,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 绝不要把 `node:*`、`electron`、原生模块导入渲染端代码——通过 IPC 调用主进程。
 - 跨进程的数据结构改动（`MindLaneFile` 等）必须同步检查主进程序列化和渲染端反序列化两侧。
 
+## 测试与验证
 
+- **Electron MCP 优先**：本项目已配置 `mcp__electron_*` 工具集（基于 Chrome DevTools Protocol），用于与运行中的 Electron 应用交互（截图、获取页面结构、执行 JS、发送键盘快捷键等）。
+- **禁止在 Electron 测试场景中使用 Playwright**：当需要与 Electron 应用 UI 交互、验证渲染进程行为或进行端到端验证时，必须使用 `mcp__electron_*` 工具，不得使用 `mcp__plugin_playwright_playwright__*` 工具。Playwright 的 Electron 支持与本项目的 `vite-plugin-electron/simple` 开发模式存在兼容性问题。
+- **主进程逻辑使用 Vitest**：纯主进程逻辑（`electron/agent/`、`electron/rag/` 等）继续使用 `npm test` 运行单元测试。
+- **验证流程**：
+  1. 启动应用：`npm run dev`
+  2. 使用 `mcp__electron__get_electron_window_info` 确认应用已连接
+  3. 使用 `mcp__electron__send_command_to_electron` 执行交互（`get_page_structure`、`click_by_text`、`fill_input` 等）
+  4. 使用 `mcp__electron__take_screenshot` 验证 UI 状态
