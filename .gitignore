@@ -27,7 +27,6 @@ release
 *.njsproj
 *.sln
 *.sw?
-.mcp.json
 
 _bmad
 _bmad-output
