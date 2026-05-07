@@ -597,6 +597,11 @@
     min-width: 280px;
   }
 
+  .workspace-layout__sidebar--collapsed {
+    width: 0;
+    min-width: 0;
+  }
+
   .workspace-home__hero,
   .workspace-home__recent {
     min-height: auto;
