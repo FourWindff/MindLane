@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
 import '../styles/side-panel.css'
 
-export type SidePanelTab = 'chat' | 'kb'
+export type SidePanelTab = 'chat'
 
 const TABS: { id: SidePanelTab; label: string }[] = [
   { id: 'chat', label: '对话' },
-  { id: 'kb', label: '知识库' },
 ]
 
 interface SidePanelProps {

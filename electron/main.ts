@@ -979,53 +979,6 @@ function registerIpcHandlers() {
     },
   )
 
-  // -- Knowledge Base --
-  ipcMain.handle('kb:upload-documents', async () => {
-    if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
-    const result = await dialog.showOpenDialog(win, {
-      title: '导入知识库文档',
-      defaultPath: settings.lastWorkspacePath ?? undefined,
-      filters: [
-        { name: '支持的文档', extensions: ['md', 'txt', 'pdf', 'docx', 'mindlane', 'png', 'jpg', 'jpeg', 'webp'] },
-        { name: '所有文件', extensions: ['*'] },
-      ],
-      properties: ['openFile', 'multiSelections'],
-    })
-    if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
-    }
-
-    const indexed = []
-
-    for (const filePath of result.filePaths) {
-      try {
-        const meta = await aiService.rag.index(filePath, (progress) => {
-          win?.webContents.send('kb:index-progress', progress)
-        })
-        indexed.push(meta)
-      } catch (err) {
-        win?.webContents.send('kb:index-progress', {
-          phase: 'error',
-          filename: path.basename(filePath),
-          progress: 0,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      }
-    }
-
-    return { ok: true, data: { indexed } }
-  })
-
-  ipcMain.handle('kb:list-documents', async () => {
-    return aiService.rag.list()
-  })
-
-  ipcMain.handle('kb:delete-document', async (_e, payload: { docId: string }) => {
-    const success = await aiService.rag.remove(payload.docId)
-    return success ? { ok: true } : { ok: false, error: '文档不存在' }
-  })
-
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {
     return fsService.settings.load()

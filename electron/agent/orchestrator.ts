@@ -299,18 +299,11 @@ export class AgentOrchestrator {
   ) {
     const { enableHITL = false } = options;
     const caps = this.provider.capabilities;
-    const hasEmbeddings = caps.has(ProviderCapability.Embeddings);
     const hasPalace =
       caps.has(ProviderCapability.ImageGen) &&
       caps.has(ProviderCapability.Vision);
 
-    // 条件化注册 RAG 工具
     const tools: StructuredToolInterface[] = [];
-    if (hasEmbeddings) {
-      const { listKnowledgeBaseTool, searchDocumentsTool } =
-        this.aiService.rag.createSearchTools();
-      tools.push(listKnowledgeBaseTool, searchDocumentsTool);
-    }
     const {
       addTopicNodeTool,
       addPalaceNodeTool,
@@ -331,7 +324,7 @@ export class AgentOrchestrator {
       this.provider,
       tools,
       profileText,
-      { hasEmbeddings, hasPalace },
+      { hasEmbeddings: false, hasPalace },
     );
 
     const graph = new StateGraph(MainGraphState)
