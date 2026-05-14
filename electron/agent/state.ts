@@ -44,7 +44,7 @@ export type MemoryPalaceStation = {
 
 export type GeneratedNode = {
   id: string
-  type: 'topic' | 'document'
+  type: 'text' | 'document'
   data: Record<string, unknown>
 }
 

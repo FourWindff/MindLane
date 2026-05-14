@@ -1,8 +1,8 @@
 import { PalaceNodeData } from '@/features/mindmap/nodes/palace'
-import { TopicNodeData } from '@/features/mindmap/nodes/topic'
+import { TextNodeData } from '@/features/mindmap/nodes/text'
 import type { Node } from '@xyflow/react'
 
-export type TopicNodeType = Node<TopicNodeData, 'topic'>
+export type TextNodeType = Node<TextNodeData, 'text'>
 export type PalaceNodeType = Node<PalaceNodeData, 'palace'>
 
-export type MindLaneNodeType = TopicNodeType | PalaceNodeType
+export type MindLaneNodeType = TextNodeType | PalaceNodeType

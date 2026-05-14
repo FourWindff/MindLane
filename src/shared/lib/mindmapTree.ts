@@ -1,4 +1,4 @@
-import { TopicNodeData } from '@/features/mindmap/nodes/topic'
+import { TextNodeData } from '@/features/mindmap/nodes/text'
 import type { Edge, Node } from '@xyflow/react'
 
 export function newId(): string {
@@ -9,7 +9,7 @@ export function createInitialNodes(): Node[] {
   return [
     {
       id: 'root',
-      type: 'topic',
+      type: 'text',
       position: { x: 0, y: 0 },
       data: { label: '中心主题' },
     },
@@ -153,7 +153,7 @@ export function withNewChild(
   nodes: Node[],
   edges: Edge[],
   parentId: string,
-  data: TopicNodeData,
+  data: TextNodeData,
   offsetX: number,
   gapY: number,
 ): { nodes: Node[]; edges: Edge[]; newNodeId: string } {
@@ -163,7 +163,7 @@ export function withNewChild(
 
   const child: Node = {
     id: childId,
-    type: 'topic',
+    type: 'text',
     position: { x: parent.position.x + offsetX, y: parent.position.y },
     data: { ...data, justAdded: true },
   }
@@ -186,7 +186,7 @@ export function withNewSibling(
   nodes: Node[],
   edges: Edge[],
   selectedId: string,
-  data: TopicNodeData,
+  data: TextNodeData,
   offsetX: number,
   gapY: number,
 ): { nodes: Node[]; edges: Edge[] } {

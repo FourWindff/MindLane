@@ -17,7 +17,7 @@ describe('yamlMindmapParser', () => {
       expect(result.nodes).toHaveLength(3)
       expect(result.edges).toHaveLength(2)
       expect(result.nodes[0]!.id).toBe('root')
-      expect(result.nodes[0]!.type).toBe('topic')
+      expect(result.nodes[0]!.type).toBe('text')
       expect((result.nodes[0]!.data as { label: string }).label).toBe('中心主题')
 
       const childLabels = result.nodes.slice(1).map((n) => (n.data as { label: string }).label)

@@ -4,7 +4,7 @@ import { z } from 'zod/v3'
 
 export interface ContextNodeInfo {
   id: string
-  type: 'topic' | 'palace' | 'document'
+  type: 'text' | 'palace' | 'document'
   label: string
   extra?: Record<string, unknown>
 }
@@ -28,8 +28,8 @@ export interface MindmapContextData {
 
 function formatNodeForLLM(n: ContextNodeInfo): string {
   switch (n.type) {
-    case 'topic':
-      return `[主题] ${n.label} (id: ${n.id})`
+    case 'text':
+      return `[文本] ${n.label} (id: ${n.id})`
     case 'palace': {
       const stationCount = n.extra?.stationCount ?? 0
       return `[记忆宫殿] ${n.label} (id: ${n.id}, ${stationCount}个站点)`

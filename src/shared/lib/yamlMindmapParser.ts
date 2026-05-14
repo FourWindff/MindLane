@@ -1,6 +1,6 @@
 import YAML from 'yaml'
 import type { Edge, Node } from '@xyflow/react'
-import type { TopicNodeData } from '@/features/mindmap/nodes/topic'
+import type { TextNodeData } from '@/features/mindmap/nodes/text'
 import { newId } from '@/shared/lib/mindmapTree'
 
 export interface MindmapYamlNode {
@@ -179,13 +179,13 @@ function buildGraph(
   isRoot: boolean,
 ): string {
   const id = isRoot ? 'root' : newId()
-  const data: TopicNodeData = { label: yamlNode.label }
+  const data: TextNodeData = { label: yamlNode.label }
   if (yamlNode.page_range) data.pageRange = yamlNode.page_range
   if (yamlNode.summary) data.summary = yamlNode.summary
 
   nodes.push({
     id,
-    type: 'topic',
+    type: 'text',
     position: { x: 0, y: 0 },
     data,
   })

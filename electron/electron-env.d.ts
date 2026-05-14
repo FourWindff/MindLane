@@ -20,7 +20,7 @@ type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
 
 type _ContextNodeInfo = {
   id: string
-  type: 'topic' | 'palace' | 'document'
+  type: 'text' | 'palace' | 'document'
   label: string
   extra?: Record<string, unknown>
 }

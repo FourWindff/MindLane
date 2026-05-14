@@ -303,7 +303,7 @@ function MindMapCanvas({
       if (aiBusy) return
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === nodeId && n.type === 'topic'
+          n.id === nodeId && n.type === 'text'
             ? { ...n, data: { ...n.data, editing: true } }
             : n.data.editing
               ? { ...n, data: { ...n.data, editing: undefined } }
@@ -414,7 +414,7 @@ function MindMapCanvas({
   useOnSelectionChange({
     onChange: ({ nodes: sel }) => {
       setSelectedId(sel[0]?.id ?? null)
-      setSelectedTopicIds(sel.filter((n) => n.type === 'topic').map((n) => n.id))
+      setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
     },
   })
 
@@ -711,12 +711,12 @@ function MindMapCanvas({
     }
 
     let selectedNodes = nodes
-      .filter((n) => n.selected && n.type === 'topic')
+      .filter((n) => n.selected && n.type === 'text')
       .map((n) => ({ id: n.id, label: String(n.data?.label ?? '') }))
 
     if (selectedNodes.length === 0 && selectedId) {
       const target = nodes.find((n) => n.id === selectedId)
-      if (target && target.type === 'topic') {
+      if (target && target.type === 'text') {
         selectedNodes = [{ id: target.id, label: String(target.data?.label ?? '') }]
       }
     }

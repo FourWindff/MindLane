@@ -4,8 +4,8 @@ import { z } from 'zod/v3'
 // AI 操作 Mindmap 节点的工具集
 // 方案一：AI 返回操作指令，前端执行
 
-// ========== 添加 Topic 节点 ==========
-const addTopicNodeTool = tool(
+// ========== 添加 Text 节点 ==========
+const addTextNodeTool = tool(
   async ({ parentId, label, palaceId }) => {
     if (!label.trim()) {
       return { ok: false, error: '节点标签不能为空' }
@@ -15,7 +15,7 @@ const addTopicNodeTool = tool(
       ok: true,
       action: 'addNode',
       data: {
-        type: 'topic' as const,
+        type: 'text' as const,
         parentId: parentId || undefined,
         nodeData: {
           label: label.trim(),
@@ -25,8 +25,8 @@ const addTopicNodeTool = tool(
     }
   },
   {
-    name: 'addTopicNode',
-    description: '在思维导图中添加一个新的主题节点。应该使用当前选中的节点ID作为父节点（通过 context.selectedNodes 获取），如果没有选中节点则不提供 parentId。',
+    name: 'addTextNode',
+    description: '在思维导图中添加一个新的文本节点。应该使用当前选中的节点ID作为父节点（通过 context.selectedNodes 获取），如果没有选中节点则不提供 parentId。',
     schema: z.object({
       parentId: z.string().optional().describe('父节点ID，应该从 context.selectedNodes[0].id 获取，不提供则添加到根节点'),
       label: z.string().describe('节点显示文本（必填）'),
@@ -100,13 +100,13 @@ const updateNodeTool = tool(
     const validatedChanges: Record<string, unknown> = {}
 
     switch (nodeType) {
-      case 'topic': {
-        const topicChanges = changes as { label?: string; palaceId?: string }
-        if (topicChanges.label !== undefined) {
-          validatedChanges.label = topicChanges.label
+      case 'text': {
+        const textChanges = changes as { label?: string; palaceId?: string }
+        if (textChanges.label !== undefined) {
+          validatedChanges.label = textChanges.label
         }
-        if (topicChanges.palaceId !== undefined) {
-          validatedChanges.palaceId = topicChanges.palaceId
+        if (textChanges.palaceId !== undefined) {
+          validatedChanges.palaceId = textChanges.palaceId
         }
         break
       }
@@ -146,7 +146,7 @@ const updateNodeTool = tool(
     description: '更新指定思维导图节点的属性。根据节点类型不同，可更新的字段也不同。',
     schema: z.object({
       nodeId: z.string().describe('要更新的节点ID（必填）'),
-      nodeType: z.enum(['topic', 'palace']).describe('节点类型（必填）'),
+      nodeType: z.enum(['text', 'palace']).describe('节点类型（必填）'),
       changes: z.record(z.unknown()).describe('要更新的字段对象'),
     }),
   }
@@ -203,7 +203,7 @@ const batchAddNodesTool = tool(
     description: '批量添加多个节点和边，用于生成完整的思维导图结构。',
     schema: z.object({
       nodes: z.array(z.object({
-        type: z.enum(['topic', 'palace']).describe('节点类型'),
+        type: z.enum(['text', 'palace']).describe('节点类型'),
         parentId: z.string().optional().describe('父节点ID'),
         nodeData: z.record(z.unknown()).describe('节点数据'),
       })).describe('节点列表'),
@@ -218,7 +218,7 @@ const batchAddNodesTool = tool(
 // 导出工具创建函数
 export function createMindmapActionTools() {
   return {
-    addTopicNodeTool,
+    addTextNodeTool,
     addPalaceNodeTool,
     updateNodeTool,
     deleteNodeTool,

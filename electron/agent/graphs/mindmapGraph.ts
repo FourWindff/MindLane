@@ -51,15 +51,15 @@ function flattenTree(
   points: KeyPoint[],
   parentId: string,
   genId: (prefix: string) => string,
-): { nodes: Array<{ id: string; type: 'topic'; data: { label: string } }>; edges: Array<{ id: string; source: string; target: string; type: string }> } {
-  const nodes: Array<{ id: string; type: 'topic'; data: { label: string } }> = []
+): { nodes: Array<{ id: string; type: 'text'; data: { label: string } }>; edges: Array<{ id: string; source: string; target: string; type: string }> } {
+  const nodes: Array<{ id: string; type: 'text'; data: { label: string } }> = []
   const edges: Array<{ id: string; source: string; target: string; type: string }> = []
 
   for (const point of points) {
-    const nodeId = genId('topic')
+    const nodeId = genId('text')
     nodes.push({
       id: nodeId,
-      type: 'topic',
+      type: 'text',
       data: { label: point.title },
     })
     edges.push({
@@ -150,7 +150,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
 
         const rootNode = {
           id: rootId,
-          type: 'topic' as const,
+          type: 'text' as const,
           data: { label: finalTitle },
         }
 

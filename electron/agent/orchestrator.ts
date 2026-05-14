@@ -305,14 +305,14 @@ export class AgentOrchestrator {
 
     const tools: StructuredToolInterface[] = [];
     const {
-      addTopicNodeTool,
+      addTextNodeTool,
       addPalaceNodeTool,
       updateNodeTool,
       deleteNodeTool,
       batchAddNodesTool,
     } = createMindmapActionTools();
     tools.push(
-      addTopicNodeTool,
+      addTextNodeTool,
       addPalaceNodeTool,
       updateNodeTool,
       deleteNodeTool,
@@ -540,7 +540,7 @@ export class AgentOrchestrator {
       }
       return {
         id: n.id,
-        type: "topic" as const,
+        type: "text" as const,
         position: { x: 0, y: 0 },
         data: { label: (n.data as { label?: string }).label ?? "" },
       };

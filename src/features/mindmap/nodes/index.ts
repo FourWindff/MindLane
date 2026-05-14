@@ -1,8 +1,8 @@
 import { nodeRegistry } from './registry'
-import { topicDescriptor } from './topic'
+import { textDescriptor } from './text'
 import { palaceDescriptor } from './palace'
 
-nodeRegistry.register(topicDescriptor)
+nodeRegistry.register(textDescriptor)
 nodeRegistry.register(palaceDescriptor)
 
 export { nodeRegistry } from './registry'

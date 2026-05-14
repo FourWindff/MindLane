@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { TopicNodeData } from '.'
+import { TextNodeData } from '.'
 
-function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
-  const data = rawData as TopicNodeData
+function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
+  const data = rawData as TextNodeData
   const { setNodes } = useReactFlow()
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -55,7 +55,7 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
 
   const onAnimationEnd = useCallback(
     (e: React.AnimationEvent<HTMLDivElement>) => {
-      if (!e.animationName.includes('topic-node-enter')) return
+      if (!e.animationName.includes('text-node-enter')) return
       setNodes((nds) =>
         nds.map((n) =>
           n.id === id && n.data.justAdded
@@ -68,12 +68,12 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
   )
 
   const className = [
-    'topic-node',
-    selected && 'topic-node--selected',
-    data.justAdded && 'topic-node--enter',
-    data.exiting && 'topic-node--exiting',
-    data.processing && 'topic-node--processing',
-    aiBusy && selected && !data.processing && 'topic-node--locked',
+    'text-node',
+    selected && 'text-node--selected',
+    data.justAdded && 'text-node--enter',
+    data.exiting && 'text-node--exiting',
+    data.processing && 'text-node--processing',
+    aiBusy && selected && !data.processing && 'text-node--locked',
   ]
     .filter(Boolean)
     .join(' ')
@@ -84,7 +84,7 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
       {editing && !aiBusy ? (
         <textarea
           ref={textareaRef}
-          className="topic-node__textarea"
+          className="text-node__textarea"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           onBlur={commit}
@@ -102,11 +102,11 @@ function TopicNodeInner({ id, data: rawData, selected }: NodeProps) {
           onClick={(e) => e.stopPropagation()}
         />
       ) : (
-        <span className="topic-node__label">{label}</span>
+        <span className="text-node__label">{label}</span>
       )}
       <Handle type="source" position={Position.Right} />
     </div>
   )
 }
 
-export const TopicNodeComponent = memo(TopicNodeInner)
+export const TextNodeComponent = memo(TextNodeInner)

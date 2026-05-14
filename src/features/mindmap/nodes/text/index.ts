@@ -1,7 +1,7 @@
 import { NodeTypeDescriptor } from '../types'
-import { TopicNodeComponent } from './TopicNodeComponent'
+import { TextNodeComponent } from './TextNodeComponent'
 
-export type TopicNodeData = {
+export type TextNodeData = {
   label: string
   palaceId?: string
   pageRange?: string
@@ -11,11 +11,11 @@ export type TopicNodeData = {
   editing?: boolean
   processing?: boolean
 }
-class TopicDescriptor extends NodeTypeDescriptor<TopicNodeData> {
-  readonly typeId = 'topic'
-  readonly component = TopicNodeComponent
+class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
+  readonly typeId = 'text'
+  readonly component = TextNodeComponent
 
-  serialize(data: TopicNodeData) {
+  serialize(data: TextNodeData) {
     return {
       label: data.label,
       ...(data.palaceId != null && { palaceId: data.palaceId }),
@@ -24,9 +24,9 @@ class TopicDescriptor extends NodeTypeDescriptor<TopicNodeData> {
     }
   }
 
-  deserialize(raw: unknown): TopicNodeData {
-    return raw as TopicNodeData
+  deserialize(raw: unknown): TextNodeData {
+    return raw as TextNodeData
   }
 }
 
-export const topicDescriptor = new TopicDescriptor()
+export const textDescriptor = new TextDescriptor()

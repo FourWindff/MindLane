@@ -1,8 +1,8 @@
 import { PalaceNodeData } from "@/features/mindmap/nodes/palace"
-import { TopicNodeData } from "@/features/mindmap/nodes/topic"
+import { TextNodeData } from "@/features/mindmap/nodes/text"
 
 export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace"
-export type { TopicNodeData }
+export type { TextNodeData }
 
 
 export interface MindLaneFile {
@@ -29,7 +29,7 @@ export interface MindLaneEdge {
 }
 
 export type MindLaneNode =
-  | { id: string; type: 'topic'; position: XY; data: TopicNodeData }
+  | { id: string; type: 'text'; position: XY; data: TextNodeData }
   | { id: string; type: 'palace'; position: XY; data: PalaceNodeData }
 
 export interface XY {
@@ -54,7 +54,7 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
       nodes: [
         {
           id: 'root',
-          type: 'topic',
+          type: 'text',
           position: { x: 0, y: 0 },
           data: { label: '中心主题' },
         },

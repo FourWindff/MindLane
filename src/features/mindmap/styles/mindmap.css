@@ -304,7 +304,7 @@
   cursor: default;
 }
 
-@keyframes topic-node-enter {
+@keyframes text-node-enter {
   from {
     opacity: 0;
     transform: scale(0.9);
@@ -317,7 +317,7 @@
   }
 }
 
-@keyframes topic-node-exit {
+@keyframes text-node-exit {
   from {
     opacity: 1;
     transform: scale(1);
@@ -330,7 +330,7 @@
   }
 }
 
-.topic-node {
+.text-node {
   min-width: 120px;
   max-width: 480px;
   padding: 0.55rem 0.75rem;
@@ -344,28 +344,28 @@
   transform-origin: center center;
 }
 
-.topic-node--enter {
-  animation: topic-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+.text-node--enter {
+  animation: text-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.topic-node--exiting {
+.text-node--exiting {
   pointer-events: none;
-  animation: topic-node-exit 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: text-node-exit 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
-.topic-node--selected {
+.text-node--selected {
   border-color: var(--ml-accent);
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.08),
     var(--ml-shadow-strong);
 }
 
-.topic-node__label {
+.text-node__label {
   display: block;
   word-break: break-word;
 }
 
-.topic-node__textarea {
+.text-node__textarea {
   field-sizing: content;
   display: block;
   min-width: 100%;
@@ -409,8 +409,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .topic-node--enter,
-  .topic-node--exiting {
+  .text-node--enter,
+  .text-node--exiting {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
@@ -547,13 +547,13 @@
 }
 
 /* —— Processing node: marching-ants border —— */
-.topic-node--processing {
+.text-node--processing {
   border-color: transparent !important;
   box-shadow: none !important;
   pointer-events: none;
 }
 
-.topic-node--processing::after {
+.text-node--processing::after {
   content: '';
   position: absolute;
   inset: -2px;
@@ -579,7 +579,7 @@
 }
 
 /* —— Locked node during AI —— */
-.topic-node--locked {
+.text-node--locked {
   opacity: 0.7;
   cursor: not-allowed;
 }
@@ -606,7 +606,7 @@
   color: #3b82f6;
   pointer-events: none;
   isolation: isolate;
-  animation: topic-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: text-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .palace-node-generating::before {

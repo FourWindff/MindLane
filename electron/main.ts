@@ -305,7 +305,7 @@ function registerIpcHandlers() {
                 ...payload.context,
                 selectedNodes: payload.context.selectedNodes?.map((n) => ({
                   ...n,
-                  type: n.type as 'topic' | 'palace' | 'document',
+                  type: n.type as 'text' | 'palace' | 'document',
                 })),
               }
             : undefined,
