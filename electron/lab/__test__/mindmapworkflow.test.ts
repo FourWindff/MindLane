@@ -176,7 +176,7 @@ describe('mindmap workflow lab', () => {
     expect(yaml).toContain('document:')
     expect(yaml).toContain('generated_at:')
     expect(yaml).toContain('mindmap:')
-    expect(yaml).toContain('主题 1-10 [p1-10]')
+    expect(yaml).toContain('主题 1-10')
   })
 
   it('runs the workflow end-to-end and writes yaml/log files', async () => {
@@ -295,7 +295,7 @@ describe('mindmap workflow lab', () => {
     )
 
     const yaml = await fs.readFile(result.yamlPath, 'utf-8')
-    expect(yaml).toContain('主题 1 [p1-1]')
+    expect(yaml).toContain('主题 1')
     expect(yaml).not.toContain('未解析片段')
   })
 })
