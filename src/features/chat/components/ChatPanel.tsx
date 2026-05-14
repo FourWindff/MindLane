@@ -12,19 +12,18 @@ import type {
   MindLaneNode,
   TopicNodeData,
   PalaceNodeData,
-  DocumentNodeData,
 } from '@/shared/lib/fileFormat'
 
 type ContextNodeInfo = {
   id: string
-  type: 'topic' | 'palace' | 'document'
+  type: 'topic' | 'palace'
   label: string
   extra?: Record<string, unknown>
 }
 
 function extractNodeInfo(node: Node): ContextNodeInfo {
   const data = node.data as Record<string, unknown>
-  const nodeType = (node.type ?? 'topic') as 'topic' | 'palace' | 'document'
+  const nodeType = (node.type ?? 'topic') as 'topic' | 'palace'
 
   switch (nodeType) {
     case 'palace': {
@@ -37,15 +36,6 @@ function extractNodeInfo(node: Node): ContextNodeInfo {
           stationCount: pd.stations?.length ?? 0,
           sourceNodeIds: pd.sourceNodeIds,
         },
-      }
-    }
-    case 'document': {
-      const dd = data as DocumentNodeData
-      return {
-        id: node.id,
-        type: 'document',
-        label: dd.filename || node.id,
-        extra: { excerpt: dd.excerpt },
       }
     }
     default: {
@@ -576,7 +566,7 @@ interface ToolCallResult {
 }
 
 interface AddNodeAction {
-  type: 'topic' | 'document' | 'palace'
+  type: 'topic' | 'palace'
   parentId?: string
   nodeData: Record<string, unknown>
 }
@@ -764,7 +754,6 @@ function handleMindmapToolCall(
 
 const MINDMAP_ACTION_TOOLS = [
   'addTopicNode',
-  'addDocumentNode',
   'addPalaceNode',
   'updateMindmapNode',
   'deleteMindmapNode',
@@ -782,7 +771,6 @@ function toolDisplayName(name: string): string {
     listWorkspaceFiles: '查看工作区文件',
     // Mindmap 操作工具
     addTopicNode: '添加主题节点',
-    addDocumentNode: '添加文档节点',
     addPalaceNode: '添加记忆宫殿',
     updateMindmapNode: '更新节点',
     deleteMindmapNode: '删除节点',

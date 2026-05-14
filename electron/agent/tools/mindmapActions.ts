@@ -35,39 +35,6 @@ const addTopicNodeTool = tool(
   }
 )
 
-// ========== 添加 Document 节点 ==========
-const addDocumentNodeTool = tool(
-  async ({ parentId, filename, excerpt, fullTextPath }) => {
-    if (!filename.trim()) {
-      return { ok: false, error: '文档文件名不能为空' }
-    }
-
-    return {
-      ok: true,
-      action: 'addNode',
-      data: {
-        type: 'document' as const,
-        parentId: parentId || undefined,
-        nodeData: {
-          filename: filename.trim(),
-          excerpt: excerpt || '',
-          ...(fullTextPath && { fullTextPath }),
-        },
-      },
-    }
-  },
-  {
-    name: 'addDocumentNode',
-    description: '在思维导图中添加一个文档引用节点，用于引用已导入的知识库文档。',
-    schema: z.object({
-      parentId: z.string().optional().describe('父节点ID，不提供则添加到根节点'),
-      filename: z.string().describe('文档文件名（必填）'),
-      excerpt: z.string().describe('文档摘要/节选内容'),
-      fullTextPath: z.string().optional().describe('完整文本文件路径（可选）'),
-    }),
-  }
-)
-
 // ========== 添加 Palace 节点 ==========
 const addPalaceNodeTool = tool(
   async ({ parentId, label, imageUrl, stations, sourceNodeIds }) => {
@@ -143,19 +110,6 @@ const updateNodeTool = tool(
         }
         break
       }
-      case 'document': {
-        const docChanges = changes as { filename?: string; excerpt?: string; fullTextPath?: string }
-        if (docChanges.filename !== undefined) {
-          validatedChanges.filename = docChanges.filename
-        }
-        if (docChanges.excerpt !== undefined) {
-          validatedChanges.excerpt = docChanges.excerpt
-        }
-        if (docChanges.fullTextPath !== undefined) {
-          validatedChanges.fullTextPath = docChanges.fullTextPath
-        }
-        break
-      }
       case 'palace': {
         const palaceChanges = changes as {
           label?: string
@@ -192,7 +146,7 @@ const updateNodeTool = tool(
     description: '更新指定思维导图节点的属性。根据节点类型不同，可更新的字段也不同。',
     schema: z.object({
       nodeId: z.string().describe('要更新的节点ID（必填）'),
-      nodeType: z.enum(['topic', 'document', 'palace']).describe('节点类型（必填）'),
+      nodeType: z.enum(['topic', 'palace']).describe('节点类型（必填）'),
       changes: z.record(z.unknown()).describe('要更新的字段对象'),
     }),
   }
@@ -249,7 +203,7 @@ const batchAddNodesTool = tool(
     description: '批量添加多个节点和边，用于生成完整的思维导图结构。',
     schema: z.object({
       nodes: z.array(z.object({
-        type: z.enum(['topic', 'document', 'palace']).describe('节点类型'),
+        type: z.enum(['topic', 'palace']).describe('节点类型'),
         parentId: z.string().optional().describe('父节点ID'),
         nodeData: z.record(z.unknown()).describe('节点数据'),
       })).describe('节点列表'),
@@ -265,7 +219,6 @@ const batchAddNodesTool = tool(
 export function createMindmapActionTools() {
   return {
     addTopicNodeTool,
-    addDocumentNodeTool,
     addPalaceNodeTool,
     updateNodeTool,
     deleteNodeTool,

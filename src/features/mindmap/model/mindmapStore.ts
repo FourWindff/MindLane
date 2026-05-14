@@ -187,8 +187,6 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
           const stations = Array.isArray(data.stations) ? data.stations : []
           return `[宫殿] ${data.label ?? node.id} (${stations.length}个站点)`
         }
-        case 'document':
-          return `[文档] ${data.filename ?? node.id}${data.excerpt ? ` — ${String(data.excerpt).slice(0, 60)}` : ''}`
         default:
           return String(data.label ?? node.id)
       }

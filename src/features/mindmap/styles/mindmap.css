@@ -889,60 +889,6 @@
   color: #fbbf24;
 }
 
-/* —— Document Node —— */
-.document-node {
-  min-width: 140px;
-  max-width: 220px;
-  padding: 0.5rem 0.65rem;
-  border-radius: 10px;
-  background: var(--ml-bg-elevated);
-  border: 2px dashed var(--ml-border-strong);
-  box-shadow: var(--ml-shadow);
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.document-node--selected {
-  border-color: var(--ml-accent);
-  box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.08),
-    var(--ml-shadow-strong);
-}
-
-.document-node__icon {
-  flex-shrink: 0;
-  color: var(--ml-text-muted);
-  padding-top: 0.1rem;
-}
-
-.document-node__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.document-node__name {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--ml-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.document-node__excerpt {
-  font-size: 0.72rem;
-  color: var(--ml-text-muted);
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 /* ========== Palace Modal ========== */
 .palace-modal__overlay {
   position: fixed;

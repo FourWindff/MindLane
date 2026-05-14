@@ -313,7 +313,6 @@ export class AgentOrchestrator {
     }
     const {
       addTopicNodeTool,
-      addDocumentNodeTool,
       addPalaceNodeTool,
       updateNodeTool,
       deleteNodeTool,
@@ -321,7 +320,6 @@ export class AgentOrchestrator {
     } = createMindmapActionTools();
     tools.push(
       addTopicNodeTool,
-      addDocumentNodeTool,
       addPalaceNodeTool,
       updateNodeTool,
       deleteNodeTool,

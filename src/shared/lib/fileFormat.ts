@@ -1,8 +1,6 @@
-import { DocumentNodeData } from "@/features/mindmap/nodes/document"
 import { PalaceNodeData } from "@/features/mindmap/nodes/palace"
 import { TopicNodeData } from "@/features/mindmap/nodes/topic"
 
-export type { DocumentNodeData }
 export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace"
 export type { TopicNodeData }
 
@@ -33,7 +31,6 @@ export interface MindLaneEdge {
 export type MindLaneNode =
   | { id: string; type: 'topic'; position: XY; data: TopicNodeData }
   | { id: string; type: 'palace'; position: XY; data: PalaceNodeData }
-  | { id: string; type: 'document'; position: XY; data: DocumentNodeData }
 
 export interface XY {
   x: number

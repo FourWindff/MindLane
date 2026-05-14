@@ -24,29 +24,6 @@ export function PropertiesPanel() {
     return <PalaceProperties nodeId={node.id} data={node.data as PalaceNodeData} />
   }
 
-  if (node.type === 'document') {
-    const data = node.data as { filename?: string; excerpt?: string }
-    return (
-      <div>
-        <div className="panel-section">
-          <div className="panel-section__title">文档节点</div>
-          <div className="panel-field">
-            <span className="panel-field__label">文件名</span>
-            <span style={{ fontSize: '0.85rem' }}>{data.filename || '未知'}</span>
-          </div>
-          {data.excerpt && (
-            <div className="panel-field">
-              <span className="panel-field__label">摘要</span>
-              <p style={{ fontSize: '0.8rem', margin: 0, lineHeight: 1.4, color: 'var(--ml-text-muted)' }}>
-                {data.excerpt}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   const data = node.data as { label?: string }
   return (
     <div>
