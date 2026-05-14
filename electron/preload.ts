@@ -52,21 +52,6 @@ type ChatSessionMeta = {
 
 type SelectedNodeContent = { id: string; label: string }
 
-type IndexedDocMeta = {
-  id: string
-  filename: string
-  filePath: string
-  indexedAt: string
-  chunkCount: number
-}
-
-type IndexProgress = {
-  phase: 'loading' | 'splitting' | 'embedding' | 'done' | 'error'
-  filename: string
-  progress: number
-  error?: string
-}
-
 type MindmapGenerationProgress = {
   phase: 'preparing' | 'extracting' | 'merging' | 'finalizing' | 'done' | 'error'
   filename: string
@@ -240,23 +225,6 @@ contextBridge.exposeInMainWorld('mindlane', {
     }) => ipcRenderer.invoke('chat:save-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     deleteSession: (payload: { workspacePath: string; sessionId: string }) =>
       ipcRenderer.invoke('chat:delete-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
-  },
-  kb: {
-    uploadDocuments: () =>
-      ipcRenderer.invoke('kb:upload-documents') as Promise<
-        { ok: true; data: { indexed: IndexedDocMeta[] } } | { ok: false; error: string }
-      >,
-    listDocuments: () =>
-      ipcRenderer.invoke('kb:list-documents') as Promise<IndexedDocMeta[]>,
-    deleteDocument: (payload: { docId: string }) =>
-      ipcRenderer.invoke('kb:delete-document', payload) as Promise<
-        { ok: true } | { ok: false; error: string }
-      >,
-    onIndexProgress: (callback: (progress: IndexProgress) => void) => {
-      const handler = (_event: unknown, progress: IndexProgress) => callback(progress)
-      ipcRenderer.on('kb:index-progress', handler)
-      return () => { ipcRenderer.off('kb:index-progress', handler) }
-    },
   },
   mindmap: {
     generateFromFile: (payload: { filePath?: string | null } = {}) =>

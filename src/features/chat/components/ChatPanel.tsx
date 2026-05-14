@@ -762,8 +762,6 @@ const MINDMAP_ACTION_TOOLS = [
 
 function toolDisplayName(name: string): string {
   const map: Record<string, string> = {
-    searchDocuments: '检索知识库',
-    listKnowledgeBase: '查看知识库',
     generateMindmap: '生成思维导图',
     generatePalace: '生成记忆宫殿',
     getMindmapContext: '读取导图',

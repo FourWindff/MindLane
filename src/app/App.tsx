@@ -4,7 +4,6 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ChatPanel } from '@/features/chat/components/ChatPanel'
-import { KnowledgeBasePanel } from '@/features/knowledge-base/components/KnowledgeBasePanel'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { WorkspaceSidebar } from '@/features/workspace/components/WorkspaceSidebar'
 import {
@@ -144,7 +143,6 @@ function AppContent() {
               >
                 {{
                   chat: <ChatPanel />,
-                  kb: <KnowledgeBasePanel />,
                 }}
               </SidePanel>
             </div>

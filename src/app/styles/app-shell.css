@@ -8,14 +8,17 @@
 
 .app-frame__content {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
+  overflow: hidden;
 }
 
 .app-shell {
   display: flex;
   flex: 1;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   background: var(--ml-bg);
 }
