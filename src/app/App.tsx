@@ -12,11 +12,11 @@ import {
   useWorkspaceStore,
 } from '@/features/workspace/store'
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
-import { SidePanel, type SidePanelTab } from '@/features/shell/components/SidePanel'
 import { ShortcutRegistryProvider, useShortcut } from '@/shared/shortcuts'
 import './styles/app-shell.css'
 import '@/features/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
+import '@/features/chat/styles/chat-panel.css'
 
 function WorkspaceEmptyState() {
   const busy = useWorkspaceStore((s) => s.busy)
@@ -56,8 +56,6 @@ function WorkspaceEmptyState() {
 
 function AppContent() {
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true)
-  const [sidePanelOpen, setSidePanelOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<SidePanelTab>('chat')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
   const workspaceInitialized = useWorkspaceStore((s) => s.initialized)
@@ -66,7 +64,6 @@ function AppContent() {
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
   const canToggleLeftSidebar = Boolean(workspacePath)
-  const canToggleRightSidebar = Boolean(workspacePath && hasDocumentOpen)
 
   useEffect(() => {
     void loadSettingsFromBackend()
@@ -102,14 +99,11 @@ function AppContent() {
     <div className="app-frame">
       <AppWindowBar
         canToggleLeftSidebar={canToggleLeftSidebar}
-        canToggleRightSidebar={canToggleRightSidebar}
+        canToggleRightSidebar={false}
         leftSidebarOpen={leftSidebarOpen}
-        rightSidebarOpen={canToggleRightSidebar && sidePanelOpen}
+        rightSidebarOpen={false}
         onToggleLeftSidebar={() => setLeftSidebarOpen((open) => !open)}
-        onToggleRightSidebar={() => {
-          if (!canToggleRightSidebar) return
-          setSidePanelOpen((open) => !open)
-        }}
+        onToggleRightSidebar={() => {}}
       />
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (
@@ -136,16 +130,8 @@ function AppContent() {
                   <WorkspaceEmptyState />
                 )}
               </main>
-              <SidePanel
-                open={canToggleRightSidebar && sidePanelOpen}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              >
-                {{
-                  chat: <ChatPanel />,
-                }}
-              </SidePanel>
             </div>
+            {hasDocumentOpen && <ChatPanel />}
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
           </div>
         )}
