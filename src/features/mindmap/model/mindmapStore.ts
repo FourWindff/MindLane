@@ -185,10 +185,10 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       switch (node.type) {
         case 'palace': {
           const stations = Array.isArray(data.stations) ? data.stations : []
-          return `[宫殿] ${data.label ?? node.id} (${stations.length}个站点)`
+          return `[宫殿] ${data.label ?? node.id} (id: ${node.id}, ${stations.length}个站点)`
         }
         default:
-          return String(data.label ?? node.id)
+          return `${String(data.label ?? node.id)} (id: ${node.id})`
       }
     }
 

@@ -26,9 +26,9 @@ const addTextNodeTool = tool(
   },
   {
     name: 'addTextNode',
-    description: '在思维导图中添加一个新的文本节点。应该使用当前选中的节点ID作为父节点（通过 context.selectedNodes 获取），如果没有选中节点则不提供 parentId。',
+    description: '在思维导图中添加一个新的文本节点。parentId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id），如果没有明确的父节点则不提供 parentId（会添加到根节点）。',
     schema: z.object({
-      parentId: z.string().optional().describe('父节点ID，应该从 context.selectedNodes[0].id 获取，不提供则添加到根节点'),
+      parentId: z.string().optional().describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
       label: z.string().describe('节点显示文本（必填）'),
       palaceId: z.string().optional().describe('关联的记忆宫殿ID（可选）'),
     }),
@@ -72,7 +72,7 @@ const addPalaceNodeTool = tool(
     name: 'addPalaceNode',
     description: '在思维导图中添加一个记忆宫殿节点。记忆宫殿包含多个站点，每个站点关联一个记忆内容。',
     schema: z.object({
-      parentId: z.string().optional().describe('父节点ID，不提供则添加到根节点'),
+      parentId: z.string().optional().describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
       label: z.string().describe('宫殿名称（必填）'),
       imageUrl: z.string().optional().describe('宫殿图片URL'),
       stations: z.array(z.object({
@@ -143,9 +143,9 @@ const updateNodeTool = tool(
   },
   {
     name: 'updateMindmapNode',
-    description: '更新指定思维导图节点的属性。根据节点类型不同，可更新的字段也不同。',
+    description: '更新指定思维导图节点的属性。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。',
     schema: z.object({
-      nodeId: z.string().describe('要更新的节点ID（必填）'),
+      nodeId: z.string().describe('要更新的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
       nodeType: z.enum(['text', 'palace']).describe('节点类型（必填）'),
       changes: z.record(z.unknown()).describe('要更新的字段对象'),
     }),
@@ -170,9 +170,9 @@ const deleteNodeTool = tool(
   },
   {
     name: 'deleteMindmapNode',
-    description: '删除指定的思维导图节点。如果该节点有子节点，默认会一并删除其子树。',
+    description: '删除指定的思维导图节点。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。如果该节点有子节点，默认会一并删除其子树。',
     schema: z.object({
-      nodeId: z.string().describe('要删除的节点ID（必填）'),
+      nodeId: z.string().describe('要删除的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
       confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
     }),
   }
