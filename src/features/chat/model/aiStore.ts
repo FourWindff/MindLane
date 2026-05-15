@@ -48,6 +48,9 @@ interface AiState {
   sessions: ChatSession[]
   showSessionList: boolean
 
+  // Float panel
+  isMinimized: boolean
+
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
   setProgress: (progress: number) => void
@@ -67,6 +70,9 @@ interface AiState {
   setShowSessionList: (show: boolean) => void
   loadSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
+
+  // Float panel
+  setIsMinimized: (val: boolean) => void
 }
 
 export const useAiStore = create<AiState>((set, get) => ({
@@ -80,6 +86,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   workspacePath: null,
   sessions: [],
   showSessionList: false,
+  isMinimized: false,
 
   setBusy: (busy) => set({ busy }),
   setStep: (step) => set({ step }),
@@ -105,6 +112,7 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   setSessions: (sessions) => set({ sessions }),
   setShowSessionList: (show) => set({ showSessionList: show }),
+  setIsMinimized: (val) => set({ isMinimized: val }),
 
   loadSession: async (sessionId: string) => {
     const state = get()

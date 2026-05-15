@@ -1,5 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Info, HelpCircle, Sparkles, Check, Square, Send, Plus, History, X, Trash2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
+import { useShallow } from 'zustand/react/shallow'
+import {
+  Sparkles,
+  Check,
+  Square,
+  Send,
+  Plus,
+  History,
+  X,
+  Trash2,
+  Bot,
+  ChevronRight,
+  SlidersHorizontal,
+  Mic,
+} from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Node, Edge } from '@xyflow/react'
@@ -13,6 +28,7 @@ import type {
   TextNodeData,
   PalaceNodeData,
 } from '@/shared/lib/fileFormat'
+import '../styles/chat-panel.css'
 
 type ContextNodeInfo = {
   id: string
@@ -55,6 +71,8 @@ export function ChatPanel() {
   const threadId = useAiStore((s) => s.threadId)
   const messages = useAiStore((s) => s.chatMessages)
   const busy = useAiStore((s) => s.busy)
+  const isMinimized = useAiStore((s) => s.isMinimized)
+  const setIsMinimized = useAiStore((s) => s.setIsMinimized)
   const addMessage = useAiStore((s) => s.addChatMessage)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const sessions = useAiStore((s) => s.sessions)
@@ -281,7 +299,7 @@ export function ChatPanel() {
     // 使用新的接口：只传递当前消息，后端会自动加载历史
     await api.chatStream({
       threadId,
-      message: text,  // 当前用户输入
+      message: text,
       context,
     })
   }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext])
@@ -334,128 +352,212 @@ export function ChatPanel() {
     void deleteSession(sessionId)
   }, [deleteSession])
 
-  if (!apiKey) {
+  // 获取选中的节点标签 - 使用 useShallow 避免无限循环
+  const selectedNodes = useMindmapStore(
+    useShallow((s) => s.nodes.filter((n) => n.selected))
+  )
+  const clearNodeSelection = useCallback(() => {
+    const store = useMindmapStore.getState()
+    store.setNodes(store.nodes.map((n) => ({ ...n, selected: false })))
+  }, [])
+
+  // 快捷操作
+  const quickActions = [
+    { label: '生成思维导图', prompt: '请帮我生成一个思维导图' },
+    { label: '总结内容', prompt: '请总结当前思维导图的内容' },
+    { label: '头脑风暴', prompt: '请帮我进行头脑风暴，生成一些创意想法' },
+    { label: '优化结构', prompt: '请帮我优化当前思维导图的结构' },
+  ]
+
+  const handleQuickAction = useCallback((prompt: string) => {
+    if (inputRef.current) {
+      inputRef.current.value = prompt
+      inputRef.current.focus()
+    }
+  }, [])
+
+  // 最小化 FAB
+  if (isMinimized) {
     return (
-      <div className="chat-panel">
-        <div className="chat-empty">
-          <div className="chat-empty__icon">
-            <Info size={32} strokeWidth={1.5} />
-          </div>
-          <p>请先在「设置」中填写 API Key</p>
-        </div>
-      </div>
+      <motion.button
+        type="button"
+        className="chat-float-fab"
+        onClick={() => setIsMinimized(false)}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0, opacity: 0 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      >
+        <Bot size={36} strokeWidth={1.5} className="chat-float-fab__icon" />
+        <span className={`chat-float-fab__status chat-float-fab__status--${busy ? 'busy' : 'idle'}`} />
+        {busy && (
+          <svg className="chat-float-fab__progress" viewBox="0 0 88 88">
+            <circle
+              className="chat-float-fab__progress-circle"
+              cx="44"
+              cy="44"
+              r="42"
+              strokeDasharray={2 * Math.PI * 42}
+              strokeDashoffset={2 * Math.PI * 42 * (1 - useAiStore.getState().progress / 100)}
+            />
+          </svg>
+        )}
+        <span className="chat-float-fab__tooltip">Neural Assistant</span>
+      </motion.button>
     )
   }
 
+  // 展开面板
   return (
-    <div className="chat-panel">
-      {/* Chat Header */}
-      <div className="chat-header">
-        <button
-          type="button"
-          className={`chat-header__history-btn${showSessionList ? ' chat-header__history-btn--active' : ''}`}
-          onClick={toggleSessionList}
-          disabled={busy}
-          title="查看历史对话"
-        >
-          <History size={14} strokeWidth={2} />
-          <span>历史</span>
-        </button>
-        <button
-          type="button"
-          className="chat-header__new-btn"
-          onClick={startNewChat}
-          disabled={busy}
-          title="创建新对话"
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>新对话</span>
-        </button>
+    <motion.div
+      className="chat-float-panel"
+      initial={{ x: 400, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: 400, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+    >
+      {/* Header */}
+      <div className="chat-float-header">
+        <div className="chat-float-header__status">
+          <span className="chat-float-header__pulse" />
+          <span className="chat-float-header__label">SYNC_ACTIVE</span>
+        </div>
+        <div className="chat-float-header__actions">
+          <button
+            type="button"
+            className={`chat-float-header__btn${showSessionList ? ' chat-float-header__btn--active' : ''}`}
+            onClick={toggleSessionList}
+            disabled={busy}
+            title="查看历史对话"
+          >
+            <History size={14} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="chat-float-header__btn"
+            onClick={startNewChat}
+            disabled={busy}
+            title="创建新对话"
+          >
+            <Plus size={14} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="chat-float-header__close"
+            onClick={() => setIsMinimized(true)}
+            title="收起面板"
+          >
+            <ChevronRight size={18} strokeWidth={2} />
+          </button>
+        </div>
       </div>
 
       {/* Session List */}
-      {showSessionList && (
-        <div className="chat-session-list">
-          <div className="chat-session-list__header">
-            <span>历史对话</span>
-            <button
-              type="button"
-              className="chat-session-list__close"
-              onClick={() => setShowSessionList(false)}
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-          </div>
-          <div className="chat-session-list__content">
-            {sessions.length === 0 ? (
-              <div className="chat-session-list__empty">暂无历史对话</div>
-            ) : (
-              sessions.map((session) => (
-                <div
-                  key={session.id}
-                  className={`chat-session-item${session.id === threadId ? ' chat-session-item--active' : ''}`}
-                  onClick={() => handleLoadSession(session.id)}
-                >
-                  <div className="chat-session-item__info">
-                    <span className="chat-session-item__title">{session.title}</span>
-                    <span className="chat-session-item__meta">
-                      {new Date(session.updatedAt).toLocaleString('zh-CN', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {' · '}
-                      {session.messageCount} 条消息
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="chat-session-item__delete"
-                    onClick={(e) => handleDeleteSession(session.id, e)}
-                    title="删除对话"
+      <AnimatePresence>
+        {showSessionList && (
+          <motion.div
+            className="chat-float-session-list"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="chat-float-session-list__header">
+              <span>历史对话</span>
+              <button
+                type="button"
+                className="chat-float-session-list__close"
+                onClick={() => setShowSessionList(false)}
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            </div>
+            <div className="chat-float-session-list__content">
+              {sessions.length === 0 ? (
+                <div className="chat-float-session-list__empty">暂无历史对话</div>
+              ) : (
+                sessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className={`chat-float-session-item${session.id === threadId ? ' chat-float-session-item--active' : ''}`}
+                    onClick={() => handleLoadSession(session.id)}
                   >
-                    <Trash2 size={14} strokeWidth={2} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+                    <div className="chat-float-session-item__info">
+                      <span className="chat-float-session-item__title">{session.title}</span>
+                      <span className="chat-float-session-item__meta">
+                        {new Date(session.updatedAt).toLocaleString('zh-CN', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                        {' · '}
+                        {session.messageCount} 条消息
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className="chat-float-session-item__delete"
+                      onClick={(e) => handleDeleteSession(session.id, e)}
+                      title="删除对话"
+                    >
+                      <Trash2 size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Messages */}
-      <div ref={scrollRef} className="chat-messages">
+      <div ref={scrollRef} className="chat-float-messages">
         {messages.length === 0 && !streamingText && (
-          <div className="chat-empty">
-            <div className="chat-empty__icon">
-              <HelpCircle size={28} strokeWidth={1.5} />
+          <div className="chat-float-empty">
+            <div className="chat-float-empty__icon">
+              <Bot size={24} strokeWidth={1.5} />
             </div>
-            <p>输入消息开始对话</p>
-            <span className="chat-empty__hint">{emptyHint}</span>
+            <h3 className="chat-float-empty__title">Neural Assistant</h3>
+            <span className="chat-float-empty__hint">{emptyHint}</span>
+            <div className="chat-float-empty__actions">
+              {quickActions.map((action) => (
+                <button
+                  key={action.label}
+                  type="button"
+                  className="chat-float-empty__action"
+                  onClick={() => handleQuickAction(action.prompt)}
+                >
+                  <Sparkles size={12} strokeWidth={2} />
+                  {action.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         {messages.map((msg, i) => (
-          <div key={i} className={`chat-bubble-row ${msg.role === 'user' ? 'chat-bubble-row--user' : 'chat-bubble-row--ai'}`}>
+          <div key={i} className={`chat-float-bubble-row ${msg.role === 'user' ? 'chat-float-bubble-row--user' : 'chat-float-bubble-row--ai'}`}>
             {msg.role !== 'user' && (
-              <div className="chat-avatar chat-avatar--ai">
+              <div className="chat-float-avatar chat-float-avatar--ai">
                 <Sparkles size={14} strokeWidth={1.8} />
               </div>
             )}
             {msg.role === 'user' ? (
-              <div className="chat-bubble chat-bubble--user">
+              <div className="chat-float-bubble chat-float-bubble--user">
                 <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
               </div>
             ) : (
-              <div className="chat-message-group">
-                <div className="chat-bubble chat-bubble--ai">
+              <div className="chat-float-message-group">
+                <div className="chat-float-bubble chat-float-bubble--ai">
                   <MarkdownContent content={msg.content} />
                 </div>
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
-                  <div className="chat-tool-calls">
+                  <div className="chat-float-tool-calls">
                     {msg.toolCalls.map((tc, j) => (
-                      <div key={j} className="chat-tool-tag">
+                      <div key={j} className="chat-float-tool-tag">
                         <Check size={11} strokeWidth={2} />
                         <span>{toolDisplayName(tc.name)}</span>
                       </div>
@@ -469,29 +571,29 @@ export function ChatPanel() {
 
         {/* Streaming area */}
         {busy && (
-          <div className="chat-bubble-row chat-bubble-row--ai">
-            <div className="chat-avatar chat-avatar--ai">
+          <div className="chat-float-bubble-row chat-float-bubble-row--ai">
+            <div className="chat-float-avatar chat-float-avatar--ai">
               <Sparkles size={14} strokeWidth={1.8} />
             </div>
-            <div className={`chat-streaming-group${streamingText ? '' : ' chat-streaming-group--thinking'}`}>
+            <div className={`chat-float-streaming-group${streamingText ? '' : ' chat-float-streaming-group--thinking'}`}>
               {activeTools.length > 0 && (
-                <div className="chat-tool-calls chat-tool-calls--active">
+                <div className="chat-float-tool-calls chat-float-tool-calls--active">
                   {activeTools.map((name, i) => (
-                    <div key={i} className="chat-tool-tag chat-tool-tag--active">
-                      <span className="chat-spinner" />
+                    <div key={i} className="chat-float-tool-tag chat-float-tool-tag--active">
+                      <span className="chat-float-spinner" />
                       <span>{toolDisplayName(name)}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className={`chat-bubble chat-bubble--ai chat-bubble--streaming${streamingText ? '' : ' chat-bubble--thinking'}`}>
+              <div className={`chat-float-bubble chat-float-bubble--ai chat-float-bubble--streaming${streamingText ? '' : ' chat-float-bubble--thinking'}`}>
                 {streamingText ? (
                   <MarkdownContent content={streamingText} />
                 ) : (
-                  <div className="chat-thinking">
-                    <span className="chat-thinking__dot" />
-                    <span className="chat-thinking__dot" />
-                    <span className="chat-thinking__dot" />
+                  <div className="chat-float-thinking">
+                    <span className="chat-float-thinking__dot" />
+                    <span className="chat-float-thinking__dot" />
+                    <span className="chat-float-thinking__dot" />
                   </div>
                 )}
               </div>
@@ -501,47 +603,80 @@ export function ChatPanel() {
       </div>
 
       {/* Input area */}
-      <div className="chat-input-area">
-        <div className="chat-input-wrap">
-          <textarea
-            ref={inputRef}
-            onKeyDown={handleKeyDown}
-            onChange={handleInputChange}
-            placeholder="输入消息…"
-            disabled={busy}
-            rows={inputRows}
-            className="chat-input"
-          />
-          {busy ? (
-            <button
-              type="button"
-              className="chat-action-btn chat-action-btn--stop"
-              onClick={stop}
-              title="停止生成"
-            >
-              <Square size={18} fill="currentColor" strokeWidth={0} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="chat-action-btn chat-action-btn--send"
-              onClick={() => void send()}
-              disabled={!apiKey}
-              title="发送 (Enter)"
-            >
-              <Send size={18} strokeWidth={2} />
-            </button>
+      <div className="chat-float-input-area">
+        <div className="chat-float-input-wrap">
+          {/* Selected nodes tags */}
+          {selectedNodes.length > 0 && (
+            <div className="chat-float-input-tags">
+              {selectedNodes.map((node) => (
+                <span key={node.id} className="chat-float-input-tag">
+                  {(node.data as { label?: string }).label || node.id}
+                  <button
+                    type="button"
+                    className="chat-float-input-tag__remove"
+                    onClick={clearNodeSelection}
+                  >
+                    <X size={10} strokeWidth={2} />
+                  </button>
+                </span>
+              ))}
+            </div>
           )}
+          <div className="chat-float-input-row">
+            <textarea
+              ref={inputRef}
+              onKeyDown={handleKeyDown}
+              onChange={handleInputChange}
+              placeholder={apiKey ? '输入消息…' : '请先在设置中填写 API Key'}
+              disabled={busy || !apiKey}
+              rows={inputRows}
+              className="chat-float-input"
+            />
+            {busy ? (
+              <button
+                type="button"
+                className="chat-float-stop-btn"
+                onClick={stop}
+                title="停止生成"
+              >
+                <Square size={14} fill="currentColor" strokeWidth={0} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="chat-float-send-btn"
+                onClick={() => void send()}
+                disabled={!apiKey}
+                title="发送 (Enter)"
+              >
+                <Send size={14} strokeWidth={2} />
+              </button>
+            )}
+          </div>
+          <div className="chat-float-input-toolbar">
+            <div className="chat-float-input-toolbar__left">
+              <button type="button" className="chat-float-toolbar-btn" title="添加附件">
+                <Plus size={14} strokeWidth={2} />
+              </button>
+              <button type="button" className="chat-float-toolbar-btn" title="设置">
+                <SlidersHorizontal size={14} strokeWidth={2} />
+              </button>
+            </div>
+            <div className="chat-float-input-toolbar__right">
+              <button type="button" className="chat-float-toolbar-btn" title="语音输入">
+                <Mic size={14} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
         </div>
-        <span className="chat-input-hint">Enter 发送，Shift+Enter 换行</span>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
 function MarkdownContent({ content }: { content: string }) {
   return (
-    <div className="chat-markdown">
+    <div className="chat-float-markdown">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
     </div>
   )

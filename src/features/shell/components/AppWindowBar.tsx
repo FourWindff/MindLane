@@ -1,22 +1,14 @@
-import { PanelLeft, PanelRight, Minus, Square, X } from 'lucide-react'
+import { FolderOpen, Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
-  canToggleLeftSidebar: boolean
-  canToggleRightSidebar: boolean
-  leftSidebarOpen: boolean
-  rightSidebarOpen: boolean
-  onToggleLeftSidebar: () => void
-  onToggleRightSidebar: () => void
+  onOpenFileManager: () => void
+  fileManagerOpen: boolean
 }
 
 export function AppWindowBar({
-  canToggleLeftSidebar,
-  canToggleRightSidebar,
-  leftSidebarOpen,
-  rightSidebarOpen,
-  onToggleLeftSidebar,
-  onToggleRightSidebar,
+  onOpenFileManager,
+  fileManagerOpen,
 }: Props) {
   return (
     <header className="window-bar">
@@ -28,31 +20,17 @@ export function AppWindowBar({
         <div className="window-bar__sidebar-actions">
           <button
             type="button"
-            className={`window-bar__tool${leftSidebarOpen ? ' window-bar__tool--active' : ''}`}
-            onClick={onToggleLeftSidebar}
-            disabled={!canToggleLeftSidebar}
-            title={leftSidebarOpen ? '收起左侧栏' : '展开左侧栏'}
-            aria-label={leftSidebarOpen ? '收起左侧栏' : '展开左侧栏'}
+            className={`window-bar__tool${fileManagerOpen ? ' window-bar__tool--active' : ''}`}
+            onClick={onOpenFileManager}
+            title="打开文件管理器"
+            aria-label="打开文件管理器"
           >
-            <PanelLeft size={16} strokeWidth={1.5} />
+            <FolderOpen size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>
 
       <div className="window-bar__trail">
-        <div className="window-bar__sidebar-actions">
-          <button
-            type="button"
-            className={`window-bar__tool${rightSidebarOpen ? ' window-bar__tool--active' : ''}`}
-            onClick={onToggleRightSidebar}
-            disabled={!canToggleRightSidebar}
-            title={rightSidebarOpen ? '收起右侧栏' : '展开右侧栏'}
-            aria-label={rightSidebarOpen ? '收起右侧栏' : '展开右侧栏'}
-          >
-            <PanelRight size={16} strokeWidth={1.5} />
-          </button>
-        </div>
-
         <div className="window-bar__window-actions">
           <button
             type="button"
