@@ -736,10 +736,16 @@ function handleMindmapToolCall(
       }
 
       case 'batchAddNodes': {
-        // 批量添加节点 - 用于生成完整导图
-        // 这里简化处理，实际使用时可能需要更复杂的逻辑
-        console.warn('[AI Tool] batchAddNodes not fully implemented')
-        return false
+        const data = result.data as { yamlFragment: string; parentId?: string }
+        const { yamlFragment, parentId } = data
+
+        if (!yamlFragment) {
+          console.warn('[AI Tool] batchAddNodes: yamlFragment is empty')
+          return false
+        }
+
+        mindmapStore.insertNodesFromYaml(yamlFragment, { parentId })
+        return true
       }
 
       default:
