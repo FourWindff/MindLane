@@ -13,6 +13,7 @@ type _WorkspaceTreeEntry = {
   type: 'file' | 'directory'
   lastModifiedAt: string
   children?: _WorkspaceTreeEntry[]
+  previewUrl?: string
 }
 
 type _FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
@@ -148,6 +149,13 @@ interface Window {
         data: unknown
       }) => Promise<{ ok: true; data: { filePath: string } } | { ok: false; error: string }>
       recentList: () => Promise<{ filePath: string; title: string; lastOpenedAt: string }[]>
+      saveThumbnail: (payload: {
+        filePath: string
+        imageData: string
+      }) => Promise<
+        | { ok: true; data: { previewUrl: string } }
+        | { ok: false; error: string }
+      >
     }
     workspace: {
       openDirectory: () => Promise<
