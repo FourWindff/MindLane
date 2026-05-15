@@ -619,6 +619,8 @@ function registerIpcHandlers() {
     async (_e, payload: { targetPath: string; workspacePath: string }) => {
       try {
         await fsService.workspace.deleteItem(payload.targetPath, payload.workspacePath)
+        // 清理缩略图
+        await fsService.thumbnails.delete(payload.targetPath)
         return { ok: true }
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) }
