@@ -1,5 +1,9 @@
 import { TextNodeData } from '@/features/mindmap/nodes/text'
+import { nodeRegistry } from '@/features/mindmap/nodes'
 import type { Edge, Node } from '@xyflow/react'
+
+export const CHILD_OFFSET_X = 260
+export const CHILD_GAP_Y = 24
 
 export function newId(): string {
   return crypto.randomUUID()
@@ -48,6 +52,11 @@ export function getChildIdsOrdered(
   const ids = getChildIds(edges, parentId)
   const y = new Map(nodes.map((n) => [n.id, n.position.y]))
   return [...ids].sort((a, b) => (y.get(a) ?? 0) - (y.get(b) ?? 0))
+}
+
+export function findRootNode(nodes: Node[], edges: Edge[]): Node | undefined {
+  const parentSet = new Set(edges.map((e) => e.target))
+  return nodes.find((n) => !parentSet.has(n.id))
 }
 
 const DEFAULT_NODE_HEIGHT = 40
@@ -212,4 +221,11 @@ export function deleteSubtree(
     nodes: nodes.filter((n) => !toRemove.has(n.id)),
     edges: edges.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)),
   }
+}
+
+export function deserializeNode(node: Node): Node {
+  const descriptor = nodeRegistry.get(node.type!)
+  return descriptor
+    ? { ...node, data: descriptor.deserialize(node.data) }
+    : node
 }

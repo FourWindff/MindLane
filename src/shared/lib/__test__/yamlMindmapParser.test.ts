@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseYamlToMindmap,
+  parseYamlFragment,
+  VIRTUAL_ROOT_SYMBOL,
   YamlParseError,
   EmptyMindmapError,
 } from '../yamlMindmapParser'
@@ -139,6 +141,45 @@ mindmap:
 `
       const result = parseYamlToMindmap(yaml)
       expect(result.title).toBe('纯 mindmap 标题')
+    })
+  })
+
+  describe('parseYamlFragment', () => {
+    it('should parse a simple fragment with one root', () => {
+      const yaml = `
+- "子主题 A":
+  - "子主题 A1"
+  - "子主题 A2"
+`
+      const result = parseYamlFragment(yaml)
+      expect(result.nodes).toHaveLength(3)
+      expect(result.edges).toHaveLength(2)
+      expect(result.nodes[0]!.data.label).toBe('子主题 A')
+    })
+
+    it('should parse a fragment with multiple roots', () => {
+      const yaml = `
+- "主题 A"
+- "主题 B":
+  - "主题 B1"
+`
+      const result = parseYamlFragment(yaml)
+      // 虚拟根 + 主题 A + 主题 B + 主题 B1 = 4 节点
+      expect(result.nodes).toHaveLength(4)
+      // 虚拟根→A, 虚拟根→B, B→B1 = 3 边
+      expect(result.edges).toHaveLength(3)
+      // 多根时创建一个虚拟根节点，用 Symbol 标记
+      expect(result.nodes.some(n => (n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL])).toBe(true)
+      // rootIds 应包含两个真实根节点
+      expect(result.rootIds).toHaveLength(2)
+    })
+
+    it('should throw EmptyMindmapError for empty fragment', () => {
+      expect(() => parseYamlFragment('')).toThrow(EmptyMindmapError)
+    })
+
+    it('should throw YamlParseError for invalid YAML', () => {
+      expect(() => parseYamlFragment('!!! not yaml !!!')).toThrow(YamlParseError)
     })
   })
 })

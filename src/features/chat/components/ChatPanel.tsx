@@ -691,8 +691,7 @@ function stripMarkers(text: string): string {
 
 // ========== AI 工具调用处理 ==========
 
-const CHILD_OFFSET_X = 260
-const CHILD_GAP_Y = 24
+import { CHILD_OFFSET_X, CHILD_GAP_Y } from '@/shared/lib/mindmapTree'
 
 interface ToolCallResult {
   name: string
@@ -871,10 +870,15 @@ function handleMindmapToolCall(
       }
 
       case 'batchAddNodes': {
-        // 批量添加节点 - 用于生成完整导图
-        // 这里简化处理，实际使用时可能需要更复杂的逻辑
-        console.warn('[AI Tool] batchAddNodes not fully implemented')
-        return false
+        const { yamlFragment, parentId } = result.data as { yamlFragment: string; parentId?: string }
+
+        if (!yamlFragment) {
+          console.warn('[AI Tool] batchAddNodes: yamlFragment is empty')
+          return false
+        }
+
+        mindmapStore.insertNodesFromYaml(yamlFragment, { parentId })
+        return true
       }
 
       default:

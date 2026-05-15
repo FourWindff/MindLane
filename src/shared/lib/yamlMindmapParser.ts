@@ -32,14 +32,20 @@ export class EmptyMindmapError extends Error {
   }
 }
 
-export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
-  let raw: unknown
+/** 用于标记 parseYamlFragment 多根场景下创建的虚拟根节点 */
+export const VIRTUAL_ROOT_SYMBOL = Symbol('virtualRoot')
+
+function parseYamlSafely(yamlString: string): unknown {
   try {
-    raw = YAML.parse(yamlString)
+    return YAML.parse(yamlString)
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err)
     throw new YamlParseError(`YAML 解析失败: ${detail}`, err)
   }
+}
+
+export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
+  const raw = parseYamlSafely(yamlString)
 
   if (!raw || typeof raw !== 'object') {
     throw new EmptyMindmapError()
@@ -62,11 +68,82 @@ export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
   return { nodes, edges, title }
 }
 
+export interface ParsedFragment extends ParsedMindmap {
+  /** 子树根节点 ID 列表（单根时为 1 个，多根时为多个） */
+  rootIds: string[]
+}
+
+/**
+ * 解析 YAML 大纲片段（无 mindmap: 包裹）
+ * 用于 AI Agent 批量添加节点时生成的子结构
+ *
+ * 如果片段包含多个根节点，会自动创建一个虚拟根节点将它们聚合。
+ * 返回的节点 ID 使用 `newId()` 生成，不预设固定 ID。
+ */
+export function parseYamlFragment(yamlString: string): ParsedFragment {
+  const raw = parseYamlSafely(yamlString)
+
+  if (!raw) {
+    throw new EmptyMindmapError()
+  }
+
+  let rootNodes: MindmapYamlNode[] = []
+
+  if (Array.isArray(raw)) {
+    rootNodes = raw.flatMap((entry) => {
+      const node = parseOutlineEntry(entry)
+      return node ? [node] : []
+    })
+  } else if (typeof raw === 'object') {
+    const entries = Object.entries(raw as Record<string, unknown>)
+    if (entries.length > 0) {
+      const [titleKey, body] = entries[0]!
+      const parsed = parseTitleString(titleKey)
+      const children = parseChildren(body)
+      const node: MindmapYamlNode = { label: parsed.label }
+      if (parsed.pageRange) node.page_range = parsed.pageRange
+      if (parsed.summary) node.summary = parsed.summary
+      if (children.length > 0) node.children = children
+      rootNodes = [node]
+    }
+  } else if (typeof raw === 'string') {
+    const parsed = parseTitleString(raw)
+    rootNodes = [{ label: parsed.label }]
+  }
+
+  if (rootNodes.length === 0) {
+    throw new EmptyMindmapError()
+  }
+
+  const nodes: Node[] = []
+  const edges: Edge[] = []
+
+  if (rootNodes.length === 1) {
+    const rootId = newId()
+    buildGraph(rootNodes[0]!, null, nodes, edges, true, rootId)
+    return { nodes, edges, title: rootNodes[0]!.label, rootIds: [rootId] }
+  }
+
+  // 多根：创建虚拟根，所有顶层节点挂在其下
+  const virtualRootId = newId()
+  nodes.push({
+    id: virtualRootId,
+    type: 'text',
+    position: { x: 0, y: 0 },
+    data: { label: '', [VIRTUAL_ROOT_SYMBOL]: true },
+  })
+  const rootIds: string[] = []
+  for (const rootNode of rootNodes) {
+    rootIds.push(buildGraph(rootNode, virtualRootId, nodes, edges, false))
+  }
+
+  return { nodes, edges, title: rootNodes[0]!.label, rootIds }
+}
+
 function extractRootNode(raw: Record<string, unknown>): MindmapYamlNode | null {
   const mindmap = raw.mindmap
   if (mindmap == null) return null
 
-  // mindmap 顶层可能是字符串(无子节点)、对象({rootLabel: children})、或数组(多根列表)
   if (typeof mindmap === 'string') {
     const parsed = parseTitleString(mindmap)
     const node: MindmapYamlNode = { label: parsed.label }
@@ -122,7 +199,6 @@ function parseOutlineEntry(entry: unknown): MindmapYamlNode | null {
     const obj = entry as Record<string, unknown>
     const entries = Object.entries(obj)
     if (entries.length === 0) return null
-    // 形如 `- "标题": [子项]`
     const [titleKey, body] = entries[0]!
     const parsed = parseTitleString(titleKey)
     const children = parseChildren(body)
@@ -145,8 +221,6 @@ interface ParsedTitle {
 function parseTitleString(value: string): ParsedTitle {
   const text = String(value).trim()
 
-  // 形如 "标题 (p.12-15) — 摘要"
-  // 优先尝试提取尾部的页码标记
   const pageMatch = text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*$/i)
     ?? text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*[—\-:]\s*(.+)$/i)
 
@@ -177,8 +251,9 @@ function buildGraph(
   nodes: Node[],
   edges: Edge[],
   isRoot: boolean,
+  explicitRootId?: string,
 ): string {
-  const id = isRoot ? 'root' : newId()
+  const id = isRoot ? (explicitRootId ?? 'root') : newId()
   const data: TextNodeData = { label: yamlNode.label }
   if (yamlNode.page_range) data.pageRange = yamlNode.page_range
   if (yamlNode.summary) data.summary = yamlNode.summary
