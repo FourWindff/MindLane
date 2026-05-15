@@ -142,6 +142,21 @@ ${this.userProfile}
                 this.prompt += `</SELECTED_NODES>\n`;
             }
 
+            this.prompt += `<TOOLS>
+你可以使用以下工具操作思维导图：
+- batchAddMindmapNodes: 批量添加节点。提供 YAML 格式的大纲片段，例如：
+  - "新主题 A":
+    - "子主题 A1"
+    - "子主题 A2"
+  - "新主题 B"
+  系统会自动解析并插入到指定父节点下方。适合一次添加多个相关节点。
+- addTextNode: 添加单个文本节点（适合简单场景）
+- addPalaceNode: 添加记忆宫殿节点
+- updateMindmapNode: 更新节点属性
+- deleteMindmapNode: 删除节点
+</TOOLS>
+`;
+
             this.prompt += `</MINDMAP>
 `;
         }
