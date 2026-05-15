@@ -1,22 +1,16 @@
-import { PanelLeft, PanelRight, Minus, Square, X } from 'lucide-react'
+import { PanelLeft, Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
   canToggleLeftSidebar: boolean
-  canToggleRightSidebar: boolean
   leftSidebarOpen: boolean
-  rightSidebarOpen: boolean
   onToggleLeftSidebar: () => void
-  onToggleRightSidebar: () => void
 }
 
 export function AppWindowBar({
   canToggleLeftSidebar,
-  canToggleRightSidebar,
   leftSidebarOpen,
-  rightSidebarOpen,
   onToggleLeftSidebar,
-  onToggleRightSidebar,
 }: Props) {
   return (
     <header className="window-bar">
@@ -40,19 +34,6 @@ export function AppWindowBar({
       </div>
 
       <div className="window-bar__trail">
-        <div className="window-bar__sidebar-actions">
-          <button
-            type="button"
-            className={`window-bar__tool${rightSidebarOpen ? ' window-bar__tool--active' : ''}`}
-            onClick={onToggleRightSidebar}
-            disabled={!canToggleRightSidebar}
-            title={rightSidebarOpen ? '收起右侧栏' : '展开右侧栏'}
-            aria-label={rightSidebarOpen ? '收起右侧栏' : '展开右侧栏'}
-          >
-            <PanelRight size={16} strokeWidth={1.5} />
-          </button>
-        </div>
-
         <div className="window-bar__window-actions">
           <button
             type="button"

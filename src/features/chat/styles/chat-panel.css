@@ -5,7 +5,7 @@
 /* ── 展开面板容器 ── */
 .chat-float-panel {
   position: fixed;
-  top: 80px;
+  top: 110px;
   right: 24px;
   bottom: 24px;
   width: 380px;
@@ -797,10 +797,10 @@
 /* ── Minimized FAB ── */
 .chat-float-fab {
   position: fixed;
-  bottom: 40px;
-  right: 40px;
-  width: 80px;
-  height: 80px;
+  bottom: 176px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
   z-index: 100;
   display: flex;
   align-items: center;

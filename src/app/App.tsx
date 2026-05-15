@@ -99,11 +99,8 @@ function AppContent() {
     <div className="app-frame">
       <AppWindowBar
         canToggleLeftSidebar={canToggleLeftSidebar}
-        canToggleRightSidebar={false}
         leftSidebarOpen={leftSidebarOpen}
-        rightSidebarOpen={false}
         onToggleLeftSidebar={() => setLeftSidebarOpen((open) => !open)}
-        onToggleRightSidebar={() => {}}
       />
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (
