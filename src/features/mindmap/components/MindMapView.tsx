@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react'
 import { AlertCircle, Landmark } from 'lucide-react'
+import { toPng } from 'html-to-image'
 import { useShortcut } from '@/shared/shortcuts'
 import {
   Background,
@@ -250,6 +251,7 @@ function MindMapCanvas({
   const filePath = useMindmapStore((s) => s.filePath)
   const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
   const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
+  const updateFilePreviewUrl = useWorkspaceStore((s) => s.updateFilePreviewUrl)
 
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
@@ -583,6 +585,28 @@ function MindMapCanvas({
     { id: 'mindmap.autoLayout', combo: 'mod+shift+l', description: '自动布局', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { doAutoLayout() } },
   )
 
+  const generateThumbnail = useCallback(async (filePath: string): Promise<string | null> => {
+    try {
+      const flowElement = document.querySelector('.mindmap-canvas-wrap .react-flow') as HTMLElement | null
+      if (!flowElement) return null
+
+      const dataUrl = await toPng(flowElement, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+      })
+
+      const result = await window.mindlane?.file.saveThumbnail({ filePath, imageData: dataUrl })
+      if (result?.ok) {
+        return result.data.previewUrl
+      }
+      return null
+    } catch (e) {
+      // 预览图生成失败静默忽略，不影响保存流程
+      console.warn('[MindLane] 预览图生成失败：', e)
+      return null
+    }
+  }, [])
+
   const doSave = useCallback(async () => {
     try {
       const store = useMindmapStore.getState()
@@ -592,12 +616,19 @@ function MindMapCanvas({
         store.setFilePath(result.data.filePath)
         store.markClean()
         await syncAfterFileSaved(result.data.filePath)
+
+        // 预览图生成不阻塞保存流程
+        void generateThumbnail(result.data.filePath).then((previewUrl) => {
+          if (previewUrl) {
+            updateFilePreviewUrl(result.data.filePath, previewUrl)
+          }
+        })
       }
     } catch (e) {
       console.error('[MindLane] 保存失败：', e)
       useAiStore.getState().setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [syncAfterFileSaved])
+  }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl])
 
   const [generationBusy, setGenerationBusy] = useState(false)
   const [generationProgress, setGenerationProgress] = useState<string | null>(null)

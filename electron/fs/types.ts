@@ -20,6 +20,7 @@ export interface WorkspaceTreeEntry {
   type: 'file' | 'directory'
   lastModifiedAt: string
   children?: WorkspaceTreeEntry[]
+  previewUrl?: string
 }
 
 export interface WorkspaceSession {

@@ -1,12 +1,19 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { shell } from 'electron'
+import { ThumbnailManager } from './thumbnailManager.js'
 import type { WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
 const SUPPORTED_EXTENSIONS = new Set(['.mindlane'])
 const IGNORED_NAMES = new Set(['.git', '.DS_Store', 'node_modules', 'Thumbs.db'])
 
 export class WorkspaceManager {
+  private thumbnails?: ThumbnailManager
+
+  setThumbnailManager(thumbnails: ThumbnailManager): void {
+    this.thumbnails = thumbnails
+  }
+
   isSupportedFile(filePath: string): boolean {
     return SUPPORTED_EXTENSIONS.has(path.extname(filePath).toLowerCase())
   }
@@ -65,11 +72,13 @@ export class WorkspaceManager {
         })
       } else if (entry.isFile() && this.isSupportedFile(entry.name)) {
         const fileStats = await fs.promises.stat(fullPath)
+        const previewUrl = this.thumbnails ? await this.thumbnails.get(fullPath) : undefined
         files.push({
           name: entry.name,
           path: fullPath,
           type: 'file',
           lastModifiedAt: fileStats.mtime.toISOString(),
+          previewUrl: previewUrl ?? undefined,
         })
       }
     }
