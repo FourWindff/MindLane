@@ -135,6 +135,11 @@ contextBridge.exposeInMainWorld('mindlane', {
     saveAs: (payload: { data: unknown }) =>
       ipcRenderer.invoke('file:save-as', payload),
     recentList: () => ipcRenderer.invoke('file:recent-list'),
+    saveThumbnail: (payload: { filePath: string; imageData: string }) =>
+      ipcRenderer.invoke('file:save-thumbnail', payload) as Promise<
+        | { ok: true; data: { previewUrl: string } }
+        | { ok: false; error: string }
+      >,
   },
   workspace: {
     openDirectory: () => ipcRenderer.invoke('workspace:open-directory'),

@@ -484,6 +484,15 @@ function registerIpcHandlers() {
     return fsService.recentFiles.list()
   })
 
+  ipcMain.handle('file:save-thumbnail', async (_e, payload: { filePath: string; imageData: string }) => {
+    try {
+      const url = await fsService.thumbnails.save(payload.filePath, payload.imageData)
+      return { ok: true, data: { previewUrl: url } }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
   // -- Workspace operations --
   ipcMain.handle('workspace:open-directory', async () => {
     if (!win) return { ok: false, error: 'No window' }
@@ -1032,6 +1041,7 @@ app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData')
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
+  fsService.workspace.setThumbnailManager(fsService.thumbnails)
 
   aiService = new AiService()
   try {
