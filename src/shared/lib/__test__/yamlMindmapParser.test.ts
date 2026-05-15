@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseYamlToMindmap,
+  parseYamlFragment,
   YamlParseError,
   EmptyMindmapError,
 } from '../yamlMindmapParser'
@@ -139,6 +140,43 @@ mindmap:
 `
       const result = parseYamlToMindmap(yaml)
       expect(result.title).toBe('纯 mindmap 标题')
+    })
+  })
+
+  describe('parseYamlFragment', () => {
+    it('should parse a simple fragment with one root', () => {
+      const yaml = `
+- "子主题 A":
+  - "子主题 A1"
+  - "子主题 A2"
+`
+      const result = parseYamlFragment(yaml)
+      expect(result.nodes).toHaveLength(3)
+      expect(result.edges).toHaveLength(2)
+      expect(result.nodes[0]!.data.label).toBe('子主题 A')
+    })
+
+    it('should parse a fragment with multiple roots', () => {
+      const yaml = `
+- "主题 A"
+- "主题 B":
+  - "主题 B1"
+`
+      const result = parseYamlFragment(yaml)
+      // 虚拟根 + 主题 A + 主题 B + 主题 B1 = 4 节点
+      expect(result.nodes).toHaveLength(4)
+      // 虚拟根→A, 虚拟根→B, B→B1 = 3 边
+      expect(result.edges).toHaveLength(3)
+      // 多根时创建一个虚拟根节点
+      expect(result.nodes.some(n => n.data.label === '__virtual_root__')).toBe(true)
+    })
+
+    it('should throw EmptyMindmapError for empty fragment', () => {
+      expect(() => parseYamlFragment('')).toThrow(EmptyMindmapError)
+    })
+
+    it('should throw YamlParseError for invalid YAML', () => {
+      expect(() => parseYamlFragment('!!! not yaml !!!')).toThrow(YamlParseError)
     })
   })
 })
