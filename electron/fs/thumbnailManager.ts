@@ -21,21 +21,22 @@ export class ThumbnailManager {
     return path.join(this.thumbnailsDir, `${this.hashPath(filePath)}.png`)
   }
 
-  /** 保存缩略图，返回 file:// URL */
+  /** 保存缩略图，返回 DataURL */
   async save(filePath: string, imageData: string): Promise<string> {
     const targetPath = this.thumbnailPath(filePath)
     // imageData 格式: data:image/png;base64,iVBORw0KGgo...
     const base64Data = imageData.replace(/^data:image\/png;base64,/, '')
     await fs.promises.writeFile(targetPath, base64Data, 'base64')
-    return `file://${targetPath}`
+    return imageData
   }
 
-  /** 获取缩略图 file:// URL，不存在返回 null */
+  /** 获取缩略图 DataURL，不存在返回 null */
   async get(filePath: string): Promise<string | null> {
     const targetPath = this.thumbnailPath(filePath)
     try {
-      await fs.promises.access(targetPath)
-      return `file://${targetPath}`
+      const data = await fs.promises.readFile(targetPath)
+      const base64 = data.toString('base64')
+      return `data:image/png;base64,${base64}`
     } catch {
       return null
     }
