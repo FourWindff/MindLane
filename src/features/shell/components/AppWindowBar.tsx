@@ -1,16 +1,14 @@
-import { PanelLeft, Minus, Square, X } from 'lucide-react'
+import { FolderOpen, Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
-  canToggleLeftSidebar: boolean
-  leftSidebarOpen: boolean
-  onToggleLeftSidebar: () => void
+  onOpenFileManager: () => void
+  fileManagerOpen: boolean
 }
 
 export function AppWindowBar({
-  canToggleLeftSidebar,
-  leftSidebarOpen,
-  onToggleLeftSidebar,
+  onOpenFileManager,
+  fileManagerOpen,
 }: Props) {
   return (
     <header className="window-bar">
@@ -22,13 +20,12 @@ export function AppWindowBar({
         <div className="window-bar__sidebar-actions">
           <button
             type="button"
-            className={`window-bar__tool${leftSidebarOpen ? ' window-bar__tool--active' : ''}`}
-            onClick={onToggleLeftSidebar}
-            disabled={!canToggleLeftSidebar}
-            title={leftSidebarOpen ? '收起左侧栏' : '展开左侧栏'}
-            aria-label={leftSidebarOpen ? '收起左侧栏' : '展开左侧栏'}
+            className={`window-bar__tool${fileManagerOpen ? ' window-bar__tool--active' : ''}`}
+            onClick={onOpenFileManager}
+            title="打开文件管理器"
+            aria-label="打开文件管理器"
           >
-            <PanelLeft size={16} strokeWidth={1.5} />
+            <FolderOpen size={16} strokeWidth={1.5} />
           </button>
         </div>
       </div>
