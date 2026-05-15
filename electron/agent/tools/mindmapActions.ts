@@ -180,37 +180,36 @@ const deleteNodeTool = tool(
 
 // ========== 批量操作 ==========
 const batchAddNodesTool = tool(
-  async ({ nodes, edges }) => {
-    if (!nodes || nodes.length === 0) {
-      return { ok: false, error: '节点列表不能为空' }
+  async ({ yamlFragment, parentId }) => {
+    if (!yamlFragment || !yamlFragment.trim()) {
+      return { ok: false, error: 'YAML 片段不能为空' }
     }
 
     return {
       ok: true,
       action: 'batchAddNodes',
       data: {
-        nodes: nodes.map(n => ({
-          type: n.type,
-          parentId: n.parentId,
-          nodeData: n.nodeData,
-        })),
-        edges: edges || [],
+        yamlFragment: yamlFragment.trim(),
+        parentId: parentId || undefined,
       },
     }
   },
   {
     name: 'batchAddMindmapNodes',
-    description: '批量添加多个节点和边，用于生成完整的思维导图结构。',
+    description: `批量添加多个节点到思维导图中。你只需提供一个 YAML 格式的大纲片段，系统会自动解析并插入到指定父节点下方。
+
+YAML 格式示例：
+- "子主题 A":
+  - "子主题 A1"
+  - "子主题 A2"
+- "子主题 B":
+  - "子主题 B1"
+
+每个条目是一个字符串（无子节点）或一个键值对（键为节点标签，值为子节点数组）。
+如果不提供 parentId，节点将插入到当前选中的节点或根节点下方。`,
     schema: z.object({
-      nodes: z.array(z.object({
-        type: z.enum(['text', 'palace']).describe('节点类型'),
-        parentId: z.string().optional().describe('父节点ID'),
-        nodeData: z.record(z.unknown()).describe('节点数据'),
-      })).describe('节点列表'),
-      edges: z.array(z.object({
-        source: z.string().describe('源节点ID'),
-        target: z.string().describe('目标节点ID'),
-      })).optional().describe('边列表'),
+      yamlFragment: z.string().describe('YAML 格式的大纲片段，描述要添加的节点结构'),
+      parentId: z.string().optional().describe('父节点ID，不提供则插入到当前选中节点或根节点'),
     }),
   }
 )
@@ -231,5 +230,5 @@ export type MindmapActionResult =
   | { ok: true; action: 'addNode'; data: { type: string; parentId?: string; nodeData: Record<string, unknown> } }
   | { ok: true; action: 'updateNode'; data: { nodeId: string; nodeType: string; changes: Record<string, unknown> } }
   | { ok: true; action: 'deleteNode'; data: { nodeId: string; confirmDeleteSubtree: boolean } }
-  | { ok: true; action: 'batchAddNodes'; data: { nodes: unknown[]; edges?: unknown[] } }
+  | { ok: true; action: 'batchAddNodes'; data: { yamlFragment: string; parentId?: string } }
   | { ok: false; error: string }
