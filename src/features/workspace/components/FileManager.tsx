@@ -339,6 +339,13 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
                           <div className="file-manager__card-dot file-manager__card-dot--3" />
                         </div>
                       </>
+                    ) : entry.previewUrl ? (
+                      <img
+                        src={entry.previewUrl}
+                        alt={displayName}
+                        className="file-manager__card-preview"
+                        draggable={false}
+                      />
                     ) : (
                       <>
                         <div className="file-manager__card-glow file-manager__card-glow--file" />
