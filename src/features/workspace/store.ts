@@ -24,6 +24,7 @@ interface WorkspaceStore {
   refreshWorkspaceFiles: (workspacePath?: string | null) => Promise<void>
   refreshTree: () => Promise<void>
   syncAfterFileSaved: (filePath: string) => Promise<void>
+  updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
   setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => Promise<void>
   toggleFolder: (folderPath: string) => void
   expandAllFolders: () => void
@@ -486,9 +487,41 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (currentWorkspacePath && fallbackSession.workspacePath !== currentWorkspacePath) {
       fallbackSession.workspacePath = currentWorkspacePath
     }
-    const files = await listWorkspaceFiles(fallbackSession.workspacePath)
-    const tree = await listWorkspaceTree(fallbackSession.workspacePath)
+    const [files, tree] = await Promise.all([
+      listWorkspaceFiles(fallbackSession.workspacePath),
+      listWorkspaceTree(fallbackSession.workspacePath),
+    ])
     set({ ...updateWorkspaceState(fallbackSession, files), tree })
+  },
+
+  updateFilePreviewUrl: (filePath: string, previewUrl: string) => {
+    const updateEntry = (entries: WorkspaceTreeEntry[]): [WorkspaceTreeEntry[], boolean] => {
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]
+        if (entry.type === 'file' && entry.path === filePath) {
+          if (entry.previewUrl === previewUrl) {
+            return [entries, true]
+          }
+          const next = [...entries]
+          next[i] = { ...entry, previewUrl }
+          return [next, true]
+        }
+        if (entry.children) {
+          const [newChildren, found] = updateEntry(entry.children)
+          if (found) {
+            const next = [...entries]
+            next[i] = { ...entry, children: newChildren }
+            return [next, true]
+          }
+        }
+      }
+      return [entries, false]
+    }
+
+    const [tree, changed] = updateEntry(get().tree)
+    if (changed) {
+      set({ tree })
+    }
   },
 
   setRestoreLastWorkspaceOnLaunch: async (enabled: boolean) => {
