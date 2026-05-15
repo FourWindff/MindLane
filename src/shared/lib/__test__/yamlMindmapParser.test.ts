@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseYamlToMindmap,
   parseYamlFragment,
+  VIRTUAL_ROOT_SYMBOL,
   YamlParseError,
   EmptyMindmapError,
 } from '../yamlMindmapParser'
@@ -167,8 +168,10 @@ mindmap:
       expect(result.nodes).toHaveLength(4)
       // 虚拟根→A, 虚拟根→B, B→B1 = 3 边
       expect(result.edges).toHaveLength(3)
-      // 多根时创建一个虚拟根节点
-      expect(result.nodes.some(n => n.data.label === '__virtual_root__')).toBe(true)
+      // 多根时创建一个虚拟根节点，用 Symbol 标记
+      expect(result.nodes.some(n => (n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL])).toBe(true)
+      // rootIds 应包含两个真实根节点
+      expect(result.rootIds).toHaveLength(2)
     })
 
     it('should throw EmptyMindmapError for empty fragment', () => {

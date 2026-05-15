@@ -41,11 +41,11 @@ import {
   reflowChildren,
   withNewChild,
   withNewSibling,
+  CHILD_OFFSET_X,
+  CHILD_GAP_Y,
 } from '@/shared/lib/mindmapTree'
 import { PalaceNodeData } from '../nodes/palace'
 
-const CHILD_OFFSET_X = 260
-const CHILD_GAP_Y = 24
 const NODE_EXIT_MS = 300
 
 type FlowContextEvent = ReactMouseEvent | globalThis.MouseEvent

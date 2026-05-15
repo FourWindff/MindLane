@@ -3,8 +3,9 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
-import { parseYamlToMindmap, parseYamlFragment } from '@/shared/lib/yamlMindmapParser'
+import { parseYamlToMindmap, parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
+import { findRootNode, deserializeNode, CHILD_OFFSET_X } from '@/shared/lib/mindmapTree'
 
 interface MindmapState {
   nodes: Node[]
@@ -33,9 +34,6 @@ interface MindmapState {
   toMindLaneFile: () => MindLaneFile
   getContextSummary: () => string
 
-  /**
-   * 从 YAML 片段批量插入节点到指定父节点下方
-   */
   insertNodesFromYaml: (
     yamlFragment: string,
     options?: { parentId?: string; fileTitle?: string }
@@ -217,22 +215,12 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   insertNodesFromYaml: (yamlFragment, options = {}) => {
     const { nodes: existingNodes, edges: existingEdges } = get()
 
-    // 1. 解析 YAML 片段
     const parsed = parseYamlFragment(yamlFragment)
 
-    // 2. 确定挂载目标
-    let targetParentId = options.parentId
-    if (!targetParentId) {
-      const selected = existingNodes.find((n) => n.selected)
-      if (selected) {
-        targetParentId = selected.id
-      } else {
-        // 找根节点（没有入边的节点）
-        const parentSet = new Set(existingEdges.map((e) => e.target))
-        const root = existingNodes.find((n) => !parentSet.has(n.id))
-        targetParentId = root?.id ?? existingNodes[0]?.id
-      }
-    }
+    const targetParentId = options.parentId
+      ?? existingNodes.find((n) => n.selected)?.id
+      ?? findRootNode(existingNodes, existingEdges)?.id
+      ?? existingNodes[0]?.id
 
     if (!targetParentId) {
       console.warn('[insertNodesFromYaml] 无法确定父节点')
@@ -245,76 +233,59 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       return
     }
 
-    // 3. 为新子树做独立布局
     const laidOut = autoLayout(parsed.nodes, parsed.edges, {
       rootX: 0,
       rootY: 0,
       direction: 'LR',
     })
 
-    // 4. 识别虚拟根节点（多根情况下 parseYamlFragment 会创建一个虚拟根）
-    const virtualRootIds = new Set(
-      laidOut
-        .filter((n) => (n.data as { label?: string }).label === '__virtual_root__')
-        .map((n) => n.id)
-    )
-
-    // 子树根：没有入边（单根）或只有虚拟根作为父节点（多根）的节点
-    const subRootIds: string[] = []
+    const virtualRootIds = new Set<string>()
     for (const n of laidOut) {
-      if (virtualRootIds.has(n.id)) continue
-      const realParents = parsed.edges.filter((e) => e.target === n.id && !virtualRootIds.has(e.source))
-      if (realParents.length === 0) {
-        subRootIds.push(n.id)
+      if ((n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL]) {
+        virtualRootIds.add(n.id)
       }
     }
 
+    const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {
       console.warn('[insertNodesFromYaml] 无法找到子树根节点')
       return
     }
 
-    // 以第一个子树根为基准计算偏移
     const firstSubRoot = laidOut.find((n) => n.id === subRootIds[0])
     if (!firstSubRoot) {
-      console.warn('[insertNodesFromYaml] 无法找到子树根节点')
+      console.warn('[insertNodesFromYaml] 子树根节点不在布局结果中')
       return
     }
 
-    const offsetX = parentNode.position.x + 260 // CHILD_OFFSET_X
+    const offsetX = parentNode.position.x + CHILD_OFFSET_X
     const offsetY = parentNode.position.y - firstSubRoot.position.y
 
-    const shiftedNodes = laidOut.map((n) => ({
-      ...n,
-      position: {
-        x: n.position.x + offsetX,
-        y: n.position.y + offsetY,
-      },
-      data: { ...n.data, justAdded: true },
-    }))
-
-    // 5. 过滤掉虚拟根节点
-    const realNodes = shiftedNodes.filter((n) => !virtualRootIds.has(n.id))
-
-    // 6. 用 nodeRegistry 反序列化数据
-    const deserializedNodes = realNodes.map((n) => {
-      const descriptor = nodeRegistry.get(n.type!)
-      return {
+    const deserializedNodes: Node[] = []
+    for (const n of laidOut) {
+      if (virtualRootIds.has(n.id)) continue
+      const shifted = {
         ...n,
-        data: descriptor ? descriptor.deserialize(n.data) : n.data,
+        position: {
+          x: n.position.x + offsetX,
+          y: n.position.y + offsetY,
+        },
+        data: { ...n.data, justAdded: true },
       }
-    })
+      deserializedNodes.push(deserializeNode(shifted))
+    }
 
-    // 7. 构建边：复用 parsed.edges 中的内部边（排除虚拟根相关的边），并添加子树根到目标父节点的连接
-    const newEdges: Edge[] = parsed.edges
-      .filter((e) => !virtualRootIds.has(e.source) && !virtualRootIds.has(e.target))
-      .map((e) => ({
+    const newEdges: Edge[] = []
+    for (const e of parsed.edges) {
+      if (virtualRootIds.has(e.source) || virtualRootIds.has(e.target)) continue
+      newEdges.push({
         id: e.id,
         source: e.source,
         target: e.target,
         type: e.type ?? 'smoothstep',
         className: 'mindmap-edge mindmap-edge--enter',
-      }))
+      })
+    }
 
     for (const subRootId of subRootIds) {
       newEdges.push({
@@ -326,7 +297,6 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       })
     }
 
-    // 7. 合并到现有图
     set({
       nodes: [...existingNodes, ...deserializedNodes],
       edges: [...existingEdges, ...newEdges],
