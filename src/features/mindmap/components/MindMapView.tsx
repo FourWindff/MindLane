@@ -20,8 +20,11 @@ import {
   SelectionMode,
   useOnSelectionChange,
   useStoreApi,
+  useReactFlow,
   type Edge,
   type Node,
+  type NodeTypes,
+  type ReactFlowInstance,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { MindMapHeader } from '@/features/mindmap/components/MindMapHeader'
@@ -221,6 +224,49 @@ function SelectionActionBar({
         生成记忆宫殿
       </button>
     </div>
+  )
+}
+
+function HiddenThumbnailFlow({
+  nodes,
+  edges,
+  nodeTypes,
+  onInit,
+}: {
+  nodes: Node[]
+  edges: Edge[]
+  nodeTypes: NodeTypes
+  onInit: React.MutableRefObject<ReactFlowInstance | null>
+}) {
+  const rf = useReactFlow()
+
+  useEffect(() => {
+    onInit.current = rf
+    return () => { onInit.current = null }
+  }, [rf, onInit])
+
+  return (
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      elementsSelectable={false}
+      zoomOnScroll={false}
+      zoomOnPinch={false}
+      zoomOnDoubleClick={false}
+      panOnDrag={false}
+      panOnScroll={false}
+      selectionOnDrag={false}
+      fitView
+      fitViewOptions={{ padding: 0.2 }}
+      minZoom={0.1}
+      maxZoom={2}
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0, 0, 0, 0.15)" />
+    </ReactFlow>
   )
 }
 
@@ -585,12 +631,25 @@ function MindMapCanvas({
     { id: 'mindmap.autoLayout', combo: 'mod+shift+l', description: '自动布局', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { doAutoLayout() } },
   )
 
+  const hiddenFlowRef = useRef<HTMLDivElement>(null)
+  const hiddenRfInstanceRef = useRef<ReactFlowInstance | null>(null)
+
   const generateThumbnail = useCallback(async (filePath: string): Promise<string | null> => {
     try {
-      const flowElement = document.querySelector('.mindmap-canvas-wrap .react-flow') as HTMLElement | null
-      if (!flowElement) return null
+      const hiddenWrap = hiddenFlowRef.current
+      if (!hiddenWrap) return null
 
-      const dataUrl = await toPng(flowElement, {
+      const hiddenFlow = hiddenWrap.querySelector('.react-flow') as HTMLElement | null
+      if (!hiddenFlow) return null
+
+      const rf = hiddenRfInstanceRef.current
+      if (rf) {
+        rf.fitView({ padding: 0.2, duration: 0 })
+      }
+
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+
+      const dataUrl = await toPng(hiddenFlow, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         style: { backgroundImage: 'none' },
@@ -955,6 +1014,29 @@ function MindMapCanvas({
         {palaceModal && (
           <PalaceModal data={palaceModal} onClose={() => setPalaceModal(null)} />
         )}
+      </div>
+      <div
+        ref={hiddenFlowRef}
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          width: '1200px',
+          height: '800px',
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -1,
+        }}
+      >
+        <ReactFlowProvider>
+          <HiddenThumbnailFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onInit={hiddenRfInstanceRef}
+          />
+        </ReactFlowProvider>
       </div>
     </div>
   )
