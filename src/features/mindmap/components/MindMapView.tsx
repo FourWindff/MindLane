@@ -593,6 +593,12 @@ function MindMapCanvas({
       const dataUrl = await toPng(flowElement, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
+        style: { backgroundImage: 'none' },
+        filter: (node) => {
+          const cls = node.classList
+          if (!cls) return true
+          return !cls.contains('react-flow__background') && !cls.contains('mindmap-minimap')
+        },
       })
 
       const result = await window.mindlane?.file.saveThumbnail({ filePath, imageData: dataUrl })
