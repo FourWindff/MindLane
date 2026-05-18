@@ -4,6 +4,7 @@ import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryPalaceStation, StationDesign } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
 import { PalaceAgent } from './base.js'
+import { messageContentToString } from '../utils.js'
 
 const COORD_PAD = 0.05
 const MIN_DISTANCE = 0.12
@@ -135,22 +136,6 @@ function buildFallbackSummary(route: MemoryPalaceStation[], hasImage: boolean): 
 
 // ===== Vision Agent 核心逻辑 =====
 
-function contentToString(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((block) => {
-        if (typeof block === 'string') return block
-        if (block && typeof block === 'object' && 'text' in block) {
-          return String((block as { text?: unknown }).text ?? '')
-        }
-        return ''
-      })
-      .join('')
-  }
-  return ''
-}
-
 function parseJsonArray(text: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/)
   if (!match) throw new Error('未找到 JSON 数组')
@@ -271,7 +256,7 @@ async function locateAnchors(
     }),
   ])
 
-  const content = contentToString(response.content).trim()
+  const content = messageContentToString(response.content).trim()
   if (!content) {
     throw new Error('视觉模型未返回内容')
   }
