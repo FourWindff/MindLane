@@ -147,40 +147,17 @@ export const MindmapStateAnnotations = {
   }),
 }
 
-/**
- * HITL (Human-in-the-Loop) 状态扩展
- */
-export const HITLStateAnnotations = {
-  interruptPoint: Annotation<'imageGen' | 'mindmapGen' | null>({
-    reducer: (_prev, next) => next,
-    default: () => null,
-  }),
-  userConfirmedPrompt: Annotation<string | null>({
-    reducer: (_prev, next) => next,
-    default: () => null,
-  }),
-  userConfirmedStructure: Annotation<{
-    nodes: GeneratedNode[]
-    edges: GeneratedEdge[]
-    title: string
-  } | null>({
-    reducer: (_prev, next) => next,
-    default: () => null,
-  }),
-}
-
 // ===== 组合状态定义 =====
 
 /**
  * 主图状态 - MindLaneAgent 使用
- * 包含：基础状态 + 思维导图状态 + Palace输入 + HITL + Palace输出
+ * 包含：基础状态 + 思维导图状态 + Palace输入 + Palace输出
  */
 export const MainGraphState = Annotation.Root({
   ...BaseStateAnnotations,
   ...MindmapStateAnnotations,
   palaceInputText: PalaceStateAnnotations.palaceInputText,
   palaceInputNodes: PalaceStateAnnotations.palaceInputNodes,
-  ...HITLStateAnnotations,
   // Palace 子图输出（需要同步回主图用于构建响应）
   imageUrls: PalaceStateAnnotations.imageUrls,
   memoryRoute: PalaceStateAnnotations.memoryRoute,
@@ -188,12 +165,11 @@ export const MainGraphState = Annotation.Root({
 
 /**
  * Palace 子图专用状态
- * 包含：基础状态 + Palace 完整状态 + HITL
+ * 包含：基础状态 + Palace 完整状态
  */
 export const PalaceSubgraphState = Annotation.Root({
   ...BaseStateAnnotations,
   ...PalaceStateAnnotations,
-  ...HITLStateAnnotations,
 })
 
 /**
