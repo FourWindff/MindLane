@@ -2,6 +2,7 @@ import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../providers/index.js'
 import { MindmapSubgraphState } from '../state.js'
 import { buildExtractStructureMessages } from '../agenthub/prompts/docToMindmap.js'
+import { extractTextContent } from '../utils.js'
 
 // ===== 配置选项 =====
 
@@ -17,31 +18,6 @@ export interface MindmapSubgraphOptions {
 interface KeyPoint {
   title: string
   children?: KeyPoint[]
-}
-
-// ===== 工具函数 =====
-
-/**
- * 从 LangChain message content 中提取文本
- * Anthropic 格式返回 content 是数组 [{type:"text", text:"..."}]
- * OpenAI 格式返回 content 是字符串
- */
-function extractTextContent(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (block): block is { type: string; text: string } =>
-          typeof block === 'object' &&
-          block !== null &&
-          'type' in block &&
-          block.type === 'text' &&
-          'text' in block,
-      )
-      .map((block) => block.text)
-      .join('')
-  }
-  return ''
 }
 
 /**

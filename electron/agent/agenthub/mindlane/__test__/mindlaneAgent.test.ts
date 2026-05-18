@@ -125,7 +125,6 @@ describe('MindLaneAgent.invoke()', () => {
 
     const result = await agent.invoke(state)
 
-    // 优先处理普通工具，返回 messages 走 ToolNode
     expect(result.messages).toHaveLength(1)
     expect(result.intent).toBeUndefined()
   })
@@ -143,10 +142,75 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.intent).toBe('qa')
     expect(result.response).toBe('这是一个回答')
   })
+
+  it('mindmapInput 未提供时回退到 content', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue(
+      new AIMessage({
+        content: '生成思维导图',
+        tool_calls: [
+          {
+            name: 'routeDecision',
+            args: { target: 'mindmap' },
+            id: 'call-1',
+            type: 'tool_call',
+          },
+        ],
+      }),
+    )
+    const agent = new MindLaneAgent(createMockProvider(mockInvoke), [mockSearchTool])
+    const state = createInitialState()
+
+    const result = await agent.invoke(state)
+
+    expect(result.intent).toBe('mindmap')
+    expect(result.mindmapInputText).toBe('生成思维导图')
+  })
+
+  it('禁用 palace 时不应包含 palace 路由选项', () => {
+    const mockInvoke = vi.fn()
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      [mockSearchTool],
+      undefined,
+      { hasEmbeddings: true, hasPalace: false },
+    )
+
+    const routeTool = (agent as unknown as { tools: Array<{ name: string; description: string }> }).tools.find(
+      (t) => t.name === 'routeDecision',
+    )
+
+    expect(routeTool).toBeDefined()
+    expect(routeTool!.description).not.toContain('palace')
+    expect(routeTool!.description).toContain('mindmap')
+  })
 })
 
 describe('MindLaneAgent.route()', () => {
-  it('过滤 routeDecision 的 tool_calls，根据 intent 路由', () => {
+  it('过滤 routeDecision 的 tool_calls，只剩下普通工具时走 tools', () => {
+    const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool])
+
+    const state = {
+      ...createInitialState(),
+      messages: [
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            {
+              name: 'searchKnowledge',
+              args: { query: 'test' },
+              id: 'call-1',
+              type: 'tool_call',
+            },
+          ],
+        }),
+      ],
+      intent: 'qa' as const,
+    }
+
+    expect(agent.route(state)).toBe('tools')
+  })
+
+  it('只有 routeDecision tool_call 时按 intent 路由', () => {
     const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool])
 
     const state = {
@@ -170,7 +234,7 @@ describe('MindLaneAgent.route()', () => {
     expect(agent.route(state)).toBe('mindmapSubgraph')
   })
 
-  it('普通 tool_calls 返回 "tools"', () => {
+  it('只有 routeDecision tool_call + intent=qa 时返回 __end__', () => {
     const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool])
 
     const state = {
@@ -180,8 +244,8 @@ describe('MindLaneAgent.route()', () => {
           content: '',
           tool_calls: [
             {
-              name: 'searchKnowledge',
-              args: { query: 'test' },
+              name: 'routeDecision',
+              args: { target: 'qa' },
               id: 'call-1',
               type: 'tool_call',
             },
@@ -190,7 +254,7 @@ describe('MindLaneAgent.route()', () => {
       ],
     }
 
-    expect(agent.route(state)).toBe('tools')
+    expect(agent.route(state)).toBe('__end__')
   })
 
   it('tool result 返回 "supervisor"', () => {

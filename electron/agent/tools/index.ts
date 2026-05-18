@@ -8,6 +8,6 @@ export {
   type MindmapActionResult,
 } from './mindmapActions.js'
 export {
-  routeDecisionTool,
+  createRouteDecisionTool,
   type RouteDecision,
 } from './routeDecisionTool.js'
