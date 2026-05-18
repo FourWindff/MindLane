@@ -3,40 +3,6 @@ import type { MindmapContextData } from "../../tools/mindmapContext.js";
 import type { CapabilityFlags } from "./mindlaneAgent.js";
 
 /**
- * 路由决策专用上下文构建器
- */
-export class RouteDecisionContextBuilder {
-    private context: MindmapContextData | null = null;
-    private capabilityFlags: CapabilityFlags;
-
-    constructor(context?: MindmapContextData, capabilityFlags?: CapabilityFlags) {
-        this.context = context ?? null;
-        this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
-    }
-
-    build(): string {
-        const parts: string[] = [];
-
-        parts.push(`你是 MindLane 的路由决策器。根据用户输入决定应该执行什么操作。`);
-
-        const routes = ['qa（问答）', 'mindmap（生成思维导图）'];
-        if (this.capabilityFlags.hasPalace) {
-            routes.push('palace（生成记忆宫殿）');
-        }
-        parts.push(`\n可选操作：${routes.join('、')}\n`);
-
-        if (this.context?.hasDocumentOpen) {
-            parts.push(`当前有打开的思维导图：${this.context.fileTitle || '未命名'}`);
-            parts.push(`选中节点数：${this.context.selectedNodes?.length || 0}\n`);
-        }
-
-        parts.push(`请分析用户意图并返回路由决定。`);
-
-        return parts.join('\n');
-    }
-}
-
-/**
  * 主上下文构建器 - 组装 System Prompt
  */
 export class ContextBuilder {
@@ -178,13 +144,3 @@ ${historyText}
     }
 }
 
-/**
- * 上下文模板工厂
- */
-export const ContextTemplates = {
-    /**
-     * 路由决策专用上下文
-     */
-    routeDecision: (context?: MindmapContextData, capabilityFlags?: CapabilityFlags) =>
-        new RouteDecisionContextBuilder(context, capabilityFlags),
-};
