@@ -7,3 +7,7 @@ export {
   createMindmapActionTools,
   type MindmapActionResult,
 } from './mindmapActions.js'
+export {
+  createRouteDecisionTool,
+  type RouteDecision,
+} from './routeDecisionTool.js'

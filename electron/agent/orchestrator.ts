@@ -309,20 +309,16 @@ export class AgentOrchestrator {
       caps.has(ProviderCapability.Vision);
 
     const tools: StructuredToolInterface[] = [];
-    const {
-      addTextNodeTool,
-      addPalaceNodeTool,
-      updateNodeTool,
-      deleteNodeTool,
-      batchAddNodesTool,
-    } = createMindmapActionTools();
+    const actionTools = createMindmapActionTools(hasPalace);
     tools.push(
-      addTextNodeTool,
-      addPalaceNodeTool,
-      updateNodeTool,
-      deleteNodeTool,
-      batchAddNodesTool,
+      actionTools.addTextNodeTool,
+      actionTools.updateNodeTool,
+      actionTools.deleteNodeTool,
+      actionTools.batchAddNodesTool,
     );
+    if (hasPalace && actionTools.addPalaceNodeTool) {
+      tools.push(actionTools.addPalaceNodeTool);
+    }
     const profileText = this.aiService.userProfile.getText();
 
     const supervisor = new MindLaneAgent(

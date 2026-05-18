@@ -1,8 +1,24 @@
 import { describe, it, expect } from 'vitest'
 import { createMindmapActionTools } from '../mindmapActions.js'
 
+describe('createMindmapActionTools', () => {
+  it('should include addPalaceNodeTool when hasPalace is true', () => {
+    const tools = createMindmapActionTools(true)
+    expect(tools.addPalaceNodeTool).toBeDefined()
+  })
+
+  it('should exclude addPalaceNodeTool when hasPalace is false', () => {
+    const tools = createMindmapActionTools(false)
+    expect(tools.addPalaceNodeTool).toBeUndefined()
+    expect(tools.addTextNodeTool).toBeDefined()
+    expect(tools.updateNodeTool).toBeDefined()
+    expect(tools.deleteNodeTool).toBeDefined()
+    expect(tools.batchAddNodesTool).toBeDefined()
+  })
+})
+
 describe('batchAddMindmapNodes', () => {
-  const tools = createMindmapActionTools()
+  const tools = createMindmapActionTools(true)
 
   it('should accept yamlFragment and parentId', async () => {
     const yaml = `

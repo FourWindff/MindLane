@@ -214,15 +214,26 @@ YAML 格式示例：
   }
 )
 
+export type MindmapActionTools = {
+  addTextNodeTool: typeof addTextNodeTool
+  updateNodeTool: typeof updateNodeTool
+  deleteNodeTool: typeof deleteNodeTool
+  batchAddNodesTool: typeof batchAddNodesTool
+  addPalaceNodeTool?: typeof addPalaceNodeTool
+}
+
 // 导出工具创建函数
-export function createMindmapActionTools() {
-  return {
+export function createMindmapActionTools(hasPalace = true): MindmapActionTools {
+  const tools: MindmapActionTools = {
     addTextNodeTool,
-    addPalaceNodeTool,
     updateNodeTool,
     deleteNodeTool,
     batchAddNodesTool,
   }
+  if (hasPalace) {
+    tools.addPalaceNodeTool = addPalaceNodeTool
+  }
+  return tools
 }
 
 // 导出类型供前端使用
