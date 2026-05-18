@@ -6,9 +6,7 @@ import type { BaseMessage } from '@langchain/core/messages'
 
 function createFakeModel(): BaseChatModel {
   return {
-    invoke: vi.fn().mockImplementation(async (_msgs: BaseMessage[]) => {
-      return new AIMessage('这是摘要内容。')
-    }),
+    invoke: vi.fn().mockResolvedValue(new AIMessage('这是摘要内容。')),
   } as unknown as BaseChatModel
 }
 
