@@ -47,3 +47,29 @@ export function messageContentToString(content: unknown): string {
   }
   return "";
 }
+
+/**
+ * 统一格式化 Agent 层错误，确保错误信息包含消息和堆栈。
+ *
+ * - Error 实例：返回 `${name}: ${message}\n${stack}`（有堆栈时）或仅 message
+ * - 非 Error 值：用 String() 转换，null → 'null'，undefined → 'Unknown error'
+ */
+export function formatAgentError(error: unknown): string {
+  if (error instanceof Error) {
+    if (error.stack) {
+      return `${error.name}: ${error.message}\n${error.stack}`
+    }
+    return error.message
+  }
+  if (
+    error !== null &&
+    error !== undefined &&
+    typeof error === 'object' &&
+    'message' in error
+  ) {
+    return String(error.message)
+  }
+  if (error === undefined) return 'Unknown error'
+  if (error === null) return 'null'
+  return String(error)
+}
