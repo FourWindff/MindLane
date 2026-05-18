@@ -24,6 +24,7 @@ import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
+import { logger } from "./shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
 import { AGENT_LIMITS } from "./config.js";
 
@@ -213,13 +214,21 @@ export class AgentOrchestrator {
           callbacks.onToolEnd(toolName, outputStr);
         }
       }
+      let result: MainGraphStateType | null = null;
+      try {
+        const snapshot = await app.getState({
+          configurable: { thread_id: request.threadId },
+        });
+        result = snapshot.values as MainGraphStateType;
+      } catch (err) {
+        logger.warn('[AgentOrchestrator] getState 失败，回退到流式内容:', err);
+      }
 
-      const snapshot = await app.getState({
-        configurable: { thread_id: request.threadId },
-      });
-      const result = snapshot.values as MainGraphStateType;
-
-      callbacks.onEnd(this.buildResponse(result, fullContent));
+      if (result) {
+        callbacks.onEnd(this.buildResponse(result, fullContent));
+      } else {
+        callbacks.onEnd({ content: fullContent || "抱歉，我无法生成回复。" });
+      }
     } catch (err) {
       if (signal?.aborted) {
         callbacks.onEnd({ content: fullContent || "（已停止生成）" });

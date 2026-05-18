@@ -4,8 +4,9 @@ import type { MemoryPalaceStation, StationDesign } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
 import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
-import { messageContentToString } from '../utils.js'
+import { messageContentToString, formatAgentError } from '../utils.js'
 import { PALACE_LAYOUT } from '../config.js'
+import { logger } from '../../shared/logger.js'
 
 const COORD_PAD = PALACE_LAYOUT.coordPad
 const MIN_DISTANCE = PALACE_LAYOUT.minDistance
@@ -279,7 +280,11 @@ export class AnchorAgent extends PalaceAgent {
         } else {
           memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
         }
-      } catch {
+      } catch (err) {
+        logger.warn(
+          '[AnchorAgent] locateAnchors 失败，降级到标准布局:\n',
+          formatAgentError(err),
+        )
         memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
       }
     } else {
@@ -302,7 +307,11 @@ export class AnchorAgent extends PalaceAgent {
       if (!summary) {
         summary = buildFallbackSummary(memoryRoute, hasImage)
       }
-    } catch {
+    } catch (err) {
+      logger.warn(
+        '[AnchorAgent] 总结生成失败，使用 fallback 摘要:\n',
+        formatAgentError(err),
+      )
       summary = buildFallbackSummary(memoryRoute, hasImage)
     }
 

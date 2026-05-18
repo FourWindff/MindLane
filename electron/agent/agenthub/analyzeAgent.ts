@@ -2,6 +2,8 @@ import { z } from 'zod/v3'
 import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryItem, StationDesign, SelectedNodeContent } from '../state.js'
 import { PalaceAgent } from './base.js'
+import { logger } from '../../shared/logger.js'
+import { formatAgentError } from '../utils.js'
 import {
   buildAnalyzeInputMessages,
   buildDesignMnemonicsMessages,
@@ -209,7 +211,8 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      return { error: error instanceof Error ? error.message : String(error) }
+      logger.error('[AnalyzeAgent] analyzeFromText 失败:\n', formatAgentError(error))
+      return { error: formatAgentError(error) }
     }
   }
 
@@ -271,7 +274,8 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      return { error: error instanceof Error ? error.message : String(error) }
+      logger.error('[AnalyzeAgent] analyzeFromNodes 失败:\n', formatAgentError(error))
+      return { error: formatAgentError(error) }
     }
   }
 }

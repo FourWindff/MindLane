@@ -310,7 +310,6 @@ function registerIpcHandlers() {
               }
             : undefined,
         }
-
         const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
         await orchestrator.stream(
           request,

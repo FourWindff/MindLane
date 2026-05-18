@@ -6,7 +6,8 @@ import type { LLMProvider } from "../../providers/index.js";
 import type { MainGraphStateType } from "../../state.js";
 import { BaseAgent } from "../base.js";
 import { ContextBuilder } from "./context.js";
-import { extractTextContent } from "../../utils.js";
+import { extractTextContent, formatAgentError } from "../../utils.js";
+import { logger } from "../../../shared/logger.js";
 import {
   createRouteDecisionTool,
   type RouteDecision,
@@ -56,47 +57,57 @@ export class MindLaneAgent extends BaseAgent {
   async invoke(
     state: MainGraphStateType,
   ): Promise<Partial<MainGraphStateType>> {
-    const systemPrompt = new ContextBuilder()
-      .withMessages(state.messages)
-      .withContext(state.context ?? undefined)
-      .withUserProfile(this.userProfile)
-      .withCapabilityFlags(this.capabilityFlags)
-      .buildSystemPrompt()
-      .buildEnvironmentPrompt()
-      .buildUserProfile()
-      .buildMindmapContext()
-      .buildHistory()
-      .build();
+    try {
+      const systemPrompt = new ContextBuilder()
+        .withMessages(state.messages)
+        .withContext(state.context ?? undefined)
+        .withUserProfile(this.userProfile)
+        .withCapabilityFlags(this.capabilityFlags)
+        .buildSystemPrompt()
+        .buildEnvironmentPrompt()
+        .buildUserProfile()
+        .buildMindmapContext()
+        .buildHistory()
+        .build();
 
-    const messagesWithSystem = [
-      new SystemMessage(systemPrompt),
-      ...state.messages,
-    ];
+      const messagesWithSystem = [
+        new SystemMessage(systemPrompt),
+        ...state.messages,
+      ];
 
-    const response = await this.modelWithTools.invoke(messagesWithSystem);
-    const content = extractTextContent(response.content);
-    const toolCalls = (response as AIMessage).tool_calls ?? [];
+      const response = await this.modelWithTools.invoke(messagesWithSystem);
+      const content = extractTextContent(response.content);
+      const toolCalls = (response as AIMessage).tool_calls ?? [];
 
-    const routeToolName = this.tools[this.tools.length - 1].name;
-    const nonRouteToolCalls = toolCalls.filter(
-      (tc) => tc.name !== routeToolName,
-    );
+      const routeToolName = this.tools[this.tools.length - 1].name;
+      const nonRouteToolCalls = toolCalls.filter(
+        (tc) => tc.name !== routeToolName,
+      );
 
-    if (nonRouteToolCalls.length > 0) {
-      return { messages: [response] };
+      if (nonRouteToolCalls.length > 0) {
+        return { messages: [response] };
+      }
+
+      const routeToolCall = toolCalls.find((tc) => tc.name === routeToolName);
+      if (routeToolCall) {
+        const decision = routeToolCall.args as RouteDecision;
+        return this.executeRouteDecision(response, decision, content);
+      }
+
+      return {
+        messages: [response],
+        intent: "qa",
+        response: content,
+      };
+    } catch (err) {
+      const formatted = formatAgentError(err);
+      logger.error('[MindLaneAgent] invoke 失败:\n', formatted);
+      return {
+        messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
+        error: formatted,
+        response: '处理请求时出错，请稍后重试。',
+      };
     }
-
-    const routeToolCall = toolCalls.find((tc) => tc.name === routeToolName);
-    if (routeToolCall) {
-      const decision = routeToolCall.args as RouteDecision;
-      return this.executeRouteDecision(response, decision, content);
-    }
-
-    return {
-      messages: [response],
-      intent: "qa",
-      response: content,
-    };
   }
 
   async invokeTools(
@@ -165,10 +176,14 @@ export class MindLaneAgent extends BaseAgent {
     decision: RouteDecision,
     content: string,
   ): Partial<MainGraphStateType> {
+    // 路由决策已被本地拦截处理，不应将 tool_calls 存入状态，
+    // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误
+    const cleanResponse = response;
+    (cleanResponse as AIMessage).tool_calls = undefined;
     switch (decision.target) {
       case "mindmap":
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "mindmap",
           mindmapInputText: decision.parameters?.mindmapInput || content,
           mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
@@ -176,7 +191,7 @@ export class MindLaneAgent extends BaseAgent {
         };
       case "palace":
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "palace",
           palaceInputText: decision.parameters?.palaceInput || content,
           response: content,
@@ -184,7 +199,7 @@ export class MindLaneAgent extends BaseAgent {
       case "qa":
       default:
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "qa",
           response: content,
         };
