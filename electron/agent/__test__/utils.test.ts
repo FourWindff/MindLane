@@ -6,7 +6,7 @@ describe('formatAgentError', () => {
     const error = new Error('something broke')
     const result = formatAgentError(error)
     expect(result).toContain('something broke')
-    expect(result).toContain('Error: something broke')
+    expect(result.startsWith('Error: something broke')).toBe(true)
   })
 
   test('includes stack trace when available', () => {
@@ -23,7 +23,7 @@ describe('formatAgentError', () => {
   })
 
   test('handles Error without stack', () => {
-    const error = { message: 'no stack' } as Error
+    const error = { message: 'no stack' }
     const result = formatAgentError(error)
     expect(result).toBe('no stack')
   })

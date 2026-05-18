@@ -56,18 +56,11 @@ export function messageContentToString(content: unknown): string {
  */
 export function formatAgentError(error: unknown): string {
   if (error instanceof Error) {
-    if (error.stack) {
-      return `${error.name}: ${error.message}\n${error.stack}`
-    }
-    return error.message
+    return error.stack ?? `${error.name}: ${error.message}`
   }
-  if (
-    error !== null &&
-    error !== undefined &&
-    typeof error === 'object' &&
-    'message' in error
-  ) {
-    return String(error.message)
+  if (error && typeof error === 'object' && 'message' in error) {
+    const name = 'name' in error ? `${String((error as Record<string, unknown>).name)}: ` : ''
+    return name + String((error as Record<string, unknown>).message)
   }
   if (error === undefined) return 'Unknown error'
   if (error === null) return 'null'
