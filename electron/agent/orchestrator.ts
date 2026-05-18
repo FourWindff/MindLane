@@ -1,5 +1,5 @@
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
-import { END, START, StateGraph, MemorySaver } from "@langchain/langgraph";
+import { END, START, StateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { type LLMProvider, ProviderCapability } from "./providers/index.js";
 import { urlToDataUrl } from "./providers/index.js";
@@ -96,6 +96,12 @@ export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
 
 export class AgentOrchestrator {
   private sessionManager: SessionManager | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private compiledMainGraph: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private compiledMindmapSubgraph: any = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private compiledPalaceSubgraph: any = null;
 
   constructor(
     private provider: LLMProvider,
@@ -119,15 +125,43 @@ export class AgentOrchestrator {
     return this.sessionManager;
   }
 
+  private getCompiledMainGraph() {
+    if (!this.compiledMainGraph) {
+      const graph = this.buildGraph();
+      const checkpointer = this.aiService.checkpointer.getAdapter();
+      this.compiledMainGraph = graph.compile(
+        checkpointer ? { checkpointer } : undefined,
+      );
+    }
+    return this.compiledMainGraph;
+  }
+
+  private getCompiledMindmapSubgraph() {
+    if (!this.compiledMindmapSubgraph) {
+      this.compiledMindmapSubgraph = buildMindmapSubgraph({
+        provider: this.provider,
+      }).compile();
+    }
+    return this.compiledMindmapSubgraph;
+  }
+
+  private getCompiledPalaceSubgraph() {
+    if (!this.compiledPalaceSubgraph) {
+      this.compiledPalaceSubgraph = buildPalaceSubgraph({
+        provider: this.provider,
+      }).compile();
+    }
+    return this.compiledPalaceSubgraph;
+  }
+
   async run(request: ChatRequest): Promise<ChatResponse> {
     // 从后端加载历史消息并构建上下文
     const contextMessages = await this.buildContextMessages(request);
-    const graph = this.buildGraph(request.context);
-    const app = graph.compile();
+    const app = this.getCompiledMainGraph();
 
     const result = await app.invoke(
       { messages: contextMessages, context: request.context ?? null },
-      { recursionLimit: 80 },
+      { recursionLimit: 80, configurable: { thread_id: request.threadId } },
     );
 
     return this.buildResponse(result as MainGraphStateType);
@@ -140,10 +174,7 @@ export class AgentOrchestrator {
   ): Promise<void> {
     // 从后端加载历史消息并构建上下文
     const contextMessages = await this.buildContextMessages(request);
-    const graph = this.buildGraph(request.context);
-    const checkpointer = new MemorySaver();
-    const app = graph.compile({ checkpointer });
-    const threadId = `stream-${Date.now()}`;
+    const app = this.getCompiledMainGraph();
 
     let fullContent = "";
 
@@ -152,7 +183,7 @@ export class AgentOrchestrator {
         version: "v2" as const,
         signal,
         recursionLimit: 80,
-        configurable: { thread_id: threadId },
+        configurable: { thread_id: request.threadId },
       };
 
       const stream = app.streamEvents(
@@ -183,7 +214,7 @@ export class AgentOrchestrator {
       }
 
       const snapshot = await app.getState({
-        configurable: { thread_id: threadId },
+        configurable: { thread_id: request.threadId },
       });
       const result = snapshot.values as MainGraphStateType;
 
@@ -216,10 +247,7 @@ export class AgentOrchestrator {
     }
 
     // 使用独立的 Palace Subgraph
-    const palaceSubgraph = buildPalaceSubgraph({
-      provider: this.provider,
-    });
-    const app = palaceSubgraph.compile();
+    const app = this.getCompiledPalaceSubgraph();
 
     try {
       const result = await app.invoke(
@@ -309,61 +337,19 @@ export class AgentOrchestrator {
       .addNode("tools", (state) => supervisor.invokeTools(state));
 
     // 添加 mindmap subgraph（无条件，所有 provider 都支持）
-    const mindmapSubgraph = buildMindmapSubgraph({
-      provider: this.provider,
-    });
-
-    const mindmapSubgraphWrapper = async (
-      state: MainGraphStateType,
-    ): Promise<Partial<MainGraphStateType>> => {
-      try {
-        const app = mindmapSubgraph.compile();
-        const result = await app.invoke(state, { recursionLimit: 80 });
-
-        return {
-          mindmapNodes: result.mindmapNodes,
-          mindmapEdges: result.mindmapEdges,
-          mindmapTitle: result.mindmapTitle,
-          error: result.error,
-          response: result.response,
-        };
-      } catch (error) {
-        return {
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    };
-
-    graph.addNode("mindmapSubgraph", mindmapSubgraphWrapper);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (graph as any).addNode(
+      "mindmapSubgraph",
+      this.getCompiledMindmapSubgraph(),
+    );
 
     // 条件化添加 palace subgraph
     if (hasPalace) {
-      const palaceSubgraph = buildPalaceSubgraph({
-        provider: this.provider,
-      });
-
-      const palaceSubgraphWrapper = async (
-        state: MainGraphStateType,
-      ): Promise<Partial<MainGraphStateType>> => {
-        try {
-          const app = palaceSubgraph.compile();
-          const result = await app.invoke(state, { recursionLimit: 80 });
-
-          return {
-            palaceInputText: result.palaceInputText,
-            palaceInputNodes: result.palaceInputNodes,
-            imageUrls: result.imageUrls,
-            memoryRoute: result.memoryRoute,
-            error: result.error,
-          };
-        } catch (error) {
-          return {
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
-      };
-
-      graph.addNode("palaceSubgraph", palaceSubgraphWrapper);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (graph as any).addNode(
+        "palaceSubgraph",
+        this.getCompiledPalaceSubgraph(),
+      );
     }
 
     graph.addEdge(START, "supervisor");
