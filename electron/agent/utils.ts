@@ -60,7 +60,8 @@ export function formatAgentError(error: unknown): string {
   }
   if (error && typeof error === 'object' && 'message' in error) {
     const name = 'name' in error ? `${String((error as Record<string, unknown>).name)}: ` : ''
-    return name + String((error as Record<string, unknown>).message)
+    const stack = 'stack' in error ? String((error as Record<string, unknown>).stack) : ''
+    return stack || (name + String((error as Record<string, unknown>).message))
   }
   if (error === undefined) return 'Unknown error'
   if (error === null) return 'null'

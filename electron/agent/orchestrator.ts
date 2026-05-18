@@ -24,6 +24,7 @@ import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
+import { logger } from "./shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
 import { AGENT_LIMITS } from "./config.js";
 
@@ -180,7 +181,6 @@ export class AgentOrchestrator {
     let fullContent = "";
 
     try {
-      console.log("[DEBUG stream] threadId:", request.threadId, "msg count:", contextMessages.length);
       const streamConfig = {
         version: "v2" as const,
         signal,
@@ -188,15 +188,12 @@ export class AgentOrchestrator {
         configurable: { thread_id: request.threadId },
       };
 
-      console.log("[DEBUG stream] calling streamEvents...");
       const stream = app.streamEvents(
         { messages: contextMessages, context: request.context ?? null },
         streamConfig,
       );
 
-      let eventCount = 0;
       for await (const event of stream) {
-        eventCount++;
         if (signal?.aborted) break;
 
         if (event.event === "on_chat_model_stream") {
@@ -217,16 +214,14 @@ export class AgentOrchestrator {
           callbacks.onToolEnd(toolName, outputStr);
         }
       }
-      console.log("[DEBUG stream] event count:", eventCount);
-
       let result: MainGraphStateType | null = null;
       try {
         const snapshot = await app.getState({
           configurable: { thread_id: request.threadId },
         });
         result = snapshot.values as MainGraphStateType;
-      } catch {
-        // 无 checkpointer 时无法 getState，回退到仅使用流式内容
+      } catch (err) {
+        logger.warn('[AgentOrchestrator] getState 失败，回退到流式内容:', err);
       }
 
       if (result) {
@@ -235,7 +230,6 @@ export class AgentOrchestrator {
         callbacks.onEnd({ content: fullContent || "抱歉，我无法生成回复。" });
       }
     } catch (err) {
-      console.error("[DEBUG stream] ERROR:", err);
       if (signal?.aborted) {
         callbacks.onEnd({ content: fullContent || "（已停止生成）" });
         return;
@@ -443,23 +437,19 @@ export class AgentOrchestrator {
   ): Promise<BaseMessage[]> {
     // 从上下文中获取工作区路径
     const workspacePath = request.context?.workspacePath;
-    console.log("[DEBUG buildContextMessages] threadId:", request.threadId, "workspacePath:", workspacePath);
 
     if (!workspacePath) {
       // 没有工作区时，仅使用当前消息
-      console.log("[DEBUG buildContextMessages] no workspace, returning single HumanMessage");
       return [new HumanMessage(request.message)];
     }
 
     // 从后端加载历史并构建上下文消息
     const sessionManager = this.getSessionManager(workspacePath);
-    const result = await sessionManager.buildContextMessages(
+    return sessionManager.buildContextMessages(
       request.threadId,
       this.provider,
       request.message,
     );
-    console.log("[DEBUG buildContextMessages] loaded", result.length, "messages from sessionManager");
-    return result;
   }
 
   private extractToolCalls(messages: BaseMessage[]): ChatResponse["toolCalls"] {

@@ -149,7 +149,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
         const formatted = formatAgentError(error)
         return {
           error: formatted,
-          response: `生成思维导图失败：${error instanceof Error ? error.message : String(error)}`,
+          response: `生成思维导图失败：${formatted.split('\n')[0]}`,
         }
       }
     })

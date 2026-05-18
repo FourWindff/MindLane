@@ -64,7 +64,7 @@ export class ImageGenAgent extends PalaceAgent {
       return {
         imagePrompt: '',
         imageUrls: [],
-        imageError: err instanceof Error ? err.message : String(err),
+        imageError: formatted,
       }
     }
   }

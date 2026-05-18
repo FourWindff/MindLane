@@ -310,10 +310,7 @@ function registerIpcHandlers() {
               }
             : undefined,
         }
-        console.log('[DEBUG main] chat-stream request threadId:', request.threadId, 'msg:', request.message.substring(0, 30));
-
         const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
-        console.log('[DEBUG main] calling orchestrator.stream...');
         await orchestrator.stream(
           request,
           {

@@ -103,6 +103,7 @@ export class MindLaneAgent extends BaseAgent {
       const formatted = formatAgentError(err);
       logger.error('[MindLaneAgent] invoke 失败:\n', formatted);
       return {
+        messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
         response: '处理请求时出错，请稍后重试。',
       };
@@ -177,7 +178,8 @@ export class MindLaneAgent extends BaseAgent {
   ): Partial<MainGraphStateType> {
     // 路由决策已被本地拦截处理，不应将 tool_calls 存入状态，
     // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误
-    const cleanResponse = new AIMessage({ content: response.content });
+    const cleanResponse = response;
+    (cleanResponse as AIMessage).tool_calls = undefined;
     switch (decision.target) {
       case "mindmap":
         return {

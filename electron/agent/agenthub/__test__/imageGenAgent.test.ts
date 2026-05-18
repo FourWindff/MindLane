@@ -35,7 +35,7 @@ describe('ImageGenAgent error logging', () => {
     const result = await agent.invoke(state)
 
     expect(consoleErrorSpy).toHaveBeenCalled()
-    expect(result.imageError).toBe('API rate limit exceeded')
+    expect(result.imageError).toContain('API rate limit exceeded')
     expect(result.imageUrls).toEqual([])
   })
 })
