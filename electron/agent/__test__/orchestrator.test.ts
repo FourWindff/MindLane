@@ -94,3 +94,27 @@ describe("AgentOrchestrator checkpointer 注入", () => {
     expect(instance).toBeDefined();
   });
 });
+
+describe("AgentOrchestrator buildGraph 结构", () => {
+  it("无论 hasPalace 如何，graph 节点结构完全一致", () => {
+    const providerWithPalace = createMockProvider(
+      new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
+    );
+    const providerWithoutPalace = createMockProvider(
+      new Set([ProviderCapability.Chat]),
+    );
+
+    const orchestratorWith = new AgentOrchestrator(providerWithPalace, createMockAiService(), "/tmp");
+    const orchestratorWithout = new AgentOrchestrator(providerWithoutPalace, createMockAiService(), "/tmp");
+
+    const buildGraphWith = (orchestratorWith as unknown as Record<string, () => { nodes: Record<string, unknown> }>)["buildGraph"].bind(orchestratorWith);
+    const buildGraphWithout = (orchestratorWithout as unknown as Record<string, () => { nodes: Record<string, unknown> }>)["buildGraph"].bind(orchestratorWithout);
+
+    const graphWith = buildGraphWith();
+    const graphWithout = buildGraphWithout();
+
+    expect(Object.keys(graphWith.nodes)).toContain("palaceSubgraph");
+    expect(Object.keys(graphWithout.nodes)).toContain("palaceSubgraph");
+    expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes));
+  });
+});
