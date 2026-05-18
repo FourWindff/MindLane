@@ -13,7 +13,7 @@ export async function compressMessages(
   messages: BaseMessage[],
   model: BaseChatModel,
 ): Promise<BaseMessage[]> {
-  if (!isOverTokenLimit(messages, AGENT_LIMITS.summaryTriggerCount)) {
+  if (!isOverTokenLimit(messages, AGENT_LIMITS.summaryTriggerTokens)) {
     return trimMessages(messages, {
       maxTokens: AGENT_LIMITS.maxTokens,
       strategy: 'last',

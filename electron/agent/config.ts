@@ -11,15 +11,15 @@
  *
  * - recursionLimit: LangGraph `StateGraph` 单次 invoke/stream 允许的最大节点
  *   迭代次数（防止 supervisor ↔ tools 无限循环），单位：步数。
- * - maxTokens: 上下文 `trimMessages` 保留的近似 token 上限，单位：token
- *   （近似 ≈ 字符数 / 3）。
- * - summaryTriggerCount: 历史消息数超过此阈值后切换为"摘要 + 最近若干条"
- *   策略，单位：消息条数。
+ * - maxTokens: 上下文 `trimMessages` 保留的真实 token 上限，单位：token。
+ *   使用 js-tiktoken (cl100k_base) 精确计数。
+ * - summaryTriggerTokens: 历史消息总 token 数超过此阈值后切换为"摘要 + 最近若干条"
+ *   策略，单位：token。
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
   maxTokens: 4000,
-  summaryTriggerCount: 20,
+  summaryTriggerTokens: 6000,
 } as const
 
 /**
