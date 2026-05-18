@@ -111,6 +111,10 @@ export const PalaceStateAnnotations = {
     reducer: (_prev, next) => next,
     default: () => [],
   }),
+  imageError: Annotation<string | undefined>({
+    reducer: (_prev, next) => next,
+    default: () => undefined,
+  }),
   detectedCoords: Annotation<DetectedAnchor[]>({
     reducer: (_prev, next) => next,
     default: () => [],
