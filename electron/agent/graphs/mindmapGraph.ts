@@ -2,7 +2,7 @@ import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../providers/index.js'
 import { MindmapSubgraphState } from '../state.js'
 import { buildExtractStructureMessages } from '../agenthub/prompts/docToMindmap.js'
-import { extractTextContent } from '../utils.js'
+import { extractTextContent, formatAgentError } from '../utils.js'
 
 // ===== 配置选项 =====
 
@@ -146,10 +146,10 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
           response: `已生成思维导图「${finalTitle}」，共 ${tree.nodes.length + 2} 个节点。`,
         }
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error)
+        const formatted = formatAgentError(error)
         return {
-          error: `生成思维导图失败：${errorMsg}`,
-          response: `生成思维导图失败：${errorMsg}`,
+          error: formatted,
+          response: `生成思维导图失败：${error instanceof Error ? error.message : String(error)}`,
         }
       }
     })
