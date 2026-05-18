@@ -115,7 +115,7 @@ export class AgentOrchestrator {
   private getSessionManager(workspacePath: string): SessionManager {
     if (
       !this.sessionManager ||
-      this.sessionManager["workspacePath"] !== workspacePath
+      this.sessionManager.workspacePath !== workspacePath
     ) {
       this.sessionManager = new SessionManager(
         this.userDataPath,
@@ -328,52 +328,43 @@ export class AgentOrchestrator {
       { hasEmbeddings: false, hasPalace },
     );
 
-    const graph = new StateGraph(MainGraphState)
-      .addNode("supervisor", (state) => supervisor.invoke(state))
-      .addNode("tools", (state) => supervisor.invokeTools(state));
-
-    // 添加 mindmap subgraph（无条件，所有 provider 都支持）
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (graph as any).addNode(
-      "mindmapSubgraph",
-      this.getCompiledMindmapSubgraph(),
-    );
-
-    // 条件化添加 palace subgraph
+    // 链式构造：一次性把所有节点加进去，让 TypeScript 累积节点名联合类型 N。
+    // 拆开写或在 if 分支里 reassign 会丢失类型，因此根据 hasPalace 走两条完整链。
     if (hasPalace) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addNode(
-        "palaceSubgraph",
-        this.getCompiledPalaceSubgraph(),
-      );
+      const graph = new StateGraph(MainGraphState)
+        .addNode("supervisor", (state) => supervisor.invoke(state))
+        .addNode("tools", (state) => supervisor.invokeTools(state))
+        .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
+        .addNode("palaceSubgraph", this.getCompiledPalaceSubgraph())
+        .addEdge(START, "supervisor")
+        .addConditionalEdges(
+          "supervisor",
+          (state: MainGraphStateType) => {
+            const route = supervisor.route(state);
+            if (route === "supervisor") return "supervisor";
+            return route;
+          },
+          {
+            tools: "tools",
+            supervisor: "supervisor",
+            mindmapSubgraph: "mindmapSubgraph",
+            palaceSubgraph: "palaceSubgraph",
+            __end__: END,
+          },
+        )
+        .addEdge("mindmapSubgraph", END)
+        .addEdge("palaceSubgraph", END)
+        .addEdge("tools", "supervisor");
+
+      return graph;
     }
 
-    graph.addEdge(START, "supervisor");
-
-    if (hasPalace) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addConditionalEdges(
-        "supervisor",
-        (state: MainGraphStateType) => {
-          const route = supervisor.route(state);
-          if (route === "supervisor") return "supervisor";
-          return route;
-        },
-        {
-          tools: "tools",
-          supervisor: "supervisor",
-          mindmapSubgraph: "mindmapSubgraph",
-          palaceSubgraph: "palaceSubgraph",
-          __end__: END,
-        },
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addEdge("mindmapSubgraph", END);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addEdge("palaceSubgraph", END);
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addConditionalEdges(
+    const graph = new StateGraph(MainGraphState)
+      .addNode("supervisor", (state) => supervisor.invoke(state))
+      .addNode("tools", (state) => supervisor.invokeTools(state))
+      .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
+      .addEdge(START, "supervisor")
+      .addConditionalEdges(
         "supervisor",
         (state: MainGraphStateType) => {
           const route = supervisor.route(state);
@@ -387,12 +378,9 @@ export class AgentOrchestrator {
           mindmapSubgraph: "mindmapSubgraph",
           __end__: END,
         },
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (graph as any).addEdge("mindmapSubgraph", END);
-    }
-
-    graph.addEdge("tools", "supervisor");
+      )
+      .addEdge("mindmapSubgraph", END)
+      .addEdge("tools", "supervisor");
 
     return graph;
   }
