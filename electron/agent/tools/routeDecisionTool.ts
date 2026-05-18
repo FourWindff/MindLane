@@ -1,19 +1,34 @@
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 
-const RouteDecisionSchema = z.object({
-  target: z.enum(['qa', 'mindmap', 'palace']),
-  reason: z.string().optional(),
-  parameters: z
-    .object({
-      mindmapInput: z.string().optional(),
-      mindmapTitle: z.string().optional(),
-      palaceInput: z.string().optional(),
-    })
-    .optional(),
-})
+type RouteTarget = 'qa' | 'mindmap' | 'palace'
 
-export type RouteDecision = z.infer<typeof RouteDecisionSchema>
+function createRouteDecisionSchema(hasPalace: boolean) {
+  const targets: RouteTarget[] = hasPalace
+    ? ['qa', 'mindmap', 'palace']
+    : ['qa', 'mindmap']
+  return z.object({
+    target: z.enum(targets as [RouteTarget, ...RouteTarget[]]),
+    reason: z.string().optional(),
+    parameters: z
+      .object({
+        mindmapInput: z.string().optional(),
+        mindmapTitle: z.string().optional(),
+        palaceInput: z.string().optional(),
+      })
+      .optional(),
+  })
+}
+
+export type RouteDecision = {
+  target: RouteTarget
+  reason?: string
+  parameters?: {
+    mindmapInput?: string
+    mindmapTitle?: string
+    palaceInput?: string
+  }
+}
 
 /**
  * 创建路由决策工具。
@@ -33,7 +48,7 @@ export function createRouteDecisionTool(hasPalace: boolean): DynamicStructuredTo
   return new DynamicStructuredTool({
     name: 'routeDecision',
     description: '根据用户请求决定执行的操作。' + routes.join('；') + '。',
-    schema: RouteDecisionSchema,
+    schema: createRouteDecisionSchema(hasPalace),
     func: async () => '',
   })
 }
