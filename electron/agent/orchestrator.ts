@@ -25,6 +25,7 @@ import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
+import { AGENT_LIMITS } from "./config.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -161,7 +162,7 @@ export class AgentOrchestrator {
 
     const result = await app.invoke(
       { messages: contextMessages, context: request.context ?? null },
-      { recursionLimit: 80, configurable: { thread_id: request.threadId } },
+      { recursionLimit: AGENT_LIMITS.recursionLimit, configurable: { thread_id: request.threadId } },
     );
 
     return this.buildResponse(result as MainGraphStateType);
@@ -182,7 +183,7 @@ export class AgentOrchestrator {
       const streamConfig = {
         version: "v2" as const,
         signal,
-        recursionLimit: 80,
+        recursionLimit: AGENT_LIMITS.recursionLimit,
         configurable: { thread_id: request.threadId },
       };
 
@@ -264,7 +265,7 @@ export class AgentOrchestrator {
           detectedCoords: [],
           memoryRoute: [],
         },
-        { recursionLimit: 80 },
+        { recursionLimit: AGENT_LIMITS.recursionLimit },
       );
 
       if (result.error) {
