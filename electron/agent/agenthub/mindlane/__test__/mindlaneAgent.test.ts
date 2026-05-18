@@ -302,4 +302,20 @@ describe('MindLaneAgent.route()', () => {
 
     expect(agent.route(state)).toBe('__end__')
   })
+
+  it('禁用 palace 时 intent=palace 回退到 __end__', () => {
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      [mockSearchTool],
+      undefined,
+      { hasEmbeddings: true, hasPalace: false },
+    )
+
+    const state = {
+      ...createInitialState(),
+      intent: 'palace' as const,
+    }
+
+    expect(agent.route(state)).toBe('__end__')
+  })
 })

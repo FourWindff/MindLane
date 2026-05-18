@@ -152,7 +152,7 @@ export class MindLaneAgent extends BaseAgent {
 
     switch (state.intent) {
       case "palace":
-        return "palaceSubgraph";
+        return this.capabilityFlags.hasPalace ? "palaceSubgraph" : "__end__";
       case "mindmap":
         return "mindmapSubgraph";
       default:
