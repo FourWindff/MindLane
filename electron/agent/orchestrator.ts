@@ -329,58 +329,30 @@ export class AgentOrchestrator {
       { hasEmbeddings: false, hasPalace },
     );
 
-    // 链式构造：一次性把所有节点加进去，让 TypeScript 累积节点名联合类型 N。
-    // 拆开写或在 if 分支里 reassign 会丢失类型，因此根据 hasPalace 走两条完整链。
-    if (hasPalace) {
-      const graph = new StateGraph(MainGraphState)
-        .addNode("supervisor", (state) => supervisor.invoke(state))
-        .addNode("tools", (state) => supervisor.invokeTools(state))
-        .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
-        .addNode("palaceSubgraph", this.getCompiledPalaceSubgraph())
-        .addEdge(START, "supervisor")
-        .addConditionalEdges(
-          "supervisor",
-          (state: MainGraphStateType) => {
-            const route = supervisor.route(state);
-            if (route === "supervisor") return "supervisor";
-            return route;
-          },
-          {
-            tools: "tools",
-            supervisor: "supervisor",
-            mindmapSubgraph: "mindmapSubgraph",
-            palaceSubgraph: "palaceSubgraph",
-            __end__: END,
-          },
-        )
-        .addEdge("mindmapSubgraph", END)
-        .addEdge("palaceSubgraph", END)
-        .addEdge("tools", "supervisor");
+    // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退
+    const routeFn = (state: MainGraphStateType) => {
+      const route = supervisor.route(state);
+      if (route === "supervisor") return "supervisor";
+      return route;
+    };
 
-      return graph;
-    }
-
+    // 统一 graph 结构：始终包含 palaceSubgraph 节点
+    // hasPalace=false 时子图仍会被编译但永远不会被执行（route() 已保证）
     const graph = new StateGraph(MainGraphState)
       .addNode("supervisor", (state) => supervisor.invoke(state))
       .addNode("tools", (state) => supervisor.invokeTools(state))
       .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
+      .addNode("palaceSubgraph", this.getCompiledPalaceSubgraph())
       .addEdge(START, "supervisor")
-      .addConditionalEdges(
-        "supervisor",
-        (state: MainGraphStateType) => {
-          const route = supervisor.route(state);
-          if (route === "supervisor") return "supervisor";
-          if (route === "palaceSubgraph") return "__end__";
-          return route;
-        },
-        {
-          tools: "tools",
-          supervisor: "supervisor",
-          mindmapSubgraph: "mindmapSubgraph",
-          __end__: END,
-        },
-      )
+      .addConditionalEdges("supervisor", routeFn, {
+        tools: "tools",
+        supervisor: "supervisor",
+        mindmapSubgraph: "mindmapSubgraph",
+        palaceSubgraph: "palaceSubgraph",
+        __end__: END,
+      })
       .addEdge("mindmapSubgraph", END)
+      .addEdge("palaceSubgraph", END)
       .addEdge("tools", "supervisor");
 
     return graph;
