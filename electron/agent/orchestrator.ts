@@ -1,4 +1,3 @@
-import path from 'node:path'
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -97,7 +96,6 @@ export interface PalaceFromNodesError {
 export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
 
 export class AgentOrchestrator {
-  private sessionManager: SessionManager | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private compiledMainGraph: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,20 +106,14 @@ export class AgentOrchestrator {
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
-    private userDataPath: string,
   ) {}
 
   /**
    * 获取或配置 SessionManager 的工作区
    */
   private getSessionManager(workspacePath: string): SessionManager {
-    if (!this.sessionManager) {
-      this.sessionManager = new SessionManager();
-      const dbPath = path.join(this.userDataPath, 'memory', 'app.db');
-      this.sessionManager.init(dbPath);
-    }
-    this.sessionManager.setWorkspace(workspacePath);
-    return this.sessionManager;
+    this.aiService.sessionManager.setWorkspace(workspacePath);
+    return this.aiService.sessionManager;
   }
 
   private getCompiledMainGraph() {

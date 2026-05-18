@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { type LLMProvider, urlToDataUrl, createProvider, getProviderMeta, getRegisteredProviders } from './agent/providers/index.js'
+import { urlToDataUrl, createProvider, getProviderMeta, getRegisteredProviders } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -290,8 +290,6 @@ function registerIpcHandlers() {
           baseUrl: providerConfig?.baseUrl,
         })
 
-        const userDataPath = app.getPath('userData')
-
         if (!payload.message?.trim()) {
           win?.webContents.send('ai:chat-stream-error', '消息不能为空')
           return
@@ -311,7 +309,7 @@ function registerIpcHandlers() {
             : undefined,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
+        const orchestrator = new AgentOrchestrator(provider, aiService)
         await orchestrator.stream(
           request,
           {
@@ -393,8 +391,7 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const userDataPath = app.getPath('userData')
-      const orchestrator = new AgentOrchestrator(provider, aiService, userDataPath)
+      const orchestrator = new AgentOrchestrator(provider, aiService)
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
   )
@@ -1051,15 +1048,14 @@ app.whenReady().then(async () => {
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerConfig = settings.providerConfigs[providerId]
     const apiKey = providerConfig?.apiKey || settings.apiKey || ''
-    let provider: LLMProvider | undefined
     if (apiKey) {
-      provider = createProvider(providerId, {
+      createProvider(providerId, {
         apiKey,
         chatModel: settings.chatModel || 'qwen-turbo',
         baseUrl: providerConfig?.baseUrl,
       })
     }
-    await aiService.init(userDataPath, provider)
+    await aiService.init(userDataPath)
   } catch (err) {
     console.error('AI service init failed:', err)
   }
