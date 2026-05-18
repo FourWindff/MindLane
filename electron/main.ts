@@ -11,7 +11,6 @@ import {
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
-import nodeCrypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
 import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
@@ -24,6 +23,7 @@ import {
   type MindmapGenerationProgress,
 } from './services/mindmapGenerationService.js'
 import type { AnthropicLabConfig } from './lab/mindmapworkflow.js'
+import { SessionMessage } from './agent/db/chatDb.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -658,100 +658,39 @@ function registerIpcHandlers() {
   )
 
   // -- Chat History (Multi-session support) --
-  const chatHistoryDir = path.join(app.getPath('userData'), 'chat-history')
-  fs.mkdirSync(chatHistoryDir, { recursive: true })
 
-  function workspaceChatDir(workspacePath: string): string {
-    const wsId = nodeCrypto.createHash('md5').update(workspacePath).digest('hex').slice(0, 12)
-    const dir = path.join(chatHistoryDir, wsId)
-    fs.mkdirSync(dir, { recursive: true })
-    return dir
-  }
-
-  function sessionFilePath(workspacePath: string, sessionId: string): string {
-    return path.join(workspaceChatDir(workspacePath), `${sessionId}.json`)
-  }
-
-  function sessionsMetaPath(workspacePath: string): string {
-    return path.join(workspaceChatDir(workspacePath), 'sessions.json')
-  }
-
-  interface ChatSessionMeta {
-    id: string
-    title: string
-    createdAt: string
-    updatedAt: string
-    messageCount: number
-  }
-
-  function loadSessionsMeta(workspacePath: string): ChatSessionMeta[] {
+  ipcMain.handle('chat:list-sessions', async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
     try {
-      const metaPath = sessionsMetaPath(workspacePath)
-      if (fs.existsSync(metaPath)) {
-        const data = JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
-        return Array.isArray(data.sessions) ? data.sessions : []
-      }
-    } catch { /* ignore */ }
-    return []
-  }
-
-  function saveSessionsMeta(workspacePath: string, sessions: ChatSessionMeta[]) {
-    try {
-      const metaPath = sessionsMetaPath(workspacePath)
-      fs.writeFileSync(metaPath, JSON.stringify({ sessions }, null, 2), 'utf-8')
-    } catch (err) {
-      console.error('Failed to save sessions meta:', err)
-    }
-  }
-
-  function generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-  }
-
-  function generateSessionTitle(messages: Array<{ role: string; content: string }>): string {
-    const firstUserMessage = messages.find(m => m.role === 'user')
-    if (firstUserMessage) {
-      const title = firstUserMessage.content.slice(0, 30)
-      return title.length < firstUserMessage.content.length ? title + '...' : title
-    }
-    return `新对话 ${new Date().toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-  }
-
-  // List all sessions for a workspace
-  ipcMain.handle('chat:list-sessions', async (_e, payload: { workspacePath: string }) => {
-    try {
-      const sessions = loadSessionsMeta(payload.workspacePath)
+      aiService.sessionManager.setWorkspace(payload.workspacePath)
+      const sessions = await aiService.sessionManager.listSessions(payload.limit, payload.offset)
       return { ok: true, data: { sessions } }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  // Load a specific session
   ipcMain.handle('chat:load-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
     try {
-      const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
-      if (fs.existsSync(filePath)) {
-        const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-        return {
-          ok: true,
-          data: {
-            sessionId: payload.sessionId,
-            messages: Array.isArray(data.messages) ? data.messages : [],
-          },
-        }
+      aiService.sessionManager.setWorkspace(payload.workspacePath)
+      const messages = await aiService.sessionManager.loadHistory(payload.sessionId)
+      return {
+        ok: true,
+        data: {
+          sessionId: payload.sessionId,
+          messages,
+        },
       }
-    } catch { /* corrupted file, return empty */ }
-    return {
-      ok: true,
-      data: {
-        sessionId: payload.sessionId,
-        messages: [],
-      },
+    } catch (err) {
+      return {
+        ok: true,
+        data: {
+          sessionId: payload.sessionId,
+          messages: [],
+        },
+      }
     }
   })
 
-  // Save a session
   ipcMain.handle(
     'chat:save-session',
     async (
@@ -767,37 +706,10 @@ function registerIpcHandlers() {
       },
     ) => {
       try {
-        const sessions = loadSessionsMeta(payload.workspacePath)
-        const existingIndex = sessions.findIndex(s => s.id === payload.sessionId)
-        const now = new Date().toISOString()
-
-        const title = existingIndex >= 0 && sessions[existingIndex].title
-          ? sessions[existingIndex].title
-          : generateSessionTitle(payload.messages)
-
-        const sessionMeta: ChatSessionMeta = {
-          id: payload.sessionId,
-          title,
-          createdAt: existingIndex >= 0 ? sessions[existingIndex].createdAt : now,
-          updatedAt: now,
-          messageCount: payload.messages.length,
-        }
-
-        if (existingIndex >= 0) {
-          sessions[existingIndex] = sessionMeta
-        } else {
-          sessions.unshift(sessionMeta)
-        }
-
-        // Sort by updatedAt desc
-        sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        saveSessionsMeta(payload.workspacePath, sessions)
-
-        const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
-        fs.writeFileSync(
-          filePath,
-          JSON.stringify({ messages: payload.messages, updatedAt: now }, null, 2),
-          'utf-8',
+        aiService.sessionManager.setWorkspace(payload.workspacePath)
+        await aiService.sessionManager.saveSession(
+          payload.sessionId,
+          payload.messages as SessionMessage[],
         )
         return { ok: true }
       } catch (err) {
@@ -806,52 +718,40 @@ function registerIpcHandlers() {
     },
   )
 
-  // Delete a session
   ipcMain.handle('chat:delete-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
     try {
-      const sessions = loadSessionsMeta(payload.workspacePath)
-      const filtered = sessions.filter(s => s.id !== payload.sessionId)
-      saveSessionsMeta(payload.workspacePath, filtered)
-
-      const filePath = sessionFilePath(payload.workspacePath, payload.sessionId)
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath)
-      }
+      aiService.sessionManager.setWorkspace(payload.workspacePath)
+      await aiService.sessionManager.deleteSession(payload.sessionId)
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
 
-  // Legacy: Load history (for backward compatibility, loads the most recent session)
   ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
     try {
-      const sessions = loadSessionsMeta(payload.workspacePath)
-      if (sessions.length > 0) {
-        const mostRecent = sessions[0]
-        const filePath = sessionFilePath(payload.workspacePath, mostRecent.id)
-        if (fs.existsSync(filePath)) {
-          const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-          return {
-            ok: true,
-            data: {
-              threadId: mostRecent.id,
-              messages: Array.isArray(data.messages) ? data.messages : [],
-            },
-          }
+      aiService.sessionManager.setWorkspace(payload.workspacePath)
+      const sessionId = await aiService.sessionManager.getMostRecentSessionId()
+      if (sessionId) {
+        const messages = await aiService.sessionManager.loadHistory(sessionId)
+        return {
+          ok: true,
+          data: {
+            threadId: sessionId,
+            messages,
+          },
         }
       }
-    } catch { /* corrupted file, return empty */ }
+    } catch { /* corrupted, return empty */ }
     return {
       ok: true,
       data: {
-        threadId: generateSessionId(),
+        threadId: `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         messages: [],
       },
     }
   })
 
-  // Legacy: Save history (for backward compatibility)
   ipcMain.handle(
     'chat:save-history',
     async (
@@ -866,34 +766,12 @@ function registerIpcHandlers() {
       },
     ) => {
       try {
-        const sessions = loadSessionsMeta(payload.workspacePath)
-        const sessionId = sessions.length > 0 ? sessions[0].id : generateSessionId()
-
-        const now = new Date().toISOString()
-        const title = sessions.length > 0 && sessions[0].title
-          ? sessions[0].title
-          : generateSessionTitle(payload.messages)
-
-        const sessionMeta: ChatSessionMeta = {
-          id: sessionId,
-          title,
-          createdAt: sessions.length > 0 ? sessions[0].createdAt : now,
-          updatedAt: now,
-          messageCount: payload.messages.length,
-        }
-
-        if (sessions.length > 0) {
-          sessions[0] = sessionMeta
-        } else {
-          sessions.unshift(sessionMeta)
-        }
-        saveSessionsMeta(payload.workspacePath, sessions)
-
-        const filePath = sessionFilePath(payload.workspacePath, sessionId)
-        fs.writeFileSync(
-          filePath,
-          JSON.stringify({ messages: payload.messages, updatedAt: now }, null, 2),
-          'utf-8',
+        aiService.sessionManager.setWorkspace(payload.workspacePath)
+        const sessionId = await aiService.sessionManager.getMostRecentSessionId()
+          || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+        await aiService.sessionManager.saveSession(
+          sessionId,
+          payload.messages as SessionMessage[],
         )
         return { ok: true }
       } catch (err) {
