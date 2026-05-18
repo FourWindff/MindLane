@@ -186,4 +186,40 @@ describe('ChatDb', () => {
     expect(wsBSessions).toHaveLength(1)
     expect(wsBSessions[0].id).toBe('s2')
   })
+
+  it('replaceSessionMessages 原子替换消息', () => {
+    db.upsertSession({
+      id: 's1',
+      workspace_hash: 'ws1',
+      title: 'Test',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      message_count: 1,
+    })
+    db.insertMessage({ session_id: 's1', role: 'user', content: 'old', tool_calls: null, timestamp: '2024-01-01T00:00:00Z' })
+
+    db.replaceSessionMessages(
+      {
+        id: 's1',
+        workspace_hash: 'ws1',
+        title: 'Updated',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-02T00:00:00Z',
+        message_count: 2,
+      },
+      [
+        { session_id: 's1', role: 'user', content: 'new1', tool_calls: null, timestamp: '2024-01-02T00:00:00Z' },
+        { session_id: 's1', role: 'assistant', content: 'new2', tool_calls: null, timestamp: '2024-01-02T00:00:01Z' },
+      ],
+    )
+
+    const session = db.getSession('s1')
+    expect(session!.title).toBe('Updated')
+    expect(session!.message_count).toBe(2)
+
+    const msgs = db.getMessages('s1')
+    expect(msgs).toHaveLength(2)
+    expect(msgs[0]!.content).toBe('new1')
+    expect(msgs[1]!.content).toBe('new2')
+  })
 })

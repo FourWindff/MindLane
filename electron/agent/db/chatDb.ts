@@ -105,6 +105,38 @@ export class ChatDb {
     stmt.run(sessionId)
   }
 
+  replaceSessionMessages(
+    meta: ChatSessionRow,
+    messages: Array<Omit<ChatMessageRow, 'id'>>,
+  ): void {
+    const deleteMessages = this.db.prepare(`DELETE FROM chat_messages WHERE session_id = ?`)
+    const insertMessage = this.db.prepare(`
+      INSERT INTO chat_messages (session_id, role, content, tool_calls, timestamp)
+      VALUES (?, ?, ?, ?, ?)
+    `)
+    const upsertSession = this.db.prepare(`
+      INSERT INTO chat_sessions (id, workspace_hash, title, created_at, updated_at, message_count)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        workspace_hash = excluded.workspace_hash,
+        title = excluded.title,
+        updated_at = excluded.updated_at,
+        message_count = excluded.message_count
+    `)
+
+    const transaction = this.db.transaction(() => {
+      deleteMessages.run(meta.id)
+      upsertSession.run(
+        meta.id, meta.workspace_hash, meta.title,
+        meta.created_at, meta.updated_at, meta.message_count,
+      )
+      for (const msg of messages) {
+        insertMessage.run(msg.session_id, msg.role, msg.content, msg.tool_calls, msg.timestamp)
+      }
+    })
+    transaction()
+  }
+
   deleteSession(sessionId: string): void {
     const deleteMessages = this.db.prepare(`
       DELETE FROM chat_messages WHERE session_id = ?

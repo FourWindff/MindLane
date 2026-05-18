@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -111,18 +112,15 @@ export class AgentOrchestrator {
   ) {}
 
   /**
-   * 获取或创建 SessionManager 实例
+   * 获取或配置 SessionManager 的工作区
    */
   private getSessionManager(workspacePath: string): SessionManager {
-    if (
-      !this.sessionManager ||
-      this.sessionManager.workspacePath !== workspacePath
-    ) {
-      this.sessionManager = new SessionManager(
-        this.userDataPath,
-        workspacePath,
-      );
+    if (!this.sessionManager) {
+      this.sessionManager = new SessionManager();
+      const dbPath = path.join(this.userDataPath, 'memory', 'app.db');
+      this.sessionManager.init(dbPath);
     }
+    this.sessionManager.setWorkspace(workspacePath);
     return this.sessionManager;
   }
 

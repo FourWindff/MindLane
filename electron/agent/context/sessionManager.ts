@@ -6,7 +6,7 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import { compressMessages } from '../memory/compression.js'
 import type { LLMProvider } from '../providers/index.js'
 import { ChatDb } from '../db/chatDb.js'
-import type { ChatSessionRow } from '../db/chatDb.js'
+import type { ChatSessionRow, SessionMessage, SessionMeta } from '../db/chatDb.js'
 export type { SessionMessage, SessionMeta } from '../db/chatDb.js'
 
 /**
@@ -139,7 +139,7 @@ export class SessionManager {
   /**
    * 加载指定会话的历史消息
    */
-  async loadHistory(threadId: string): Promise<import('../db/chatDb.js').SessionMessage[]> {
+  async loadHistory(threadId: string): Promise<SessionMessage[]> {
     if (!this.db) throw new Error('SessionManager not initialized')
 
     const rows = this.db.getMessages(threadId)
@@ -212,7 +212,7 @@ export class SessionManager {
   async listSessions(
     limit?: number,
     offset?: number,
-  ): Promise<import('../db/chatDb.js').SessionMeta[]> {
+  ): Promise<SessionMeta[]> {
     if (!this.db) throw new Error('SessionManager not initialized')
 
     const rows = this.db.listSessions(this._workspaceHash, limit, offset)
@@ -230,7 +230,7 @@ export class SessionManager {
    */
   async saveSession(
     sessionId: string,
-    messages: import('../db/chatDb.js').SessionMessage[],
+    messages: SessionMessage[],
   ): Promise<void> {
     if (!this.db) throw new Error('SessionManager not initialized')
 
@@ -258,29 +258,23 @@ export class SessionManager {
       }
     }
 
-    // Delete all existing messages for this session
-    this.db.deleteMessagesBySession(sessionId)
-
-    // Upsert session metadata
-    this.db.upsertSession({
-      id: sessionId,
-      workspace_hash: this._workspaceHash,
-      title,
-      created_at: existing ? existing.created_at : now,
-      updated_at: now,
-      message_count: messages.length,
-    })
-
-    // Insert all messages
-    for (const msg of messages) {
-      this.db.insertMessage({
+    this.db.replaceSessionMessages(
+      {
+        id: sessionId,
+        workspace_hash: this._workspaceHash,
+        title,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+        message_count: messages.length,
+      },
+      messages.map((msg) => ({
         session_id: sessionId,
         role: msg.role,
         content: msg.content,
         tool_calls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
         timestamp: msg.timestamp ?? now,
-      })
-    }
+      })),
+    )
   }
 
   /**
