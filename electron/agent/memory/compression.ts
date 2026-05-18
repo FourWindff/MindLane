@@ -7,22 +7,17 @@ import {
 } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { AGENT_LIMITS } from '../config.js'
+import { estimateMessageTokens, isOverTokenLimit } from '../lib/tokenCounter.js'
 
 export async function compressMessages(
   messages: BaseMessage[],
   model: BaseChatModel,
 ): Promise<BaseMessage[]> {
-  if (messages.length <= AGENT_LIMITS.summaryTriggerCount) {
+  if (!isOverTokenLimit(messages, AGENT_LIMITS.summaryTriggerCount)) {
     return trimMessages(messages, {
       maxTokens: AGENT_LIMITS.maxTokens,
       strategy: 'last',
-      tokenCounter: (msgs) => {
-        const arr = Array.isArray(msgs) ? msgs : [msgs]
-        return arr.reduce((sum, m) => {
-          const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-          return sum + Math.ceil(content.length / 3)
-        }, 0)
-      },
+      tokenCounter: estimateMessageTokens,
       startOn: 'human',
       includeSystem: true,
     })
