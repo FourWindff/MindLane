@@ -1,5 +1,8 @@
 import { ChatAnthropic } from '@langchain/anthropic'
 import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
+import { withRetry, withTimeout } from './middleware/index.js'
+
+const HTTP_TIMEOUT_MS = 30_000
 
 const MINIMAX_ANTHROPIC_BASE_URL = 'https://api.minimaxi.com/anthropic'
 const MINIMAX_IMAGE_URL = 'https://api.minimaxi.com/v1/image_generation'
@@ -133,25 +136,34 @@ export class MiniMaxProvider extends LLMProvider {
       throw new Error('请输入画面描述')
     }
 
-    const response = await fetch(MINIMAX_IMAGE_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: DEFAULT_IMAGE_MODEL,
-        prompt,
-        aspect_ratio: mapSizeToAspectRatio(input.size),
-        response_format: 'url',
-        n: Math.min(4, Math.max(1, input.n ?? 1)),
-      }),
-    })
+    const payload = await withRetry(() =>
+      withTimeout(
+        async (signal) => {
+          const response = await fetch(MINIMAX_IMAGE_URL, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: DEFAULT_IMAGE_MODEL,
+              prompt,
+              aspect_ratio: mapSizeToAspectRatio(input.size),
+              response_format: 'url',
+              n: Math.min(4, Math.max(1, input.n ?? 1)),
+            }),
+            signal,
+          })
 
-    const payload = (await response.json().catch(() => null)) as MiniMaxImageResponse | null
-    if (!response.ok) {
-      throw new Error(errMsg(payload, `创建图片失败：HTTP ${response.status}`))
-    }
+          const body = (await response.json().catch(() => null)) as MiniMaxImageResponse | null
+          if (!response.ok) {
+            throw new Error(errMsg(body, `创建图片失败：HTTP ${response.status}`))
+          }
+          return body
+        },
+        HTTP_TIMEOUT_MS,
+      ),
+    )
 
     const urls = extractImageUrls(payload)
     if (urls.length === 0) {

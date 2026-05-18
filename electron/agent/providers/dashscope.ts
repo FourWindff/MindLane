@@ -1,6 +1,7 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
 import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
+import { withRetry, withTimeout, sleepWithAbort, linkSignals } from './middleware/index.js'
 
 const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 const IMAGE_SYNTH_URL =
@@ -33,9 +34,12 @@ function errMsg(body: unknown, fallback: string): string {
   return fallback
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
+// 单次 fetch 调用的超时，避免被卡死（HTTP 30s）
+const HTTP_TIMEOUT_MS = 30_000
+// 整个 generateImage（包含 60 次轮询）的总超时
+const TOTAL_TIMEOUT_MS = 120_000
+const POLL_INTERVAL_MS = 1500
+const POLL_MAX_TIMES = 60
 
 export class DashScopeProvider extends LLMProvider {
   private readonly apiKey: string
@@ -112,65 +116,107 @@ export class DashScopeProvider extends LLMProvider {
       throw new Error('请输入画面描述')
     }
 
-    const createRes = await fetch(IMAGE_SYNTH_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'X-DashScope-Async': 'enable',
-      },
-      body: JSON.stringify({
-        model: 'wanx-v1',
-        input: { prompt },
-        parameters: {
-          style: '<auto>',
-          size: input.size ?? '1024*1024',
-          n: Math.min(4, Math.max(1, input.n ?? 1)),
-        },
-      }),
-    })
-
-    const createData = (await createRes.json().catch(() => null)) as TaskBody | null
-    if (!createRes.ok) {
-      throw new Error(errMsg(createData, `创建任务失败 HTTP ${createRes.status}`))
-    }
-    const taskId = createData?.output?.task_id
-    if (typeof taskId !== 'string') {
-      throw new Error(errMsg(createData, '未返回 task_id'))
-    }
-
-    const taskUrl = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
-    for (let i = 0; i < 60; i++) {
-      await sleep(1500)
-      const pollRes = await fetch(taskUrl, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
-      })
-      const pollData = (await pollRes.json().catch(() => null)) as TaskBody | null
-      if (!pollRes.ok) {
-        throw new Error(errMsg(pollData, `查询任务失败 HTTP ${pollRes.status}`))
-      }
-      const status = pollData?.output?.task_status
-      if (status === 'SUCCEEDED') {
-        const urls = (pollData?.output?.results ?? [])
-          .map((item) => item?.url)
-          .filter((url): url is string => typeof url === 'string' && url.length > 0)
-        if (urls.length === 0) {
-          throw new Error('任务成功但未返回图片 URL')
-        }
-        return { urls }
-      }
-      if (status === 'FAILED' || status === 'UNKNOWN' || status === 'CANCELED') {
-        throw new Error(
-          String(
-            pollData?.output?.message ??
-              pollData?.message ??
-              pollData?.output?.code ??
-              '文生图失败',
-          ),
+    // 用总超时给整个流程兜底，轮询 sleep / fetch 都可被该 signal 中断。
+    return withTimeout(
+      async (totalSignal) => {
+        const createData = await withRetry(
+          () =>
+            withTimeout(
+              async (signal) => {
+                const linked = linkSignals([totalSignal, signal])
+                try {
+                  const res = await fetch(IMAGE_SYNTH_URL, {
+                    method: 'POST',
+                    headers: {
+                      Authorization: `Bearer ${this.apiKey}`,
+                      'Content-Type': 'application/json',
+                      'X-DashScope-Async': 'enable',
+                    },
+                    body: JSON.stringify({
+                      model: 'wanx-v1',
+                      input: { prompt },
+                      parameters: {
+                        style: '<auto>',
+                        size: input.size ?? '1024*1024',
+                        n: Math.min(4, Math.max(1, input.n ?? 1)),
+                      },
+                    }),
+                    signal: linked.signal,
+                  })
+                  const data = (await res.json().catch(() => null)) as TaskBody | null
+                  if (!res.ok) {
+                    throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
+                  }
+                  return data
+                } finally {
+                  linked.cleanup()
+                }
+              },
+              HTTP_TIMEOUT_MS,
+              { signal: totalSignal },
+            ),
         )
-      }
-    }
 
-    throw new Error('文生图超时，请稍后重试')
+        const taskId = createData?.output?.task_id
+        if (typeof taskId !== 'string') {
+          throw new Error(errMsg(createData, '未返回 task_id'))
+        }
+
+        const taskUrl = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
+        for (let i = 0; i < POLL_MAX_TIMES; i++) {
+          // 可被中断的 sleep（替代裸 setTimeout，避免轮询卡死无法取消）
+          await sleepWithAbort(POLL_INTERVAL_MS, totalSignal)
+
+          const pollData = await withRetry(
+            () =>
+              withTimeout(
+                async (signal) => {
+                  const linked = linkSignals([totalSignal, signal])
+                  try {
+                    const res = await fetch(taskUrl, {
+                      headers: { Authorization: `Bearer ${this.apiKey}` },
+                      signal: linked.signal,
+                    })
+                    const data = (await res.json().catch(() => null)) as TaskBody | null
+                    if (!res.ok) {
+                      throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
+                    }
+                    return data
+                  } finally {
+                    linked.cleanup()
+                  }
+                },
+                HTTP_TIMEOUT_MS,
+                { signal: totalSignal },
+              ),
+          )
+
+          const status = pollData?.output?.task_status
+          if (status === 'SUCCEEDED') {
+            const urls = (pollData?.output?.results ?? [])
+              .map((item) => item?.url)
+              .filter((url): url is string => typeof url === 'string' && url.length > 0)
+            if (urls.length === 0) {
+              throw new Error('任务成功但未返回图片 URL')
+            }
+            return { urls }
+          }
+          if (status === 'FAILED' || status === 'UNKNOWN' || status === 'CANCELED') {
+            throw new Error(
+              String(
+                pollData?.output?.message ??
+                  pollData?.message ??
+                  pollData?.output?.code ??
+                  '文生图失败',
+              ),
+            )
+          }
+        }
+
+        throw new Error('文生图超时，请稍后重试')
+      },
+      TOTAL_TIMEOUT_MS,
+      { timeoutMessage: '文生图超时，请稍后重试' },
+    )
   }
 }
