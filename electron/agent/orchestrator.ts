@@ -97,7 +97,6 @@ export interface PalaceFromNodesError {
 export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
 
 export class AgentOrchestrator {
-  private sessionManager: SessionManager | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private compiledMainGraph: any = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,23 +107,14 @@ export class AgentOrchestrator {
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
-    private userDataPath: string,
   ) {}
 
   /**
-   * 获取或创建 SessionManager 实例
+   * 获取或配置 SessionManager 的工作区
    */
   private getSessionManager(workspacePath: string): SessionManager {
-    if (
-      !this.sessionManager ||
-      this.sessionManager.workspacePath !== workspacePath
-    ) {
-      this.sessionManager = new SessionManager(
-        this.userDataPath,
-        workspacePath,
-      );
-    }
-    return this.sessionManager;
+    this.aiService.sessionManager.setWorkspace(workspacePath);
+    return this.aiService.sessionManager;
   }
 
   private getCompiledMainGraph() {

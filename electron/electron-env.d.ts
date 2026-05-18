@@ -248,7 +248,7 @@ interface Window {
         }>
       }) => Promise<{ ok: true } | { ok: false; error: string }>
       // Multi-session APIs
-      listSessions: (payload: { workspacePath: string }) => Promise<
+      listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) => Promise<
         | { ok: true; data: { sessions: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }> } }
         | { ok: false; error: string }
       >

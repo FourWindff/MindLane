@@ -31,6 +31,10 @@ function createMockAiService(checkpointer?: unknown): AiService {
     userProfile: {
       getText: vi.fn().mockReturnValue(""),
     },
+    sessionManager: {
+      setWorkspace: vi.fn(),
+      buildContextMessages: vi.fn().mockResolvedValue([]),
+    },
   } as unknown as AiService;
 }
 
@@ -44,7 +48,7 @@ describe("AgentOrchestrator 编译缓存", () => {
   beforeEach(() => {
     provider = createMockProvider();
     aiService = createMockAiService();
-    orchestrator = new AgentOrchestrator(provider, aiService, "/tmp");
+    orchestrator = new AgentOrchestrator(provider, aiService);
   });
 
   it("getCompiledMainGraph() 多次调用返回同一实例", () => {
@@ -61,7 +65,7 @@ describe("AgentOrchestrator 编译缓存", () => {
     provider = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
     );
-    orchestrator = new AgentOrchestrator(provider, aiService, "/tmp");
+    orchestrator = new AgentOrchestrator(provider, aiService);
     const getCompiledPalaceSubgraph = (orchestrator as unknown as Record<string, () => unknown>)["getCompiledPalaceSubgraph"].bind(orchestrator);
     expect(getCompiledPalaceSubgraph()).toBe(getCompiledPalaceSubgraph());
   });
@@ -72,7 +76,7 @@ describe("AgentOrchestrator checkpointer 注入", () => {
     const mockCheckpointer = { put: vi.fn(), get: vi.fn() };
     const provider = createMockProvider();
     const aiService = createMockAiService(mockCheckpointer);
-    const orchestrator = new AgentOrchestrator(provider, aiService, "/tmp");
+    const orchestrator = new AgentOrchestrator(provider, aiService);
 
     const getCompiledMainGraph = (orchestrator as unknown as Record<string, () => unknown>)["getCompiledMainGraph"].bind(orchestrator);
 
@@ -84,7 +88,7 @@ describe("AgentOrchestrator checkpointer 注入", () => {
   it("getCompiledMainGraph() 在 checkpointer 为 undefined 时不报错", () => {
     const provider = createMockProvider();
     const aiService = createMockAiService(undefined);
-    const orchestrator = new AgentOrchestrator(provider, aiService, "/tmp");
+    const orchestrator = new AgentOrchestrator(provider, aiService);
 
     const getCompiledMainGraph = (orchestrator as unknown as Record<string, () => unknown>)["getCompiledMainGraph"].bind(orchestrator);
 

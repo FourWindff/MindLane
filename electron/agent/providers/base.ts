@@ -46,6 +46,7 @@ export abstract class LLMProvider {
     size?: string
     n?: number
   }): Promise<{ urls: string[] }> {
+    void _input
     throw new UnsupportedCapabilityError('imageGen')
   }
 

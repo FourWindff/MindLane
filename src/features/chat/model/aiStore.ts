@@ -146,9 +146,11 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
 
     if (result?.ok) {
-      // Refresh session list
+      // Refresh session list (default page 1, 20 items)
       const listResult = await window.mindlane?.chat?.listSessions({
         workspacePath: state.workspacePath,
+        limit: 20,
+        offset: 0,
       })
       if (listResult?.ok) {
         set({ sessions: listResult.data.sessions })
@@ -177,7 +179,7 @@ export async function saveChatHistory(): Promise<void> {
     })
     // Refresh sessions list after saving
     if ('listSessions' in api && api.listSessions) {
-      const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath })
+      const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath, limit: 20, offset: 0 })
       if (sessionsResult?.ok && sessionsResult.data) {
         useAiStore.setState({ sessions: sessionsResult.data.sessions })
       }
@@ -197,7 +199,7 @@ export async function loadWorkspaceChat(workspacePath: string): Promise<void> {
 
   // Load session list first
   if ('listSessions' in api && api.listSessions) {
-    const sessionsResult = await api.listSessions({ workspacePath })
+    const sessionsResult = await api.listSessions({ workspacePath, limit: 20, offset: 0 })
     if (sessionsResult?.ok && sessionsResult.data) {
       useAiStore.setState({ sessions: sessionsResult.data.sessions })
     }

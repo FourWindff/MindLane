@@ -202,7 +202,7 @@ contextBridge.exposeInMainWorld('mindlane', {
       }>
     }) => ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     // New multi-session APIs
-    listSessions: (payload: { workspacePath: string }) =>
+    listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke('chat:list-sessions', payload) as Promise<
         | { ok: true; data: { sessions: ChatSessionMeta[] } }
         | { ok: false; error: string }
