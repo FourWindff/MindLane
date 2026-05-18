@@ -43,20 +43,27 @@ export interface SessionMeta {
  */
 export class SessionManager {
   private chatHistoryDir: string
-  private workspacePath: string
+  private _workspacePath: string
   private workspaceChatDir: string
 
   constructor(userDataPath: string, workspacePath: string) {
     this.chatHistoryDir = path.join(userDataPath, 'chat-history')
-    this.workspacePath = workspacePath
+    this._workspacePath = workspacePath
     this.workspaceChatDir = this.initWorkspaceChatDir()
+  }
+
+  /**
+   * 当前工作区路径（只读）
+   */
+  get workspacePath(): string {
+    return this._workspacePath
   }
 
   /**
    * 初始化工作区聊天历史目录
    */
   private initWorkspaceChatDir(): string {
-    const wsId = nodeCrypto.createHash('md5').update(this.workspacePath).digest('hex').slice(0, 12)
+    const wsId = nodeCrypto.createHash('md5').update(this._workspacePath).digest('hex').slice(0, 12)
     const dir = path.join(this.chatHistoryDir, wsId)
     fs.mkdirSync(dir, { recursive: true })
     return dir
@@ -80,7 +87,7 @@ export class SessionManager {
    * 切换工作区（用于复用实例）
    */
   switchWorkspace(workspacePath: string): void {
-    this.workspacePath = workspacePath
+    this._workspacePath = workspacePath
     this.workspaceChatDir = this.initWorkspaceChatDir()
   }
 
