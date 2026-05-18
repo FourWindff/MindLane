@@ -24,7 +24,7 @@ import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
-import { logger } from "./shared/logger.js";
+import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
 import { AGENT_LIMITS } from "./config.js";
 
