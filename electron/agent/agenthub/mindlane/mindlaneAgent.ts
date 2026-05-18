@@ -175,10 +175,13 @@ export class MindLaneAgent extends BaseAgent {
     decision: RouteDecision,
     content: string,
   ): Partial<MainGraphStateType> {
+    // 路由决策已被本地拦截处理，不应将 tool_calls 存入状态，
+    // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误
+    const cleanResponse = new AIMessage({ content: response.content });
     switch (decision.target) {
       case "mindmap":
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "mindmap",
           mindmapInputText: decision.parameters?.mindmapInput || content,
           mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
@@ -186,7 +189,7 @@ export class MindLaneAgent extends BaseAgent {
         };
       case "palace":
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "palace",
           palaceInputText: decision.parameters?.palaceInput || content,
           response: content,
@@ -194,7 +197,7 @@ export class MindLaneAgent extends BaseAgent {
       case "qa":
       default:
         return {
-          messages: [response],
+          messages: [cleanResponse],
           intent: "qa",
           response: content,
         };
