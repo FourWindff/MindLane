@@ -6,17 +6,15 @@ import {
   AIMessage,
 } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
-
-const MAX_TOKENS = 4000
-const SUMMARY_TRIGGER_COUNT = 20
+import { AGENT_LIMITS } from '../config.js'
 
 export async function compressMessages(
   messages: BaseMessage[],
   model: BaseChatModel,
 ): Promise<BaseMessage[]> {
-  if (messages.length <= SUMMARY_TRIGGER_COUNT) {
+  if (messages.length <= AGENT_LIMITS.summaryTriggerCount) {
     return trimMessages(messages, {
-      maxTokens: MAX_TOKENS,
+      maxTokens: AGENT_LIMITS.maxTokens,
       strategy: 'last',
       tokenCounter: (msgs) => {
         const arr = Array.isArray(msgs) ? msgs : [msgs]

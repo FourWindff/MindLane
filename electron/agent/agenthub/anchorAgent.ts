@@ -5,9 +5,10 @@ import { buildSummaryMessages } from './prompts/textToPalace.js'
 import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
 import { messageContentToString } from '../utils.js'
+import { PALACE_LAYOUT } from '../config.js'
 
-const COORD_PAD = 0.05
-const MIN_DISTANCE = 0.12
+const COORD_PAD = PALACE_LAYOUT.coordPad
+const MIN_DISTANCE = PALACE_LAYOUT.minDistance
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
