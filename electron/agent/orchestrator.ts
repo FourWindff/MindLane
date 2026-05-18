@@ -20,11 +20,7 @@ import type {
   MindLaneNode,
   MindLaneEdge,
 } from "../../src/shared/lib/fileFormat.js";
-import {
-  buildPalaceSubgraph,
-  HITLInterruptError,
-  type HITLInterruptData,
-} from "./graphs/palaceGraph.js";
+import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
@@ -64,10 +60,8 @@ export interface ChatResponse {
   };
 }
 
-export type HITLData = HITLInterruptData;
-
 /**
- * 扩展的流回调接口，支持 HITL
+ * 流回调接口
  */
 export interface StreamCallbacks {
   onToken: (token: string) => void;
@@ -75,7 +69,6 @@ export interface StreamCallbacks {
   onToolEnd: (name: string, output: string) => void;
   onEnd: (response: ChatResponse) => void;
   onError: (error: string) => void;
-  onHITL?: (data: HITLData) => void | Promise<void>;
 }
 
 export interface PalaceFromNodesResult {
@@ -129,7 +122,7 @@ export class AgentOrchestrator {
   async run(request: ChatRequest): Promise<ChatResponse> {
     // 从后端加载历史消息并构建上下文
     const contextMessages = await this.buildContextMessages(request);
-    const graph = this.buildGraph(request.context, { enableHITL: false });
+    const graph = this.buildGraph(request.context);
     const app = graph.compile();
 
     const result = await app.invoke(
@@ -144,12 +137,10 @@ export class AgentOrchestrator {
     request: ChatRequest,
     callbacks: StreamCallbacks,
     signal?: AbortSignal,
-    options: { enableHITL?: boolean } = {},
   ): Promise<void> {
-    const { enableHITL = false } = options;
     // 从后端加载历史消息并构建上下文
     const contextMessages = await this.buildContextMessages(request);
-    const graph = this.buildGraph(request.context, { enableHITL });
+    const graph = this.buildGraph(request.context);
     const checkpointer = new MemorySaver();
     const app = graph.compile({ checkpointer });
     const threadId = `stream-${Date.now()}`;
@@ -198,13 +189,6 @@ export class AgentOrchestrator {
 
       callbacks.onEnd(this.buildResponse(result, fullContent));
     } catch (err) {
-      // 处理 HITL 中断
-      if (err instanceof HITLInterruptError && callbacks.onHITL) {
-        await callbacks.onHITL(err.data);
-        // HITL 中断不调用 onError，等待用户 resume
-        return;
-      }
-
       if (signal?.aborted) {
         callbacks.onEnd({ content: fullContent || "（已停止生成）" });
         return;
@@ -234,7 +218,6 @@ export class AgentOrchestrator {
     // 使用独立的 Palace Subgraph
     const palaceSubgraph = buildPalaceSubgraph({
       provider: this.provider,
-      enableHITL: false,
     });
     const app = palaceSubgraph.compile();
 
@@ -252,9 +235,6 @@ export class AgentOrchestrator {
           imageUrls: [],
           detectedCoords: [],
           memoryRoute: [],
-          interruptPoint: null,
-          userConfirmedPrompt: null,
-          userConfirmedStructure: null,
         },
         { recursionLimit: 80 },
       );
@@ -293,11 +273,8 @@ export class AgentOrchestrator {
     }
   }
 
-  private buildGraph(
-    _?: MindmapContextData,
-    options: { enableHITL?: boolean } = {},
-  ) {
-    const { enableHITL = false } = options;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private buildGraph(_ctx?: MindmapContextData) {
     const caps = this.provider.capabilities;
     const hasPalace =
       caps.has(ProviderCapability.ImageGen) &&
@@ -363,7 +340,6 @@ export class AgentOrchestrator {
     if (hasPalace) {
       const palaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
-        enableHITL,
       });
 
       const palaceSubgraphWrapper = async (
@@ -379,13 +355,8 @@ export class AgentOrchestrator {
             imageUrls: result.imageUrls,
             memoryRoute: result.memoryRoute,
             error: result.error,
-            interruptPoint: result.interruptPoint,
-            userConfirmedPrompt: result.userConfirmedPrompt,
           };
         } catch (error) {
-          if (error instanceof HITLInterruptError) {
-            throw error;
-          }
           return {
             error: error instanceof Error ? error.message : String(error),
           };
