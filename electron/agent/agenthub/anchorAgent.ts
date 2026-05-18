@@ -1,8 +1,8 @@
-import { HumanMessage } from '@langchain/core/messages'
-import type { LLMProvider, DetectedAnchor } from '../providers/index.js'
+import type { DetectedAnchor } from '../providers/index.js'
 import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryPalaceStation, StationDesign } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
+import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
 
 const COORD_PAD = 0.05
@@ -221,66 +221,6 @@ function normalizeDetectedAnchors(
 }
 
 /**
- * 视觉定位：在图片中定位锚点位置
- * 从 Provider 解耦，作为 Vision Agent 的核心业务能力
- */
-async function locateAnchors(
-  provider: LLMProvider,
-  input: {
-    imageUrl: string
-    anchors: Array<{ order: number; anchorVisual: string }>
-  },
-): Promise<DetectedAnchor[]> {
-  if (!provider.visionModel) {
-    throw new Error('No vision model configured')
-  }
-  if (!input.imageUrl.trim()) {
-    throw new Error('缺少图片 URL')
-  }
-  if (input.anchors.length === 0) {
-    return []
-  }
-
-  const anchorList = input.anchors
-    .map((anchor) => `${anchor.order}. ${anchor.anchorVisual}`)
-    .join('\n')
-
-  const prompt = [
-    '你是精确的图片视觉定位助手。请仔细查看这张图片，找到每个视觉锚点对应物体的精确中心位置。',
-    '',
-    '定位规则：',
-    '1. 找到锚点描述的物体在图中的实际位置，给出其视觉中心的 x/y 归一化坐标（0 到 1 之间的小数，精确到小数点后两位）。',
-    '2. x 表示从左（0）到右（1），y 表示从上（0）到下（1）。',
-    '3. 每个坐标必须定位到该物体本身的视觉中心，不要估算偏移。',
-    '4. 任意两个锚点的坐标距离应不小于 0.08；如果两个物体确实紧挨，分别定位到各自物体的中心即可。',
-    '5. 如果某个锚点在图中不容易精确识别，给出最合理的位置估计，不要省略。',
-    '',
-    '严格返回 JSON 数组，不要输出任何额外文字：',
-    '[{"order":1,"anchorVisual":"...","x":0.12,"y":0.34}, ...]',
-    '',
-    '锚点列表：',
-    anchorList,
-  ].join('\n')
-
-  const response = await provider.visionModel.invoke([
-    new HumanMessage({
-      content: [
-        { type: 'image_url', image_url: { url: input.imageUrl } },
-        { type: 'text', text: prompt },
-      ],
-    }),
-  ])
-
-  const content = contentToString(response.content).trim()
-  if (!content) {
-    throw new Error('视觉模型未返回内容')
-  }
-
-  const parsed = parseJsonArray(content)
-  return normalizeDetectedAnchors(parsed, input.anchors)
-}
-
-/**
  * VisionAgent - 视觉定位智能体
  *
  * 架构职责：
@@ -294,6 +234,40 @@ async function locateAnchors(
  * - 输出 memoryRoute 和 response 总结
  */
 export class AnchorAgent extends PalaceAgent {
+  /**
+   * 视觉定位：在图片中定位锚点位置
+   * 作为 Vision Agent 的核心业务能力，与 Provider 解耦
+   */
+  private async locateAnchors(input: {
+    imageUrl: string
+    anchors: Array<{ order: number; anchorVisual: string }>
+  }): Promise<DetectedAnchor[]> {
+    if (!this.provider.visionModel) {
+      throw new Error('No vision model configured')
+    }
+    if (!input.imageUrl.trim()) {
+      throw new Error('缺少图片 URL')
+    }
+    if (input.anchors.length === 0) {
+      return []
+    }
+
+    const response = await this.provider.visionModel.invoke(
+      buildAnchorLocateMessages({
+        imageUrl: input.imageUrl,
+        anchors: input.anchors,
+      }),
+    )
+
+    const content = contentToString(response.content).trim()
+    if (!content) {
+      throw new Error('视觉模型未返回内容')
+    }
+
+    const parsed = parseJsonArray(content)
+    return normalizeDetectedAnchors(parsed, input.anchors)
+  }
+
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
     if (!state.palace || state.error) return {}
 
@@ -302,8 +276,7 @@ export class AnchorAgent extends PalaceAgent {
 
     if (hasImage) {
       try {
-        // 使用 Vision Agent 自己的 locateAnchors 方法，而非 Provider 的方法
-        const detectedCoords = await locateAnchors(this.provider, {
+        const detectedCoords = await this.locateAnchors({
           imageUrl: state.imageUrls[0]!,
           anchors: state.palace.stations.map((station) => ({
             order: station.order,
