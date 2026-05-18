@@ -2,6 +2,8 @@ import type { PalaceSubgraphStateType } from '../state.js'
 import { buildImagePromptGeneratorMessages } from './prompts/textToPalace.js'
 import { buildPalaceImagePrompt } from './prompts/nodesToPalace.js'
 import { PalaceAgent } from './base.js'
+import { logger } from '../../shared/logger.js'
+import { formatAgentError } from '../utils.js'
 
 /**
  * ImageGenAgent - 图像生成智能体
@@ -57,11 +59,12 @@ export class ImageGenAgent extends PalaceAgent {
         imageUrls: imageResult.urls,
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const formatted = formatAgentError(err)
+      logger.error('[ImageGenAgent] 图像生成失败:', formatted)
       return {
         imagePrompt: '',
         imageUrls: [],
-        imageError: message,
+        imageError: err instanceof Error ? err.message : String(err),
       }
     }
   }
