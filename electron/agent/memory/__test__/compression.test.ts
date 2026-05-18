@@ -21,7 +21,7 @@ describe('compressMessages', () => {
 
     const result = await compressMessages(messages, model)
 
-    expect(result.length).toBeGreaterThan(0)
+    expect(result.length).toBe(3)
     // 未触发摘要，所以 model.invoke 不应被调用
     expect(model.invoke).not.toHaveBeenCalled()
   })
@@ -40,8 +40,10 @@ describe('compressMessages', () => {
 
     // 触发了摘要，所以 model.invoke 应被调用
     expect(model.invoke).toHaveBeenCalledTimes(1)
-    // 结果应包含摘要消息 + 最近 10 条非系统消息
-    expect(result.length).toBeGreaterThan(0)
+    // 0 system + 1 summary + 10 recent
+    expect(result.length).toBe(11)
+    expect(result[0]).toBeInstanceOf(AIMessage)
+    expect((result[0] as AIMessage).content).toMatch(/^\[对话摘要\]/)
   })
 
   it('preserves system messages in output', async () => {

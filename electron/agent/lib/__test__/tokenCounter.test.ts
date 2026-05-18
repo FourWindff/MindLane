@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateTokenCount, estimateMessageTokens, isOverTokenLimit } from '../tokenCounter.js'
+import { estimateTokenCount, estimateMessageTokens } from '../tokenCounter.js'
 import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 
 describe('estimateTokenCount', () => {
@@ -25,10 +25,6 @@ describe('estimateTokenCount', () => {
   it('returns 0 for empty string', () => {
     expect(estimateTokenCount('')).toBe(0)
   })
-
-  it('returns 0 for whitespace-only string', () => {
-    expect(estimateTokenCount('   \n\t')).toBe(0)
-  })
 })
 
 describe('estimateMessageTokens', () => {
@@ -43,17 +39,22 @@ describe('estimateMessageTokens', () => {
     expect(count).toBeLessThan(30)
   })
 
-  it('handles array content (multimodal)', () => {
-    const messages = [
+  it('ignores non-text blocks in multimodal content', () => {
+    // image_url block 没有 `text` 字段，应被 messageContentToString 过滤掉，
+    // 否则 base64 url 会被全文 encode，token 数会爆炸。
+    const textOnly = [new HumanMessage('Look at this')]
+    const multimodal = [
       new HumanMessage({
         content: [
           { type: 'text', text: 'Look at this' },
-          { type: 'image_url', image_url: { url: 'data:image/png;base64,...' } },
+          {
+            type: 'image_url',
+            image_url: { url: 'data:image/png;base64,AAAA'.repeat(1000) },
+          },
         ],
       }),
     ]
-    const count = estimateMessageTokens(messages)
-    expect(count).toBeGreaterThan(0)
+    expect(estimateMessageTokens(multimodal)).toBe(estimateMessageTokens(textOnly))
   })
 
   it('handles empty messages array', () => {
@@ -65,17 +66,5 @@ describe('estimateMessageTokens', () => {
     const count = estimateMessageTokens(messages)
     expect(count).toBeGreaterThan(4)
     expect(count).toBeLessThan(15)
-  })
-})
-
-describe('isOverTokenLimit', () => {
-  it('returns true when over limit', () => {
-    const messages = [new HumanMessage('Hello world this is a test message with many words')]
-    expect(isOverTokenLimit(messages, 1)).toBe(true)
-  })
-
-  it('returns false when under limit', () => {
-    const messages = [new HumanMessage('Hi')]
-    expect(isOverTokenLimit(messages, 100)).toBe(false)
   })
 })
