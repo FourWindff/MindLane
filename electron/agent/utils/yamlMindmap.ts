@@ -185,7 +185,7 @@ function sanitizeStructuredTree(value: unknown): unknown {
   }
 }
 
-function normalizePageRangeValue(value: unknown): string | null {
+export function normalizePageRangeValue(value: unknown): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return formatPageRange(value, value)
   }
