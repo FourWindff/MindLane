@@ -47,7 +47,6 @@ function ToolbarButton({
         onClick={onClick}
         disabled={disabled}
         aria-label={ariaLabel}
-        title={tooltip}
       >
         {icon}
       </button>
