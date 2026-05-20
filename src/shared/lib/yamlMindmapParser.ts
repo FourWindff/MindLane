@@ -270,7 +270,7 @@ function buildGraph(
       id: `e-${parentId}-${id}`,
       source: parentId,
       target: id,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge',
     })
   }

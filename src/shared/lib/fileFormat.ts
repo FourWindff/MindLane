@@ -66,10 +66,3 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
   }
 }
 
-export function serializeFile(file: MindLaneFile): string {
-  return JSON.stringify(
-    { ...file, metadata: { ...file.metadata, updatedAt: new Date().toISOString() } },
-    null,
-    2,
-  )
-}

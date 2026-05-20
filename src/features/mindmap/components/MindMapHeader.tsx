@@ -1,4 +1,4 @@
-import { ListTree, Columns2, Trash2, RotateCcw, AlignLeft, Save, FolderInput, Settings, FileUp } from 'lucide-react'
+import { ListTree, Columns2, Trash2, RotateCcw, Save, FolderInput, Settings, FileUp } from 'lucide-react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 
 type Props = {
@@ -8,10 +8,10 @@ type Props = {
   onReset: () => void
   onOpenSettings?: () => void
   onSwitchWorkspace?: () => void
-  onAutoLayout?: () => void
   onSave?: () => void
   onGenerateFromFile?: () => void
   generateFromFileBusy?: boolean
+  canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
 }
@@ -23,10 +23,10 @@ export function MindMapHeader({
   onReset,
   onOpenSettings,
   onSwitchWorkspace,
-  onAutoLayout,
   onSave,
   onGenerateFromFile,
   generateFromFileBusy,
+  canAddChild,
   canAddSibling,
   canRemove,
 }: Props) {
@@ -47,6 +47,7 @@ export function MindMapHeader({
             type="button"
             className="mindmap-header__btn mindmap-header__btn--primary"
             onClick={onAddChild}
+            disabled={!canAddChild}
           >
             <ListTree className="mindmap-header__icon" size={16} strokeWidth={1.5} />
             <span>子主题</span>
@@ -82,17 +83,6 @@ export function MindMapHeader({
             >
               <FileUp className="mindmap-header__icon" size={16} strokeWidth={1.5} />
               <span>{generateFromFileBusy ? '生成中…' : '从文件生成'}</span>
-            </button>
-          )}
-          {onAutoLayout && (
-            <button
-              type="button"
-              className="mindmap-header__btn mindmap-header__btn--ghost"
-              onClick={onAutoLayout}
-              title="自动布局"
-            >
-              <AlignLeft className="mindmap-header__icon" size={16} strokeWidth={1.5} />
-              <span>布局</span>
             </button>
           )}
           {onSave && (

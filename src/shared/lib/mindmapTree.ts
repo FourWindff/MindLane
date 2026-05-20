@@ -182,7 +182,7 @@ export function withNewChild(
       id: `e-${parentId}-${childId}`,
       source: parentId,
       target: childId,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge mindmap-edge--enter',
     },
   ]
@@ -205,23 +205,6 @@ export function withNewSibling(
   return { nodes: n2, edges: e2 }
 }
 
-export function deleteSubtree(
-  nodes: Node[],
-  edges: Edge[],
-  rootId: string,
-): { nodes: Node[]; edges: Edge[] } {
-  const toRemove = new Set<string>()
-  const stack = [rootId]
-  while (stack.length) {
-    const id = stack.pop()!
-    toRemove.add(id)
-    getChildIds(edges, id).forEach((c) => stack.push(c))
-  }
-  return {
-    nodes: nodes.filter((n) => !toRemove.has(n.id)),
-    edges: edges.filter((e) => !toRemove.has(e.source) && !toRemove.has(e.target)),
-  }
-}
 
 export function deserializeNode(node: Node): Node {
   const descriptor = nodeRegistry.get(node.type!)

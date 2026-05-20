@@ -22,6 +22,7 @@ import {
   useStoreApi,
   useReactFlow,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeTypes,
   type ReactFlowInstance,
@@ -34,7 +35,6 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import { autoLayout } from '@/shared/lib/autoLayout'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -49,6 +49,7 @@ import {
   CHILD_GAP_Y,
 } from '@/shared/lib/mindmapTree'
 import { PalaceNodeData } from '../nodes/palace'
+import { MindmapEdge } from '@/features/mindmap/edges'
 
 const NODE_EXIT_MS = 300
 
@@ -231,11 +232,13 @@ function HiddenThumbnailFlow({
   nodes,
   edges,
   nodeTypes,
+  edgeTypes,
   onInit,
 }: {
   nodes: Node[]
   edges: Edge[]
   nodeTypes: NodeTypes
+  edgeTypes: Record<string, React.ComponentType<EdgeProps>>
   onInit: React.MutableRefObject<ReactFlowInstance | null>
 }) {
   const rf = useReactFlow()
@@ -250,6 +253,7 @@ function HiddenThumbnailFlow({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
@@ -278,6 +282,7 @@ function MindMapCanvas({
   onOpenSettings?: () => void
 }) {
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
+  const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const rfStore = useStoreApi()
 
   const nodes = useMindmapStore((s) => s.nodes)
@@ -301,6 +306,7 @@ function MindMapCanvas({
 
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
+  const [hasSelection, setHasSelection] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -463,6 +469,7 @@ function MindMapCanvas({
     onChange: ({ nodes: sel }) => {
       setSelectedId(sel[0]?.id ?? null)
       setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
+      setHasSelection(sel.length > 0)
     },
   })
 
@@ -585,6 +592,8 @@ function MindMapCanvas({
     if (idx >= 0 && idx < siblings.length - 1) selectNode(siblings[idx + 1]!)
   }, [nodes, edges, selectedId, selectNode])
 
+  const canAddChild = hasSelection
+
   const canAddSibling = useMemo(() => {
     if (!selectedId) return false
     return findParentId(edges, selectedId) != null
@@ -619,16 +628,6 @@ function MindMapCanvas({
   )
   useShortcut(
     { id: 'mindmap.navDown', combo: 'arrowdown', description: '选中下方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateDown() } },
-  )
-
-  const doAutoLayout = useCallback(() => {
-    if (aiBusy) return
-    const laid = autoLayout(nodes, edges)
-    setNodes(laid)
-  }, [aiBusy, nodes, edges, setNodes])
-
-  useShortcut(
-    { id: 'mindmap.autoLayout', combo: 'mod+shift+l', description: '自动布局', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { doAutoLayout() } },
   )
 
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
@@ -849,7 +848,7 @@ function MindMapCanvas({
       id: `e-${parentId}-${palaceId}`,
       source: parentId,
       target: palaceId,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge',
     }
 
@@ -858,7 +857,7 @@ function MindMapCanvas({
       id: `e-${palaceId}-${n.id}`,
       source: palaceId,
       target: n.id,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge',
     }))
 
@@ -943,10 +942,10 @@ function MindMapCanvas({
         onReset={reset}
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
-        onAutoLayout={doAutoLayout}
         onSave={doSave}
         onGenerateFromFile={generateFromFile}
         generateFromFileBusy={generationBusy}
+        canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
       />
@@ -966,6 +965,7 @@ function MindMapCanvas({
           panOnDrag={[1]}
           selectionMode={SelectionMode.Partial}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
@@ -1034,6 +1034,7 @@ function MindMapCanvas({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onInit={hiddenRfInstanceRef}
           />
         </ReactFlowProvider>
