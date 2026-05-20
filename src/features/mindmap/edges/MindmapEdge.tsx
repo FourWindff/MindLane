@@ -1,14 +1,6 @@
 import { BaseEdge, getBezierPath, useStore, type EdgeProps } from '@xyflow/react'
 import { useMemo } from 'react'
-
-const BASE_CURVATURE = 0.25
-const CURVATURE_SPREAD = 0.04
-
-function computeCurvature(siblingIndex: number, siblingCount: number): number {
-  if (siblingCount <= 1) return BASE_CURVATURE
-  const totalSpread = (siblingCount - 1) * CURVATURE_SPREAD
-  return BASE_CURVATURE - totalSpread / 2 + siblingIndex * CURVATURE_SPREAD
-}
+import { computeSiblingCurvature } from './siblingOffset'
 
 export function MindmapEdge(props: EdgeProps) {
   const {
@@ -44,7 +36,7 @@ export function MindmapEdge(props: EdgeProps) {
     const siblingIndex = siblingEdges.findIndex((e) => e.id === id)
     const siblingCount = siblingEdges.length
 
-    const curvature = computeCurvature(
+    const curvature = computeSiblingCurvature(
       siblingIndex >= 0 ? siblingIndex : 0,
       siblingCount,
     )
