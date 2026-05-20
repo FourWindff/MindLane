@@ -64,6 +64,7 @@ function AppContent() {
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
+  const filePath = useMindmapStore((s) => s.filePath)
 
   useEffect(() => {
     void loadSettingsFromBackend()
@@ -113,6 +114,7 @@ function AppContent() {
       <AppWindowBar
         onOpenFileManager={() => setFileManagerOpen(true)}
         fileManagerOpen={fileManagerOpen}
+        filePath={filePath ?? undefined}
       />
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (
