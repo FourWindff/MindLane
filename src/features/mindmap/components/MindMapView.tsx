@@ -307,6 +307,7 @@ function MindMapCanvas({
 
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
+  const [hasSelection, setHasSelection] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -469,6 +470,7 @@ function MindMapCanvas({
     onChange: ({ nodes: sel }) => {
       setSelectedId(sel[0]?.id ?? null)
       setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
+      setHasSelection(sel.length > 0)
     },
   })
 
@@ -590,6 +592,8 @@ function MindMapCanvas({
     const idx = siblings.indexOf(selectedId)
     if (idx >= 0 && idx < siblings.length - 1) selectNode(siblings[idx + 1]!)
   }, [nodes, edges, selectedId, selectNode])
+
+  const canAddChild = hasSelection
 
   const canAddSibling = useMemo(() => {
     if (!selectedId) return false
@@ -953,6 +957,7 @@ function MindMapCanvas({
         onSave={doSave}
         onGenerateFromFile={generateFromFile}
         generateFromFileBusy={generationBusy}
+        canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
       />

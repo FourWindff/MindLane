@@ -12,6 +12,7 @@ type Props = {
   onSave?: () => void
   onGenerateFromFile?: () => void
   generateFromFileBusy?: boolean
+  canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
 }
@@ -27,6 +28,7 @@ export function MindMapHeader({
   onSave,
   onGenerateFromFile,
   generateFromFileBusy,
+  canAddChild,
   canAddSibling,
   canRemove,
 }: Props) {
@@ -47,6 +49,7 @@ export function MindMapHeader({
             type="button"
             className="mindmap-header__btn mindmap-header__btn--primary"
             onClick={onAddChild}
+            disabled={!canAddChild}
           >
             <ListTree className="mindmap-header__icon" size={16} strokeWidth={1.5} />
             <span>子主题</span>
