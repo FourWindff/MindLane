@@ -119,7 +119,7 @@ describe('mindmap workflow lab', () => {
 
     expect(chunks.length).toBeGreaterThan(1)
     expect(chunks[0]?.startPage).toBe(1)
-    expect(chunks.at(-1)?.endPage).toBe(633)
+    expect(chunks[chunks.length - 1]?.endPage).toBe(633)
 
     for (let index = 1; index < chunks.length; index += 1) {
       expect(chunks[index]!.startPage).toBe(chunks[index - 1]!.endPage + 1)

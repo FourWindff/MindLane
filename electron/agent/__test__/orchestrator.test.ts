@@ -108,8 +108,8 @@ describe("AgentOrchestrator buildGraph 结构", () => {
       new Set([ProviderCapability.Chat]),
     );
 
-    const orchestratorWith = new AgentOrchestrator(providerWithPalace, createMockAiService(), "/tmp");
-    const orchestratorWithout = new AgentOrchestrator(providerWithoutPalace, createMockAiService(), "/tmp");
+    const orchestratorWith = new AgentOrchestrator(providerWithPalace, createMockAiService());
+    const orchestratorWithout = new AgentOrchestrator(providerWithoutPalace, createMockAiService());
 
     const buildGraphWith = (orchestratorWith as unknown as Record<string, () => { nodes: Record<string, unknown> }>)["buildGraph"].bind(orchestratorWith);
     const buildGraphWithout = (orchestratorWithout as unknown as Record<string, () => { nodes: Record<string, unknown> }>)["buildGraph"].bind(orchestratorWithout);

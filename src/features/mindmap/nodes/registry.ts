@@ -5,7 +5,7 @@ import { NodeTypeDescriptor } from './types'
 class NodeRegistry {
   private descriptors = new Map<string, NodeTypeDescriptor>()
 
-  register(descriptor: NodeTypeDescriptor<unknown>): void {
+  register(descriptor: NodeTypeDescriptor): void {
     this.descriptors.set(descriptor.typeId, descriptor as NodeTypeDescriptor)
   }
 

@@ -63,6 +63,6 @@ describe('batchAddMindmapNodes', () => {
       ok: true,
       action: 'batchAddNodes',
     })
-    expect(result.data.parentId).toBeUndefined()
+    expect(result.data!.parentId).toBeUndefined()
   })
 })

@@ -1,7 +1,7 @@
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { BaseLanguageModelInterface } from "@langchain/core/language_models/base";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMProvider } from "../../providers/index.js";
 import type { MainGraphStateType } from "../../state.js";
 import { BaseAgent } from "../base.js";
@@ -36,7 +36,7 @@ export class MindLaneAgent extends BaseAgent {
   private tools: StructuredToolInterface[];
   private userProfile?: string;
   private capabilityFlags: CapabilityFlags;
-  private modelWithTools: ReturnType<BaseLanguageModelInterface["bindTools"]>;
+  private modelWithTools: ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
 
   constructor(
     provider: LLMProvider,

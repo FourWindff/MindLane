@@ -24,10 +24,6 @@ describe('MindmapGraph error with stack', () => {
       mindmapNodes: [],
       mindmapEdges: [],
       mindmapTitle: '',
-      palaceInputText: '',
-      palaceInputNodes: [],
-      imageUrls: [],
-      memoryRoute: [],
     })
 
     expect(result.error).toContain('LLM timeout')
