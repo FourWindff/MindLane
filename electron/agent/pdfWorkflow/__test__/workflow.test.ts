@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
-import { sanitizeTreeCandidate } from '../utils.js'
+import { sanitizeTreeCandidate } from '../../utils/yamlMindmap.js'
 import {
   __test__,
   chunkPdfPages,

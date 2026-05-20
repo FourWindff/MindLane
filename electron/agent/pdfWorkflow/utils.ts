@@ -8,7 +8,6 @@ import type {
 } from './types.js'
 import {
   formatPageRange,
-  normalizePageRangeValue,
   parsePageRange,
 } from '../utils/yamlMindmap.js'
 import YAML from 'yaml'
