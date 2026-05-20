@@ -69,7 +69,6 @@ function createProviderFromSettings(): LLMProvider {
   let baseUrl: string | undefined
 
   const settings = loadSettings()
-  console.log('[studio] settings path:', JSON.stringify(settings))
   if (settings) {
     providerId = settings.activeProviders.chat
     const providerConfig = settings.providerConfigs[providerId]
