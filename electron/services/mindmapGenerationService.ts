@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { runMindmapWorkflow } from '../lab/mindmapworkflow.js'
-import type { AnthropicLabConfig, MindmapWorkflowResult } from '../lab/mindmapworkflow.js'
+import { runMindmapWorkflow } from '../agent/pdfWorkflow/index.js'
+import type { AnthropicLabConfig, MindmapWorkflowResult } from '../agent/pdfWorkflow/index.js'
 
 export type MindmapGenerationPhase =
   | 'preparing'
@@ -80,7 +80,7 @@ export async function generateFromFile(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     emit({ phase: 'error', filename, error: message })
-    throw new MindmapGenerationError(`Lab 工作流执行失败: ${message}`)
+    throw new MindmapGenerationError(`PDF 工作流执行失败: ${message}`)
   }
 
   emit({ phase: 'merging', filename, message: '合并子树' })
