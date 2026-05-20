@@ -14,6 +14,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
   Mic,
+  CircleDot,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -608,18 +609,17 @@ export function ChatPanel() {
           {/* Selected nodes tags */}
           {selectedNodes.length > 0 && (
             <div className="chat-float-input-tags">
-              {selectedNodes.map((node) => (
-                <span key={node.id} className="chat-float-input-tag">
-                  {(node.data as { label?: string }).label || node.id}
-                  <button
-                    type="button"
-                    className="chat-float-input-tag__remove"
-                    onClick={clearNodeSelection}
-                  >
-                    <X size={10} strokeWidth={2} />
-                  </button>
-                </span>
-              ))}
+              <span className="chat-float-input-tag">
+                <CircleDot size={12} strokeWidth={2} />
+                {selectedNodes.length}
+                <button
+                  type="button"
+                  className="chat-float-input-tag__remove"
+                  onClick={clearNodeSelection}
+                >
+                  <X size={10} strokeWidth={2} />
+                </button>
+              </span>
             </div>
           )}
           <div className="chat-float-input-row">
