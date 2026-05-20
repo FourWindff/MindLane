@@ -1,6 +1,14 @@
-import { BaseEdge, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, getBezierPath, useStore, type EdgeProps } from '@xyflow/react'
 import { useMemo } from 'react'
-import { computeSiblingCenterX } from './siblingOffset'
+
+const BASE_CURVATURE = 0.25
+const CURVATURE_SPREAD = 0.04
+
+function computeCurvature(siblingIndex: number, siblingCount: number): number {
+  if (siblingCount <= 1) return BASE_CURVATURE
+  const totalSpread = (siblingCount - 1) * CURVATURE_SPREAD
+  return BASE_CURVATURE - totalSpread / 2 + siblingIndex * CURVATURE_SPREAD
+}
 
 export function MindmapEdge(props: EdgeProps) {
   const {
@@ -24,12 +32,9 @@ export function MindmapEdge(props: EdgeProps) {
     labelBgBorderRadius,
   } = props
 
-  // Subscribe to both edges and nodes at the top level for reactive updates
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
 
-  // Memoize sibling computation to avoid recalculating on every render
   const edgePath = useMemo(() => {
-    // Build Y-position lookup map for O(1) access during sorting
     const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
 
     const siblingEdges = edges
@@ -39,21 +44,19 @@ export function MindmapEdge(props: EdgeProps) {
     const siblingIndex = siblingEdges.findIndex((e) => e.id === id)
     const siblingCount = siblingEdges.length
 
-    const centerX = computeSiblingCenterX(
-      sourceX,
-      targetX,
+    const curvature = computeCurvature(
       siblingIndex >= 0 ? siblingIndex : 0,
       siblingCount,
     )
 
-    const [path] = getSmoothStepPath({
+    const [path] = getBezierPath({
       sourceX,
       sourceY,
       sourcePosition,
       targetX,
       targetY,
       targetPosition,
-      centerX,
+      curvature,
     })
 
     return path

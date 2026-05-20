@@ -17,3 +17,19 @@ export function computeSiblingCenterX(
   const totalSpread = (siblingCount - 1) * spreadPerEdge
   return defaultCenterX - totalSpread / 2 + siblingIndex * spreadPerEdge
 }
+
+export const BASE_CURVATURE = 0.25
+export const CURVATURE_SPREAD = 0.04
+
+/**
+ * 根据同级 edge 的索引计算 bezier 曲线的 curvature。
+ * 同级 edge 的 curvature 在 BASE_CURVATURE 两侧对称分布，相邻 edge 间隔 CURVATURE_SPREAD。
+ */
+export function computeSiblingCurvature(
+  siblingIndex: number,
+  siblingCount: number,
+): number {
+  if (siblingCount <= 1) return BASE_CURVATURE
+  const totalSpread = (siblingCount - 1) * CURVATURE_SPREAD
+  return BASE_CURVATURE - totalSpread / 2 + siblingIndex * CURVATURE_SPREAD
+}
