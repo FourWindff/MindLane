@@ -23,12 +23,6 @@ export interface WorkspaceTreeEntry {
   previewUrl?: string
 }
 
-export interface WorkspaceSession {
-  workspacePath: string | null
-  recentWorkspacePaths: string[]
-  lastOpenedFilePath: string | null
-  restoreLastWorkspaceOnLaunch: boolean
-}
 
 export interface AppSettings {
   apiKey: string

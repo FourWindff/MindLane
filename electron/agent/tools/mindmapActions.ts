@@ -236,10 +236,3 @@ export function createMindmapActionTools(hasPalace = true): MindmapActionTools {
   return tools
 }
 
-// 导出类型供前端使用
-export type MindmapActionResult =
-  | { ok: true; action: 'addNode'; data: { type: string; parentId?: string; nodeData: Record<string, unknown> } }
-  | { ok: true; action: 'updateNode'; data: { nodeId: string; nodeType: string; changes: Record<string, unknown> } }
-  | { ok: true; action: 'deleteNode'; data: { nodeId: string; confirmDeleteSubtree: boolean } }
-  | { ok: true; action: 'batchAddNodes'; data: { yamlFragment: string; parentId?: string } }
-  | { ok: false; error: string }

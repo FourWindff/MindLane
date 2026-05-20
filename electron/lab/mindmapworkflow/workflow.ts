@@ -106,14 +106,6 @@ type WorkflowStateType = typeof WorkflowState.State
 type LeafTask = z.infer<typeof LeafTaskSchema>
 type MergeTask = z.infer<typeof MergeTaskSchema>
 
-export function buildMindmapWorkflow(
-  config: AnthropicLabConfig,
-  dependencies: WorkflowDependencies = {},
-) {
-  const runtime = createRuntime(config, dependencies)
-  return buildMindmapWorkflowWithRuntime(runtime)
-}
-
 export async function runMindmapWorkflow(
   config: AnthropicLabConfig,
   dependencies: WorkflowDependencies = {},
