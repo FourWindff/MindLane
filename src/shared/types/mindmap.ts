@@ -4,5 +4,3 @@ import type { Node } from '@xyflow/react'
 
 export type TextNodeType = Node<TextNodeData, 'text'>
 export type PalaceNodeType = Node<PalaceNodeData, 'palace'>
-
-export type MindLaneNodeType = TextNodeType | PalaceNodeType
