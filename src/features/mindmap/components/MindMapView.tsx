@@ -855,7 +855,7 @@ function MindMapCanvas({
       id: `e-${parentId}-${palaceId}`,
       source: parentId,
       target: palaceId,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge',
     }
 
@@ -864,7 +864,7 @@ function MindMapCanvas({
       id: `e-${palaceId}-${n.id}`,
       source: palaceId,
       target: n.id,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge',
     }))
 
