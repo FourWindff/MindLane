@@ -189,4 +189,3 @@ export const MindmapSubgraphState = Annotation.Root({
 
 export type MainGraphStateType = typeof MainGraphState.State
 export type PalaceSubgraphStateType = typeof PalaceSubgraphState.State
-export type MindmapSubgraphStateType = typeof MindmapSubgraphState.State

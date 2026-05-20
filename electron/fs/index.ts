@@ -40,12 +40,3 @@ export { CacheManager } from './cacheManager.js'
 export { SettingsManager } from './settingsManager.js'
 export { RecentFilesManager } from './recentFilesManager.js'
 export { WorkspaceManager } from './workspaceManager.js'
-export type {
-  FsResult,
-  RecentFileEntry,
-  WorkspaceFileEntry,
-  WorkspaceTreeEntry,
-  WorkspaceSession,
-  AppSettings,
-  ProviderConfig,
-} from './types.js'
