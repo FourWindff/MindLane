@@ -98,8 +98,8 @@ describe('normalizeTree', () => {
     const normalized = normalizeTree(tree, '1-1')
     expect(normalized.label).toBe('AI')
     expect(normalized.page_range).toBe('5-5')
-    expect(normalized.children[0]!.label).toBe('ML')
-    expect(normalized.children[0]!.page_range).toBe('1-3')
+    expect(normalized.children![0]!.label).toBe('ML')
+    expect(normalized.children![0]!.page_range).toBe('1-3')
   })
 
   it('uses fallback range when page_range is empty', () => {

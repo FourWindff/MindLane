@@ -1,4 +1,5 @@
 import type { MindmapYamlNode } from '../utils/yamlMindmap.js'
+export type { MindmapYamlNode }
 
 export interface AnthropicLabConfig {
   apiKey: string
