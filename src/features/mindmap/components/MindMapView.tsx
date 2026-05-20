@@ -35,7 +35,6 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import { autoLayout } from '@/shared/lib/autoLayout'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -627,16 +626,6 @@ function MindMapCanvas({
     { id: 'mindmap.navDown', combo: 'arrowdown', description: '选中下方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateDown() } },
   )
 
-  const doAutoLayout = useCallback(() => {
-    if (aiBusy) return
-    const laid = autoLayout(nodes, edges)
-    setNodes(laid)
-  }, [aiBusy, nodes, edges, setNodes])
-
-  useShortcut(
-    { id: 'mindmap.autoLayout', combo: 'mod+shift+l', description: '自动布局', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { doAutoLayout() } },
-  )
-
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
   const hiddenRfInstanceRef = useRef<ReactFlowInstance | null>(null)
 
@@ -949,7 +938,6 @@ function MindMapCanvas({
         onReset={reset}
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
-        onAutoLayout={doAutoLayout}
         onSave={doSave}
         onGenerateFromFile={generateFromFile}
         generateFromFileBusy={generationBusy}
