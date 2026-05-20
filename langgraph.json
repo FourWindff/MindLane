@@ -1,0 +1,7 @@
+{
+  "graphs": {
+    "mindmap": "./electron/agent/studio.ts:mindmapGraph",
+    "palace": "./electron/agent/studio.ts:palaceGraph",
+    "main": "./electron/agent/studio.ts:mainGraph"
+  }
+}

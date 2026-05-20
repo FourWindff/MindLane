@@ -302,7 +302,7 @@ export class AgentOrchestrator {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private buildGraph(_ctx?: MindmapContextData) {
+  buildGraph(_ctx?: MindmapContextData) {
     const caps = this.provider.capabilities;
     const hasPalace =
       caps.has(ProviderCapability.ImageGen) &&

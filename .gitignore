@@ -37,3 +37,5 @@ _bmad-output
 electron/lab/output
 tsconfig.node.tsbuildinfo
 .playwright-mcp
+# LangGraph API
+.langgraph_api
