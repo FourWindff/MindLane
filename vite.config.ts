@@ -22,7 +22,6 @@ export default defineConfig({
                 if (id.startsWith('node:') || id === 'electron') return true
                 const nativeOrProblematic = [
                   'better-sqlite3',
-                  'hnswlib-node',
                   'pdf-parse',
                   'mammoth',
                   '@anthropic-ai/sdk',

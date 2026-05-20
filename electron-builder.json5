@@ -11,7 +11,6 @@
     "dist",
     "dist-electron",
     "node_modules/better-sqlite3/**/*",
-    "node_modules/hnswlib-node/**/*",
     "node_modules/pdf-parse/**/*",
     "node_modules/mammoth/**/*",
     "node_modules/bindings/**/*",
@@ -20,8 +19,7 @@
     "node_modules/prebuild-install/**/*"
   ],
   "asarUnpack": [
-    "node_modules/better-sqlite3/**",
-    "node_modules/hnswlib-node/**"
+    "node_modules/better-sqlite3/**"
   ],
   "mac": {
     "target": [
