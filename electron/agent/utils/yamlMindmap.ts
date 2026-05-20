@@ -158,11 +158,6 @@ function expandIndent(text: string): string {
   return text.replace(/^( +)/gm, (match) => '  '.repeat(match.length))
 }
 
-function stripCodeFence(text: string): string {
-  const fenced = text.match(/```ya?ml\s*([\s\S]*?)```/i)
-  return fenced?.[1]?.trim() ?? text
-}
-
 function sanitizeStructuredTree(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => sanitizeStructuredTree(item))
