@@ -1,4 +1,5 @@
 import { BaseEdge, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
+import { useMemo } from 'react'
 import { computeSiblingCenterX } from './siblingOffset'
 
 export function MindmapEdge(props: EdgeProps) {
@@ -23,37 +24,40 @@ export function MindmapEdge(props: EdgeProps) {
     labelBgBorderRadius,
   } = props
 
-  const edges = useStore((s) => s.edges)
+  // Subscribe to both edges and nodes at the top level for reactive updates
+  const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
 
-  // Get all edges originating from the same source node, sorted by target Y position
-  const siblingEdges = edges
-    .filter((e) => e.source === source)
-    .sort((a, b) => {
-      const nodes = useStore.getState().nodes
-      const nodeA = nodes.find((n) => n.id === a.target)
-      const nodeB = nodes.find((n) => n.id === b.target)
-      return (nodeA?.position.y ?? 0) - (nodeB?.position.y ?? 0)
+  // Memoize sibling computation to avoid recalculating on every render
+  const edgePath = useMemo(() => {
+    // Build Y-position lookup map for O(1) access during sorting
+    const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
+
+    const siblingEdges = edges
+      .filter((e) => e.source === source)
+      .sort((a, b) => (nodeYById.get(a.target) ?? 0) - (nodeYById.get(b.target) ?? 0))
+
+    const siblingIndex = siblingEdges.findIndex((e) => e.id === id)
+    const siblingCount = siblingEdges.length
+
+    const centerX = computeSiblingCenterX(
+      sourceX,
+      targetX,
+      siblingIndex >= 0 ? siblingIndex : 0,
+      siblingCount,
+    )
+
+    const [path] = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      centerX,
     })
 
-  const siblingIndex = siblingEdges.findIndex((e) => e.id === id)
-  const siblingCount = siblingEdges.length
-
-  const centerX = computeSiblingCenterX(
-    sourceX,
-    targetX,
-    siblingIndex >= 0 ? siblingIndex : 0,
-    siblingCount,
-  )
-
-  const [edgePath] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    centerX,
-  })
+    return path
+  }, [edges, nodes, source, id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition])
 
   return (
     <BaseEdge
