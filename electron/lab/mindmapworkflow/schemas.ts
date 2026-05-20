@@ -26,13 +26,6 @@ export const LeafTaskSchema = z.object({
   }),
 })
 
-export const LeafBatchOutputSchema = z.object({
-  results: z.array(z.object({
-    chunk_id: z.string(),
-    mindmap: z.unknown(),
-  })).min(1),
-})
-
 export const MergeTaskSchema = z.object({
   group: z.object({
     groupIndex: z.number(),

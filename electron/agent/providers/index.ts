@@ -1,5 +1,3 @@
-export { LLMProvider, ProviderCapability, UnsupportedCapabilityError, type ChatModelOption, type DetectedAnchor, urlToDataUrl } from './base.js'
-export { DashScopeProvider } from './dashscope.js'
-export { KimiCodeProvider } from './kimi-code.js'
+export { LLMProvider, ProviderCapability, type DetectedAnchor, urlToDataUrl } from './base.js'
 export { MiniMaxProvider, mapSizeToAspectRatio } from './minimax.js'
-export { createProvider, registerProvider, getProviderMeta, getRegisteredProviders, type ProviderFactory, type ProviderMeta } from './registry.js'
+export { createProvider, getProviderMeta, getRegisteredProviders } from './registry.js'

@@ -2,13 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   withRetry,
   withTimeout,
-  isRetryableError,
-  computeBackoffDelay,
   linkSignals,
   sleepWithAbort,
-  TimeoutError,
-  RetryExhaustedError,
 } from '../middleware/index.js'
+import {
+  isRetryableError,
+  computeBackoffDelay,
+  RetryExhaustedError,
+} from '../middleware/retry.js'
+import { TimeoutError } from '../middleware/timeout.js'
 
 describe('isRetryableError', () => {
   it('treats TimeoutError as retryable', () => {
