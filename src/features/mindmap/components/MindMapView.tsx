@@ -22,6 +22,7 @@ import {
   useStoreApi,
   useReactFlow,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeTypes,
   type ReactFlowInstance,
@@ -49,6 +50,7 @@ import {
   CHILD_GAP_Y,
 } from '@/shared/lib/mindmapTree'
 import { PalaceNodeData } from '../nodes/palace'
+import { MindmapEdge } from '@/features/mindmap/edges'
 
 const NODE_EXIT_MS = 300
 
@@ -231,11 +233,13 @@ function HiddenThumbnailFlow({
   nodes,
   edges,
   nodeTypes,
+  edgeTypes,
   onInit,
 }: {
   nodes: Node[]
   edges: Edge[]
   nodeTypes: NodeTypes
+  edgeTypes: Record<string, React.ComponentType<EdgeProps>>
   onInit: React.MutableRefObject<ReactFlowInstance | null>
 }) {
   const rf = useReactFlow()
@@ -250,6 +254,7 @@ function HiddenThumbnailFlow({
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={false}
@@ -278,6 +283,7 @@ function MindMapCanvas({
   onOpenSettings?: () => void
 }) {
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
+  const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const rfStore = useStoreApi()
 
   const nodes = useMindmapStore((s) => s.nodes)
@@ -966,6 +972,7 @@ function MindMapCanvas({
           panOnDrag={[1]}
           selectionMode={SelectionMode.Partial}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
@@ -1034,6 +1041,7 @@ function MindMapCanvas({
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onInit={hiddenRfInstanceRef}
           />
         </ReactFlowProvider>
