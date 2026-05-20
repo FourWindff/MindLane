@@ -182,7 +182,7 @@ export function withNewChild(
       id: `e-${parentId}-${childId}`,
       source: parentId,
       target: childId,
-      type: 'smoothstep',
+      type: 'mindmap',
       className: 'mindmap-edge mindmap-edge--enter',
     },
   ]

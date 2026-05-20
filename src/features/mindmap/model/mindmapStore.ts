@@ -87,7 +87,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
 
   onConnect: (connection) => {
     set((s) => ({
-      edges: addEdge({ ...connection, type: 'smoothstep' }, s.edges),
+      edges: addEdge({ ...connection, type: 'mindmap' }, s.edges),
       dirty: true,
     }))
   },
@@ -282,7 +282,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
         id: e.id,
         source: e.source,
         target: e.target,
-        type: e.type ?? 'smoothstep',
+        type: e.type ?? 'mindmap',
         className: 'mindmap-edge mindmap-edge--enter',
       })
     }
@@ -292,7 +292,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
         id: `e-${targetParentId}-${subRootId}`,
         source: targetParentId,
         target: subRootId,
-        type: 'smoothstep',
+        type: 'mindmap',
         className: 'mindmap-edge mindmap-edge--enter',
       })
     }

@@ -158,7 +158,7 @@ export function ChatPanel() {
         id: e.id,
         source: e.source,
         target: e.target,
-        type: e.type ?? 'smoothstep',
+        type: e.type ?? 'mindmap',
         className: 'mindmap-edge mindmap-edge--enter',
       }))
 
@@ -789,7 +789,7 @@ function handleMindmapToolCall(
           id: `e_${targetParentId}_${newNodeId}`,
           source: targetParentId,
           target: newNodeId,
-          type: 'smoothstep',
+          type: 'mindmap',
           className: 'mindmap-edge',
         }
 
