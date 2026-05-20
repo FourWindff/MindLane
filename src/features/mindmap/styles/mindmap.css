@@ -384,10 +384,13 @@
 }
 
 .react-flow__handle {
-  width: 8px;
-  height: 8px;
-  background: var(--ml-accent);
-  border: 2px solid var(--ml-bg-elevated);
+  opacity: 0;
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
 }
 
 @keyframes mindmap-edge-enter {
