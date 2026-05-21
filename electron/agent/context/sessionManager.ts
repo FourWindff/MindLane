@@ -128,8 +128,14 @@ export class SessionManager {
         }
       }
 
-      // Rename chat-history to chat-history.migrated
-      fs.renameSync(chatHistoryDir, `${chatHistoryDir}.migrated`)
+      // Rename chat-history to chat-history.migrated (avoid ENOTEMPTY if already exists)
+      let migratedPath = `${chatHistoryDir}.migrated`
+      let suffix = 1
+      while (fs.existsSync(migratedPath)) {
+        migratedPath = `${chatHistoryDir}.migrated-${suffix}`
+        suffix++
+      }
+      fs.renameSync(chatHistoryDir, migratedPath)
       console.log('[SessionManager] Legacy data migration completed successfully')
     } catch (error) {
       console.error('[SessionManager] Legacy data migration failed:', error)
