@@ -1,4 +1,5 @@
 import { Plus, ArrowRight, Folder, FileText } from 'lucide-react'
+import { useCallback } from 'react'
 import type { MouseEvent } from 'react'
 import type { WorkspaceTreeEntry } from '../types'
 
@@ -19,15 +20,17 @@ export function FileManagerGrid({
   onContextMenu: (e: MouseEvent, entry: WorkspaceTreeEntry | null) => void
   onNewFile: () => void
 }) {
+  const handleGridContextMenu = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault()
+      onContextMenu(e, null)
+    },
+    [onContextMenu],
+  )
+
   return (
     <div className="file-manager__scroll">
-      <div
-        className="file-manager__grid"
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onContextMenu(e, null)
-        }}
-      >
+      <div className="file-manager__grid" onContextMenu={handleGridContextMenu}>
         {items.map((entry) => {
           const isFolder = entry.type === 'directory'
           const displayName = isFolder ? entry.name : entry.name.replace(/\.mindlane$/, '')

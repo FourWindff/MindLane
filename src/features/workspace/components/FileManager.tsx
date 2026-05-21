@@ -1,4 +1,4 @@
-import { useCallback, useState, type MouseEvent } from 'react'
+import { useCallback, useMemo, useState, type MouseEvent } from 'react'
 import { useWorkspaceStore } from '../store'
 import { FileContextMenu } from './FileContextMenu'
 import { RenameDialog } from './RenameDialog'
@@ -46,8 +46,7 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
   const [navigationPath, setNavigationPath] = useState<string[]>([])
 
-  // Build flat list of current-level items based on navigation path
-  const getCurrentLevelItems = useCallback((): WorkspaceTreeEntry[] => {
+  const currentLevelItems = useMemo((): WorkspaceTreeEntry[] => {
     if (navigationPath.length === 0) return tree
     let current = tree
     for (const segment of navigationPath) {
@@ -60,8 +59,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
     }
     return current
   }, [tree, navigationPath])
-
-  const currentLevelItems = getCurrentLevelItems()
   const currentFolder = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null
 
   const handleContextMenu = useCallback((e: MouseEvent, entry: WorkspaceTreeEntry | null) => {
@@ -135,35 +132,33 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
     if (ok) closeDialog()
   }
 
-  const handleNavigateInto = (entry: WorkspaceTreeEntry) => {
+  const handleNavigateInto = useCallback((entry: WorkspaceTreeEntry) => {
     if (entry.type === 'directory') {
-      setNavigationPath([...navigationPath, entry.name])
+      setNavigationPath((prev) => [...prev, entry.name])
     } else {
       void openWorkspaceFile(entry.path)
       onClose()
     }
-  }
+  }, [openWorkspaceFile, onClose])
 
-  const handleBreadcrumbClick = (idx: number) => {
-    setNavigationPath(navigationPath.slice(0, idx + 1))
-  }
+  const handleBreadcrumbClick = useCallback((idx: number) => {
+    setNavigationPath((prev) => prev.slice(0, idx + 1))
+  }, [])
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose()
     setNavigationPath([])
-  }
+  }, [onClose])
 
-  const handleToolbarNewFile = () => {
+  const handleToolbarNewFile = useCallback(() => {
     if (!workspacePath) return
     setDialog({ type: 'new-file', parentPath: workspacePath })
-  }
+  }, [workspacePath])
 
-  const handleToolbarNewFolder = () => {
+  const handleToolbarNewFolder = useCallback(() => {
     if (!workspacePath) return
     setDialog({ type: 'new-folder', parentPath: workspacePath })
-  }
-  const handleRefresh = useCallback(() => void refreshWorkspaceFiles(), [refreshWorkspaceFiles])
-  const handleSwitchWorkspace = useCallback(() => void switchWorkspace(), [switchWorkspace])
+  }, [workspacePath])
 
   if (!isOpen) return null
 
@@ -172,7 +167,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
       <div className="file-manager__panel">
         <div className="file-manager__gradient" />
 
-        {/* Header */}
         <div className="file-manager__header">
           <FileManagerBreadcrumb
             navigationPath={navigationPath}
@@ -188,9 +182,9 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             workspacePath={workspacePath}
             onNewFile={handleToolbarNewFile}
             onNewFolder={handleToolbarNewFolder}
-            onRefresh={handleRefresh}
+            onRefresh={() => void refreshWorkspaceFiles()}
             onOpenSettings={onOpenSettings}
-            onSwitchWorkspace={handleSwitchWorkspace}
+            onSwitchWorkspace={() => void switchWorkspace()}
             onClose={handleClose}
           />
         </div>
