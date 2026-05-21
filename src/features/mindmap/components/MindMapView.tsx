@@ -6,7 +6,6 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from 'react'
-import { Landmark } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { useShortcut } from '@/shared/shortcuts'
 import {
@@ -51,40 +50,11 @@ import { PalaceNodeData } from '../nodes/palace'
 import { MindmapEdge } from '@/features/mindmap/edges'
 import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
+import { SelectionActionBar } from './SelectionActionBar'
 
 const NODE_EXIT_MS = 300
 
 type FlowContextEvent = ReactMouseEvent | globalThis.MouseEvent
-
-function SelectionActionBar({
-  selectedTopicCount,
-  onGeneratePalace,
-  aiBusy,
-  palaceEnabled,
-}: {
-  selectedTopicCount: number
-  onGeneratePalace: () => void
-  aiBusy: boolean
-  palaceEnabled: boolean
-}) {
-  if (selectedTopicCount < 1 || aiBusy) return null
-
-  return (
-    <div className="selection-bar">
-      <span className="selection-bar__count">已选 {selectedTopicCount} 个主题</span>
-      <button
-        type="button"
-        className="selection-bar__btn"
-        onClick={onGeneratePalace}
-        disabled={!palaceEnabled}
-        title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
-      >
-        <Landmark size={14} strokeWidth={1.6} />
-        生成记忆宫殿
-      </button>
-    </div>
-  )
-}
 
 function HiddenThumbnailFlow({
   nodes,
