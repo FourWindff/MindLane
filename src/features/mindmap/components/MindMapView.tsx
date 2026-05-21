@@ -726,6 +726,7 @@ function MindMapCanvas({
                 imageUrl: result.imageUrl,
                 stations: result.stations,
                 sourceNodeIds: result.sourceNodeIds,
+                expanded: true,
               },
             }
           }

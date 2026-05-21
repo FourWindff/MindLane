@@ -629,6 +629,55 @@
     box-shadow 0.28s;
 }
 
+/* —— Collapsed phase —— */
+.palace-node-shell--collapsed {
+  width: 72px;
+  height: 72px;
+  border: 2px solid #3b82f6;
+}
+.palace-node-shell--collapsed:hover {
+  box-shadow: var(--ml-shadow-strong);
+  transform: scale(1.06);
+  transition:
+    width 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    height 0.28s cubic-bezier(0.25, 1, 0.5, 1),
+    border-color 0.28s,
+    box-shadow 0.18s,
+    transform 0.18s;
+}
+
+.palace-node-collapsed-inner {
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b82f6;
+}
+
+/* —— Expanding phase (starts at collapsed size, then grows) —— */
+.palace-node-shell--expanding {
+  width: 72px;
+  height: 72px;
+  border: 2px solid var(--ml-border-strong);
+}
+
+/* —— Expanded phase (full size) —— */
+.palace-node-shell--expanded {
+  width: 220px;
+  border: 2px solid var(--ml-border-strong);
+}
+.palace-node-shell--expanded:hover {
+  box-shadow: var(--ml-shadow-strong);
+}
+
+/* —— Collapsing phase (shrinking back) —— */
+.palace-node-shell--collapsing {
+  width: 72px;
+  height: 72px;
+  border: 2px solid #3b82f6;
+}
+
 .palace-node-expanded-inner {
   position: relative;
   animation: palace-content-in 0.28s cubic-bezier(0.25, 1, 0.5, 1) both;
