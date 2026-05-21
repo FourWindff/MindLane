@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MindMapView } from '@/features/mindmap/components/MindMapView'
+import { MindMapView } from '@/features/mindmap'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
