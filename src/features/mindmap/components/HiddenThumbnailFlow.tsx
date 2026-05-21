@@ -5,11 +5,12 @@ import {
   ReactFlow,
   useReactFlow,
   type Edge,
-  type EdgeProps,
   type Node,
   type NodeTypes,
   type ReactFlowInstance,
 } from '@xyflow/react'
+
+type EdgeTypes = NonNullable<React.ComponentProps<typeof ReactFlow>['edgeTypes']>
 
 export function HiddenThumbnailFlow({
   nodes,
@@ -21,7 +22,7 @@ export function HiddenThumbnailFlow({
   nodes: Node[]
   edges: Edge[]
   nodeTypes: NodeTypes
-  edgeTypes: Record<string, React.ComponentType<EdgeProps>>
+  edgeTypes: EdgeTypes
   onInit: React.MutableRefObject<ReactFlowInstance | null>
 }) {
   const rf = useReactFlow()
