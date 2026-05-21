@@ -1,10 +1,27 @@
-import { useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { useRef, useCallback } from 'react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { extractNodeInfo } from '@/features/chat/lib/chatUtils'
 import type { ContextNodeInfo } from '@/features/chat/lib/chatUtils'
+
+function useShallowById<T, U extends { id: string }>(
+  selector: (state: T) => U[]
+): (state: T) => U[] {
+  const prev = useRef<U[]>()
+  return (state) => {
+    const next = selector(state)
+    if (
+      prev.current &&
+      prev.current.length === next.length &&
+      prev.current.every((n, i) => n.id === next[i]!.id)
+    ) {
+      return prev.current
+    }
+    prev.current = next
+    return next
+  }
+}
 
 export interface ChatContext {
   mindmapSummary?: string
@@ -26,7 +43,7 @@ export function useChatContext() {
   const capabilities = useSettingsStore((s) => s.capabilities)
 
   const selectedNodes = useMindmapStore(
-    useShallow((s) => s.nodes.filter((n) => n.selected))
+    useShallowById((s) => s.nodes.filter((n) => n.selected))
   )
 
   const buildContext = useCallback((): ChatContext => {
