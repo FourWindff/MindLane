@@ -495,57 +495,6 @@
   border-radius: 1.5rem;
 }
 
-/* --- Footer --- */
-.file-manager__footer {
-  width: 100%;
-  position: relative;
-  z-index: 1;
-}
-
-.file-manager__footer-divider {
-  width: 100%;
-  height: 1px;
-  background: var(--ml-border);
-  margin: 1rem 0;
-}
-
-.file-manager__stats {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  justify-content: center;
-  padding-bottom: 0.5rem;
-}
-
-.file-manager__stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-}
-
-.file-manager__stat-value {
-  font-size: 1.5rem;
-  font-weight: 900;
-  font-style: italic;
-  color: var(--ml-text);
-  line-height: 1.1;
-}
-
-.file-manager__stat-label {
-  font-size: 0.55rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.4em;
-  color: var(--ml-text-faint);
-}
-
-.file-manager__stat-divider {
-  width: 1px;
-  height: 2rem;
-  background: var(--ml-border);
-}
-
 /* --- Mindmap Preview --- */
 .file-manager__card-preview {
   width: 100%;
@@ -611,9 +560,5 @@
   .file-manager__card-name {
     font-size: 0.9rem;
     max-width: 130px;
-  }
-
-  .file-manager__stats {
-    gap: 1rem;
   }
 }

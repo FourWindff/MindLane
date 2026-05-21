@@ -7,7 +7,6 @@ import { InputDialog } from './InputDialog'
 import { FileManagerToolbar } from './FileManagerToolbar'
 import { FileManagerBreadcrumb } from './FileManagerBreadcrumb'
 import { FileManagerGrid } from './FileManagerGrid'
-import { FileManagerFooter } from './FileManagerFooter'
 import type { WorkspaceTreeEntry } from '../types'
 import '../file-manager.css'
 
@@ -206,9 +205,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
           onContextMenu={handleContextMenu}
           onNewFile={handleToolbarNewFile}
         />
-
-        {/* Footer stats */}
-        <FileManagerFooter items={currentLevelItems} />
 
         {/* Context Menu */}
         {contextMenu.scope !== 'closed' && (
