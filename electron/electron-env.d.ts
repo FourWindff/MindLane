@@ -38,11 +38,7 @@ type _ChatContext = {
   workspaceFiles?: { name: string; filePath: string }[]
 }
 
-type _ChatToolCall = {
-  name: string
-  args: Record<string, unknown>
-  result: string
-}
+type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
 
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
 type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge

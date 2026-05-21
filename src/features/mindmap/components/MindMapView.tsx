@@ -88,7 +88,7 @@ function MindMapCanvas({
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
   const [hasSelection, setHasSelection] = useState(false)
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ scope: 'closed' })
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
@@ -189,14 +189,14 @@ function MindMapCanvas({
   }, [])
 
   useEffect(() => {
-    if (!contextMenu) return
+    if (contextMenu.scope === 'closed') return
     const onDismiss = (e: Event) => {
       const t = e.target
       if (t instanceof window.Node && contextMenuRef.current?.contains(t)) return
-      setContextMenu(null)
+      setContextMenu({ scope: 'closed' })
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null)
+      if (e.key === 'Escape') setContextMenu({ scope: 'closed' })
     }
     window.addEventListener('mousedown', onDismiss, true)
     window.addEventListener('scroll', onDismiss, true)
@@ -768,11 +768,11 @@ function MindMapCanvas({
         />
         <AiProgressOverlay />
         <GenerationProgressOverlay progress={generationProgress} />
-        {contextMenu ? (
+        {contextMenu.scope !== 'closed' ? (
           <MindMapContextMenu
             menu={contextMenu}
             menuRef={contextMenuRef}
-            onClose={() => setContextMenu(null)}
+            onClose={() => setContextMenu({ scope: 'closed' })}
             onAddChild={addChild}
             onAddSibling={addSibling}
             onRemove={removeSelected}

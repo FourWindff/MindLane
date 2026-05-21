@@ -24,11 +24,10 @@ type DialogState =
   | { type: 'rename'; entry: WorkspaceTreeEntry }
   | { type: 'delete'; entry: WorkspaceTreeEntry }
 
-type ContextMenuState = {
-  x: number
-  y: number
-  entry: WorkspaceTreeEntry | null
-} | null
+type ContextMenuState =
+  | { scope: 'closed' }
+  | { scope: 'empty'; x: number; y: number }
+  | { scope: 'entry'; x: number; y: number; entry: WorkspaceTreeEntry }
 
 export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProps) {
   const busy = useWorkspaceStore((s) => s.busy)
@@ -44,7 +43,7 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
   const renameItem = useWorkspaceStore((s) => s.renameItem)
   const openWorkspaceFile = useWorkspaceStore((s) => s.openWorkspaceFile)
 
-  const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ scope: 'closed' })
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
   const [navigationPath, setNavigationPath] = useState<string[]>([])
 
@@ -70,11 +69,13 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
     e.preventDefault()
     const container = (e.currentTarget as HTMLElement).closest('.file-manager__grid')
     const rect = container?.getBoundingClientRect() ?? { left: 0, top: 0 }
-    setContextMenu({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      entry,
-    })
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    if (entry) {
+      setContextMenu({ scope: 'entry', x, y, entry })
+    } else {
+      setContextMenu({ scope: 'empty', x, y })
+    }
   }, [])
 
   const handleContextAction = useCallback(
@@ -210,13 +211,13 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
         <FileManagerFooter items={currentLevelItems} />
 
         {/* Context Menu */}
-        {contextMenu && (
+        {contextMenu.scope !== 'closed' && (
           <FileContextMenu
             x={contextMenu.x}
             y={contextMenu.y}
-            entry={contextMenu.entry}
+            entry={contextMenu.scope === 'entry' ? contextMenu.entry : null}
             onAction={handleContextAction}
-            onClose={() => setContextMenu(null)}
+            onClose={() => setContextMenu({ scope: 'closed' })}
           />
         )}
 

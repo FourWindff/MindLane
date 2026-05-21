@@ -93,16 +93,7 @@ export class SessionManager {
           if (!fs.existsSync(sessionFilePath)) continue
 
           const sessionData = JSON.parse(fs.readFileSync(sessionFilePath, 'utf-8'))
-          const messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{
-              name: string
-              args: Record<string, unknown>
-              result: string
-            }>
-            timestamp?: string
-          }> = Array.isArray(sessionData.messages) ? sessionData.messages : []
+          const messages: SessionMessage[] = Array.isArray(sessionData.messages) ? sessionData.messages : []
 
           // Insert session metadata
           const row: ChatSessionRow = {

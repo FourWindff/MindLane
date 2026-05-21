@@ -15,14 +15,12 @@ export type AiPipelineStep =
   | 'generating-map'
   | 'chatting'
 
+import type { ChatToolCall } from '@/shared/lib/fileFormat'
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  toolCalls?: Array<{
-    name: string
-    args: Record<string, unknown>
-    result: string
-  }>
+  toolCalls?: ChatToolCall[]
 }
 
 export interface ChatSession {

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react'
-import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
+import { createEmptyFile, type MindLaneFile, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
 import { parseYamlToMindmap, parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
@@ -187,14 +187,18 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
     const roots = nodes.filter((n) => !parentSet.has(n.id))
 
     function describeNode(node: Node): string {
-      const data = node.data as Record<string, unknown>
       switch (node.type) {
         case 'palace': {
-          const stations = Array.isArray(data.stations) ? data.stations : []
-          return `[宫殿] ${data.label ?? node.id} (id: ${node.id}, ${stations.length}个站点)`
+          if (isPalaceNodeData(node.data)) {
+            return `[宫殿] ${node.data.label} (id: ${node.id}, ${node.data.stations.length}个站点)`
+          }
+          return `[宫殿] ${node.id}`
         }
         default:
-          return `${String(data.label ?? node.id)} (id: ${node.id})`
+          if (isTextNodeData(node.data)) {
+            return `${node.data.label} (id: ${node.id})`
+          }
+          return `${node.id}`
       }
     }
 
