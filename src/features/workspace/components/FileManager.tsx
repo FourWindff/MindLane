@@ -17,23 +17,6 @@ interface FileManagerProps {
   onOpenSettings?: () => void
 }
 
-function countEntries(entries: WorkspaceTreeEntry[]): { files: number; folders: number } {
-  let files = 0
-  let folders = 0
-  for (const e of entries) {
-    if (e.type === 'file') files++
-    else {
-      folders++
-      if (e.children) {
-        const sub = countEntries(e.children)
-        files += sub.files
-        folders += sub.folders
-      }
-    }
-  }
-  return { files, folders }
-}
-
 type DialogState =
   | { type: 'none' }
   | { type: 'new-file'; parentPath: string }
@@ -64,8 +47,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null)
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
   const [navigationPath, setNavigationPath] = useState<string[]>([])
-
-  countEntries(tree)
 
   // Build flat list of current-level items based on navigation path
   const getCurrentLevelItems = useCallback((): WorkspaceTreeEntry[] => {
