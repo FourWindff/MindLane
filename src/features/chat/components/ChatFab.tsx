@@ -8,7 +8,6 @@ interface ChatFabProps {
 
 export function ChatFab({ onExpand }: ChatFabProps) {
   const busy = useAiStore((s) => s.busy)
-  const progress = useAiStore((s) => s.progress)
 
   return (
     <motion.button
@@ -24,18 +23,6 @@ export function ChatFab({ onExpand }: ChatFabProps) {
     >
       <Bot size={36} strokeWidth={1.5} className="chat-float-fab__icon" />
       <span className={`chat-float-fab__status chat-float-fab__status--${busy ? 'busy' : 'idle'}`} />
-      {busy && (
-        <svg className="chat-float-fab__progress" viewBox="0 0 88 88">
-          <circle
-            className="chat-float-fab__progress-circle"
-            cx="44"
-            cy="44"
-            r="42"
-            strokeDasharray={2 * Math.PI * 42}
-            strokeDashoffset={2 * Math.PI * 42 * (1 - progress / 100)}
-          />
-        </svg>
-      )}
       <span className="chat-float-fab__tooltip">Neural Assistant</span>
     </motion.button>
   )

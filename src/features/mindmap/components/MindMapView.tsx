@@ -28,7 +28,7 @@ import { PalaceModal } from '@/features/mindmap/components/PalaceModal'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import {
   collectSubtreeIds,
@@ -49,7 +49,6 @@ import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
 import { SelectionActionBar } from './SelectionActionBar'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
-import { GenerationProgressOverlay } from './GenerationProgressOverlay'
 
 const NODE_EXIT_MS = 300
 
@@ -456,8 +455,9 @@ function MindMapCanvas({
   }, [])
 
   const doSave = useCallback(async () => {
+    const store = useMindmapStore.getState()
+    const ai = useAiStore.getState()
     try {
-      const store = useMindmapStore.getState()
       const data = store.toMindLaneFile()
       const result = await window.mindlane?.file.save({ filePath: store.filePath, data })
       if (result?.ok) {
@@ -474,85 +474,79 @@ function MindMapCanvas({
       }
     } catch (e) {
       console.error('[MindLane] 保存失败：', e)
-      useAiStore.getState().setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
+      ai.setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl])
-
-  const [generationBusy, setGenerationBusy] = useState(false)
-  const [generationProgress, setGenerationProgress] = useState<string | null>(null)
 
   useEffect(() => {
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane?.mindmap) return
+    const validSteps: readonly string[] = ['preparing', 'extracting', 'merging', 'finalizing']
     const off = mindlane.mindmap.onGenerationProgress((progress) => {
-      if (progress.phase === 'error') {
-        setGenerationProgress(null)
+      const ai = useAiStore.getState()
+      if (progress.phase === 'error' || progress.phase === 'done') {
+        if (ai.busy) ai.setBusy(false)
+        if (ai.step !== 'idle') ai.setStep('idle')
         return
       }
-      if (progress.phase === 'done') {
-        setGenerationProgress(null)
-        return
-      }
-      const phaseLabel: Record<string, string> = {
-        preparing: '准备文件',
-        extracting: 'AI 提取大纲',
-        merging: '合并子树',
-        finalizing: '生成 YAML',
-        done: '完成',
-        error: '错误',
-      }
-      const label = phaseLabel[progress.phase] ?? progress.phase
-      setGenerationProgress(progress.message ? `${label} · ${progress.message}` : label)
+      if (!validSteps.includes(progress.phase)) return
+      const step = progress.phase as AiPipelineStep
+      if (!ai.busy) ai.setBusy(true)
+      if (ai.step !== step) ai.setStep(step)
     })
     return off
   }, [])
 
   const generateFromFile = useCallback(async () => {
-    if (aiBusy || generationBusy) return
+    if (aiBusy) return
+
+    const ai = useAiStore.getState()
+    const settings = useSettingsStore.getState()
+    const mindmap = useMindmapStore.getState()
 
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane?.mindmap) {
-      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      ai.setError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
     const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
+    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
     if (!currentKey?.trim()) {
-      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      ai.setError('请先在右侧「设置」面板中填写 API Key')
       return
     }
 
-    setGenerationBusy(true)
-    setGenerationProgress('选择文件…')
+    ai.setBusy(true)
+    ai.setStep('preparing')
 
     try {
       const result = await mindlane.mindmap.generateFromFile({})
       if (!result.ok) {
         if (!result.canceled) {
-          useAiStore.getState().setError(`生成失败：${result.error}`)
+          ai.setError(`生成失败：${result.error}`)
         }
         return
       }
 
       try {
-        useMindmapStore.getState().loadFromYaml(result.data.yamlContent, {
+        mindmap.loadFromYaml(result.data.yamlContent, {
           fileTitle: result.data.documentTitle,
         })
       } catch (e) {
-        useAiStore.getState().setError(
+        ai.setError(
           `YAML 解析失败：${e instanceof Error ? e.message : String(e)}`,
         )
       }
     } catch (e) {
-      useAiStore.getState().setError(
+      ai.setError(
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     } finally {
-      setGenerationBusy(false)
-      setGenerationProgress(null)
+      if (ai.busy) ai.setBusy(false)
+      if (ai.step !== 'idle') ai.setStep('idle')
     }
-  }, [aiBusy, apiKey, generationBusy])
+  }, [aiBusy, apiKey])
 
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
@@ -574,18 +568,21 @@ function MindMapCanvas({
   const generatePalace = useCallback(async () => {
     if (aiBusy) return
 
+    const ai = useAiStore.getState()
+    const settings = useSettingsStore.getState()
+
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane) {
-      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      ai.setError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
     const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
-    const currentModel = backendSettings?.chatModel || chatModel || useSettingsStore.getState().chatModel || 'qwen-turbo'
+    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
+    const currentModel = backendSettings?.chatModel || chatModel || settings.chatModel || 'qwen-turbo'
 
     if (!currentKey) {
-      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      ai.setError('请先在右侧「设置」面板中填写 API Key')
       return
     }
 
@@ -600,7 +597,7 @@ function MindMapCanvas({
       }
     }
     if (selectedNodes.length === 0) {
-      useAiStore.getState().setError('未选中任何主题节点')
+      ai.setError('未选中任何主题节点')
       return
     }
 
@@ -659,8 +656,8 @@ function MindMapCanvas({
     setNodes(laidOut)
     setEdges(nextEdges)
 
-    useAiStore.getState().setBusy(true)
-    useAiStore.getState().setStep('analyzing')
+    ai.setBusy(true)
+    ai.setStep('analyzing')
 
     try {
       const OVERALL_TIMEOUT = 120_000
@@ -676,7 +673,7 @@ function MindMapCanvas({
       if (!result) {
         setNodes(rollbackNodes)
         setEdges(rollbackEdges)
-        useAiStore.getState().setError('生成超时（超过 2 分钟），请检查网络后重试')
+        ai.setError('生成超时（超过 2 分钟），请检查网络后重试')
         return
       }
 
@@ -684,7 +681,7 @@ function MindMapCanvas({
         setNodes(rollbackNodes)
         setEdges(rollbackEdges)
         const errMsg = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
-        useAiStore.getState().setError(`AI 返回错误：${errMsg}`)
+        ai.setError(`AI 返回错误：${errMsg}`)
         return
       }
 
@@ -707,11 +704,11 @@ function MindMapCanvas({
           return n
         }),
       )
-      useAiStore.getState().reset()
+      ai.reset()
     } catch (e) {
       setNodes(rollbackNodes)
       setEdges(rollbackEdges)
-      useAiStore.getState().setError(
+      ai.setError(
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     }
@@ -728,7 +725,7 @@ function MindMapCanvas({
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
         onGenerateFromFile={generateFromFile}
-        generateFromFileBusy={generationBusy}
+        generateFromFileBusy={aiBusy}
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
@@ -770,8 +767,7 @@ function MindMapCanvas({
           palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
-        <GenerationProgressOverlay progress={generationProgress} />
-        {contextMenu.scope !== 'closed' ? (
+        {contextMenu ? (
           <MindMapContextMenu
             menu={contextMenu}
             menuRef={contextMenuRef}
