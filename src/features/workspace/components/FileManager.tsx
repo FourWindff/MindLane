@@ -1,20 +1,15 @@
 import { useCallback, useState, type MouseEvent } from 'react'
 import {
-  X,
   Plus,
   ChevronRight,
   ArrowRight,
-  Settings,
-  FolderInput,
-  FilePlus,
-  FolderPlus,
-  RefreshCw,
 } from 'lucide-react'
 import { useWorkspaceStore } from '../store'
 import { FileContextMenu } from './FileContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InputDialog } from './InputDialog'
+import { FileManagerToolbar } from './FileManagerToolbar'
 import type { WorkspaceTreeEntry } from '../types'
 import '../file-manager.css'
 
@@ -227,68 +222,16 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             </p>
           </div>
 
-          <div className="file-manager__header-actions">
-            <button
-              type="button"
-              className="file-manager__icon-btn"
-              onClick={handleToolbarNewFile}
-              disabled={busy || !workspacePath}
-              title="新建文件"
-              aria-label="新建文件"
-            >
-              <FilePlus size={16} strokeWidth={1.5} />
-            </button>
-            <button
-              type="button"
-              className="file-manager__icon-btn"
-              onClick={handleToolbarNewFolder}
-              disabled={busy || !workspacePath}
-              title="新建文件夹"
-              aria-label="新建文件夹"
-            >
-              <FolderPlus size={16} strokeWidth={1.5} />
-            </button>
-            <button
-              type="button"
-              className="file-manager__icon-btn"
-              onClick={() => void refreshWorkspaceFiles()}
-              disabled={busy || !workspacePath}
-              title="刷新"
-              aria-label="刷新"
-            >
-              <RefreshCw size={16} strokeWidth={1.5} />
-            </button>
-            {onOpenSettings && (
-              <button
-                type="button"
-                className="file-manager__icon-btn"
-                onClick={onOpenSettings}
-                disabled={busy}
-                title="设置"
-                aria-label="设置"
-              >
-                <Settings size={16} strokeWidth={1.5} />
-              </button>
-            )}
-            <button
-              type="button"
-              className="file-manager__icon-btn"
-              onClick={() => void switchWorkspace()}
-              disabled={busy}
-              title="切换仓库"
-              aria-label="切换仓库"
-            >
-              <FolderInput size={16} strokeWidth={1.5} />
-            </button>
-            <button
-              type="button"
-              className="file-manager__close-btn"
-              onClick={handleClose}
-              aria-label="关闭"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <FileManagerToolbar
+            busy={busy}
+            workspacePath={workspacePath}
+            onNewFile={handleToolbarNewFile}
+            onNewFolder={handleToolbarNewFolder}
+            onRefresh={() => void refreshWorkspaceFiles()}
+            onOpenSettings={onOpenSettings}
+            onSwitchWorkspace={() => void switchWorkspace()}
+            onClose={handleClose}
+          />
         </div>
 
         {lastError && (
