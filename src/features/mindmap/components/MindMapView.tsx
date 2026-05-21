@@ -246,13 +246,16 @@ function MindMapCanvas({
 
   const mindmapShortcutsEnabled = useCallback(() => !aiBusy, [aiBusy])
 
-  useOnSelectionChange({
-    onChange: ({ nodes: sel }) => {
+  const handleSelectionChange = useCallback(
+    ({ nodes: sel }: { nodes: Node[] }) => {
       setSelectedId(sel[0]?.id ?? null)
       setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
       setHasSelection(sel.length > 0)
     },
-  })
+    [],
+  )
+
+  useOnSelectionChange({ onChange: handleSelectionChange })
 
   const addChild = useCallback(() => {
     if (aiBusy) return
