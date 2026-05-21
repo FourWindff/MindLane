@@ -1,4 +1,4 @@
-import { Plus, ArrowRight } from 'lucide-react'
+import { Plus, ArrowRight, Folder, FileText } from 'lucide-react'
 import type { MouseEvent } from 'react'
 import type { WorkspaceTreeEntry } from '../types'
 
@@ -47,14 +47,11 @@ export function FileManagerGrid({
             >
               <div className="file-manager__card-visual">
                 {isFolder ? (
-                  <>
-                    <div className="file-manager__card-glow file-manager__card-glow--folder" />
-                    <div className="file-manager__card-dots">
-                      <div className="file-manager__card-dot file-manager__card-dot--1" />
-                      <div className="file-manager__card-dot file-manager__card-dot--2" />
-                      <div className="file-manager__card-dot file-manager__card-dot--3" />
-                    </div>
-                  </>
+                  <Folder
+                    size={40}
+                    className="file-manager__card-icon file-manager__card-icon--folder"
+                    strokeWidth={1.5}
+                  />
                 ) : entry.previewUrl ? (
                   <img
                     src={entry.previewUrl}
@@ -63,13 +60,11 @@ export function FileManagerGrid({
                     draggable={false}
                   />
                 ) : (
-                  <>
-                    <div className="file-manager__card-glow file-manager__card-glow--file" />
-                    <div className="file-manager__card-dots">
-                      <div className="file-manager__card-dot file-manager__card-dot--center" />
-                      <div className="file-manager__card-dot file-manager__card-dot--orbit" />
-                    </div>
-                  </>
+                  <FileText
+                    size={40}
+                    className="file-manager__card-icon file-manager__card-icon--file"
+                    strokeWidth={1.5}
+                  />
                 )}
               </div>
 
