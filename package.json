@@ -8,8 +8,8 @@
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "NODE_OPTIONS='--max-old-space-size=4096' vitest run",
-    "test:watch": "vitest",
+    "test": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/test.mjs run",
+    "test:watch": "node scripts/test.mjs",
     "postinstall": "electron-rebuild"
   },
   "dependencies": {
