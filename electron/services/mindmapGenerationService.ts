@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { runMindmapWorkflow } from '../agent/pdfWorkflow/index.js'
-import type { AnthropicLabConfig, MindmapWorkflowResult } from '../agent/pdfWorkflow/index.js'
+import { runMindmapWorkflow } from '../agent/graphs/mindmapGraph/documentPipeline/index.js'
+import type { AnthropicLabConfig, MindmapWorkflowResult } from '../agent/graphs/mindmapGraph/documentPipeline/index.js'
 
 export type MindmapGenerationPhase =
   | 'preparing'

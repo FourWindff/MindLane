@@ -9,7 +9,7 @@ import type {
 import {
   formatPageRange,
   parsePageRange,
-} from '../utils/yamlMindmap.js'
+} from '../../../utils/yamlMindmap.js'
 import YAML from 'yaml'
 
 export function sortLeafResults(results: LeafExtractionResult[]): LeafExtractionResult[] {

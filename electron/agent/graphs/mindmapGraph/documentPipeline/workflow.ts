@@ -31,7 +31,7 @@ import {
   sortLeafResults,
   sortMergeResults,
 } from './utils.js'
-import { overwriteArray } from '../utils/yamlMindmap.js'
+import { overwriteArray } from '../../../utils/yamlMindmap.js'
 
 const WorkflowState = Annotation.Root({
   document: Annotation<DocumentMeta | null>({

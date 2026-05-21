@@ -21,7 +21,7 @@ import type {
   MindLaneEdge,
 } from "../../src/shared/lib/fileFormat.js";
 import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
-import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
+import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";

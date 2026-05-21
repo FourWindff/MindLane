@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildMindmapSubgraph } from '../mindmapGraph.js'
-import type { LLMProvider } from '../../providers/index.js'
-import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../utils/yamlMindmap.js'
-import type { MindmapYamlNode } from '../../utils/yamlMindmap.js'
+import { buildMindmapSubgraph } from '../index.js'
+import type { LLMProvider } from '../../../providers/index.js'
+import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
+import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 
 describe('MindmapGraph error with stack', () => {
   it('includes stack trace in state.error when generation fails', async () => {

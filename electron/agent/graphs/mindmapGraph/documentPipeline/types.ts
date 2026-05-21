@@ -1,4 +1,4 @@
-import type { MindmapYamlNode } from '../utils/yamlMindmap.js'
+import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 export type { MindmapYamlNode }
 
 export interface AnthropicLabConfig {

@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import YAML from 'yaml'
-import { serializeMindmapOutline } from '../utils/yamlMindmap.js'
+import { serializeMindmapOutline } from '../../../utils/yamlMindmap.js'
 import type { DocumentMeta, MindmapYamlNode, PdfChunk, PdfPage } from './types.js'
 
 export async function loadPdfPages(pdfPath: string): Promise<PdfPage[]> {

@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { LeafTaskSchema, MergeTaskSchema, TreeSchema } from './schemas.js'
-import { serializeMindmapForestOutline, serializeMindmapOutline } from '../utils/yamlMindmap.js'
+import { serializeMindmapForestOutline, serializeMindmapOutline } from '../../../utils/yamlMindmap.js'
 import type {
   ChatModelLike,
   DocumentMeta,
@@ -24,7 +24,7 @@ import {
   responseToText,
   sanitizeTreeCandidate,
   withRetries,
-} from '../utils/yamlMindmap.js'
+} from '../../../utils/yamlMindmap.js'
 
 export class LeafExtractAgent {
   constructor(
