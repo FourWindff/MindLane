@@ -7,6 +7,7 @@ import { InputDialog } from './InputDialog'
 import { FileManagerToolbar } from './FileManagerToolbar'
 import { FileManagerBreadcrumb } from './FileManagerBreadcrumb'
 import { FileManagerGrid } from './FileManagerGrid'
+import { FileManagerFooter } from './FileManagerFooter'
 import type { WorkspaceTreeEntry } from '../types'
 import '../file-manager.css'
 
@@ -225,29 +226,7 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
         />
 
         {/* Footer stats */}
-        <div className="file-manager__footer">
-          <div className="file-manager__footer-divider" />
-          <div className="file-manager__stats">
-            <div className="file-manager__stat">
-              <span className="file-manager__stat-value">{currentLevelItems.length}</span>
-              <span className="file-manager__stat-label">Total Clusters</span>
-            </div>
-            <div className="file-manager__stat-divider" />
-            <div className="file-manager__stat">
-              <span className="file-manager__stat-value">
-                {currentLevelItems.filter((e) => e.type === 'directory').length}
-              </span>
-              <span className="file-manager__stat-label">Biological Groups</span>
-            </div>
-            <div className="file-manager__stat-divider" />
-            <div className="file-manager__stat">
-              <span className="file-manager__stat-value">
-                {currentLevelItems.filter((e) => e.type === 'file').length}
-              </span>
-              <span className="file-manager__stat-label">Neural Nodes</span>
-            </div>
-          </div>
-        </div>
+        <FileManagerFooter items={currentLevelItems} />
 
         {/* Context Menu */}
         {contextMenu && (
