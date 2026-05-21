@@ -5,6 +5,8 @@ export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/pal
 export type { TextNodeData }
 
 
+export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
+
 export interface MindLaneFile {
   version: '1.0'
   metadata: {
@@ -86,7 +88,7 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
         },
       ],
       edges: [],
-      viewport: { x: 0, y: 0, zoom: 1 },
+      viewport: DEFAULT_VIEWPORT,
     },
     documents: [],
   }

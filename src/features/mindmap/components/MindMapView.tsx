@@ -17,10 +17,12 @@ import {
   ReactFlowProvider,
   SelectionMode,
   useOnSelectionChange,
+  useReactFlow,
   useStoreApi,
   type Edge,
   type Node,
   type ReactFlowInstance,
+  type Viewport,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { MindMapHeader } from '@/features/mindmap/components/MindMapHeader'
@@ -30,6 +32,7 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
+import { DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -64,6 +67,7 @@ function MindMapCanvas({
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
   const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const rfStore = useStoreApi()
+  const rf = useReactFlow()
 
   const nodes = useMindmapStore((s) => s.nodes)
   const edges = useMindmapStore((s) => s.edges)
@@ -95,10 +99,39 @@ function MindMapCanvas({
   const exitTimeoutsRef = useRef<number[]>([])
   const layoutTimerRef = useRef<number | null>(null)
   const isLayoutingRef = useRef(false)
+  const lastRestoredFileRef = useRef<string | null>(null)
+  const viewportDebounceRef = useRef<number | null>(null)
 
   useEffect(() => {
     graphRef.current = { nodes, edges }
   }, [nodes, edges])
+
+  useEffect(() => {
+    if (!hasDocumentOpen || nodes.length === 0) return
+    if (lastRestoredFileRef.current === filePath) return
+    lastRestoredFileRef.current = filePath
+
+    const vp = useMindmapStore.getState().viewport
+    const isDefault = vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
+    if (isDefault) {
+      rf.fitView({ padding: 0.2, duration: 300 })
+    } else {
+      rf.setViewport(vp)
+    }
+  }, [filePath, hasDocumentOpen, nodes.length, rf])
+
+  const handleMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      if (viewportDebounceRef.current) {
+        window.clearTimeout(viewportDebounceRef.current)
+      }
+      viewportDebounceRef.current = window.setTimeout(() => {
+        viewportDebounceRef.current = null
+        useMindmapStore.getState().setViewport(viewport)
+      }, 200)
+    },
+    [],
+  )
 
   const handleNodesChange = useCallback(
     (changes: import('@xyflow/react').NodeChange[]) => {
@@ -750,8 +783,7 @@ function MindMapCanvas({
           nodesDraggable={false}
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
+          onMoveEnd={handleMoveEnd}
           minZoom={0.2}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}

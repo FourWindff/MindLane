@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
-import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange } from '@xyflow/react'
-import { createEmptyFile, type MindLaneFile, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
+import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange, Viewport } from '@xyflow/react'
+import { createEmptyFile, DEFAULT_VIEWPORT, type MindLaneFile, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
 import { parseYamlToMindmap, parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
@@ -15,6 +15,7 @@ interface MindmapState {
   filePath: string | null
   fileTitle: string
   editingNodeId: string | null
+  viewport: Viewport
 
   setNodes: (nodes: Node[] | ((prev: Node[]) => Node[])) => void
   setEdges: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void
@@ -26,6 +27,7 @@ interface MindmapState {
   markClean: () => void
   setFilePath: (filePath: string) => void
   setFileTitle: (fileTitle: string) => void
+  setViewport: (viewport: Viewport) => void
 
   loadFile: (filePath: string, data: MindLaneFile) => void
   loadFromYaml: (yamlString: string, options?: { fileTitle?: string; filePath?: string | null }) => void
@@ -49,6 +51,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   hasDocumentOpen: false,
   filePath: null,
   fileTitle: initialFile.metadata.title,
+  viewport: initialFile.mindmap.viewport,
   editingNodeId: null,
 
   setEditingNodeId: (id) => set({ editingNodeId: id }),
@@ -56,6 +59,8 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   setFilePath: (filePath) => set({ filePath }),
 
   setFileTitle: (fileTitle) => set({ fileTitle }),
+
+  setViewport: (viewport) => set({ viewport }),
 
   setNodes: (updater) => {
     set((s) => ({
@@ -106,6 +111,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       filePath,
       fileTitle: data.metadata.title,
       dirty: false,
+      viewport: data.mindmap.viewport,
     })
   },
 
@@ -120,6 +126,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       fileTitle: options.fileTitle ?? parsed.title,
       dirty: true,
       editingNodeId: null,
+      viewport: DEFAULT_VIEWPORT,
     })
   },
 
@@ -132,6 +139,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       filePath: null,
       fileTitle: f.metadata.title,
       dirty: false,
+      viewport: f.mindmap.viewport,
     })
   },
 
@@ -145,11 +153,12 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       fileTitle: f.metadata.title,
       dirty: false,
       editingNodeId: null,
+      viewport: f.mindmap.viewport,
     })
   },
 
   toMindLaneFile: (): MindLaneFile => {
-    const { nodes, edges, fileTitle } = get()
+    const { nodes, edges, fileTitle, viewport } = get()
     const now = new Date().toISOString()
     return {
       version: '1.0',
@@ -168,7 +177,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
           type: e.type,
           className: e.className,
         })),
-        viewport: { x: 0, y: 0, zoom: 1 },
+        viewport,
       },
       documents: [],
     }
