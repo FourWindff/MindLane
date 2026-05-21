@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { MindmapYamlNode } from './types.js'
+import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 
 export const TreeSchema: z.ZodType<MindmapYamlNode> = z.lazy(() =>
   z.object({

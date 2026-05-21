@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import YAML from 'yaml'
-import { sanitizeTreeCandidate } from '../mindmapworkflow/utils.js'
+import { sanitizeTreeCandidate } from '../../../../utils/yamlMindmap.js'
 import {
   __test__,
   chunkPdfPages,
@@ -12,10 +12,10 @@ import {
   serializeMindmapYaml,
   type MindmapYamlNode,
   type PdfPage,
-} from '../mindmapworkflow.js'
+} from '../index.js'
 
-const LAB_DIR = path.dirname(new URL('../mindmapworkflow.ts', import.meta.url).pathname)
-const SAMPLE_PDF = path.join(LAB_DIR, '..', 'lab', 'Hello-Agents-V1.0.2-20260210.pdf')
+const FIXTURES_DIR = path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures')
+const SAMPLE_PDF = path.join(FIXTURES_DIR, 'Hello-Agents-V1.0.2-20260210.pdf')
 
 const tempDirs: string[] = []
 

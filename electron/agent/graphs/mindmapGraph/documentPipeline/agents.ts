@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages'
 import { z } from 'zod'
 import { LeafTaskSchema, MergeTaskSchema, TreeSchema } from './schemas.js'
-import { serializeMindmapForestOutline, serializeMindmapOutline } from './io.js'
+import { serializeMindmapForestOutline, serializeMindmapOutline } from '../../../utils/yamlMindmap.js'
 import type {
   ChatModelLike,
   DocumentMeta,
@@ -15,14 +15,16 @@ import {
   derivePageRange,
   fallbackLeafNode,
   fallbackMergeNode,
-  formatPageRange,
-  extractYaml,
-  normalizeTree,
   parseLeafBatchText,
+} from './utils.js'
+import {
+  extractYaml,
+  formatPageRange,
+  normalizeTree,
   responseToText,
   sanitizeTreeCandidate,
   withRetries,
-} from './utils.js'
+} from '../../../utils/yamlMindmap.js'
 
 export class LeafExtractAgent {
   constructor(
@@ -121,7 +123,7 @@ export class LeafExtractAgent {
           '你是一个严谨的知识结构提炼助手。',
           '请根据用户给出的多个 PDF 文本块，分别提炼出对应的局部思维导图。',
           '只输出 YAML，不要 JSON，不要 Markdown 解释，不要额外前后缀。',
-          '你输出的是思维导图中的层级节点关系，不是文章目录，也不要求每一层都是“主题标题”。',
+          '你输出的是思维导图中的层级节点关系，不是文章目录，也不要求每一层都是"主题标题"。',
           '节点可以是概念、事实、方法、步骤、约束、案例、结论、现象或具体内容，只要能真实表达上下级包含关系即可。',
           '输出格式：',
           'results:',
@@ -140,16 +142,16 @@ export class LeafExtractAgent {
           '- 每个输入 chunk 都必须返回一个 results 项，且 chunk_id 必须与输入完全一致',
           '- 每个 results 项里必须包含 mindmap 字段',
           '- 每棵 mindmap 顶层只能有 1 个根节点',
-          '- 有子节点的节点使用“节点内容:”',
-          '- 子节点必须使用“- 节点内容”开头',
+          '- 有子节点的节点使用"节点内容:"',
+          '- 子节点必须使用"- 节点内容"开头',
           '- 没有子节点的叶子节点不要再写 children、label、page_range 之类字段',
           '- 不要输出页码、括号页码、page_range 字段或任何来源定位信息',
           '- 只能使用空格缩进，绝对不要使用 Tab',
           '- 根节点顶格写，不要在前面加 -',
-          '- 缩进规则只有一条：每下降一级，就在上一层前缀基础上只多 1 个前导空格，然后接“- ”',
-          '- 缩进示例必须严格写成：根节点“根内容:”，二级“ - 节点内容”，三级“  - 节点内容”',
+          '- 缩进规则只有一条：每下降一级，就在上一层前缀基础上只多 1 个前导空格，然后接"- "',
+          '- 缩进示例必须严格写成：根节点"根内容:"，二级" - 节点内容"，三级"  - 节点内容"',
           '- 冒号后面不要再写同一行内容；有子节点就换行后继续缩进',
-          '- 不要为了凑格式把节点写成“一级主题、二级主题、三级主题”这类空泛词',
+          '- 不要为了凑格式把节点写成"一级主题、二级主题、三级主题"这类空泛词',
           '- 节点内容优先保留真实信息，而不是标题化改写',
           '- 各 chunk 分开提炼，不要跨 chunk 合并，不要遗漏任何 chunk',
           '- 每棵 mindmap 仅保留 2-3 层结构',
@@ -259,7 +261,7 @@ export class MergeAgent {
           '请把多棵局部知识树合并成一棵更高层的树，输出严格 YAML 脑图大纲。',
           '只输出 YAML，不要 JSON，不要 Markdown 解释，不要额外前后缀。',
           '不要记录页码，不要在标题后添加 [p1-10] 之类标记。',
-          '你输出的是思维导图中的层级节点关系，不是文章目录，也不要求每一层都是“主题标题”。',
+          '你输出的是思维导图中的层级节点关系，不是文章目录，也不要求每一层都是"主题标题"。',
           '节点可以是概念、事实、方法、步骤、约束、案例、结论、现象或具体内容，只要能真实表达上下级包含关系即可。',
           '输出结构示例：',
           '智能体系统设计:',
@@ -268,16 +270,16 @@ export class MergeAgent {
           ' - 工具与记忆协同',
           '要求：',
           '- 顶层只能有 1 个根节点',
-          '- 有子节点的节点使用“节点内容:”',
-          '- 子节点必须使用“- 节点内容”开头',
+          '- 有子节点的节点使用"节点内容:"',
+          '- 子节点必须使用"- 节点内容"开头',
           '- 没有子节点的叶子节点不要再写 children、label、page_range 之类字段',
           '- 不要输出页码、括号页码、page_range 字段或任何来源定位信息',
           '- 只能使用空格缩进，绝对不要使用 Tab',
           '- 根节点顶格写，不要在前面加 -',
-          '- 缩进规则只有一条：每下降一级，就在上一层前缀基础上只多 1 个前导空格，然后接“- ”',
-          '- 缩进示例必须严格写成：根节点“根内容:”，二级“ - 节点内容”，三级“  - 节点内容”',
+          '- 缩进规则只有一条：每下降一级，就在上一层前缀基础上只多 1 个前导空格，然后接"- "',
+          '- 缩进示例必须严格写成：根节点"根内容:"，二级" - 节点内容"，三级"  - 节点内容"',
           '- 冒号后面不要再写同一行内容；有子节点就换行后继续缩进',
-          '- 不要为了凑格式把节点写成“一级主题、二级主题、三级主题”这类空泛词',
+          '- 不要为了凑格式把节点写成"一级主题、二级主题、三级主题"这类空泛词',
           '- 节点内容优先保留真实信息，而不是标题化改写',
           '- 可以重命名父节点，但不能丢失关键主题',
           '- 合并重复主题，保持层次清晰',

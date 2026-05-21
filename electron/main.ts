@@ -22,7 +22,7 @@ import {
   MindmapGenerationError,
   type MindmapGenerationProgress,
 } from './services/mindmapGenerationService.js'
-import type { AnthropicLabConfig } from './lab/mindmapworkflow.js'
+import type { AnthropicLabConfig } from './agent/graphs/mindmapGraph/documentPipeline/index.js'
 import { SessionMessage } from './agent/db/chatDb.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))

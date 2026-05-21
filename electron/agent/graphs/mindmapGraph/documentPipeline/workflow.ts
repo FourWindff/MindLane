@@ -28,10 +28,10 @@ import {
   fallbackMergeNode,
   derivePageRange,
   groupTrees,
-  overwriteArray,
   sortLeafResults,
   sortMergeResults,
 } from './utils.js'
+import { overwriteArray } from '../../../utils/yamlMindmap.js'
 
 const WorkflowState = Annotation.Root({
   document: Annotation<DocumentMeta | null>({

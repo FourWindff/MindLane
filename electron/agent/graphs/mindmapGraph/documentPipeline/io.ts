@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import YAML from 'yaml'
+import { serializeMindmapOutline } from '../../../utils/yamlMindmap.js'
 import type { DocumentMeta, MindmapYamlNode, PdfChunk, PdfPage } from './types.js'
 
 export async function loadPdfPages(pdfPath: string): Promise<PdfPage[]> {
@@ -103,65 +104,4 @@ export function serializeMindmapYaml(
   }).trimEnd()
 
   return `${metadata}\nmindmap:\n${serializeMindmapOutline(mindmap, 1)}\n`
-}
-
-export function serializeMindmapOutline(
-  node: MindmapYamlNode,
-  indentLevel = 0,
-): string {
-  const lines = serializeOutlineNode(node, indentLevel, true)
-  return lines.join('\n')
-}
-
-export function serializeMindmapForestOutline(
-  trees: MindmapYamlNode[],
-  indentLevel = 0,
-): string {
-  const lines = trees.flatMap((tree) => serializeOutlineNode(tree, indentLevel, false))
-  return lines.join('\n')
-}
-
-function serializeOutlineNode(
-  node: MindmapYamlNode,
-  indentLevel: number,
-  isRoot: boolean,
-): string[] {
-  const indent = '  '.repeat(indentLevel)
-  const title = stringifyYamlScalar(formatNodeTitle(node))
-  const children = node.children ?? []
-
-  if (isRoot) {
-    if (children.length === 0) {
-      return [`${indent}${title}: []`]
-    }
-
-    return [
-      `${indent}${title}:`,
-      ...serializeOutlineChildren(children, indentLevel + 1),
-    ]
-  }
-
-  if (children.length === 0) {
-    return [`${indent}- ${title}`]
-  }
-
-  return [
-    `${indent}- ${title}:`,
-    ...serializeOutlineChildren(children, indentLevel + 1),
-  ]
-}
-
-function serializeOutlineChildren(
-  children: MindmapYamlNode[],
-  indentLevel: number,
-): string[] {
-  return children.flatMap((child) => serializeOutlineNode(child, indentLevel, false))
-}
-
-function formatNodeTitle(node: MindmapYamlNode): string {
-  return node.label
-}
-
-function stringifyYamlScalar(value: string): string {
-  return YAML.stringify(value).trim()
 }

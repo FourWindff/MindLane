@@ -1,3 +1,6 @@
+import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
+export type { MindmapYamlNode }
+
 export interface AnthropicLabConfig {
   apiKey: string
   baseUrl: string
@@ -46,13 +49,6 @@ export interface PdfChunk {
   startPage: number
   endPage: number
   text: string
-}
-
-export interface MindmapYamlNode {
-  label: string
-  page_range: string
-  summary?: string
-  children?: MindmapYamlNode[]
 }
 
 export interface DocumentMeta {

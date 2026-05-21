@@ -1,58 +1,15 @@
 import { StateGraph, START, END } from '@langchain/langgraph'
-import type { LLMProvider } from '../providers/index.js'
-import { MindmapSubgraphState } from '../state.js'
-import { buildExtractStructureMessages } from '../agenthub/prompts/docToMindmap.js'
-import { extractTextContent, formatAgentError } from '../utils.js'
+import type { LLMProvider } from '../../providers/index.js'
+import { MindmapSubgraphState } from '../../state.js'
+import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
+import { extractTextContent, formatAgentError } from '../../utils.js'
+import { extractYaml, sanitizeTreeCandidate } from '../../utils/yamlMindmap.js'
+import { flattenYamlTree, extractRootTree } from './shared/flattenTree.js'
 
 // ===== 配置选项 =====
 
 export interface MindmapSubgraphOptions {
   provider: LLMProvider
-}
-
-// ===== 类型定义 =====
-
-/**
- * 知识结构树节点
- */
-interface KeyPoint {
-  title: string
-  children?: KeyPoint[]
-}
-
-/**
- * 递归扁平化树形结构为节点和边
- */
-function flattenTree(
-  points: KeyPoint[],
-  parentId: string,
-  genId: (prefix: string) => string,
-): { nodes: Array<{ id: string; type: 'text'; data: { label: string } }>; edges: Array<{ id: string; source: string; target: string; type: string }> } {
-  const nodes: Array<{ id: string; type: 'text'; data: { label: string } }> = []
-  const edges: Array<{ id: string; source: string; target: string; type: string }> = []
-
-  for (const point of points) {
-    const nodeId = genId('text')
-    nodes.push({
-      id: nodeId,
-      type: 'text',
-      data: { label: point.title },
-    })
-    edges.push({
-      id: `e-${parentId}-${nodeId}`,
-      source: parentId,
-      target: nodeId,
-      type: 'smoothstep',
-    })
-
-    if (point.children && point.children.length > 0) {
-      const sub = flattenTree(point.children, nodeId, genId)
-      nodes.push(...sub.nodes)
-      edges.push(...sub.edges)
-    }
-  }
-
-  return { nodes, edges }
 }
 
 // ===== Subgraph 构建器 =====
@@ -64,7 +21,6 @@ function flattenTree(
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const { provider } = options
 
-  // 使用 Mindmap 子图专用状态类型
   const graph = new StateGraph(MindmapSubgraphState)
     .addNode('generate', async (state) => {
       const documentText = state.mindmapInputText
@@ -89,23 +45,20 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
         )
         const extractContent = extractTextContent(extractResponse.content)
 
-        const jsonMatch = extractContent.match(/\{[\s\S]*\}/)
-        if (!jsonMatch) {
+        const parsedYaml = extractYaml(extractContent)
+        const treeCandidate = sanitizeTreeCandidate(parsedYaml)
+        const rootTree = extractRootTree(treeCandidate, title)
+
+        if (!rootTree) {
           return {
-            error: 'AI 未返回有效的 JSON 结构',
+            error: 'AI 未返回有效的思维导图结构',
             response: '生成思维导图失败：无法解析结构',
           }
         }
 
-        const parsed = JSON.parse(jsonMatch[0]) as {
-          title?: string
-          points?: KeyPoint[]
-        }
+        const finalTitle = rootTree.label || title
 
-        const finalTitle = parsed.title ?? title
-        const points = parsed.points ?? []
-
-        if (points.length === 0) {
+        if (!rootTree.children || rootTree.children.length === 0) {
           return {
             error: '未提取到任何要点',
             response: '生成思维导图失败：未提取到任何要点',
@@ -137,7 +90,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
           type: 'smoothstep',
         }
 
-        const tree = flattenTree(points, rootId, genId)
+        const tree = flattenYamlTree(rootTree.children, rootId, genId)
 
         return {
           mindmapNodes: [docNode, rootNode, ...tree.nodes],
