@@ -19,6 +19,7 @@ import { MindLaneAgent } from "./agenthub/mindlane/mindlaneAgent.js";
 import type {
   MindLaneNode,
   MindLaneEdge,
+  ChatToolCall,
 } from "../../src/shared/lib/fileFormat.js";
 import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from "./graphs/mindmapGraph.js";
@@ -45,11 +46,7 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   content: string;
-  toolCalls?: Array<{
-    name: string;
-    args: Record<string, unknown>;
-    result: string;
-  }>;
+  toolCalls?: ChatToolCall[];
   mindmapData?: {
     nodes: MindLaneNode[];
     edges: MindLaneEdge[];

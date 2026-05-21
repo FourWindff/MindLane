@@ -45,6 +45,32 @@ export interface DocumentRef {
   textPath: string
 }
 
+export interface ChatToolCall {
+  name: string
+  args: Record<string, unknown>
+  result: string
+}
+
+export function isTextNodeData(data: unknown): data is TextNodeData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'label' in data &&
+    typeof (data as Record<string, unknown>).label === 'string'
+  )
+}
+
+export function isPalaceNodeData(data: unknown): data is PalaceNodeData {
+  if (typeof data !== 'object' || data === null) return false
+  const record = data as Record<string, unknown>
+  return (
+    typeof record.label === 'string' &&
+    typeof record.imageUrl === 'string' &&
+    Array.isArray(record.stations) &&
+    Array.isArray(record.sourceNodeIds)
+  )
+}
+
 export function createEmptyFile(title = '未命名'): MindLaneFile {
   const now = new Date().toISOString()
   return {

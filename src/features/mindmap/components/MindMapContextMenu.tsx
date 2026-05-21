@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 
 export type ContextMenuState =
+  | { scope: 'closed' }
   | { clientX: number; clientY: number; scope: 'pane' }
   | { clientX: number; clientY: number; scope: 'node'; nodeId: string }
 
@@ -35,6 +36,8 @@ export function MindMapContextMenu({
   selectedCount,
   palaceEnabled,
 }: ContextMenuProps) {
+  if (menu.scope === 'closed') return null
+
   const run = (fn: () => void) => {
     fn()
     onClose()

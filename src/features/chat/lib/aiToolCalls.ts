@@ -2,12 +2,9 @@ import type { Node, Edge } from '@xyflow/react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { CHILD_OFFSET_X, CHILD_GAP_Y } from '@/shared/lib/mindmapTree'
+import type { ChatToolCall } from '@/shared/lib/fileFormat'
 
-export interface ToolCallResult {
-  name: string
-  args: Record<string, unknown>
-  result: string
-}
+export type ToolCallResult = ChatToolCall
 
 interface AddNodeAction {
   type: 'text' | 'palace'
@@ -34,10 +31,6 @@ export const MINDMAP_ACTION_TOOLS = [
   'batchAddMindmapNodes',
 ]
 
-/**
- * Process an AI tool call that modifies the mindmap.
- * Returns true if the action was handled successfully.
- */
 export function handleMindmapToolCall(
   toolCall: ToolCallResult,
   mindmapStore: ReturnType<typeof useMindmapStore.getState>

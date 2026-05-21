@@ -1,5 +1,5 @@
 import type { Node } from '@xyflow/react'
-import type { TextNodeData, PalaceNodeData } from '@/shared/lib/fileFormat'
+import { isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
 
 export type ContextNodeInfo = {
   id: string
@@ -12,46 +12,37 @@ function isKnownNodeType(type: string | undefined): type is 'text' | 'palace' {
   return type === 'text' || type === 'palace'
 }
 
-/**
- * Extracts a normalized info object from a React Flow node,
- * handling both text and palace node types.
- */
 export function extractNodeInfo(node: Node): ContextNodeInfo {
-  const data = node.data as Record<string, unknown>
   const nodeType = isKnownNodeType(node.type) ? node.type : 'text'
 
   switch (nodeType) {
     case 'palace': {
-      const pd = data as PalaceNodeData
-      return {
-        id: node.id,
-        type: 'palace',
-        label: pd.label || node.id,
-        extra: {
-          stationCount: pd.stations?.length ?? 0,
-          sourceNodeIds: pd.sourceNodeIds,
-        },
+      if (isPalaceNodeData(node.data)) {
+        return {
+          id: node.id,
+          type: 'palace',
+          label: node.data.label || node.id,
+          extra: {
+            stationCount: node.data.stations.length,
+            sourceNodeIds: node.data.sourceNodeIds,
+          },
+        }
       }
+      break
     }
     case 'text': {
-      const td = data as TextNodeData
-      return {
-        id: node.id,
-        type: 'text',
-        label: td.label || node.id,
+      if (isTextNodeData(node.data)) {
+        return {
+          id: node.id,
+          type: 'text',
+          label: node.data.label || node.id,
+        }
       }
-    }
-    default: {
-      // Unknown types are already handled by the type guard above,
-      // but this default ensures exhaustiveness at runtime.
-      const td = data as TextNodeData
-      return {
-        id: node.id,
-        type: 'text',
-        label: td.label || node.id,
-      }
+      break
     }
   }
+
+  return { id: node.id, type: 'text', label: node.id }
 }
 
 const MARKER_RE = /\[(?:INTENT:\w+|PALACE_INPUT:[\s\S]*?|MINDMAP_INPUT:[\s\S]*?|MINDMAP_TITLE:[\s\S]*?)\]/g
@@ -65,10 +56,6 @@ export function stripMarkers(text: string): string {
   return text.replace(MARKER_RE, '').replace(PARTIAL_MARKER_RE, '').trim()
 }
 
-/**
- * Returns a human-readable Chinese display name for a tool call name.
- * Falls back to the raw name if no mapping exists.
- */
 export function toolDisplayName(name: string): string {
   const map = {
     generateMindmap: '生成思维导图',
@@ -82,5 +69,5 @@ export function toolDisplayName(name: string): string {
     deleteMindmapNode: '删除节点',
     batchAddMindmapNodes: '批量添加节点',
   } as const
-  return (map as Record<string, string>)[name] ?? name
+  return map[name as keyof typeof map] ?? name
 }
