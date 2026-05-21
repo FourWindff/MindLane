@@ -1,7 +1,5 @@
 import { useEffect } from 'react'
 import {
-  Background,
-  BackgroundVariant,
   ReactFlow,
   useReactFlow,
   type Edge,
@@ -52,8 +50,6 @@ export function HiddenThumbnailFlow({
       minZoom={0.1}
       maxZoom={2}
       proOptions={{ hideAttribution: true }}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0, 0, 0, 0.15)" />
-    </ReactFlow>
+    />
   )
 }

@@ -9,8 +9,6 @@ import {
 import { toPng } from 'html-to-image'
 import { useShortcut } from '@/shared/shortcuts'
 import {
-  Background,
-  BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlow,
@@ -788,7 +786,6 @@ function MindMapCanvas({
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0, 0, 0, 0.15)" />
           <Controls showInteractive={false} />
           <MiniMap nodeStrokeWidth={3} zoomable pannable className="mindmap-minimap" />
         </ReactFlow>
