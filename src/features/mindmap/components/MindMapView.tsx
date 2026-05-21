@@ -49,6 +49,7 @@ import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
 import { SelectionActionBar } from './SelectionActionBar'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
+import { GenerationProgressOverlay } from './GenerationProgressOverlay'
 
 const NODE_EXIT_MS = 300
 
@@ -766,14 +767,7 @@ function MindMapCanvas({
           palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
-        {generationProgress && (
-          <div className="ai-progress-overlay">
-            <div className="ai-progress-overlay__card">
-              <div className="ai-progress-overlay__spinner" />
-              <span className="ai-progress-overlay__text">{generationProgress}</span>
-            </div>
-          </div>
-        )}
+        <GenerationProgressOverlay progress={generationProgress} />
         {contextMenu ? (
           <MindMapContextMenu
             menu={contextMenu}
