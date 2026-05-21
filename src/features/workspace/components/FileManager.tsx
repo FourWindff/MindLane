@@ -1,7 +1,6 @@
 import { useCallback, useState, type MouseEvent } from 'react'
 import {
   Plus,
-  ChevronRight,
   ArrowRight,
 } from 'lucide-react'
 import { useWorkspaceStore } from '../store'
@@ -10,6 +9,7 @@ import { RenameDialog } from './RenameDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { InputDialog } from './InputDialog'
 import { FileManagerToolbar } from './FileManagerToolbar'
+import { FileManagerBreadcrumb } from './FileManagerBreadcrumb'
 import type { WorkspaceTreeEntry } from '../types'
 import '../file-manager.css'
 
@@ -195,34 +195,14 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
 
         {/* Header */}
         <div className="file-manager__header">
-          <div className="file-manager__header-left">
-            <div className="file-manager__breadcrumb">
-              <button
-                type="button"
-                className="file-manager__breadcrumb-root"
-                onClick={() => setNavigationPath([])}
-              >
-                思想聚落
-              </button>
-              {navigationPath.map((name, idx) => (
-                <div key={name} className="file-manager__breadcrumb-segment">
-                  <ChevronRight className="file-manager__breadcrumb-chevron" size={18} />
-                  <button
-                    type="button"
-                    className="file-manager__breadcrumb-link"
-                    onClick={() => handleBreadcrumbClick(idx)}
-                  >
-                    {name}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <p className="file-manager__subtitle">
-              {currentFolder
-                ? `Scanning Cluster: ${currentFolder}`
-                : 'Neural Projection of consciousness'}
-            </p>
-          </div>
+          <FileManagerBreadcrumb
+            navigationPath={navigationPath}
+            currentFolder={currentFolder}
+            lastError={lastError}
+            onNavigateRoot={() => setNavigationPath([])}
+            onBreadcrumbClick={handleBreadcrumbClick}
+            onClearError={clearError}
+          />
 
           <FileManagerToolbar
             busy={busy}
@@ -235,15 +215,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             onClose={handleClose}
           />
         </div>
-
-        {lastError && (
-          <div className="file-manager__error" role="alert">
-            <span>{lastError}</span>
-            <button type="button" className="file-manager__error-close" onClick={clearError}>
-              关闭
-            </button>
-          </div>
-        )}
 
         {/* Grid */}
         <div className="file-manager__scroll">
