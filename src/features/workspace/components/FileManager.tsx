@@ -183,6 +183,8 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
     if (!workspacePath) return
     setDialog({ type: 'new-folder', parentPath: workspacePath })
   }
+  const handleRefresh = useCallback(() => void refreshWorkspaceFiles(), [refreshWorkspaceFiles])
+  const handleSwitchWorkspace = useCallback(() => void switchWorkspace(), [switchWorkspace])
 
   if (!isOpen) return null
 
@@ -227,9 +229,9 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             workspacePath={workspacePath}
             onNewFile={handleToolbarNewFile}
             onNewFolder={handleToolbarNewFolder}
-            onRefresh={() => void refreshWorkspaceFiles()}
+            onRefresh={handleRefresh}
             onOpenSettings={onOpenSettings}
-            onSwitchWorkspace={() => void switchWorkspace()}
+            onSwitchWorkspace={handleSwitchWorkspace}
             onClose={handleClose}
           />
         </div>
