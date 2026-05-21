@@ -1,16 +1,13 @@
-import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
-import { normalizeTree } from '../../../utils/yamlMindmap.js'
+import { normalizeTree, type MindmapYamlNode } from '../../../utils/yamlMindmap.js'
+import type { GeneratedNode, GeneratedEdge } from '../../../state.js'
 
-/**
- * 递归扁平化 MindmapYamlNode 树为 GeneratedNode/GeneratedEdge
- */
 export function flattenYamlTree(
   nodes: MindmapYamlNode[],
   parentId: string,
   genId: (prefix: string) => string,
-): { nodes: Array<{ id: string; type: 'text'; data: Record<string, unknown> }>; edges: Array<{ id: string; source: string; target: string; type: string }> } {
-  const resultNodes: Array<{ id: string; type: 'text'; data: Record<string, unknown> }> = []
-  const resultEdges: Array<{ id: string; source: string; target: string; type: string }> = []
+): { nodes: GeneratedNode[]; edges: GeneratedEdge[] } {
+  const resultNodes: GeneratedNode[] = []
+  const resultEdges: GeneratedEdge[] = []
 
   for (const node of nodes) {
     const nodeId = genId('text')
@@ -39,20 +36,17 @@ export function flattenYamlTree(
   return { nodes: resultNodes, edges: resultEdges }
 }
 
-/**
- * 从 sanitizeTreeCandidate 的结果中提取 MindmapYamlNode 根节点
- */
 export function extractRootTree(treeCandidate: unknown, fallbackTitle: string): MindmapYamlNode | null {
   if (!treeCandidate || typeof treeCandidate !== 'object') {
     return null
   }
 
-  // Single structured/outline tree
-  if ('label' in (treeCandidate as Record<string, unknown>) && typeof (treeCandidate as Record<string, unknown>).label === 'string') {
+  const record = treeCandidate as Record<string, unknown>
+
+  if ('label' in record && typeof record.label === 'string') {
     return normalizeTree(treeCandidate as MindmapYamlNode, '')
   }
 
-  // Array of trees — wrap in virtual root
   if (Array.isArray(treeCandidate)) {
     const children = treeCandidate
       .filter((item): item is MindmapYamlNode =>
@@ -69,6 +63,5 @@ export function extractRootTree(treeCandidate: unknown, fallbackTitle: string): 
     }
   }
 
-  // Single object without label (should not happen after sanitizeTreeCandidate)
   return null
 }
