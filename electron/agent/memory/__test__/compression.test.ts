@@ -56,7 +56,7 @@ describe('compressMessages', () => {
 
     const result = await compressMessages(messages, model)
 
-    const systemMsgs = result.filter((m) => m._getType() === 'system')
+    const systemMsgs = result.filter((m) => m.type === 'system')
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1)
   })
 

@@ -11,7 +11,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
   const toolResults = new Map<string, string>()
 
   for (const msg of messages) {
-    if (msg instanceof ToolMessage || msg.getType() === 'tool') {
+    if (msg instanceof ToolMessage || msg.type === 'tool') {
       const toolMsg = msg as ToolMessage
       if (toolMsg.tool_call_id) {
         toolResults.set(toolMsg.tool_call_id, extractTextContent(toolMsg.content))
@@ -23,7 +23,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
   const pendingToolCalls: NonNullable<SessionMessage['toolCalls']> = []
 
   for (const msg of messages) {
-    const type = msg.getType()
+    const type = msg.type
 
     if (type === 'tool') {
       continue

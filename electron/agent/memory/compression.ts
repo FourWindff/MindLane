@@ -24,15 +24,15 @@ export async function compressMessages(
     })
   }
 
-  const systemMsgs = messages.filter((m) => m._getType() === 'system')
-  const nonSystem = messages.filter((m) => m._getType() !== 'system')
+  const systemMsgs = messages.filter((m) => m.type === 'system')
+  const nonSystem = messages.filter((m) => m.type !== 'system')
 
   const olderMessages = nonSystem.slice(0, -10)
   const recentMessages = nonSystem.slice(-10)
 
   const conversationText = olderMessages
     .map((m) => {
-      const role = m._getType() === 'human' ? '用户' : '助手'
+      const role = m.type === 'human' ? '用户' : '助手'
       return `${role}: ${messageContentToString(m.content)}`
     })
     .join('\n')

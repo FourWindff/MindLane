@@ -360,8 +360,8 @@ export class AgentOrchestrator {
     const toolCalls: ChatResponse["toolCalls"] = [];
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      if (msg.getType() === "human") break;
-      if (msg.getType() === "tool") {
+      if (msg.type === "human") break;
+      if (msg.type === "tool") {
         const toolMsg = msg as BaseMessage & {
           name?: string;
           content: unknown;

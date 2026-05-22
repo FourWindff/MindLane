@@ -110,7 +110,7 @@ export class MindLaneAgent extends BaseAgent {
   ): Promise<Partial<MainGraphStateType>> {
     // 过滤掉路由决策工具的调用，它已在 invoke() 中直接处理
     const lastMessage = state.messages[state.messages.length - 1];
-    if (lastMessage && lastMessage._getType() === "ai") {
+    if (lastMessage && lastMessage.type === "ai") {
       const msg = lastMessage as AIMessage;
       const routeToolName = this.tools[this.tools.length - 1].name;
       const nonRouteToolCalls =
@@ -142,7 +142,7 @@ export class MindLaneAgent extends BaseAgent {
   route(state: MainGraphStateType): string {
     const lastMessage = state.messages[state.messages.length - 1];
 
-    if (lastMessage && lastMessage._getType() === "ai") {
+    if (lastMessage && lastMessage.type === "ai") {
       const msg = lastMessage as AIMessage;
       const routeToolName = this.tools[this.tools.length - 1].name;
       const nonRouteToolCalls =

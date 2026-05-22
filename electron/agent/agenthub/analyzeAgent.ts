@@ -141,11 +141,11 @@ export class AnalyzeAgent extends PalaceAgent {
 
     const chatMessages = state.messages
       .filter((m) => {
-        const type = m._getType()
+        const type = m.type
         return type === 'human' || type === 'ai' || type === 'system'
       })
       .map((m) => ({
-        role: m._getType() === 'human' ? 'user' : m._getType() === 'ai' ? 'assistant' : 'system',
+        role: m.type === 'human' ? 'user' : m.type === 'ai' ? 'assistant' : 'system',
         content: typeof m.content === 'string' ? m.content : String(m.content),
       }))
 
