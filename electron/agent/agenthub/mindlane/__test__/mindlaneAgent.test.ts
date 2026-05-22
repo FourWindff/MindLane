@@ -257,22 +257,6 @@ describe('MindLaneAgent.route()', () => {
     expect(agent.route(state)).toBe('__end__')
   })
 
-  it('tool result 返回 "supervisor"', () => {
-    const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool])
-
-    const state = {
-      ...createInitialState(),
-      messages: [
-        new ToolMessage({
-          content: '搜索结果',
-          tool_call_id: 'call-1',
-        }),
-      ],
-    }
-
-    expect(agent.route(state)).toBe('supervisor')
-  })
-
   it('intent=mindmap 返回 "mindmapSubgraph"', () => {
     const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool])
 

@@ -157,10 +157,6 @@ export class MindLaneAgent extends BaseAgent {
       }
     }
 
-    if (lastMessage && lastMessage._getType() === "tool") {
-      return "supervisor";
-    }
-
     switch (state.intent) {
       case "palace":
         return this.capabilityFlags.hasPalace ? "palaceSubgraph" : "__end__";

@@ -326,11 +326,7 @@ export class AgentOrchestrator {
     );
 
     // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退
-    const routeFn = (state: MainGraphStateType) => {
-      const route = supervisor.route(state);
-      if (route === "supervisor") return "supervisor";
-      return route;
-    };
+    const routeFn = (state: MainGraphStateType) => supervisor.route(state);
 
     // 统一 graph 结构：始终包含 palaceSubgraph 节点
     // hasPalace=false 时子图仍会被编译但永远不会被执行（route() 已保证）
@@ -342,7 +338,6 @@ export class AgentOrchestrator {
       .addEdge(START, "supervisor")
       .addConditionalEdges("supervisor", routeFn, {
         tools: "tools",
-        supervisor: "supervisor",
         mindmapSubgraph: "mindmapSubgraph",
         palaceSubgraph: "palaceSubgraph",
         __end__: END,
