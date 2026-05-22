@@ -9,7 +9,6 @@ export class ContextBuilder {
     private prompt: string = '';
     private messages: BaseMessage[] = [];
     private context?: MindmapContextData;
-    private userProfile?: string;
     private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true };
 
     /**
@@ -25,14 +24,6 @@ export class ContextBuilder {
      */
     withContext(context?: MindmapContextData): this {
         this.context = context;
-        return this;
-    }
-
-    /**
-     * 设置用户画像
-     */
-    withUserProfile(profile?: string): this {
-        this.userProfile = profile;
         return this;
     }
 
@@ -77,16 +68,6 @@ export class ContextBuilder {
 # platform_policy: ${platformPolicy}
 </ENV>
 `;
-        return this;
-    }
-
-    buildUserProfile(): this {
-        if (this.userProfile) {
-            this.prompt += `<USER_PROFILE>
-${this.userProfile}
-</USER_PROFILE>
-`;
-        }
         return this;
     }
 

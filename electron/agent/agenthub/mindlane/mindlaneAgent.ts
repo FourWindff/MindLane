@@ -34,14 +34,12 @@ export interface CapabilityFlags {
 export class MindLaneAgent extends BaseAgent {
   private toolNode: ToolNode;
   private tools: StructuredToolInterface[];
-  private userProfile?: string;
   private capabilityFlags: CapabilityFlags;
   private modelWithTools: ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
 
   constructor(
     provider: LLMProvider,
     tools: StructuredToolInterface[],
-    userProfile?: string,
     capabilityFlags?: CapabilityFlags,
   ) {
     super(provider);
@@ -49,7 +47,6 @@ export class MindLaneAgent extends BaseAgent {
     this.tools = [...tools, routeTool];
     // ToolNode 只包含原始工具，路由决策工具在 invoke() 中直接处理
     this.toolNode = new ToolNode(tools);
-    this.userProfile = userProfile;
     this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
     this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
   }
@@ -61,11 +58,9 @@ export class MindLaneAgent extends BaseAgent {
       const systemPrompt = new ContextBuilder()
         .withMessages(state.messages)
         .withContext(state.context ?? undefined)
-        .withUserProfile(this.userProfile)
         .withCapabilityFlags(this.capabilityFlags)
         .buildSystemPrompt()
         .buildEnvironmentPrompt()
-        .buildUserProfile()
         .buildMindmapContext()
         .buildHistory()
         .build();

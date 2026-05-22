@@ -292,12 +292,9 @@ export class AgentOrchestrator {
     if (hasPalace && actionTools.addPalaceNodeTool) {
       tools.push(actionTools.addPalaceNodeTool);
     }
-    const profileText = this.aiService.userProfile.getText();
-
     const supervisor = new MindLaneAgent(
       this.provider,
       tools,
-      profileText,
       { hasEmbeddings: false, hasPalace },
     );
 

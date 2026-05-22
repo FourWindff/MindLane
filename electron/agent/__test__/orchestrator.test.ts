@@ -30,9 +30,6 @@ function createMockAiService(checkpointer?: unknown): AiService {
       getAdapter: vi.fn().mockReturnValue(checkpointer),
       get: vi.fn().mockReturnValue(null),
     },
-    userProfile: {
-      getText: vi.fn().mockReturnValue(""),
-    },
   } as unknown as AiService;
 }
 
