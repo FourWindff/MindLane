@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { MindMapView } from '@/features/mindmap/components/MindMapView'
+import { MindMapView } from '@/features/mindmap'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
-import { ChatPanel } from '@/features/chat/components/ChatPanel'
+import { ChatPanel } from '@/features/chat'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
-import { FileManager } from '@/features/workspace/components/FileManager'
+import { FileManager } from '@/features/workspace'
 import {
   initializeWorkspaceSession,
   saveCurrentDocumentSilently,
@@ -64,6 +64,7 @@ function AppContent() {
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
+  const filePath = useMindmapStore((s) => s.filePath)
 
   useEffect(() => {
     void loadSettingsFromBackend()
@@ -113,6 +114,7 @@ function AppContent() {
       <AppWindowBar
         onOpenFileManager={() => setFileManagerOpen(true)}
         fileManagerOpen={fileManagerOpen}
+        filePath={filePath ?? undefined}
       />
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (

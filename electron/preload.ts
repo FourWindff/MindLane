@@ -36,11 +36,7 @@ type ChatContext = {
   workspaceFiles?: { name: string; filePath: string }[]
 }
 
-type ChatToolCall = {
-  name: string
-  args: Record<string, unknown>
-  result: string
-}
+import type { ChatToolCall } from '../src/shared/lib/fileFormat'
 
 type ChatSessionMeta = {
   id: string

@@ -6,23 +6,24 @@ function generateThreadId(): string {
 
 export type AiPipelineStep =
   | 'idle'
+  | 'preparing'
   | 'analyzing'
   | 'planning'
   | 'generating-image'
   | 'building'
   | 'reading-doc'
   | 'extracting'
+  | 'merging'
+  | 'finalizing'
   | 'generating-map'
   | 'chatting'
+
+import type { ChatToolCall } from '@/shared/lib/fileFormat'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  toolCalls?: Array<{
-    name: string
-    args: Record<string, unknown>
-    result: string
-  }>
+  toolCalls?: ChatToolCall[]
 }
 
 export interface ChatSession {
@@ -36,7 +37,6 @@ export interface ChatSession {
 interface AiState {
   busy: boolean
   step: AiPipelineStep
-  progress: number
   streamText: string
   errorMessage: string | null
 
@@ -53,7 +53,6 @@ interface AiState {
 
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
-  setProgress: (progress: number) => void
   appendStreamText: (text: string) => void
   resetStream: () => void
   setError: (msg: string) => void
@@ -78,7 +77,6 @@ interface AiState {
 export const useAiStore = create<AiState>((set, get) => ({
   busy: false,
   step: 'idle',
-  progress: 0,
   streamText: '',
   errorMessage: null,
   threadId: '',
@@ -90,12 +88,11 @@ export const useAiStore = create<AiState>((set, get) => ({
 
   setBusy: (busy) => set({ busy }),
   setStep: (step) => set({ step }),
-  setProgress: (progress) => set({ progress }),
   appendStreamText: (text) => set((s) => ({ streamText: s.streamText + text })),
   resetStream: () => set({ streamText: '' }),
   setError: (msg) => set({ errorMessage: msg, busy: false, step: 'idle' }),
   clearError: () => set({ errorMessage: null }),
-  reset: () => set({ busy: false, step: 'idle', progress: 0, streamText: '', errorMessage: null }),
+  reset: () => set({ busy: false, step: 'idle', streamText: '', errorMessage: null }),
 
   setThreadId: (id) => set({ threadId: id }),
   addChatMessage: (msg) => set((s) => ({ chatMessages: [...s.chatMessages, msg] })),

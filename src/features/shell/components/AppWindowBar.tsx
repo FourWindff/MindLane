@@ -1,15 +1,24 @@
-import { FolderOpen, Minus, Square, X } from 'lucide-react'
+import { Home, Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
   onOpenFileManager: () => void
   fileManagerOpen: boolean
+  filePath?: string
+}
+
+function extractFileName(filePath: string | undefined): string | null {
+  if (!filePath) return null
+  return filePath.split(/[/\\]/).pop()!.replace(/\.mindlane$/, '')
 }
 
 export function AppWindowBar({
   onOpenFileManager,
   fileManagerOpen,
+  filePath,
 }: Props) {
+  const fileName = extractFileName(filePath)
+
   return (
     <header className="window-bar">
       <div className="window-bar__lead">
@@ -25,10 +34,18 @@ export function AppWindowBar({
             title="打开文件管理器"
             aria-label="打开文件管理器"
           >
-            <FolderOpen size={16} strokeWidth={1.5} />
+            <Home size={18} strokeWidth={1.5} />
           </button>
         </div>
       </div>
+
+      {fileName && (
+        <div className="window-bar__center">
+          <span className="window-bar__filename" title={fileName}>
+            {fileName}
+          </span>
+        </div>
+      )}
 
       <div className="window-bar__trail">
         <div className="window-bar__window-actions">
@@ -39,7 +56,7 @@ export function AppWindowBar({
             title="最小化"
             aria-label="最小化"
           >
-            <Minus size={16} strokeWidth={1.7} />
+            <Minus size={18} strokeWidth={1.7} />
           </button>
           <button
             type="button"
@@ -48,7 +65,7 @@ export function AppWindowBar({
             title="最大化"
             aria-label="最大化"
           >
-            <Square size={13} strokeWidth={1.7} />
+            <Square size={15} strokeWidth={1.7} />
           </button>
           <button
             type="button"
@@ -57,7 +74,7 @@ export function AppWindowBar({
             title="关闭"
             aria-label="关闭"
           >
-            <X size={16} strokeWidth={1.7} />
+            <X size={18} strokeWidth={1.7} />
           </button>
         </div>
       </div>

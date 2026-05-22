@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3'
+import type { ChatToolCall } from '../../../src/shared/lib/fileFormat.js'
 
 export interface ChatSessionRow {
   id: string
@@ -29,11 +30,7 @@ export interface SessionMeta {
 export interface SessionMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
-  toolCalls?: Array<{
-    name: string
-    args: Record<string, unknown>
-    result: string
-  }>
+  toolCalls?: ChatToolCall[]
   timestamp?: string
 }
 

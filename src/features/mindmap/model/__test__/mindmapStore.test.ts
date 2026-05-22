@@ -1,5 +1,49 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useMindmapStore } from '../mindmapStore'
+import { createEmptyFile, DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
+
+describe('mindmapStore.viewport', () => {
+  beforeEach(() => {
+    useMindmapStore.getState().newFile('测试')
+  })
+
+  it('should restore viewport from loaded file', () => {
+    const store = useMindmapStore.getState()
+    const file = createEmptyFile('测试文件')
+    file.mindmap.viewport = { x: 100, y: 200, zoom: 0.8 }
+
+    store.loadFile('/test/path.mindlane', file)
+
+    expect(useMindmapStore.getState().viewport).toEqual({ x: 100, y: 200, zoom: 0.8 })
+  })
+
+  it('should persist current viewport in toMindLaneFile', () => {
+    const store = useMindmapStore.getState()
+    store.setViewport({ x: 50, y: 75, zoom: 1.2 })
+
+    const file = store.toMindLaneFile()
+
+    expect(file.mindmap.viewport).toEqual({ x: 50, y: 75, zoom: 1.2 })
+  })
+
+  it('should reset viewport on newFile', () => {
+    const store = useMindmapStore.getState()
+    store.setViewport({ x: 999, y: 999, zoom: 2 })
+
+    store.newFile('新文件')
+
+    expect(useMindmapStore.getState().viewport).toEqual(DEFAULT_VIEWPORT)
+  })
+
+  it('should reset viewport on clearDocument', () => {
+    const store = useMindmapStore.getState()
+    store.setViewport({ x: 999, y: 999, zoom: 2 })
+
+    store.clearDocument()
+
+    expect(useMindmapStore.getState().viewport).toEqual(DEFAULT_VIEWPORT)
+  })
+})
 
 describe('mindmapStore.insertNodesFromYaml', () => {
   beforeEach(() => {

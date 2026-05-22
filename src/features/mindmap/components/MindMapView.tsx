@@ -5,27 +5,22 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
-  type RefObject,
 } from 'react'
-import { AlertCircle, Landmark } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { useShortcut } from '@/shared/shortcuts'
 import {
-  Background,
-  BackgroundVariant,
   Controls,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
   useOnSelectionChange,
-  useStoreApi,
   useReactFlow,
+  useStoreApi,
   type Edge,
-  type EdgeProps,
   type Node,
-  type NodeTypes,
   type ReactFlowInstance,
+  type Viewport,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { MindMapHeader } from '@/features/mindmap/components/MindMapHeader'
@@ -35,6 +30,7 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
+import { DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -50,229 +46,14 @@ import {
 } from '@/shared/lib/mindmapTree'
 import { PalaceNodeData } from '../nodes/palace'
 import { MindmapEdge } from '@/features/mindmap/edges'
+import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
+import { AiProgressOverlay } from './AiProgressOverlay'
+import { SelectionActionBar } from './SelectionActionBar'
+import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 
 const NODE_EXIT_MS = 300
 
 type FlowContextEvent = ReactMouseEvent | globalThis.MouseEvent
-
-type ContextMenuState =
-  | { clientX: number; clientY: number; scope: 'pane' }
-  | { clientX: number; clientY: number; scope: 'node'; nodeId: string }
-
-type ContextMenuProps = {
-  menu: ContextMenuState
-  menuRef: RefObject<HTMLDivElement>
-  onClose: () => void
-  onAddChild: () => void
-  onAddSibling: () => void
-  onRemove: () => void
-  onReset: () => void
-  onGeneratePalace?: () => void
-  canAddSibling: boolean
-  canRemove: boolean
-  aiBusy: boolean
-  selectedCount: number
-  palaceEnabled: boolean
-}
-
-function MindMapContextMenu({
-  menu,
-  menuRef,
-  onClose,
-  onAddChild,
-  onAddSibling,
-  onRemove,
-  onReset,
-  onGeneratePalace,
-  canAddSibling,
-  canRemove,
-  aiBusy,
-  selectedCount,
-  palaceEnabled,
-}: ContextMenuProps) {
-  const run = (fn: () => void) => {
-    fn()
-    onClose()
-  }
-
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 0
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 0
-  const menuW = 200
-  const menuH = 280
-  const left = Math.min(menu.clientX, Math.max(8, vw - menuW - 8))
-  const top = Math.min(menu.clientY, Math.max(8, vh - menuH - 8))
-
-  return (
-    <div
-      ref={menuRef}
-      className="mindmap-ctx"
-      style={{ left, top }}
-      role="menu"
-      aria-label="导图菜单"
-    >
-      <button type="button" className="mindmap-ctx__item" role="menuitem" onClick={() => run(onAddChild)} disabled={aiBusy}>
-        子主题
-      </button>
-      <button
-        type="button"
-        className="mindmap-ctx__item"
-        role="menuitem"
-        onClick={() => run(onAddSibling)}
-        disabled={!canAddSibling || aiBusy}
-      >
-        同级
-      </button>
-      <button
-        type="button"
-        className="mindmap-ctx__item mindmap-ctx__item--danger"
-        role="menuitem"
-        onClick={() => run(onRemove)}
-        disabled={!canRemove || aiBusy}
-      >
-        删除
-      </button>
-      {menu.scope === 'node' && (
-        <>
-          <div className="mindmap-ctx__sep" role="separator" />
-          <button
-            type="button"
-            className="mindmap-ctx__item mindmap-ctx__item--accent"
-            role="menuitem"
-            onClick={() => run(() => onGeneratePalace?.())}
-            disabled={!onGeneratePalace || aiBusy || !palaceEnabled}
-            title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
-          >
-            生成记忆宫殿{selectedCount > 1 ? ` (${selectedCount} 节点)` : ''}
-          </button>
-        </>
-      )}
-      <div className="mindmap-ctx__sep" role="separator" />
-      <button type="button" className="mindmap-ctx__item mindmap-ctx__item--muted" role="menuitem" onClick={() => run(onReset)} disabled={aiBusy}>
-        重置
-      </button>
-    </div>
-  )
-}
-
-function stepDisplayName(step: AiPipelineStep): string {
-  switch (step) {
-    case 'analyzing': return '分析节点内容…'
-    case 'planning': return '规划记忆路线…'
-    case 'generating-image': return '生成宫殿图片…'
-    case 'building': return '构建宫殿节点…'
-    case 'reading-doc': return '读取文档…'
-    case 'extracting': return 'AI 提取结构…'
-    case 'generating-map': return '生成思维导图…'
-    case 'chatting': return 'AI 对话中…'
-    default: return '处理中…'
-  }
-}
-
-function AiProgressOverlay() {
-  const busy = useAiStore((s) => s.busy)
-  const step = useAiStore((s) => s.step)
-  const errorMessage = useAiStore((s) => s.errorMessage)
-  const clearError = useAiStore((s) => s.clearError)
-
-  if (errorMessage) {
-    return (
-      <div className="ai-progress-overlay">
-        <div className="ai-progress-overlay__card ai-progress-overlay__card--error" onClick={clearError}>
-          <AlertCircle size={16} strokeWidth={1.6} />
-          <span className="ai-progress-overlay__text">{errorMessage}</span>
-          <span className="ai-progress-overlay__dismiss">点击关闭</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (!busy || step === 'idle' || step === 'chatting') return null
-
-  return (
-    <div className="ai-progress-overlay">
-      <div className="ai-progress-overlay__card">
-        <div className="ai-progress-overlay__spinner" />
-        <span className="ai-progress-overlay__text">{stepDisplayName(step)}</span>
-      </div>
-    </div>
-  )
-}
-
-function SelectionActionBar({
-  selectedTopicCount,
-  onGeneratePalace,
-  aiBusy,
-  palaceEnabled,
-}: {
-  selectedTopicCount: number
-  onGeneratePalace: () => void
-  aiBusy: boolean
-  palaceEnabled: boolean
-}) {
-  if (selectedTopicCount < 1 || aiBusy) return null
-
-  return (
-    <div className="selection-bar">
-      <span className="selection-bar__count">已选 {selectedTopicCount} 个主题</span>
-      <button
-        type="button"
-        className="selection-bar__btn"
-        onClick={onGeneratePalace}
-        disabled={!palaceEnabled}
-        title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
-      >
-        <Landmark size={14} strokeWidth={1.6} />
-        生成记忆宫殿
-      </button>
-    </div>
-  )
-}
-
-function HiddenThumbnailFlow({
-  nodes,
-  edges,
-  nodeTypes,
-  edgeTypes,
-  onInit,
-}: {
-  nodes: Node[]
-  edges: Edge[]
-  nodeTypes: NodeTypes
-  edgeTypes: Record<string, React.ComponentType<EdgeProps>>
-  onInit: React.MutableRefObject<ReactFlowInstance | null>
-}) {
-  const rf = useReactFlow()
-
-  useEffect(() => {
-    onInit.current = rf
-    return () => { onInit.current = null }
-  }, [rf, onInit])
-
-  return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      zoomOnScroll={false}
-      zoomOnPinch={false}
-      zoomOnDoubleClick={false}
-      panOnDrag={false}
-      panOnScroll={false}
-      selectionOnDrag={false}
-      fitView
-      fitViewOptions={{ padding: 0.2 }}
-      minZoom={0.1}
-      maxZoom={2}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0, 0, 0, 0.15)" />
-    </ReactFlow>
-  )
-}
 
 function MindMapCanvas({
   onSwitchWorkspace,
@@ -284,6 +65,7 @@ function MindMapCanvas({
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
   const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const rfStore = useStoreApi()
+  const rf = useReactFlow()
 
   const nodes = useMindmapStore((s) => s.nodes)
   const edges = useMindmapStore((s) => s.edges)
@@ -307,7 +89,7 @@ function MindMapCanvas({
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
   const [hasSelection, setHasSelection] = useState(false)
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ scope: 'closed' })
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
@@ -315,10 +97,39 @@ function MindMapCanvas({
   const exitTimeoutsRef = useRef<number[]>([])
   const layoutTimerRef = useRef<number | null>(null)
   const isLayoutingRef = useRef(false)
+  const lastRestoredFileRef = useRef<string | null>(null)
+  const viewportDebounceRef = useRef<number | null>(null)
 
   useEffect(() => {
     graphRef.current = { nodes, edges }
   }, [nodes, edges])
+
+  useEffect(() => {
+    if (!hasDocumentOpen || nodes.length === 0) return
+    if (lastRestoredFileRef.current === filePath) return
+    lastRestoredFileRef.current = filePath
+
+    const vp = useMindmapStore.getState().viewport
+    const isDefault = vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
+    if (isDefault) {
+      rf.fitView({ padding: 0.2, duration: 300 })
+    } else {
+      rf.setViewport(vp)
+    }
+  }, [filePath, hasDocumentOpen, nodes.length, rf])
+
+  const handleMoveEnd = useCallback(
+    (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      if (viewportDebounceRef.current) {
+        window.clearTimeout(viewportDebounceRef.current)
+      }
+      viewportDebounceRef.current = window.setTimeout(() => {
+        viewportDebounceRef.current = null
+        useMindmapStore.getState().setViewport(viewport)
+      }, 200)
+    },
+    [],
+  )
 
   const handleNodesChange = useCallback(
     (changes: import('@xyflow/react').NodeChange[]) => {
@@ -408,14 +219,14 @@ function MindMapCanvas({
   }, [])
 
   useEffect(() => {
-    if (!contextMenu) return
+    if (contextMenu.scope === 'closed') return
     const onDismiss = (e: Event) => {
       const t = e.target
       if (t instanceof window.Node && contextMenuRef.current?.contains(t)) return
-      setContextMenu(null)
+      setContextMenu({ scope: 'closed' })
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null)
+      if (e.key === 'Escape') setContextMenu({ scope: 'closed' })
     }
     window.addEventListener('mousedown', onDismiss, true)
     window.addEventListener('scroll', onDismiss, true)
@@ -465,13 +276,16 @@ function MindMapCanvas({
 
   const mindmapShortcutsEnabled = useCallback(() => !aiBusy, [aiBusy])
 
-  useOnSelectionChange({
-    onChange: ({ nodes: sel }) => {
+  const handleSelectionChange = useCallback(
+    ({ nodes: sel }: { nodes: Node[] }) => {
       setSelectedId(sel[0]?.id ?? null)
       setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
       setHasSelection(sel.length > 0)
     },
-  })
+    [],
+  )
+
+  useOnSelectionChange({ onChange: handleSelectionChange })
 
   const addChild = useCallback(() => {
     if (aiBusy) return
@@ -672,8 +486,9 @@ function MindMapCanvas({
   }, [])
 
   const doSave = useCallback(async () => {
+    const store = useMindmapStore.getState()
+    const ai = useAiStore.getState()
     try {
-      const store = useMindmapStore.getState()
       const data = store.toMindLaneFile()
       const result = await window.mindlane?.file.save({ filePath: store.filePath, data })
       if (result?.ok) {
@@ -690,85 +505,79 @@ function MindMapCanvas({
       }
     } catch (e) {
       console.error('[MindLane] 保存失败：', e)
-      useAiStore.getState().setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
+      ai.setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl])
-
-  const [generationBusy, setGenerationBusy] = useState(false)
-  const [generationProgress, setGenerationProgress] = useState<string | null>(null)
 
   useEffect(() => {
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane?.mindmap) return
+    const validSteps: readonly string[] = ['preparing', 'extracting', 'merging', 'finalizing']
     const off = mindlane.mindmap.onGenerationProgress((progress) => {
-      if (progress.phase === 'error') {
-        setGenerationProgress(null)
+      const ai = useAiStore.getState()
+      if (progress.phase === 'error' || progress.phase === 'done') {
+        if (ai.busy) ai.setBusy(false)
+        if (ai.step !== 'idle') ai.setStep('idle')
         return
       }
-      if (progress.phase === 'done') {
-        setGenerationProgress(null)
-        return
-      }
-      const phaseLabel: Record<string, string> = {
-        preparing: '准备文件',
-        extracting: 'AI 提取大纲',
-        merging: '合并子树',
-        finalizing: '生成 YAML',
-        done: '完成',
-        error: '错误',
-      }
-      const label = phaseLabel[progress.phase] ?? progress.phase
-      setGenerationProgress(progress.message ? `${label} · ${progress.message}` : label)
+      if (!validSteps.includes(progress.phase)) return
+      const step = progress.phase as AiPipelineStep
+      if (!ai.busy) ai.setBusy(true)
+      if (ai.step !== step) ai.setStep(step)
     })
     return off
   }, [])
 
   const generateFromFile = useCallback(async () => {
-    if (aiBusy || generationBusy) return
+    if (aiBusy) return
+
+    const ai = useAiStore.getState()
+    const settings = useSettingsStore.getState()
+    const mindmap = useMindmapStore.getState()
 
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane?.mindmap) {
-      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      ai.setError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
     const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
+    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
     if (!currentKey?.trim()) {
-      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      ai.setError('请先在右侧「设置」面板中填写 API Key')
       return
     }
 
-    setGenerationBusy(true)
-    setGenerationProgress('选择文件…')
+    ai.setBusy(true)
+    ai.setStep('preparing')
 
     try {
       const result = await mindlane.mindmap.generateFromFile({})
       if (!result.ok) {
         if (!result.canceled) {
-          useAiStore.getState().setError(`生成失败：${result.error}`)
+          ai.setError(`生成失败：${result.error}`)
         }
         return
       }
 
       try {
-        useMindmapStore.getState().loadFromYaml(result.data.yamlContent, {
+        mindmap.loadFromYaml(result.data.yamlContent, {
           fileTitle: result.data.documentTitle,
         })
       } catch (e) {
-        useAiStore.getState().setError(
+        ai.setError(
           `YAML 解析失败：${e instanceof Error ? e.message : String(e)}`,
         )
       }
     } catch (e) {
-      useAiStore.getState().setError(
+      ai.setError(
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     } finally {
-      setGenerationBusy(false)
-      setGenerationProgress(null)
+      if (ai.busy) ai.setBusy(false)
+      if (ai.step !== 'idle') ai.setStep('idle')
     }
-  }, [aiBusy, apiKey, generationBusy])
+  }, [aiBusy, apiKey])
 
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
@@ -790,18 +599,21 @@ function MindMapCanvas({
   const generatePalace = useCallback(async () => {
     if (aiBusy) return
 
+    const ai = useAiStore.getState()
+    const settings = useSettingsStore.getState()
+
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane) {
-      useAiStore.getState().setError('IPC 通道不可用，请确认 Electron 环境')
+      ai.setError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
     const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || useSettingsStore.getState().apiKey
-    const currentModel = backendSettings?.chatModel || chatModel || useSettingsStore.getState().chatModel || 'qwen-turbo'
+    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
+    const currentModel = backendSettings?.chatModel || chatModel || settings.chatModel || 'qwen-turbo'
 
     if (!currentKey) {
-      useAiStore.getState().setError('请先在右侧「设置」面板中填写 API Key')
+      ai.setError('请先在右侧「设置」面板中填写 API Key')
       return
     }
 
@@ -816,7 +628,7 @@ function MindMapCanvas({
       }
     }
     if (selectedNodes.length === 0) {
-      useAiStore.getState().setError('未选中任何主题节点')
+      ai.setError('未选中任何主题节点')
       return
     }
 
@@ -875,8 +687,8 @@ function MindMapCanvas({
     setNodes(laidOut)
     setEdges(nextEdges)
 
-    useAiStore.getState().setBusy(true)
-    useAiStore.getState().setStep('analyzing')
+    ai.setBusy(true)
+    ai.setStep('analyzing')
 
     try {
       const OVERALL_TIMEOUT = 120_000
@@ -892,7 +704,7 @@ function MindMapCanvas({
       if (!result) {
         setNodes(rollbackNodes)
         setEdges(rollbackEdges)
-        useAiStore.getState().setError('生成超时（超过 2 分钟），请检查网络后重试')
+        ai.setError('生成超时（超过 2 分钟），请检查网络后重试')
         return
       }
 
@@ -900,7 +712,7 @@ function MindMapCanvas({
         setNodes(rollbackNodes)
         setEdges(rollbackEdges)
         const errMsg = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
-        useAiStore.getState().setError(`AI 返回错误：${errMsg}`)
+        ai.setError(`AI 返回错误：${errMsg}`)
         return
       }
 
@@ -914,6 +726,7 @@ function MindMapCanvas({
                 imageUrl: result.imageUrl,
                 stations: result.stations,
                 sourceNodeIds: result.sourceNodeIds,
+                expanded: true,
               },
             }
           }
@@ -923,11 +736,11 @@ function MindMapCanvas({
           return n
         }),
       )
-      useAiStore.getState().reset()
+      ai.reset()
     } catch (e) {
       setNodes(rollbackNodes)
       setEdges(rollbackEdges)
-      useAiStore.getState().setError(
+      ai.setError(
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     }
@@ -944,7 +757,7 @@ function MindMapCanvas({
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
         onGenerateFromFile={generateFromFile}
-        generateFromFileBusy={generationBusy}
+        generateFromFileBusy={aiBusy}
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
@@ -969,13 +782,11 @@ function MindMapCanvas({
           nodesDraggable={false}
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
-          fitView
-          fitViewOptions={{ padding: 0.2 }}
+          onMoveEnd={handleMoveEnd}
           minZoom={0.2}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="rgba(0, 0, 0, 0.15)" />
           <Controls showInteractive={false} />
           <MiniMap nodeStrokeWidth={3} zoomable pannable className="mindmap-minimap" />
         </ReactFlow>
@@ -986,19 +797,11 @@ function MindMapCanvas({
           palaceEnabled={palaceEnabled}
         />
         <AiProgressOverlay />
-        {generationProgress && (
-          <div className="ai-progress-overlay">
-            <div className="ai-progress-overlay__card">
-              <div className="ai-progress-overlay__spinner" />
-              <span className="ai-progress-overlay__text">{generationProgress}</span>
-            </div>
-          </div>
-        )}
         {contextMenu ? (
           <MindMapContextMenu
             menu={contextMenu}
             menuRef={contextMenuRef}
-            onClose={() => setContextMenu(null)}
+            onClose={() => setContextMenu({ scope: 'closed' })}
             onAddChild={addChild}
             onAddSibling={addSibling}
             onRemove={removeSelected}
