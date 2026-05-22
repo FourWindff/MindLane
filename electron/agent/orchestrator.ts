@@ -1,5 +1,6 @@
 import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import { END, START, StateGraph } from "@langchain/langgraph";
+import type { CompiledStateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { type LLMProvider, ProviderCapability } from "./providers/index.js";
 import { urlToDataUrl } from "./providers/index.js";
@@ -10,6 +11,8 @@ import type {
   GeneratedNode,
   GeneratedEdge,
   MainGraphStateType,
+  PalaceSubgraphStateType,
+  MindmapSubgraphStateType,
 } from "./state.js";
 import { MainGraphState } from "./state.js";
 
@@ -93,12 +96,9 @@ export interface PalaceFromNodesError {
 export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
 
 export class AgentOrchestrator {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private compiledMainGraph: any = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private compiledMindmapSubgraph: any = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private compiledPalaceSubgraph: any = null;
+  private compiledMainGraph: CompiledStateGraph<MainGraphStateType, unknown, string> | null = null;
+  private compiledMindmapSubgraph: CompiledStateGraph<MindmapSubgraphStateType, unknown, string> | null = null;
+  private compiledPalaceSubgraph: CompiledStateGraph<PalaceSubgraphStateType, unknown, string> | null = null;
 
   constructor(
     private provider: LLMProvider,
@@ -223,7 +223,7 @@ export class AgentOrchestrator {
     const app = this.getCompiledPalaceSubgraph();
 
     try {
-      const result = await app.invoke(
+      const result = (await app.invoke(
         {
           messages: [],
           context: null,
@@ -238,7 +238,7 @@ export class AgentOrchestrator {
           memoryRoute: [],
         },
         { recursionLimit: AGENT_LIMITS.recursionLimit },
-      );
+      )) as PalaceSubgraphStateType;
 
       if (result.error) {
         return { ok: false, error: result.error };
