@@ -23,7 +23,6 @@ import type {
 } from "../../src/shared/lib/fileFormat.js";
 import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import { SessionManager } from "./context/sessionManager.js";
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
@@ -106,14 +105,6 @@ export class AgentOrchestrator {
     private aiService: AiService,
   ) {}
 
-  /**
-   * 获取或配置 SessionManager 的工作区
-   */
-  private getSessionManager(workspacePath: string): SessionManager {
-    this.aiService.sessionManager.setWorkspace(workspacePath);
-    return this.aiService.sessionManager;
-  }
-
   private getCompiledMainGraph() {
     if (!this.compiledMainGraph) {
       const graph = this.buildGraph();
@@ -148,8 +139,6 @@ export class AgentOrchestrator {
     callbacks: StreamCallbacks,
     signal?: AbortSignal,
   ): Promise<void> {
-    // 从后端加载历史消息并构建上下文
-    const contextMessages = await this.buildContextMessages(request);
     const app = this.getCompiledMainGraph();
 
     let fullContent = "";
@@ -163,7 +152,7 @@ export class AgentOrchestrator {
       };
 
       const stream = app.streamEvents(
-        { messages: contextMessages, context: request.context ?? null },
+        { messages: [new HumanMessage(request.message)], context: request.context ?? null },
         streamConfig,
       );
 
@@ -370,43 +359,24 @@ export class AgentOrchestrator {
     return response;
   }
 
-  /**
-   * 构建上下文消息 - 从后端加载历史并压缩
-   */
-  private async buildContextMessages(
-    request: ChatRequest,
-  ): Promise<BaseMessage[]> {
-    // 从上下文中获取工作区路径
-    const workspacePath = request.context?.workspacePath;
-
-    if (!workspacePath) {
-      // 没有工作区时，仅使用当前消息
-      return [new HumanMessage(request.message)];
-    }
-
-    // 从后端加载历史并构建上下文消息
-    const sessionManager = this.getSessionManager(workspacePath);
-    return sessionManager.buildContextMessages(
-      request.threadId,
-      this.provider,
-      request.message,
-    );
-  }
-
   private extractToolCalls(messages: BaseMessage[]): ChatResponse["toolCalls"] {
     const toolCalls: ChatResponse["toolCalls"] = [];
-    for (const msg of messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.getType() === "human") break;
       if (msg.getType() === "tool") {
         const toolMsg = msg as BaseMessage & {
           name?: string;
           content: unknown;
         };
-        const name = toolMsg.name ?? "unknown";
-        const resultStr =
-          typeof toolMsg.content === "string"
-            ? toolMsg.content
-            : JSON.stringify(toolMsg.content);
-        toolCalls.push({ name, args: {}, result: resultStr });
+        toolCalls.unshift({
+          name: toolMsg.name ?? "unknown",
+          args: {},
+          result:
+            typeof toolMsg.content === "string"
+              ? toolMsg.content
+              : JSON.stringify(toolMsg.content),
+        });
       }
     }
     return toolCalls.length > 0 ? toolCalls : undefined;

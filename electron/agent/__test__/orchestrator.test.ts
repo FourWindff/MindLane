@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentOrchestrator } from "../orchestrator.js";
 import { AiService } from "../service.js";
 import { ProviderCapability, type LLMProvider } from "../providers/index.js";
+import { HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
+import type { BaseMessage } from "@langchain/core/messages";
 
 // ─── Mock 工厂 ───────────────────────────────────────────────
 
@@ -30,10 +32,6 @@ function createMockAiService(checkpointer?: unknown): AiService {
     },
     userProfile: {
       getText: vi.fn().mockReturnValue(""),
-    },
-    sessionManager: {
-      setWorkspace: vi.fn(),
-      buildContextMessages: vi.fn().mockResolvedValue([]),
     },
   } as unknown as AiService;
 }
@@ -120,5 +118,80 @@ describe("AgentOrchestrator buildGraph 结构", () => {
     expect(Object.keys(graphWith.nodes)).toContain("palaceSubgraph");
     expect(Object.keys(graphWithout.nodes)).toContain("palaceSubgraph");
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes));
+  });
+});
+
+describe("AgentOrchestrator stream() 消息输入", () => {
+  it("始终只传入当前新消息，由 LangGraph checkpointer 管理历史", async () => {
+    const provider = createMockProvider();
+    const aiService = createMockAiService();
+    const orchestrator = new AgentOrchestrator(provider, aiService);
+
+    const capturedInputs: Array<{ messages: BaseMessage[] }> = [];
+    const mockGraph = {
+      streamEvents: vi.fn().mockImplementation(async function* (input: { messages: BaseMessage[] }) {
+        capturedInputs.push(input);
+        yield { event: "on_chat_model_stream", data: { chunk: { content: "ok" } } };
+      }),
+      getState: vi.fn().mockResolvedValue({ values: { messages: [], intent: "qa", response: "ok" } }),
+    };
+
+    (orchestrator as unknown as { compiledMainGraph: typeof mockGraph }).compiledMainGraph = mockGraph;
+
+    await orchestrator.stream(
+      { threadId: "test-thread", message: "扩展子主题C", context: { workspacePath: "/test" } },
+      { onToken: vi.fn(), onToolStart: vi.fn(), onToolEnd: vi.fn(), onEnd: vi.fn(), onError: vi.fn() },
+    );
+
+    expect(capturedInputs).toHaveLength(1);
+    expect(capturedInputs[0].messages).toHaveLength(1);
+    expect(capturedInputs[0].messages[0]).toBeInstanceOf(HumanMessage);
+    expect((capturedInputs[0].messages[0] as HumanMessage).content).toBe("扩展子主题C");
+  });
+});
+
+describe("AgentOrchestrator extractToolCalls", () => {
+  let extractToolCalls: (msgs: BaseMessage[]) => unknown;
+
+  beforeEach(() => {
+    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockAiService());
+    extractToolCalls = (orchestrator as unknown as { extractToolCalls: typeof extractToolCalls })["extractToolCalls"].bind(orchestrator);
+  });
+
+  it("只提取当前轮次（最后一条 human 消息之后）的 ToolMessage", () => {
+    const messages: BaseMessage[] = [
+      new HumanMessage("第一轮"),
+      new AIMessage("回复1"),
+      new ToolMessage({ content: "旧工具结果", tool_call_id: "call-1", name: "oldTool" }),
+      new HumanMessage("第二轮"),
+      new AIMessage("回复2"),
+      new ToolMessage({ content: "新工具结果", tool_call_id: "call-2", name: "newTool" }),
+    ];
+
+    const result = extractToolCalls(messages);
+    expect(result).toHaveLength(1);
+    expect(result![0]).toMatchObject({ name: "newTool", result: "新工具结果" });
+  });
+
+  it("没有 human 消息时提取所有 ToolMessage", () => {
+    const messages: BaseMessage[] = [
+      new ToolMessage({ content: "工具结果", tool_call_id: "call-1", name: "singleTool" }),
+    ];
+
+    const result = extractToolCalls(messages);
+    expect(result).toHaveLength(1);
+    expect(result![0]).toMatchObject({ name: "singleTool", result: "工具结果" });
+  });
+
+  it("当前轮次无 ToolMessage 时返回 undefined", () => {
+    const messages: BaseMessage[] = [
+      new HumanMessage("第一轮"),
+      new ToolMessage({ content: "旧工具", tool_call_id: "call-1", name: "oldTool" }),
+      new HumanMessage("第二轮"),
+      new AIMessage("纯文本回复"),
+    ];
+
+    const result = extractToolCalls(messages);
+    expect(result).toBeUndefined();
   });
 });
