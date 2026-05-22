@@ -20,6 +20,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
   }
 
   const result: SessionMessage[] = []
+  const pendingToolCalls: NonNullable<SessionMessage['toolCalls']> = []
 
   for (const msg of messages) {
     const type = msg.getType()
@@ -47,12 +48,18 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
         result: tc.id ? (toolResults.get(tc.id) ?? '') : '',
       }))
 
-      result.push({
-        role: 'assistant',
-        content,
-        toolCalls: toolCalls?.length ? toolCalls : undefined,
-      })
-      continue
+      if (toolCalls && toolCalls.length > 0) {
+        pendingToolCalls.push(...toolCalls)
+      }
+
+      if (content) {
+        result.push({
+          role: 'assistant',
+          content,
+          toolCalls: pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined,
+        })
+        pendingToolCalls.length = 0
+      }
     }
   }
 
