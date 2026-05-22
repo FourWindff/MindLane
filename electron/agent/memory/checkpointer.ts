@@ -1,7 +1,62 @@
 import { SqliteSaver } from '@langchain/langgraph-checkpoint-sqlite'
 import type { BaseCheckpointSaver } from '@langchain/langgraph'
+import type { BaseMessage } from '@langchain/core/messages'
+import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import path from 'node:path'
 import fs from 'node:fs'
+import type { SessionMessage } from '../db/chatDb.js'
+
+export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): SessionMessage[] {
+  const toolResults = new Map<string, string>()
+
+  for (const msg of messages) {
+    if (msg instanceof ToolMessage || msg.getType() === 'tool') {
+      const toolMsg = msg as ToolMessage
+      if (toolMsg.tool_call_id) {
+        toolResults.set(toolMsg.tool_call_id, typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content))
+      }
+    }
+  }
+
+  const result: SessionMessage[] = []
+
+  for (const msg of messages) {
+    const type = msg.getType()
+
+    if (type === 'tool') {
+      continue
+    }
+
+    if (type === 'human') {
+      result.push({ role: 'user', content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) })
+      continue
+    }
+
+    if (type === 'system') {
+      result.push({ role: 'system', content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) })
+      continue
+    }
+
+    if (type === 'ai') {
+      const aiMsg = msg as AIMessage
+      const content = typeof aiMsg.content === 'string' ? aiMsg.content : JSON.stringify(aiMsg.content)
+      const toolCalls = aiMsg.tool_calls?.map((tc) => ({
+        name: tc.name,
+        args: tc.args as Record<string, unknown>,
+        result: tc.id ? (toolResults.get(tc.id) ?? '') : '',
+      }))
+
+      result.push({
+        role: 'assistant',
+        content,
+        toolCalls: toolCalls?.length ? toolCalls : undefined,
+      })
+      continue
+    }
+  }
+
+  return result
+}
 
 export class CheckpointerManager {
   private saver: SqliteSaver | null = null
@@ -27,5 +82,24 @@ export class CheckpointerManager {
 
   getAdapter(): BaseCheckpointSaver | undefined {
     return this.saver ?? undefined
+  }
+
+  async getMessages(threadId: string): Promise<SessionMessage[]> {
+    if (!this.saver) return []
+    const tuple = await this.saver.getTuple({ configurable: { thread_id: threadId } })
+    if (!tuple) return []
+    const messages = tuple.checkpoint.channel_values?.messages as BaseMessage[] | undefined
+    if (!messages || !Array.isArray(messages)) return []
+    return checkpointMessagesToSessionMessages(messages)
+  }
+
+  async getMessageCount(threadId: string): Promise<number> {
+    const messages = await this.getMessages(threadId)
+    return messages.length
+  }
+
+  async deleteThread(threadId: string): Promise<void> {
+    if (!this.saver) return
+    await this.saver.deleteThread(threadId)
   }
 }
