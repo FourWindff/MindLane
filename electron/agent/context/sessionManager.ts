@@ -7,7 +7,7 @@ import { compressMessages } from '../memory/compression.js'
 import type { LLMProvider } from '../providers/index.js'
 import { ChatDb } from '../db/chatDb.js'
 import type { ChatSessionRow, SessionMessage, SessionMeta } from '../db/chatDb.js'
-import { CheckpointerManager } from '../memory/checkpointer.js'
+import type { CheckpointerManager } from '../memory/checkpointer.js'
 export type { SessionMessage, SessionMeta } from '../db/chatDb.js'
 
 /**
@@ -31,11 +31,16 @@ export class SessionManager {
    */
   init(dbPath: string, options?: { userDataPath?: string }): void {
     this.db = new ChatDb(dbPath)
-    this.checkpointer = new CheckpointerManager()
-    this.checkpointer.initWithDbPath(dbPath)
     if (options?.userDataPath) {
       this.migrateFromLegacy(options.userDataPath)
     }
+  }
+
+  /**
+   * 注入 CheckpointerManager（由 AiService 统一创建）
+   */
+  setCheckpointer(cp: CheckpointerManager): void {
+    this.checkpointer = cp
   }
 
   /**
@@ -130,7 +135,7 @@ export class SessionManager {
    * 加载指定会话的历史消息（从 LangGraph checkpoints）
    */
   async loadHistory(threadId: string): Promise<SessionMessage[]> {
-    if (!this.checkpointer) throw new Error('SessionManager not initialized')
+    if (!this.checkpointer) return []
     return this.checkpointer.getMessages(threadId)
   }
 

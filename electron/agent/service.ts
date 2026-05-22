@@ -18,5 +18,6 @@ export class AiService {
 
     this.sessionManager.init(dbPath, { userDataPath })
     await this.checkpointer.initWithDbPath(dbPath)
+    this.sessionManager.setCheckpointer(this.checkpointer)
   }
 }
