@@ -65,17 +65,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
           }
         }
 
-        const docNodeId = genId('doc')
         const rootId = genId('root')
-
-        const docNode = {
-          id: docNodeId,
-          type: 'document' as const,
-          data: {
-            filename: title,
-            excerpt: documentText.slice(0, 200),
-          },
-        }
 
         const rootNode = {
           id: rootId,
@@ -83,20 +73,13 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
           data: { label: finalTitle },
         }
 
-        const docToRootEdge = {
-          id: `e-${docNodeId}-${rootId}`,
-          source: docNodeId,
-          target: rootId,
-          type: 'smoothstep',
-        }
-
         const tree = flattenYamlTree(rootTree.children, rootId, genId)
 
         return {
-          mindmapNodes: [docNode, rootNode, ...tree.nodes],
-          mindmapEdges: [docToRootEdge, ...tree.edges],
+          mindmapNodes: [rootNode, ...tree.nodes],
+          mindmapEdges: tree.edges,
           mindmapTitle: finalTitle,
-          response: `已生成思维导图「${finalTitle}」，共 ${tree.nodes.length + 2} 个节点。`,
+          response: `已生成思维导图「${finalTitle}」，共 ${tree.nodes.length + 1} 个节点。`,
         }
       } catch (error) {
         const formatted = formatAgentError(error)

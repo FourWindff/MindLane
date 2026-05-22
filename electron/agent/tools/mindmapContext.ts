@@ -2,7 +2,7 @@ import { MindLaneEdge, MindLaneNode } from '@/shared/lib/fileFormat'
 
 export interface ContextNodeInfo {
   id: string
-  type: 'text' | 'palace' | 'document'
+  type: 'text' | 'palace'
   label: string
   extra?: Record<string, unknown>
 }

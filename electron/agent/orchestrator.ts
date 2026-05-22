@@ -384,26 +384,12 @@ export class AgentOrchestrator {
     mindmapEdges: GeneratedEdge[],
     mindmapTitle: string,
   ): ChatResponse["mindmapData"] {
-    const mappedNodes = mindmapNodes.map((n) => {
-      if (n.type === "document") {
-        return {
-          id: n.id,
-          type: "document" as const,
-          position: { x: 0, y: 0 },
-          data: {
-            filename: (n.data as { filename?: string }).filename ?? "",
-            excerpt: (n.data as { excerpt?: string }).excerpt ?? "",
-            fullTextPath: (n.data as { fullTextPath?: string }).fullTextPath,
-          },
-        };
-      }
-      return {
-        id: n.id,
-        type: "text" as const,
-        position: { x: 0, y: 0 },
-        data: { label: (n.data as { label?: string }).label ?? "" },
-      };
-    }) as MindLaneNode[];
+    const mappedNodes = mindmapNodes.map((n) => ({
+      id: n.id,
+      type: "text" as const,
+      position: { x: 0, y: 0 },
+      data: { label: (n.data as { label?: string }).label ?? "" },
+    })) as MindLaneNode[];
 
     return {
       nodes: mappedNodes,

@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 
 type ContextNodeInfo = {
   id: string
-  type: 'text' | 'palace' | 'document'
+  type: 'text' | 'palace'
   label: string
   extra?: Record<string, unknown>
 }
