@@ -33,6 +33,7 @@ _bmad-output
 .claude
 .codex
 .gitnexus
+.codegraph
 
 electron/lab/output
 tsconfig.node.tsbuildinfo
