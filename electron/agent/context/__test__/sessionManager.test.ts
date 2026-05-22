@@ -23,18 +23,18 @@ describe('SessionManager', () => {
     expect(manager.workspaceHash).toBe(expectedHash)
   })
 
-  it('saveSession 和 loadHistory 往返正确', async () => {
+  it('saveSession 保存会话元数据', async () => {
     const messages: SessionMessage[] = [
       { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00Z' },
       { role: 'assistant', content: 'Hi there', timestamp: '2024-01-01T00:00:01Z' },
     ]
     await manager.saveSession('session-1', messages)
-    const loaded = await manager.loadHistory('session-1')
-    expect(loaded).toHaveLength(2)
-    expect(loaded[0].role).toBe('user')
-    expect(loaded[0].content).toBe('Hello')
-    expect(loaded[1].role).toBe('assistant')
-    expect(loaded[1].content).toBe('Hi there')
+
+    // Verify session metadata is saved
+    const sessions = await manager.listSessions()
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0].id).toBe('session-1')
+    expect(sessions[0].messageCount).toBe(2)
   })
 
   it('saveSession 自动从第一条用户消息生成标题', async () => {
@@ -115,7 +115,7 @@ describe('SessionManager', () => {
     expect(page2[1].id).toBe('session-2')
   })
 
-  it('deleteSession 删除会话和消息', async () => {
+  it('deleteSession 删除会话元数据', async () => {
     const messages: SessionMessage[] = [
       { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00Z' },
     ]
@@ -124,16 +124,10 @@ describe('SessionManager', () => {
     const sessionsBefore = await manager.listSessions()
     expect(sessionsBefore).toHaveLength(1)
 
-    const loadedBefore = await manager.loadHistory('session-delete')
-    expect(loadedBefore).toHaveLength(1)
-
     await manager.deleteSession('session-delete')
 
     const sessionsAfter = await manager.listSessions()
     expect(sessionsAfter).toHaveLength(0)
-
-    const loadedAfter = await manager.loadHistory('session-delete')
-    expect(loadedAfter).toHaveLength(0)
   })
 
   it('getMostRecentSessionId 返回最近更新的会话', async () => {
@@ -177,50 +171,14 @@ describe('SessionManager', () => {
     expect(ws1Sessions[0].title).toBe('Workspace 1')
   })
 
-  it('loadHistoryAsMessages 转换为 LangChain 消息', async () => {
-    const messages: SessionMessage[] = [
-      { role: 'system', content: 'You are a helpful assistant', timestamp: '2024-01-01T00:00:00Z' },
-      { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:01Z' },
-      { role: 'assistant', content: 'Hi there', timestamp: '2024-01-01T00:00:02Z' },
-    ]
-    await manager.saveSession('session-lc', messages)
-
-    const withSystem = await manager.loadHistoryAsMessages('session-lc')
-    expect(withSystem).toHaveLength(3)
-    expect(withSystem[0].getType()).toBe('system')
-    expect(withSystem[1].getType()).toBe('human')
-    expect(withSystem[2].getType()).toBe('ai')
-
-    const withoutSystem = await manager.loadHistoryAsMessages('session-lc', { includeSystem: false })
-    expect(withoutSystem).toHaveLength(2)
-    expect(withoutSystem[0].getType()).toBe('human')
-    expect(withoutSystem[1].getType()).toBe('ai')
+  it('loadHistory 从 checkpoint 读取消息（无 checkpoint 时返回空）', async () => {
+    // Without a LangGraph checkpoint, loadHistory returns empty
+    const loaded = await manager.loadHistory('non-existent-session')
+    expect(loaded).toHaveLength(0)
   })
 
-  it('toolCalls 正确序列化和反序列化', async () => {
-    const toolCalls = [
-      { name: 'tool1', args: { key: 'value', num: 42 }, result: 'done' },
-      { name: 'tool2', args: { foo: 'bar' }, result: 'success' },
-    ]
-    const messages: SessionMessage[] = [
-      {
-        role: 'assistant',
-        content: 'Using tools',
-        toolCalls,
-        timestamp: '2024-01-01T00:00:00Z',
-      },
-    ]
-    await manager.saveSession('session-tools', messages)
-
-    const loaded = await manager.loadHistory('session-tools')
-    expect(loaded).toHaveLength(1)
-    expect(loaded[0].toolCalls).toBeDefined()
-    expect(loaded[0].toolCalls).toHaveLength(2)
-    expect(loaded[0].toolCalls![0].name).toBe('tool1')
-    expect(loaded[0].toolCalls![0].args).toEqual({ key: 'value', num: 42 })
-    expect(loaded[0].toolCalls![0].result).toBe('done')
-    expect(loaded[0].toolCalls![1].name).toBe('tool2')
-    expect(loaded[0].toolCalls![1].args).toEqual({ foo: 'bar' })
-    expect(loaded[0].toolCalls![1].result).toBe('success')
+  it('loadHistoryAsMessages 无 checkpoint 时返回空', async () => {
+    const loaded = await manager.loadHistoryAsMessages('non-existent-session')
+    expect(loaded).toHaveLength(0)
   })
 })

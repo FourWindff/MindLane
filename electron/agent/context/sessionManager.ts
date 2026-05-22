@@ -7,13 +7,14 @@ import { compressMessages } from '../memory/compression.js'
 import type { LLMProvider } from '../providers/index.js'
 import { ChatDb } from '../db/chatDb.js'
 import type { ChatSessionRow, SessionMessage, SessionMeta } from '../db/chatDb.js'
+import { CheckpointerManager } from '../memory/checkpointer.js'
 export type { SessionMessage, SessionMeta } from '../db/chatDb.js'
 
 /**
  * 聊天历史管理器 - SQLite 版本
  *
  * 职责：
- * 1. 从 SQLite 加载指定会话的历史消息
+ * 1. 从 LangGraph checkpoints 加载指定会话的历史消息
  * 2. 将存储格式转换为 LangChain Message 格式
  * 3. 提供消息压缩/截断策略
  * 4. 支持会话的 CRUD 操作
@@ -21,6 +22,7 @@ export type { SessionMessage, SessionMeta } from '../db/chatDb.js'
  */
 export class SessionManager {
   private db: ChatDb | null = null
+  private checkpointer: CheckpointerManager | null = null
   private _workspacePath: string = ''
   private _workspaceHash: string = ''
 
@@ -29,6 +31,8 @@ export class SessionManager {
    */
   init(dbPath: string, options?: { userDataPath?: string }): void {
     this.db = new ChatDb(dbPath)
+    this.checkpointer = new CheckpointerManager()
+    this.checkpointer.initWithDbPath(dbPath)
     if (options?.userDataPath) {
       this.migrateFromLegacy(options.userDataPath)
     }
@@ -95,7 +99,7 @@ export class SessionManager {
           const sessionData = JSON.parse(fs.readFileSync(sessionFilePath, 'utf-8'))
           const messages: SessionMessage[] = Array.isArray(sessionData.messages) ? sessionData.messages : []
 
-          // Insert session metadata
+          // Insert session metadata only (messages are in checkpoints)
           const row: ChatSessionRow = {
             id: session.id,
             workspace_hash: dir.name,
@@ -105,17 +109,6 @@ export class SessionManager {
             message_count: messages.length,
           }
           this.db!.upsertSession(row)
-
-          // Insert messages
-          for (const msg of messages) {
-            this.db!.insertMessage({
-              session_id: session.id,
-              role: msg.role,
-              content: msg.content,
-              tool_calls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
-              timestamp: msg.timestamp ?? session.updatedAt,
-            })
-          }
         }
       }
 
@@ -134,18 +127,11 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的历史消息
+   * 加载指定会话的历史消息（从 LangGraph checkpoints）
    */
   async loadHistory(threadId: string): Promise<SessionMessage[]> {
-    if (!this.db) throw new Error('SessionManager not initialized')
-
-    const rows = this.db.getMessages(threadId)
-    return rows.map((row) => ({
-      role: row.role,
-      content: row.content,
-      toolCalls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined,
-      timestamp: row.timestamp,
-    }))
+    if (!this.checkpointer) throw new Error('SessionManager not initialized')
+    return this.checkpointer.getMessages(threadId)
   }
 
   /**
@@ -223,7 +209,7 @@ export class SessionManager {
   }
 
   /**
-   * 保存会话历史
+   * 保存会话元数据（消息内容已存储在 LangGraph checkpoints 中）
    */
   async saveSession(
     sessionId: string,
@@ -255,31 +241,23 @@ export class SessionManager {
       }
     }
 
-    this.db.replaceSessionMessages(
-      {
-        id: sessionId,
-        workspace_hash: this._workspaceHash,
-        title,
-        created_at: existing?.created_at ?? now,
-        updated_at: now,
-        message_count: messages.length,
-      },
-      messages.map((msg) => ({
-        session_id: sessionId,
-        role: msg.role,
-        content: msg.content,
-        tool_calls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : null,
-        timestamp: msg.timestamp ?? now,
-      })),
-    )
+    this.db.upsertSession({
+      id: sessionId,
+      workspace_hash: this._workspaceHash,
+      title,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+      message_count: messages.length,
+    })
   }
 
   /**
-   * 删除会话
+   * 删除会话（包括元数据和 checkpoint）
    */
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.db) throw new Error('SessionManager not initialized')
     this.db.deleteSession(sessionId)
+    await this.checkpointer?.deleteThread(sessionId)
   }
 
   /**
@@ -297,5 +275,6 @@ export class SessionManager {
   close(): void {
     this.db?.close()
     this.db = null
+    this.checkpointer = null
   }
 }
