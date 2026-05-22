@@ -30,7 +30,7 @@ import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import { DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
+import { isDefaultViewport } from '@/shared/lib/fileFormat'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -110,13 +110,19 @@ function MindMapCanvas({
     lastRestoredFileRef.current = filePath
 
     const vp = useMindmapStore.getState().viewport
-    const isDefault = vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
-    if (isDefault) {
+    if (isDefaultViewport(vp)) {
       rf.fitView({ padding: 0.2, duration: 300 })
     } else {
       rf.setViewport(vp)
     }
   }, [filePath, hasDocumentOpen, nodes.length, rf])
+
+  const handleInit = useCallback((instance: ReactFlowInstance) => {
+    const vp = useMindmapStore.getState().viewport
+    if (!isDefaultViewport(vp)) {
+      instance.setViewport(vp)
+    }
+  }, [])
 
   const handleMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
@@ -217,6 +223,15 @@ function MindMapCanvas({
       exitTimeoutsRef.current = []
     }
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (viewportDebounceRef.current) {
+        window.clearTimeout(viewportDebounceRef.current)
+        viewportDebounceRef.current = null
+      }
+    }
+  }, [filePath])
 
   useEffect(() => {
     if (contextMenu.scope === 'closed') return
@@ -783,6 +798,7 @@ function MindMapCanvas({
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
           onMoveEnd={handleMoveEnd}
+          onInit={handleInit}
           minZoom={0.2}
           maxZoom={1.5}
           proOptions={{ hideAttribution: true }}

@@ -7,6 +7,10 @@ export type { TextNodeData }
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
+export function isDefaultViewport(vp: { x: number; y: number; zoom: number }): boolean {
+  return vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
+}
+
 export interface MindLaneFile {
   version: '1.0'
   metadata: {
