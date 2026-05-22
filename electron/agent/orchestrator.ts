@@ -143,19 +143,6 @@ export class AgentOrchestrator {
     return this.compiledPalaceSubgraph;
   }
 
-  async run(request: ChatRequest): Promise<ChatResponse> {
-    // 从后端加载历史消息并构建上下文
-    const contextMessages = await this.buildContextMessages(request);
-    const app = this.getCompiledMainGraph();
-
-    const result = await app.invoke(
-      { messages: contextMessages, context: request.context ?? null },
-      { recursionLimit: AGENT_LIMITS.recursionLimit, configurable: { thread_id: request.threadId } },
-    );
-
-    return this.buildResponse(result as MainGraphStateType);
-  }
-
   async stream(
     request: ChatRequest,
     callbacks: StreamCallbacks,
