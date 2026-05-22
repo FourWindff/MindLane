@@ -171,7 +171,6 @@ describe('MindLaneAgent.invoke()', () => {
     const agent = new MindLaneAgent(
       createMockProvider(mockInvoke),
       [mockSearchTool],
-      undefined,
       { hasEmbeddings: true, hasPalace: false },
     )
 
@@ -291,7 +290,6 @@ describe('MindLaneAgent.route()', () => {
     const agent = new MindLaneAgent(
       createMockProvider(vi.fn()),
       [mockSearchTool],
-      undefined,
       { hasEmbeddings: true, hasPalace: false },
     )
 

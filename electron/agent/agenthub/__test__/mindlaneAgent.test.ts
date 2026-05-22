@@ -24,7 +24,7 @@ describe('MindLaneAgent error handling', () => {
       },
     } as unknown as LLMProvider
 
-    const agent = new MindLaneAgent(mockProvider, [], undefined, {
+    const agent = new MindLaneAgent(mockProvider, [], {
       hasEmbeddings: true,
       hasPalace: true,
     })
