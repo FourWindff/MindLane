@@ -5,6 +5,7 @@ import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import path from 'node:path'
 import fs from 'node:fs'
 import type { SessionMessage } from '../db/chatDb.js'
+import { extractTextContent } from '../utils.js'
 
 export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): SessionMessage[] {
   const toolResults = new Map<string, string>()
@@ -13,7 +14,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
     if (msg instanceof ToolMessage || msg.getType() === 'tool') {
       const toolMsg = msg as ToolMessage
       if (toolMsg.tool_call_id) {
-        toolResults.set(toolMsg.tool_call_id, typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content))
+        toolResults.set(toolMsg.tool_call_id, extractTextContent(toolMsg.content))
       }
     }
   }
@@ -28,18 +29,18 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
     }
 
     if (type === 'human') {
-      result.push({ role: 'user', content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) })
+      result.push({ role: 'user', content: extractTextContent(msg.content) })
       continue
     }
 
     if (type === 'system') {
-      result.push({ role: 'system', content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content) })
+      result.push({ role: 'system', content: extractTextContent(msg.content) })
       continue
     }
 
     if (type === 'ai') {
       const aiMsg = msg as AIMessage
-      const content = typeof aiMsg.content === 'string' ? aiMsg.content : JSON.stringify(aiMsg.content)
+      const content = extractTextContent(aiMsg.content)
       const toolCalls = aiMsg.tool_calls?.map((tc) => ({
         name: tc.name,
         args: tc.args as Record<string, unknown>,
