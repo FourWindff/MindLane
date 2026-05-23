@@ -44,6 +44,41 @@ function parseYamlSafely(yamlString: string): unknown {
   }
 }
 
+/**
+ * 修复 AI 常见的 YAML 格式错误：
+ * 当 `- "父节点"` 后面跟着缩进的子节点 `- "子节点"` 时，
+ * AI 经常忘记在父节点后加冒号，导致 YAML 解析失败。
+ */
+function fixAiYamlErrors(yamlString: string): string {
+  const lines = yamlString.split('\n')
+  const fixed: string[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!
+    fixed.push(line)
+
+    // 检测当前行是否是列表项（以 - 开头，值为字符串）
+    const match = line.match(/^(\s*)-\s*"([^"]+)"\s*$/)
+    if (!match) continue
+
+    const indent = match[1]!.length
+    const nextLine = lines[i + 1]
+    if (!nextLine) continue
+
+    // 检测下一行是否是缩进的子列表项
+    const nextMatch = nextLine.match(/^(\s*)-/)
+    if (!nextMatch) continue
+
+    const nextIndent = nextMatch[1]!.length
+    // 如果下一行缩进更深，说明当前行应该是父节点，需要在末尾加冒号
+    if (nextIndent > indent) {
+      fixed[fixed.length - 1] = `${line}:`
+    }
+  }
+
+  return fixed.join('\n')
+}
+
 export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
   const raw = parseYamlSafely(yamlString)
 
@@ -81,7 +116,13 @@ export interface ParsedFragment extends ParsedMindmap {
  * 返回的节点 ID 使用 `newId()` 生成，不预设固定 ID。
  */
 export function parseYamlFragment(yamlString: string): ParsedFragment {
-  const raw = parseYamlSafely(yamlString)
+  let raw: unknown
+  try {
+    raw = parseYamlSafely(yamlString)
+  } catch {
+    const fixed = fixAiYamlErrors(yamlString)
+    raw = parseYamlSafely(fixed)
+  }
 
   if (!raw) {
     throw new EmptyMindmapError()

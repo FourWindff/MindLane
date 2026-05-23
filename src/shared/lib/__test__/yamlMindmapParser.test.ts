@@ -181,5 +181,23 @@ mindmap:
     it('should throw YamlParseError for invalid YAML', () => {
       expect(() => parseYamlFragment('!!! not yaml !!!')).toThrow(YamlParseError)
     })
+
+    it('should tolerate AI-generated YAML missing colons', () => {
+      // AI 经常忘记在父节点后加冒号
+      const yaml = `
+- "学习率的作用与选择"
+  - "学习率过大：损失震荡不收敛"
+  - "学习率过小：收敛速度极慢"
+- "学习率调整策略"
+  - "固定学习率：简单但可能非最优"
+`
+      const result = parseYamlFragment(yaml)
+      // 虚拟根 + 2 个父节点 + 3 个子节点 = 6 节点
+      expect(result.nodes).toHaveLength(6)
+      // 虚拟根→父1, 虚拟根→父2, 父1→子1, 父1→子2, 父2→子3 = 5 边
+      expect(result.edges).toHaveLength(5)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '学习率的作用与选择')).toBe(true)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '学习率过大：损失震荡不收敛')).toBe(true)
+    })
   })
 })
