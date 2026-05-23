@@ -1,4 +1,5 @@
-import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { CompiledStateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
@@ -292,6 +293,37 @@ export class AgentOrchestrator {
     if (hasPalace && actionTools.addPalaceNodeTool) {
       tools.push(actionTools.addPalaceNodeTool);
     }
+    const toolNode = new ToolNode(tools);
+
+    // 工具执行节点：过滤掉路由决策工具的调用（已在 supervisor.invoke 中处理）
+    const toolsNode = async (state: MainGraphStateType) => {
+      const lastMessage = state.messages[state.messages.length - 1];
+      if (lastMessage && lastMessage.type === "ai") {
+        const msg = lastMessage as AIMessage;
+        const nonRouteToolCalls =
+          msg.tool_calls?.filter((tc) => tc.name !== "routeDecision") ?? [];
+        if (nonRouteToolCalls.length === 0) {
+          return { messages: [] };
+        }
+        const filteredState = {
+          ...state,
+          messages: [
+            ...state.messages.slice(0, -1),
+            new AIMessage({
+              content: msg.content,
+              tool_calls: nonRouteToolCalls,
+            }),
+          ],
+        };
+        const result = await toolNode.invoke(filteredState);
+        const messages = result.messages ?? result;
+        return { messages: Array.isArray(messages) ? messages : [messages] };
+      }
+      const result = await toolNode.invoke(state);
+      const messages = result.messages ?? result;
+      return { messages: Array.isArray(messages) ? messages : [messages] };
+    };
+
     const supervisor = new MindLaneAgent(
       this.provider,
       tools,
@@ -305,7 +337,7 @@ export class AgentOrchestrator {
     // hasPalace=false 时子图仍会被编译但永远不会被执行（route() 已保证）
     const graph = new StateGraph(MainGraphState)
       .addNode("supervisor", (state) => supervisor.invoke(state))
-      .addNode("tools", (state) => supervisor.invokeTools(state))
+      .addNode("tools", toolsNode)
       .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
       .addNode("palaceSubgraph", this.getCompiledPalaceSubgraph())
       .addEdge(START, "supervisor")
