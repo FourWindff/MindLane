@@ -1,5 +1,4 @@
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
-import { ToolNode } from "@langchain/langgraph/prebuilt";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMProvider } from "../../providers/index.js";
@@ -32,7 +31,6 @@ export interface CapabilityFlags {
 }
 
 export class MindLaneAgent extends BaseAgent {
-  private toolNode: ToolNode;
   private tools: StructuredToolInterface[];
   private capabilityFlags: CapabilityFlags;
   private modelWithTools: ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
@@ -46,7 +44,6 @@ export class MindLaneAgent extends BaseAgent {
     const routeTool = createRouteDecisionTool(capabilityFlags?.hasPalace ?? true);
     this.tools = [...tools, routeTool];
     // ToolNode 只包含原始工具，路由决策工具在 invoke() 中直接处理
-    this.toolNode = new ToolNode(tools);
     this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
     this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
   }
@@ -103,40 +100,6 @@ export class MindLaneAgent extends BaseAgent {
         response: '处理请求时出错，请稍后重试。',
       };
     }
-  }
-
-  async invokeTools(
-    state: MainGraphStateType,
-  ): Promise<Partial<MainGraphStateType>> {
-    // 过滤掉路由决策工具的调用，它已在 invoke() 中直接处理
-    const lastMessage = state.messages[state.messages.length - 1];
-    if (lastMessage && lastMessage.type === "ai") {
-      const msg = lastMessage as AIMessage;
-      const routeToolName = this.tools[this.tools.length - 1].name;
-      const nonRouteToolCalls =
-        msg.tool_calls?.filter((tc) => tc.name !== routeToolName) ?? [];
-      if (nonRouteToolCalls.length === 0) {
-        return { messages: [] };
-      }
-      // 创建只包含非路由工具的临时状态给 ToolNode
-      const filteredState = {
-        ...state,
-        messages: [
-          ...state.messages.slice(0, -1),
-          new AIMessage({
-            content: msg.content,
-            tool_calls: nonRouteToolCalls,
-          }),
-        ],
-      };
-      const result = await this.toolNode.invoke(filteredState);
-      const messages = result.messages ?? result;
-      return { messages: Array.isArray(messages) ? messages : [messages] };
-    }
-
-    const result = await this.toolNode.invoke(state);
-    const messages = result.messages ?? result;
-    return { messages: Array.isArray(messages) ? messages : [messages] };
   }
 
   route(state: MainGraphStateType): string {
