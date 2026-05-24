@@ -1,0 +1,121 @@
+/* —— Floating Toolbar —— */
+.mindmap-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+  pointer-events: none;
+}
+
+.mindmap-header__panel {
+  display: inline-flex;
+  padding: 4px 5px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.04);
+  pointer-events: auto;
+}
+
+.float-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.float-toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 9px;
+  gap: 1px;
+}
+
+.float-toolbar__group--edit {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.float-toolbar__group--file {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+.float-toolbar__group--system {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.float-toolbar__divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: rgba(0, 0, 0, 0.08);
+  align-self: center;
+}
+
+.float-toolbar__btn-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.float-toolbar__btn {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ml-text);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    transform 0.1s ease;
+}
+
+.float-toolbar__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.float-toolbar__btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.float-toolbar__btn--danger {
+  color: var(--ml-danger);
+}
+
+.float-toolbar__btn--danger:hover:not(:disabled) {
+  background: rgba(229, 72, 77, 0.1);
+  color: var(--ml-danger);
+}
+
+.float-toolbar__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.float-toolbar__btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(32, 32, 32, 0.25);
+}
+
+@media (max-width: 700px) {
+  .float-toolbar {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 260px;
+  }
+
+  .float-toolbar__divider {
+    display: none;
+  }
+}

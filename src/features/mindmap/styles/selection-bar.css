@@ -1,0 +1,54 @@
+/* —— Selection Action Bar —— */
+.selection-bar {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10040;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.85rem;
+  border-radius: 12px;
+  background: var(--ml-bg-elevated);
+  border: 1px solid var(--ml-border-strong);
+  box-shadow: var(--ml-shadow-strong);
+  animation: selection-bar-enter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes selection-bar-enter {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.selection-bar__count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ml-text-muted);
+  white-space: nowrap;
+}
+
+.selection-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--ml-accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ml-bg-elevated);
+  background: var(--ml-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.selection-bar__btn:hover {
+  background: var(--ml-accent-hover);
+}
+
+.selection-bar__btn:active {
+  transform: scale(0.97);
+}

@@ -1,0 +1,26 @@
+/* —— Tooltip —— */
+.float-toolbar__tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-4px);
+  padding: 5px 10px;
+  border-radius: 7px;
+  background: rgba(30, 30, 30, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--ml-bg-elevated);
+  font-size: 0.74rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 101;
+}
+
+.float-toolbar__btn-wrap:hover .float-toolbar__tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

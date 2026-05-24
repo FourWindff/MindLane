@@ -1,0 +1,50 @@
+.palace-node__thumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--ml-fill-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  border-radius: 10px 10px 0 0;
+}
+
+.palace-node__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px 10px 0 0;
+}
+
+.palace-node__placeholder {
+  color: var(--ml-text-faint);
+}
+
+.palace-node__info {
+  padding: 0.45rem 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.palace-node__label {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ml-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palace-node__badge {
+  flex-shrink: 0;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ml-bg-elevated);
+  background: var(--ml-accent);
+}

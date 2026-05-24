@@ -1,0 +1,123 @@
+/* ── Chat Markdown ── */
+.chat-float-markdown {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+.chat-float-markdown > :first-child {
+  margin-top: 0;
+}
+
+.chat-float-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-float-markdown p {
+  margin: 0.35em 0;
+}
+
+.chat-float-markdown h1,
+.chat-float-markdown h2,
+.chat-float-markdown h3,
+.chat-float-markdown h4 {
+  margin: 0.6em 0 0.25em;
+  line-height: 1.3;
+}
+
+.chat-float-markdown h1 { font-size: 1.15em; }
+.chat-float-markdown h2 { font-size: 1.05em; }
+.chat-float-markdown h3 { font-size: 0.95em; }
+
+.chat-float-markdown ul,
+.chat-float-markdown ol {
+  margin: 0.3em 0;
+  padding-left: 1.4em;
+}
+
+.chat-float-markdown li {
+  margin: 0.15em 0;
+}
+
+.chat-float-markdown code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.88em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--ml-fill-medium);
+}
+
+.chat-float-markdown pre {
+  margin: 0.4em 0;
+  padding: 0.55em 0.7em;
+  border-radius: 8px;
+  background: var(--ml-code-bg);
+  color: var(--ml-code-text);
+  overflow-x: auto;
+  font-size: 0.82em;
+  line-height: 1.5;
+}
+
+.chat-float-markdown pre code {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+  color: inherit;
+}
+
+.chat-float-markdown blockquote {
+  margin: 0.4em 0;
+  padding: 0.2em 0 0.2em 0.7em;
+  border-left: 3px solid var(--ml-border-strong);
+  color: var(--ml-text-muted);
+}
+
+.chat-float-markdown table {
+  border-collapse: collapse;
+  margin: 0.4em 0;
+  font-size: 0.9em;
+  width: 100%;
+}
+
+.chat-float-markdown th,
+.chat-float-markdown td {
+  border: 1px solid var(--ml-border);
+  padding: 0.3em 0.5em;
+  text-align: left;
+}
+
+.chat-float-markdown th {
+  background: var(--ml-fill-soft);
+  font-weight: 600;
+}
+
+.chat-float-markdown hr {
+  border: none;
+  border-top: 1px solid var(--ml-border);
+  margin: 0.6em 0;
+}
+
+.chat-float-markdown a {
+  color: var(--ml-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chat-float-markdown strong {
+  font-weight: 700;
+}
+
+/* ── Chat spinner ── */
+.chat-float-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--ml-border-strong);
+  border-top-color: var(--ml-text);
+  border-radius: 50%;
+  animation: chat-float-spin 0.6s linear infinite;
+}
+
+@keyframes chat-float-spin {
+  to { transform: rotate(360deg); }
+}

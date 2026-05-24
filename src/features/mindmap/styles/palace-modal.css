@@ -1,0 +1,152 @@
+.palace-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  animation: palace-modal-fadein 0.25s ease;
+}
+
+@keyframes palace-modal-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.palace-modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(92vw, 960px);
+  max-height: 88vh;
+  border-radius: 16px;
+  background: var(--ml-bg-elevated);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: palace-modal-scalein 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes palace-modal-scalein {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.palace-modal__close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ml-bg-elevated);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.palace-modal__close:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.palace-modal__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.palace-modal__image-wrap {
+  position: relative;
+  flex: 1 1 60%;
+  min-width: 0;
+  background: var(--ml-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.palace-modal__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.palace-modal__no-image {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1rem;
+}
+
+.palace-modal__pin {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ml-accent);
+  color: var(--ml-bg-elevated);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: default;
+  transition: transform 0.25s, box-shadow 0.25s;
+  z-index: 2;
+}
+.palace-modal__pin:hover {
+  transform: translate(-50%, -50%) scale(1.25);
+}
+.palace-modal__pin--active {
+  transform: translate(-50%, -50%) scale(1.4);
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.5),
+    0 0 20px 6px rgba(255, 255, 255, 0.6),
+    0 0 40px 12px rgba(255, 255, 255, 0.25);
+}
+
+.palace-modal__trail-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+.palace-modal__trail-path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 0.6;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9))
+          drop-shadow(0 0 14px rgba(255, 255, 255, 0.5));
+}
+
+.palace-modal__play-btn {
+  margin-bottom: 0.85rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--ml-text), var(--ml-accent));
+  color: var(--ml-bg-elevated);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.palace-modal__play-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+.palace-modal__play-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

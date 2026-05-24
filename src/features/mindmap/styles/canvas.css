@@ -1,0 +1,52 @@
+.mindmap-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.mindmap-canvas-wrap .react-flow {
+  background: var(--ml-bg);
+  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+  cursor: default;
+}
+
+.mindmap-canvas-wrap .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selected .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.updating .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selectable:focus .react-flow__edge-path,
+.mindmap-canvas-wrap .react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+  stroke: var(--ml-edge-stroke);
+  shape-rendering: crispEdges;
+}
+
+.mindmap-canvas-wrap .react-flow__controls {
+  box-shadow: var(--ml-shadow);
+}
+
+.mindmap-canvas-wrap .react-flow__controls-button {
+  background: var(--ml-bg-elevated) !important;
+  border-bottom: 1px solid var(--ml-border) !important;
+  fill: var(--ml-text) !important;
+}
+
+.mindmap-canvas-wrap .react-flow__controls-button:hover {
+  background: var(--ml-fill-soft) !important;
+}
+
+/* Ensure canvas shows default cursor, not pointer */
+.mindmap-canvas-wrap .react-flow__pane {
+  cursor: default;
+}
+
+.mindmap-minimap {
+  background: var(--ml-bg-subtle) !important;
+  border: 1px solid var(--ml-border) !important;
+  border-radius: 8px;
+}
+
+/* —— Smooth position transitions for all nodes —— */
+.react-flow__node {
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  cursor: default;
+}

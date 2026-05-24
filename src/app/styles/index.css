@@ -23,6 +23,14 @@
   --ml-accent-soft: rgba(0, 0, 0, 0.045);
   --ml-accent-hover: #0a0a0a;
   --ml-danger: #e5484d;
+  --ml-success: #10b981;
+  --ml-warning: #f59e0b;
+  --ml-info: #3b82f6;
+  --ml-edge-stroke: #c8c8c8;
+  --ml-code-bg: #1c1c1c;
+  --ml-code-text: #e0e0e0;
+  --ml-palace-accent-1: #a855f7;
+  --ml-palace-accent-2: #ec4899;
 }
 
 *,

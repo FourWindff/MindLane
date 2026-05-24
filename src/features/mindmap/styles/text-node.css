@@ -1,0 +1,124 @@
+@keyframes text-node-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes text-node-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.88);
+    filter: blur(4px);
+  }
+}
+
+.text-node {
+  min-width: 120px;
+  max-width: 480px;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: var(--ml-bg-elevated);
+  border: 2px solid var(--ml-border-strong);
+  box-shadow: var(--ml-shadow);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: var(--ml-text);
+  transform-origin: center center;
+}
+
+.text-node--enter {
+  animation: text-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.text-node--exiting {
+  pointer-events: none;
+  animation: text-node-exit 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.text-node--selected {
+  border-color: var(--ml-accent);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.08),
+    var(--ml-shadow-strong);
+}
+
+.text-node__label {
+  display: block;
+  word-break: break-word;
+}
+
+.text-node__textarea {
+  field-sizing: content;
+  display: block;
+  min-width: 100%;
+  max-width: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  line-height: inherit;
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.react-flow__handle {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  min-width: 0;
+  min-height: 0;
+  background: transparent;
+  border: none;
+}
+
+@keyframes mindmap-edge-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mindmap-edge--enter .react-flow__edge-path {
+  animation: mindmap-edge-enter 0.32s ease-out both;
+}
+
+.mindmap-edge--exiting .react-flow__edge-path {
+  transition: opacity 0.28s cubic-bezier(0.4, 0, 1, 1);
+  opacity: 0.08;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-node--enter,
+  .text-node--exiting {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .mindmap-edge--enter .react-flow__edge-path {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .mindmap-edge--exiting .react-flow__edge-path {
+    transition-duration: 0.01ms !important;
+    opacity: 0 !important;
+  }
+}
