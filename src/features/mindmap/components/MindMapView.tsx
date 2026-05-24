@@ -589,8 +589,9 @@ function MindMapCanvas({
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     } finally {
-      if (ai.busy) ai.setBusy(false)
-      if (ai.step !== 'idle') ai.setStep('idle')
+      const current = useAiStore.getState()
+      if (current.busy) current.setBusy(false)
+      if (current.step !== 'idle') current.setStep('idle')
     }
   }, [aiBusy, apiKey])
 
