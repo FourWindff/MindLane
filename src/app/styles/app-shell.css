@@ -35,4 +35,5 @@
   display: flex;
   flex-direction: column;
   background: var(--ml-bg-elevated);
+  position: relative;
 }

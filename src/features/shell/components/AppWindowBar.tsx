@@ -1,24 +1,7 @@
-import { Home, Minus, Square, X } from 'lucide-react'
+import { Minus, Square, X } from 'lucide-react'
 import '../styles/window.css'
 
-type Props = {
-  onOpenFileManager: () => void
-  fileManagerOpen: boolean
-  filePath?: string
-}
-
-function extractFileName(filePath: string | undefined): string | null {
-  if (!filePath) return null
-  return filePath.split(/[/\\]/).pop()!.replace(/\.mindlane$/, '')
-}
-
-export function AppWindowBar({
-  onOpenFileManager,
-  fileManagerOpen,
-  filePath,
-}: Props) {
-  const fileName = extractFileName(filePath)
-
+export function AppWindowBar() {
   return (
     <header className="window-bar">
       <div className="window-bar__lead">
@@ -26,26 +9,7 @@ export function AppWindowBar({
           <span className="window-bar__brand-mark" aria-hidden />
           <span className="window-bar__brand-name">MindLane</span>
         </div>
-        <div className="window-bar__sidebar-actions">
-          <button
-            type="button"
-            className={`window-bar__tool${fileManagerOpen ? ' window-bar__tool--active' : ''}`}
-            onClick={onOpenFileManager}
-            title="打开文件管理器"
-            aria-label="打开文件管理器"
-          >
-            <Home size={18} strokeWidth={1.5} />
-          </button>
-        </div>
       </div>
-
-      {fileName && (
-        <div className="window-bar__center">
-          <span className="window-bar__filename" title={fileName}>
-            {fileName}
-          </span>
-        </div>
-      )}
 
       <div className="window-bar__trail">
         <div className="window-bar__window-actions">
