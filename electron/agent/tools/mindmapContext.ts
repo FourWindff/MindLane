@@ -1,4 +1,4 @@
-import { MindLaneEdge, MindLaneNode } from '@/shared/lib/fileFormat'
+import { MindLaneEdge, MindLaneNode, type DocumentRef } from '@/shared/lib/fileFormat'
 
 export interface ContextNodeInfo {
   id: string
@@ -22,4 +22,6 @@ export interface MindmapContextData {
   hasDocumentOpen?: boolean
   workspacePath?: string
   workspaceFiles?: WorkspaceFileInfo[]
+  /** Optional attached document reference for mindmap generation */
+  attachedDocument?: DocumentRef
 }

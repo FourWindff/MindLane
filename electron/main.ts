@@ -258,6 +258,7 @@ function registerIpcHandlers() {
           hasDocumentOpen?: boolean
           workspacePath?: string
           workspaceFiles?: { name: string; filePath: string }[]
+          attachedDocument?: { id: string; type: 'pdf' | 'url' | 'text'; source: string; title?: string }
         }
       },
     ) => {
@@ -300,6 +301,7 @@ function registerIpcHandlers() {
                 })),
               }
             : undefined,
+          documentRef: payload.context?.attachedDocument,
         }
 
         const orchestrator = new AgentOrchestrator(provider, aiService)

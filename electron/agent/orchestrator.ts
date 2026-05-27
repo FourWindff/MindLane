@@ -12,6 +12,7 @@ import type {
   MainGraphStateType,
   PalaceSubgraphStateType,
   MindmapSubgraphStateType,
+  DocumentRef,
 } from "./state.js";
 import { MainGraphState } from "./state.js";
 
@@ -43,6 +44,8 @@ export interface ChatRequest {
   /** 当前用户输入（后端会自动加载历史） */
   message: string;
   context?: MindmapContextData;
+  /** Optional document reference for mindmap generation from file */
+  documentRef?: DocumentRef;
 }
 
 export interface ChatResponse {
@@ -150,10 +153,26 @@ export class AgentOrchestrator {
         configurable: { thread_id: request.threadId },
       };
 
-      const stream = app.streamEvents(
-        { messages: [new HumanMessage(request.message)], context: request.context ?? null },
-        streamConfig,
-      );
+      // Build initial state from request
+      const initialState: Partial<MainGraphStateType> = {
+        messages: [new HumanMessage(request.message)],
+        context: request.context ?? null,
+      };
+
+      // If a document is attached, pre-populate the mindmap input source
+      if (request.documentRef) {
+        const doc = request.documentRef;
+        initialState.mindmapInputSource = {
+          type: doc.type,
+          path: doc.type === 'pdf' ? doc.source : undefined,
+          url: doc.type === 'url' ? doc.source : undefined,
+        };
+        initialState.mindmapInputTitle = '思维导图';
+        initialState.intent = 'mindmap';
+        initialState.documentRef = doc;
+      }
+
+      const stream = app.streamEvents(initialState, streamConfig);
 
       for await (const event of stream) {
         if (signal?.aborted) break;
