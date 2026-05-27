@@ -19,8 +19,8 @@ interface ChatInputProps {
   onKeyDown: (e: React.KeyboardEvent) => void
   onInputChange: () => void
   onClearSelection: () => void
-  onSelectAttachment: () => void
-  onRemoveAttachment: () => void
+  onSelectAttachment?: () => void
+  onRemoveAttachment?: () => void
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -66,7 +66,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   <button
                     type="button"
                     className="chat-float-input-tag__remove"
-                    onClick={onRemoveAttachment}
+                    onClick={() => onRemoveAttachment?.()}
                   >
                     <X size={10} strokeWidth={2} />
                   </button>
@@ -117,7 +117,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 type="button"
                 className="chat-float-toolbar-btn"
                 title="添加附件"
-                onClick={onSelectAttachment}
+                onClick={() => onSelectAttachment?.()}
                 disabled={busy || !apiKey}
               >
                 <Plus size={14} strokeWidth={2} />
