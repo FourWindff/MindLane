@@ -363,6 +363,10 @@
   padding: 0.5rem;
   position: relative;
   z-index: 1;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  transform: translateZ(0);
+  will-change: scroll-position;
 }
 
 .file-manager__scroll::-webkit-scrollbar {
@@ -384,6 +388,7 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.875rem;
   padding-bottom: 1.5rem;
+  align-items: stretch;
 }
 
 /* --- Card --- */
@@ -402,34 +407,23 @@
   overflow: hidden;
   cursor: pointer;
   transition:
-    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.3s ease;
-  animation: fm-card-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-}
-
-@keyframes fm-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 200px 220px;
+  will-change: transform;
 }
 
 .file-manager__card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: var(--ml-border-strong);
-  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.07);
   background: var(--ml-bg-elevated);
 }
 
 .file-manager__card:active {
-  transform: translateY(-1px) scale(0.98);
-  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.04);
+  transform: translateY(0) scale(0.99);
 }
 
 .file-manager__card:disabled {
@@ -452,7 +446,6 @@
 .file-manager__card--folder:hover {
   background: #ffffff;
   border-color: rgba(28, 25, 23, 0.18);
-  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.08), 0 0 0 1px rgba(28, 25, 23, 0.04);
 }
 
 .file-manager__card--folder .file-manager__card-visual {
@@ -482,7 +475,7 @@
   border-radius: 0 3px 3px 0;
   background: var(--ml-text-muted);
   opacity: 0.2;
-  transition: opacity 0.3s ease, background 0.3s ease;
+  transition: opacity 140ms ease, background-color 140ms ease;
 }
 
 .file-manager__card--folder:hover::before {
@@ -501,7 +494,7 @@
   margin-bottom: 1.25rem;
   border-radius: 14px;
   background: var(--ml-fill-soft);
-  transition: background 0.3s ease;
+  transition: background-color 140ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-visual {
@@ -509,11 +502,11 @@
 }
 
 .file-manager__card-icon {
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 140ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-icon {
-  transform: scale(1.08);
+  transform: scale(1.04);
 }
 
 .file-manager__card-icon--folder {
@@ -573,7 +566,7 @@
   color: var(--ml-text-muted);
   opacity: 0;
   transform: translateY(3px);
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 120ms ease, transform 120ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-hint {
@@ -591,7 +584,7 @@
   border-radius: 3px 3px 0 0;
   background: linear-gradient(90deg, rgba(28, 25, 23, 0.12), rgba(28, 25, 23, 0.06));
   opacity: 0.6;
-  transition: all 0.3s ease;
+  transition: opacity 140ms ease, background 140ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-accent {
@@ -613,21 +606,25 @@
   justify-content: center;
   gap: 0.625rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: fm-card-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) 0.06s backwards;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 200px 220px;
+  will-change: transform;
 }
 
 .file-manager__new-card:hover {
   border-color: var(--ml-border-strong);
   border-style: solid;
   background: var(--ml-bg);
-  box-shadow: 0 8px 24px rgba(28, 25, 23, 0.05);
-  transform: translateY(-3px);
+  transform: translateY(-2px);
 }
 
 .file-manager__new-card:active {
-  transform: translateY(-1px) scale(0.98);
-  box-shadow: 0 2px 8px rgba(28, 25, 23, 0.03);
+  transform: translateY(0) scale(0.99);
 }
 
 .file-manager__new-card:disabled {
@@ -651,7 +648,7 @@
   justify-content: center;
   background: var(--ml-fill-soft);
   color: var(--ml-text-muted);
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 140ms ease, color 140ms ease;
 }
 
 .file-manager__new-card:hover .file-manager__new-card-icon {
@@ -670,7 +667,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--ml-text-muted);
-  transition: color 0.2s ease;
+  transition: color 140ms ease;
 }
 
 .file-manager__new-card:hover .file-manager__new-card-label {
@@ -795,19 +792,3 @@
     font-size: 0.65rem;
   }
 }
-
-/* ========================================
-   Staggered card entry delays
-   ======================================== */
-.file-manager__grid .file-manager__card:nth-child(1) { animation-delay: 0ms; }
-.file-manager__grid .file-manager__card:nth-child(2) { animation-delay: 30ms; }
-.file-manager__grid .file-manager__card:nth-child(3) { animation-delay: 60ms; }
-.file-manager__grid .file-manager__card:nth-child(4) { animation-delay: 90ms; }
-.file-manager__grid .file-manager__card:nth-child(5) { animation-delay: 120ms; }
-.file-manager__grid .file-manager__card:nth-child(6) { animation-delay: 150ms; }
-.file-manager__grid .file-manager__card:nth-child(7) { animation-delay: 180ms; }
-.file-manager__grid .file-manager__card:nth-child(8) { animation-delay: 210ms; }
-.file-manager__grid .file-manager__card:nth-child(9) { animation-delay: 240ms; }
-.file-manager__grid .file-manager__card:nth-child(10) { animation-delay: 270ms; }
-.file-manager__grid .file-manager__card:nth-child(11) { animation-delay: 300ms; }
-.file-manager__grid .file-manager__card:nth-child(12) { animation-delay: 330ms; }
