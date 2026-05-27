@@ -2,7 +2,7 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMProvider } from "../../providers/index.js";
-import type { MainGraphStateType } from "../../state.js";
+import type { MainGraphStateType, MindmapInputSource } from "../../state.js";
 import { BaseAgent } from "../base.js";
 import { ContextBuilder } from "./context.js";
 import { extractTextContent, formatAgentError } from "../../utils.js";
@@ -51,6 +51,22 @@ export class MindLaneAgent extends BaseAgent {
   async invoke(
     state: MainGraphStateType,
   ): Promise<Partial<MainGraphStateType>> {
+    // If subgraph has output YAML but not yet inserted, generate tool call
+    if (state.mindmapYaml && !state.response) {
+      return {
+        messages: [new AIMessage({
+          content: `已从 ${state.mindmapInputSource?.type || '来源'} 生成思维导图「${state.mindmapTitle}」，正在插入...`,
+          tool_calls: [{
+            name: 'batchAddMindmapNodes',
+            args: {
+              yamlFragment: state.mindmapYaml,
+            },
+            id: `tc-mindmap-${Date.now()}`,
+          }],
+        })],
+      };
+    }
+
     try {
       const systemPrompt = new ContextBuilder()
         .withMessages(state.messages)
@@ -135,14 +151,28 @@ export class MindLaneAgent extends BaseAgent {
     const cleanResponse = response;
     (cleanResponse as AIMessage).tool_calls = undefined;
     switch (decision.target) {
-      case "mindmap":
+      case "mindmap": {
+        const source = decision.parameters?.mindmapSource;
+        if (source) {
+          return {
+            messages: [cleanResponse],
+            intent: "mindmap",
+            mindmapInputSource: {
+              type: source.type,
+              path: source.path,
+              url: source.url,
+            } as MindmapInputSource,
+            mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
+            response: content,
+          };
+        }
+        // No external source — pure text request. Let tools handle it.
         return {
           messages: [cleanResponse],
-          intent: "mindmap",
-          mindmapInputText: decision.parameters?.mindmapInput || content,
-          mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
+          intent: "qa",
           response: content,
         };
+      }
       case "palace":
         return {
           messages: [cleanResponse],

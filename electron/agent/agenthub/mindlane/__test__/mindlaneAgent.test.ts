@@ -31,11 +31,19 @@ function createInitialState() {
     intent: 'qa' as const,
     response: '',
     error: '',
-    mindmapInputText: '',
+    mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapNodes: [],
-    mindmapEdges: [],
+    mindmapYaml: '',
     mindmapTitle: '',
+    documentChunks: [],
+    leafCursor: 0,
+    pendingLeafRange: null,
+    leafResults: [],
+    mergeInputs: [],
+    mergeResults: [],
+    pendingMergeGroups: [],
+    finalTree: null,
+    documentRef: null,
     palaceInputText: '',
     palaceInputNodes: [],
     imageUrls: [],
@@ -70,9 +78,42 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(state)
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
+    // No mindmapSource provided — pure text request falls through to qa intent
+    expect(result.intent).toBe('qa')
+    expect(result.mindmapInputSource).toBeUndefined()
+    expect(result.mindmapInputTitle).toBeUndefined()
+    expect(result.messages).toHaveLength(1)
+  })
+
+  it('routeDecision with mindmapSource sets mindmapInputSource and intent', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue(
+      new AIMessage({
+        content: '从 PDF 生成思维导图',
+        tool_calls: [
+          {
+            name: 'routeDecision',
+            args: {
+              target: 'mindmap',
+              parameters: {
+                mindmapSource: { type: 'pdf', path: '/test.pdf' },
+                mindmapTitle: 'PDF 导图',
+              },
+            },
+            id: 'call-1',
+            type: 'tool_call',
+          },
+        ],
+      }),
+    )
+    const agent = new MindLaneAgent(createMockProvider(mockInvoke), [mockSearchTool])
+    const state = createInitialState()
+
+    const result = await agent.invoke(state)
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
     expect(result.intent).toBe('mindmap')
-    expect(result.mindmapInputText).toBe('AI 基础知识')
-    expect(result.mindmapInputTitle).toBe('AI 导图')
+    expect(result.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
+    expect(result.mindmapInputTitle).toBe('PDF 导图')
     expect(result.messages).toHaveLength(1)
   })
 
@@ -143,7 +184,7 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.response).toBe('这是一个回答')
   })
 
-  it('mindmapInput 未提供时回退到 content', async () => {
+  it('mindmap route without source falls back to qa intent', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
         content: '生成思维导图',
@@ -162,8 +203,9 @@ describe('MindLaneAgent.invoke()', () => {
 
     const result = await agent.invoke(state)
 
-    expect(result.intent).toBe('mindmap')
-    expect(result.mindmapInputText).toBe('生成思维导图')
+    // No mindmapSource — pure text, let tools handle it
+    expect(result.intent).toBe('qa')
+    expect(result.mindmapInputSource).toBeUndefined()
   })
 
   it('禁用 palace 时不应包含 palace 路由选项', () => {
