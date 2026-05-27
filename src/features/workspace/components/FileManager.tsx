@@ -13,7 +13,6 @@ import '../file-manager.css'
 interface FileManagerProps {
   isOpen: boolean
   onClose: () => void
-  onOpenSettings?: () => void
 }
 
 type DialogState =
@@ -28,7 +27,7 @@ type ContextMenuState =
   | { scope: 'empty'; x: number; y: number }
   | { scope: 'entry'; x: number; y: number; entry: WorkspaceTreeEntry }
 
-export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProps) {
+export function FileManager({ isOpen, onClose }: FileManagerProps) {
   const busy = useWorkspaceStore((s) => s.busy)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const tree = useWorkspaceStore((s) => s.tree)
@@ -199,7 +198,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             onNewFile={handleToolbarNewFile}
             onNewFolder={handleToolbarNewFolder}
             onRefresh={() => void refreshWorkspaceFiles()}
-            onOpenSettings={onOpenSettings}
             onSwitchWorkspace={() => void switchWorkspace()}
             onClose={handleClose}
           />

@@ -144,7 +144,6 @@ function AppContent() {
             <FileManager
               isOpen={fileManagerOpen}
               onClose={() => setFileManagerOpen(false)}
-              onOpenSettings={() => setSettingsOpen(true)}
             />
           </div>
         )}

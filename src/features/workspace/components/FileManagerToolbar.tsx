@@ -1,6 +1,5 @@
 import {
   X,
-  Settings,
   FolderInput,
   FilePlus,
   FolderPlus,
@@ -13,7 +12,6 @@ export function FileManagerToolbar({
   onNewFile,
   onNewFolder,
   onRefresh,
-  onOpenSettings,
   onSwitchWorkspace,
   onClose,
 }: {
@@ -22,7 +20,6 @@ export function FileManagerToolbar({
   onNewFile: () => void
   onNewFolder: () => void
   onRefresh: () => void
-  onOpenSettings?: () => void
   onSwitchWorkspace: () => void
   onClose: () => void
 }) {
@@ -66,18 +63,6 @@ export function FileManagerToolbar({
         >
           <RefreshCw size={15} strokeWidth={1.5} />
         </button>
-        {onOpenSettings && (
-          <button
-            type="button"
-            className="file-manager__icon-btn"
-            onClick={onOpenSettings}
-            disabled={busy}
-            title="设置"
-            aria-label="设置"
-          >
-            <Settings size={15} strokeWidth={1.5} />
-          </button>
-        )}
         <button
           type="button"
           className="file-manager__icon-btn"
