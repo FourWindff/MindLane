@@ -1,0 +1,234 @@
+import { describe, it, expect } from 'vitest'
+import { StateGraph } from '@langchain/langgraph'
+import { MainGraphState, MindmapSubgraphState } from '../state.js'
+
+describe('MindmapSubgraphState', () => {
+  it('has mindmapInputSource field', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('test', async (state) => {
+        expect(state.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
+        return {}
+      })
+      .addEdge('__start__', 'test')
+      .addEdge('test', '__end__')
+
+    const compiled = graph.compile()
+    await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
+      mindmapInputTitle: 'Test',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+    })
+  })
+
+  it('has documentRef field', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('test', async (state) => {
+        expect(state.documentRef).toEqual({ id: 'doc-1', type: 'pdf', source: '/test.pdf' })
+        return {}
+      })
+      .addEdge('__start__', 'test')
+      .addEdge('test', '__end__')
+
+    const compiled = graph.compile()
+    await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: { id: 'doc-1', type: 'pdf', source: '/test.pdf' },
+    })
+  })
+
+  it('has mindmapYaml field', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('test', async (state) => {
+        expect(state.mindmapYaml).toBe('root:\n  label: Test\n')
+        return {}
+      })
+      .addEdge('__start__', 'test')
+      .addEdge('test', '__end__')
+
+    const compiled = graph.compile()
+    await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: 'root:\n  label: Test\n',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+    })
+  })
+
+  it('accumulates leafResults via reducer', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('addLeaf', async () => {
+        return { leafResults: [{ chunkIndex: 1, chunkId: 'c2', tree: { root: 'b' } }] }
+      })
+      .addEdge('__start__', 'addLeaf')
+      .addEdge('addLeaf', '__end__')
+
+    const compiled = graph.compile()
+    const result = await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [{ chunkIndex: 0, chunkId: 'c1', tree: { root: 'a' } }],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+    })
+
+    expect(result.leafResults).toHaveLength(2)
+    expect(result.leafResults[0].chunkId).toBe('c1')
+    expect(result.leafResults[1].chunkId).toBe('c2')
+  })
+
+  it('accumulates mergeResults via reducer', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('addMerge', async () => {
+        return { mergeResults: [{ groupIndex: 1, tree: { root: 'b' } }] }
+      })
+      .addEdge('__start__', 'addMerge')
+      .addEdge('addMerge', '__end__')
+
+    const compiled = graph.compile()
+    const result = await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [{ groupIndex: 0, tree: { root: 'a' } }],
+      documentRef: null,
+    })
+
+    expect(result.mergeResults).toHaveLength(2)
+    expect(result.mergeResults[0].groupIndex).toBe(0)
+    expect(result.mergeResults[1].groupIndex).toBe(1)
+  })
+})
+
+describe('MainGraphState', () => {
+  it('combines mindmap and palace fields', async () => {
+    const graph = new StateGraph(MainGraphState)
+      .addNode('test', async (state) => {
+        expect(state.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
+        expect(state.palaceInputText).toBe(' palace text')
+        expect(state.imageUrls).toEqual([])
+        return {}
+      })
+      .addEdge('__start__', 'test')
+      .addEdge('test', '__end__')
+
+    const compiled = graph.compile()
+    await compiled.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
+      mindmapInputTitle: 'Test',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+      palaceInputText: ' palace text',
+      palaceInputNodes: [],
+      imageUrls: [],
+      memoryRoute: [],
+    })
+  })
+
+  it('accumulates messages via reducer', async () => {
+    const graph = new StateGraph(MainGraphState)
+      .addNode('addMsg', async () => {
+        return { messages: [{ type: 'human', content: 'hello' }] }
+      })
+      .addEdge('__start__', 'addMsg')
+      .addEdge('addMsg', '__end__')
+
+    const compiled = graph.compile()
+    const result = await compiled.invoke({
+      messages: [{ type: 'system', content: 'sys' }],
+      context: null,
+      intent: 'qa',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+      palaceInputText: '',
+      palaceInputNodes: [],
+      imageUrls: [],
+      memoryRoute: [],
+    })
+
+    expect(result.messages).toHaveLength(2)
+  })
+})

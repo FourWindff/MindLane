@@ -55,6 +55,27 @@ export type GeneratedEdge = {
   type: string
 }
 
+export interface MindmapInputSource {
+  type: 'pdf' | 'url' | 'text'
+  path?: string
+  url?: string
+  content?: string
+}
+
+export interface DocumentRef {
+  id: string
+  type: 'pdf' | 'url' | 'text'
+  source: string
+}
+
+export type DocumentChunk = {
+  id: string
+  index: number
+  startPage: number
+  endPage: number
+  text: string
+}
+
 // ===== 状态切片定义（用于组合和复用） =====
 
 /**
@@ -129,25 +150,49 @@ export const PalaceStateAnnotations = {
  * 思维导图状态切片
  */
 export const MindmapStateAnnotations = {
-  mindmapInputText: Annotation<string>({
+  mindmapInputSource: Annotation<MindmapInputSource | null>({
     reducer: (_prev, next) => next,
-    default: () => '',
+    default: () => null,
   }),
   mindmapInputTitle: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => '',
   }),
-  mindmapNodes: Annotation<GeneratedNode[]>({
+  mindmapYaml: Annotation<string>({
     reducer: (_prev, next) => next,
-    default: () => [],
-  }),
-  mindmapEdges: Annotation<GeneratedEdge[]>({
-    reducer: (_prev, next) => next,
-    default: () => [],
+    default: () => '',
   }),
   mindmapTitle: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => '',
+  }),
+  documentChunks: Annotation<DocumentChunk[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+  leafCursor: Annotation<number>({
+    reducer: (_prev, next) => next,
+    default: () => 0,
+  }),
+  pendingLeafRange: Annotation<{ start: number; end: number } | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
+  }),
+  leafResults: Annotation<Array<{ chunkIndex: number; chunkId: string; tree: unknown }>>({
+    reducer: (prev, next) => [...prev, ...next],
+    default: () => [],
+  }),
+  mergeInputs: Annotation<unknown[]>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+  mergeResults: Annotation<Array<{ groupIndex: number; tree: unknown }>>({
+    reducer: (prev, next) => [...prev, ...next],
+    default: () => [],
+  }),
+  documentRef: Annotation<DocumentRef | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
 }
 
