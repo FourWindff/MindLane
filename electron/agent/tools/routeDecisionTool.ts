@@ -15,6 +15,13 @@ function createRouteDecisionSchema(hasPalace: boolean) {
         mindmapInput: z.string().optional(),
         mindmapTitle: z.string().optional(),
         palaceInput: z.string().optional(),
+        mindmapSource: z
+          .object({
+            type: z.enum(['pdf', 'url']),
+            path: z.string().optional(),
+            url: z.string().optional(),
+          })
+          .optional(),
       })
       .optional(),
   })
@@ -27,6 +34,7 @@ export type RouteDecision = {
     mindmapInput?: string
     mindmapTitle?: string
     palaceInput?: string
+    mindmapSource?: { type: 'pdf' | 'url'; path?: string; url?: string }
   }
 }
 

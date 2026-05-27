@@ -9,8 +9,6 @@ import type { AiService } from "./service.js";
 import type {
   SelectedNodeContent,
   MemoryPalaceStation,
-  GeneratedNode,
-  GeneratedEdge,
   MainGraphStateType,
   PalaceSubgraphStateType,
   MindmapSubgraphStateType,
@@ -347,7 +345,7 @@ export class AgentOrchestrator {
         palaceSubgraph: "palaceSubgraph",
         __end__: END,
       })
-      .addEdge("mindmapSubgraph", END)
+      .addEdge("mindmapSubgraph", "supervisor")
       .addEdge("palaceSubgraph", END)
       .addEdge("tools", "supervisor");
 
@@ -369,13 +367,8 @@ export class AgentOrchestrator {
       toolCalls: this.extractToolCalls(result.messages),
     };
 
-    if (result.intent === "mindmap" && result.mindmapNodes.length > 0) {
-      response.mindmapData = this.mapMindmapResult(
-        result.mindmapNodes,
-        result.mindmapEdges,
-        result.mindmapTitle,
-      );
-    }
+    // Mindmap data now flows through YAML → batchAddMindmapNodes tool calls
+    // The insertion is handled by the tool execution in the supervisor loop
 
     if (result.intent === "palace" && result.memoryRoute.length > 0) {
       response.palaceData = {
@@ -411,27 +404,4 @@ export class AgentOrchestrator {
     return toolCalls.length > 0 ? toolCalls : undefined;
   }
 
-  private mapMindmapResult(
-    mindmapNodes: GeneratedNode[],
-    mindmapEdges: GeneratedEdge[],
-    mindmapTitle: string,
-  ): ChatResponse["mindmapData"] {
-    const mappedNodes = mindmapNodes.map((n) => ({
-      id: n.id,
-      type: "text" as const,
-      position: { x: 0, y: 0 },
-      data: { label: (n.data as { label?: string }).label ?? "" },
-    })) as MindLaneNode[];
-
-    return {
-      nodes: mappedNodes,
-      edges: mindmapEdges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type,
-      })),
-      title: mindmapTitle || "生成的思维导图",
-    };
-  }
 }
