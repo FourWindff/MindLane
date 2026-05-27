@@ -1,17 +1,26 @@
 import { forwardRef } from 'react'
-import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot } from 'lucide-react'
+import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
 import type { Node } from '@xyflow/react'
+
+export interface AttachmentInfo {
+  name: string
+  path: string
+  size: number
+}
 
 interface ChatInputProps {
   apiKey: string | null
   busy: boolean
   inputRows: number
   selectedNodes: Node[]
+  attachment?: AttachmentInfo
   onSend: () => void
   onStop: () => void
   onKeyDown: (e: React.KeyboardEvent) => void
   onInputChange: () => void
   onClearSelection: () => void
+  onSelectAttachment: () => void
+  onRemoveAttachment: () => void
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -21,30 +30,48 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       busy,
       inputRows,
       selectedNodes,
+      attachment,
       onSend,
       onStop,
       onKeyDown,
       onInputChange,
       onClearSelection,
+      onSelectAttachment,
+      onRemoveAttachment,
     },
     ref,
   ) {
     return (
       <div className="chat-float-input-area">
         <div className="chat-float-input-wrap">
-          {selectedNodes.length > 0 && (
+          {(selectedNodes.length > 0 || attachment) && (
             <div className="chat-float-input-tags">
-              <span className="chat-float-input-tag">
-                <CircleDot size={12} strokeWidth={2} />
-                {selectedNodes.length}
-                <button
-                  type="button"
-                  className="chat-float-input-tag__remove"
-                  onClick={onClearSelection}
-                >
-                  <X size={10} strokeWidth={2} />
-                </button>
-              </span>
+              {selectedNodes.length > 0 && (
+                <span className="chat-float-input-tag">
+                  <CircleDot size={12} strokeWidth={2} />
+                  {selectedNodes.length}
+                  <button
+                    type="button"
+                    className="chat-float-input-tag__remove"
+                    onClick={onClearSelection}
+                  >
+                    <X size={10} strokeWidth={2} />
+                  </button>
+                </span>
+              )}
+              {attachment && (
+                <span className="chat-float-input-tag">
+                  <FileText size={12} strokeWidth={2} />
+                  {attachment.name}
+                  <button
+                    type="button"
+                    className="chat-float-input-tag__remove"
+                    onClick={onRemoveAttachment}
+                  >
+                    <X size={10} strokeWidth={2} />
+                  </button>
+                </span>
+              )}
             </div>
           )}
           <div className="chat-float-input-row">
@@ -52,7 +79,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               ref={ref}
               onKeyDown={onKeyDown}
               onChange={onInputChange}
-              placeholder={apiKey ? '输入消息…' : '请先在设置中填写 API Key'}
+              placeholder={
+                !apiKey
+                  ? '请先在设置中填写 API Key'
+                  : attachment
+                    ? '输入提示词（可选）...'
+                    : '输入消息…'
+              }
               disabled={busy || !apiKey}
               rows={inputRows}
               className="chat-float-input"
@@ -80,7 +113,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           </div>
           <div className="chat-float-input-toolbar">
             <div className="chat-float-input-toolbar__left">
-              <button type="button" className="chat-float-toolbar-btn" title="添加附件">
+              <button
+                type="button"
+                className="chat-float-toolbar-btn"
+                title="添加附件"
+                onClick={onSelectAttachment}
+                disabled={busy || !apiKey}
+              >
                 <Plus size={14} strokeWidth={2} />
               </button>
               <button type="button" className="chat-float-toolbar-btn" title="设置">
