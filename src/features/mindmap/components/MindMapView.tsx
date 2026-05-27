@@ -28,7 +28,7 @@ import { PalaceModal } from '@/features/mindmap/components/PalaceModal'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
+import { useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { isDefaultViewport } from '@/shared/lib/fileFormat'
 import {
@@ -524,76 +524,7 @@ function MindMapCanvas({
     }
   }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl])
 
-  useEffect(() => {
-    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
-    if (!mindlane?.mindmap) return
-    const validSteps: readonly string[] = ['preparing', 'extracting', 'merging', 'finalizing']
-    const off = mindlane.mindmap.onGenerationProgress((progress) => {
-      const ai = useAiStore.getState()
-      if (progress.phase === 'error' || progress.phase === 'done') {
-        if (ai.busy) ai.setBusy(false)
-        if (ai.step !== 'idle') ai.setStep('idle')
-        return
-      }
-      if (!validSteps.includes(progress.phase)) return
-      const step = progress.phase as AiPipelineStep
-      if (!ai.busy) ai.setBusy(true)
-      if (ai.step !== step) ai.setStep(step)
-    })
-    return off
-  }, [])
-
-  const generateFromFile = useCallback(async () => {
-    if (aiBusy) return
-
-    const ai = useAiStore.getState()
-    const settings = useSettingsStore.getState()
-    const mindmap = useMindmapStore.getState()
-
-    const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
-    if (!mindlane?.mindmap) {
-      ai.setError('IPC 通道不可用，请确认 Electron 环境')
-      return
-    }
-
-    const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
-    if (!currentKey?.trim()) {
-      ai.setError('请先在右侧「设置」面板中填写 API Key')
-      return
-    }
-
-    ai.setBusy(true)
-    ai.setStep('preparing')
-
-    try {
-      const result = await mindlane.mindmap.generateFromFile({})
-      if (!result.ok) {
-        if (!result.canceled) {
-          ai.setError(`生成失败：${result.error}`)
-        }
-        return
-      }
-
-      try {
-        mindmap.loadFromYaml(result.data.yamlContent, {
-          fileTitle: result.data.documentTitle,
-        })
-      } catch (e) {
-        ai.setError(
-          `YAML 解析失败：${e instanceof Error ? e.message : String(e)}`,
-        )
-      }
-    } catch (e) {
-      ai.setError(
-        `生成异常：${e instanceof Error ? e.message : String(e)}`,
-      )
-    } finally {
-      const current = useAiStore.getState()
-      if (current.busy) current.setBusy(false)
-      if (current.step !== 'idle') current.setStep('idle')
-    }
-  }, [aiBusy, apiKey])
+  void aiBusy
 
   useShortcut(
     { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
@@ -772,8 +703,6 @@ function MindMapCanvas({
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
-        onGenerateFromFile={generateFromFile}
-        generateFromFileBusy={aiBusy}
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}

@@ -46,9 +46,13 @@ export interface XY {
 
 export interface DocumentRef {
   id: string
+  type: 'pdf' | 'url' | 'text'
+  source: string
   filename: string
   importedAt: string
-  textPath: string
+  title?: string
+  pageCount?: number
+  metadata?: Record<string, unknown>
 }
 
 export interface ChatToolCall {

@@ -6,7 +6,6 @@ import {
   Save,
   FolderInput,
   Settings,
-  FileUp,
 } from 'lucide-react'
 
 type Props = {
@@ -17,8 +16,6 @@ type Props = {
   onOpenSettings?: () => void
   onSwitchWorkspace?: () => void
   onSave?: () => void
-  onGenerateFromFile?: () => void
-  generateFromFileBusy?: boolean
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
@@ -63,8 +60,6 @@ export function MindMapHeader({
   onOpenSettings,
   onSwitchWorkspace,
   onSave,
-  onGenerateFromFile,
-  generateFromFileBusy,
   canAddChild,
   canAddSibling,
   canRemove,
@@ -107,15 +102,6 @@ export function MindMapHeader({
                 ariaLabel="保存"
                 tooltip="保存 (Ctrl+S)"
                 icon={<Save size={22} strokeWidth={1.5} />}
-              />
-            )}
-            {onGenerateFromFile && (
-              <ToolbarButton
-                onClick={onGenerateFromFile}
-                disabled={generateFromFileBusy}
-                ariaLabel="从文件生成"
-                tooltip="从 PDF 文件生成思维导图"
-                icon={<FileUp size={22} strokeWidth={1.5} />}
               />
             )}
             {onSwitchWorkspace && (

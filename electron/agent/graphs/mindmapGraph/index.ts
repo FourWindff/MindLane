@@ -4,7 +4,6 @@ import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { extractYaml, sanitizeTreeCandidate } from '../../utils/yamlMindmap.js'
 import { PdfDocumentLoader, chunkPages } from './loaders/pdfLoader.js'
-import { DefaultDocumentLoaderRegistry } from './loaders/index.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/flattenTree.js'
 

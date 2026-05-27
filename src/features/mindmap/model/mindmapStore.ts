@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange, Viewport } from '@xyflow/react'
-import { createEmptyFile, DEFAULT_VIEWPORT, type MindLaneFile, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
+import { createEmptyFile, DEFAULT_VIEWPORT, type MindLaneFile, type DocumentRef, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
 import { parseYamlToMindmap, parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
@@ -16,6 +16,7 @@ interface MindmapState {
   fileTitle: string
   editingNodeId: string | null
   viewport: Viewport
+  documentRefs: DocumentRef[]
 
   setNodes: (nodes: Node[] | ((prev: Node[]) => Node[])) => void
   setEdges: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void
@@ -35,6 +36,7 @@ interface MindmapState {
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
   getContextSummary: () => string
+  addDocumentRef: (ref: DocumentRef) => void
 
   insertNodesFromYaml: (
     yamlFragment: string,
@@ -53,6 +55,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   fileTitle: initialFile.metadata.title,
   viewport: initialFile.mindmap.viewport,
   editingNodeId: null,
+  documentRefs: [],
 
   setEditingNodeId: (id) => set({ editingNodeId: id }),
 
@@ -107,6 +110,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
     set({
       nodes: hydratedNodes as Node[],
       edges: data.mindmap.edges as Edge[],
+      documentRefs: data.documents || [],
       hasDocumentOpen: true,
       filePath,
       fileTitle: data.metadata.title,
@@ -135,6 +139,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
     set({
       nodes: f.mindmap.nodes as Node[],
       edges: f.mindmap.edges as Edge[],
+      documentRefs: [],
       hasDocumentOpen: true,
       filePath: null,
       fileTitle: f.metadata.title,
@@ -158,7 +163,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
   },
 
   toMindLaneFile: (): MindLaneFile => {
-    const { nodes, edges, fileTitle, viewport } = get()
+    const { nodes, edges, fileTitle, viewport, documentRefs } = get()
     const now = new Date().toISOString()
     return {
       version: '1.0',
@@ -179,8 +184,15 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
         })),
         viewport,
       },
-      documents: [],
+      documents: documentRefs,
     }
+  },
+
+  addDocumentRef: (ref) => {
+    set((s) => ({
+      documentRefs: [...s.documentRefs, ref],
+      dirty: true,
+    }))
   },
 
   getContextSummary: (): string => {
