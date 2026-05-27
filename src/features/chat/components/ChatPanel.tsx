@@ -105,9 +105,6 @@ export function ChatPanel() {
     if (inputRef.current) inputRef.current.value = ''
     setInputRows(1)
 
-    // Clear attachment after sending
-    setAttachedDocument(null)
-
     scrollToBottom()
     useAiStore.getState().setBusy(true)
     useAiStore.getState().setStep('chatting')
@@ -117,6 +114,7 @@ export function ChatPanel() {
     if (!api) return
 
     const context = buildContext()
+    setAttachedDocument(null) // clear after context captures the doc
     await api.chatStream({ threadId, message: text, context })
   }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext, setAttachedDocument])
 
