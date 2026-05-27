@@ -67,6 +67,14 @@ export class MindLaneAgent extends BaseAgent {
       };
     }
 
+    // Preset intent with input source: skip LLM routing and go directly to subgraph
+    if (state.intent === 'mindmap' && state.mindmapInputSource) {
+      return { messages: [] };
+    }
+    if (state.intent === 'palace' && state.palaceInputText) {
+      return { messages: [] };
+    }
+
     try {
       const systemPrompt = new ContextBuilder()
         .withMessages(state.messages)

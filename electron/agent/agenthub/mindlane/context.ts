@@ -92,6 +92,15 @@ export class ContextBuilder {
             this.prompt += `</MINDMAP>
 `;
         }
+
+        if (this.context?.attachedDocument) {
+            const doc = this.context.attachedDocument;
+            this.prompt += `<ATTACHED_DOCUMENT type="${doc.type}" filename="${doc.filename}" path="${doc.source}">
+用户已附加文档「${doc.filename}」，请根据此文档内容生成思维导图。
+</ATTACHED_DOCUMENT>
+`;
+        }
+
         return this;
     }
 
