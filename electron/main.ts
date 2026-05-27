@@ -484,7 +484,7 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('file:select-document', async () => {
-    if (!win) return { ok: false, error: '窗口未初始化' }
+    if (!win) return { ok: false, error: 'No window' }
 
     const result = await dialog.showOpenDialog(win, {
       properties: ['openFile'],
@@ -495,10 +495,10 @@ function registerIpcHandlers() {
     })
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '用户取消选择' }
+      return { ok: false, error: 'User cancelled' }
     }
 
-    const filePath = result.filePaths[0]!
+    const filePath = result.filePaths[0]
     try {
       const stats = await fs.promises.stat(filePath)
       return {
@@ -509,8 +509,8 @@ function registerIpcHandlers() {
           size: stats.size,
         },
       }
-    } catch {
-      return { ok: false, error: '无法读取文件信息' }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Failed to read file info' }
     }
   })
 

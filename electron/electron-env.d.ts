@@ -152,6 +152,10 @@ interface Window {
         | { ok: true; data: { previewUrl: string } }
         | { ok: false; error: string }
       >
+      selectDocument: () => Promise<
+        | { ok: true; data: { path: string; name: string; size: number } }
+        | { ok: false; error: string }
+      >
     }
     workspace: {
       openDirectory: () => Promise<
