@@ -54,8 +54,6 @@ export function SettingsPanel() {
   return (
     <div className="settings-page">
       <aside className="settings-page__sidebar">
-        <div className="settings-page__sidebar-title">设置</div>
-        <div className="settings-page__sidebar-subtitle">MindLane</div>
         <nav className="settings-page__nav" aria-label="设置分类">
           {SETTINGS_SECTIONS.map((section) => (
             <button
@@ -72,14 +70,6 @@ export function SettingsPanel() {
       </aside>
 
       <div className="settings-page__content">
-        <header className="settings-page__header">
-          <div>
-            <div className="settings-page__eyebrow">MindLane 设置</div>
-            <h2 className="settings-page__title">{activeSectionMeta.label}</h2>
-            <p className="settings-page__description">{activeSectionMeta.description}</p>
-          </div>
-        </header>
-
         <div className="settings-page__sections">
           <section
             className={`settings-card${activeSection === 'about' ? '' : ' settings-card--hidden'}`}
