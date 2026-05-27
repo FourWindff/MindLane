@@ -10,6 +10,7 @@ import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { useChatStream } from '@/features/chat/hooks/useChatStream'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
+import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 import '../styles/chat-panel.css'
 
@@ -28,6 +29,8 @@ export function ChatPanel() {
   const loadSession = useAiStore((s) => s.loadSession)
   const deleteSession = useAiStore((s) => s.deleteSession)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
+  const attachedDocument = useAiStore((s) => s.attachedDocument)
+  const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -69,15 +72,41 @@ export function ChatPanel() {
     }
   }, [threadId, messages.length, scrollToBottom])
 
+  const handleSelectAttachment = useCallback(async () => {
+    const api = window.mindlane?.file
+    if (!api?.selectDocument) return
+
+    const result = await api.selectDocument()
+    if (result?.ok && result.data) {
+      const docRef: DocumentRef = {
+        id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        type: 'pdf',
+        source: result.data.path,
+        filename: result.data.name,
+        importedAt: new Date().toISOString(),
+      }
+      setAttachedDocument(docRef)
+    }
+  }, [setAttachedDocument])
+
+  const handleRemoveAttachment = useCallback(() => {
+    setAttachedDocument(null)
+  }, [setAttachedDocument])
+
   const send = useCallback(async () => {
-    const text = inputRef.current?.value.trim()
-    if (!text || busy) return
+    const text = inputRef.current?.value.trim() || ''
+    const doc = useAiStore.getState().attachedDocument
+
+    if ((!text && !doc) || busy) return
     if (!apiKey) return
 
-    const userMsg = { role: 'user' as const, content: text }
+    const userMsg = { role: 'user' as const, content: text || `请根据「${doc?.filename}」生成思维导图` }
     addMessage(userMsg)
     if (inputRef.current) inputRef.current.value = ''
     setInputRows(1)
+
+    // Clear attachment after sending
+    setAttachedDocument(null)
 
     scrollToBottom()
     useAiStore.getState().setBusy(true)
@@ -89,7 +118,7 @@ export function ChatPanel() {
 
     const context = buildContext()
     await api.chatStream({ threadId, message: text, context })
-  }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext])
+  }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {
     const api = window.mindlane?.ai
@@ -187,11 +216,14 @@ export function ChatPanel() {
         busy={busy}
         inputRows={inputRows}
         selectedNodes={selectedNodes}
+        attachment={attachedDocument ? { name: attachedDocument.filename, path: attachedDocument.source, size: 0 } : undefined}
         onSend={send}
         onStop={stop}
         onKeyDown={handleKeyDown}
         onInputChange={handleInputChange}
         onClearSelection={clearNodeSelection}
+        onSelectAttachment={handleSelectAttachment}
+        onRemoveAttachment={handleRemoveAttachment}
       />
     </motion.div>
   )
