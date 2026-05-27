@@ -258,7 +258,7 @@ function registerIpcHandlers() {
           hasDocumentOpen?: boolean
           workspacePath?: string
           workspaceFiles?: { name: string; filePath: string }[]
-          attachedDocument?: { id: string; type: 'pdf' | 'url' | 'text'; source: string; title?: string }
+          attachedDocument?: { id: string; type: 'pdf' | 'url' | 'text'; source: string; filename: string; importedAt: string; title?: string }
         }
       },
     ) => {

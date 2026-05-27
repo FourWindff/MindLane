@@ -59,7 +59,7 @@ describe('MindmapSubgraphState', () => {
       leafResults: [],
       mergeInputs: [],
       mergeResults: [],
-      documentRef: { id: 'doc-1', type: 'pdf', source: '/test.pdf' },
+      documentRef: { id: 'doc-1', type: 'pdf', source: '/test.pdf', filename: 'test.pdf', importedAt: new Date().toISOString() },
     })
   })
 

@@ -167,7 +167,7 @@ export class AgentOrchestrator {
           path: doc.type === 'pdf' ? doc.source : undefined,
           url: doc.type === 'url' ? doc.source : undefined,
         };
-        initialState.mindmapInputTitle = '思维导图';
+        initialState.mindmapInputTitle = doc.title || doc.filename || '思维导图';
         initialState.intent = 'mindmap';
         initialState.documentRef = doc;
       }
