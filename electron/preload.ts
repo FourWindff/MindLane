@@ -129,6 +129,11 @@ contextBridge.exposeInMainWorld('mindlane', {
         | { ok: true; data: { previewUrl: string } }
         | { ok: false; error: string }
       >,
+    selectDocument: () =>
+      ipcRenderer.invoke('file:select-document') as Promise<
+        | { ok: true; data: { path: string; name: string; size: number } }
+        | { ok: false; error: string }
+      >,
   },
   workspace: {
     openDirectory: () => ipcRenderer.invoke('workspace:open-directory'),

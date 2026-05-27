@@ -483,6 +483,37 @@ function registerIpcHandlers() {
     }
   })
 
+  ipcMain.handle('file:select-document', async () => {
+    if (!win) return { ok: false, error: '窗口未初始化' }
+
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile'],
+      filters: [
+        { name: 'PDF Documents', extensions: ['pdf'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, error: '用户取消选择' }
+    }
+
+    const filePath = result.filePaths[0]!
+    try {
+      const stats = await fs.promises.stat(filePath)
+      return {
+        ok: true,
+        data: {
+          path: filePath,
+          name: path.basename(filePath),
+          size: stats.size,
+        },
+      }
+    } catch {
+      return { ok: false, error: '无法读取文件信息' }
+    }
+  })
+
   // -- Workspace operations --
   ipcMain.handle('workspace:open-directory', async () => {
     if (!win) return { ok: false, error: 'No window' }
