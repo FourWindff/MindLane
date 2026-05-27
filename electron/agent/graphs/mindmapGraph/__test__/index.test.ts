@@ -4,7 +4,89 @@ import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 
-describe('MindmapGraph error with stack', () => {
+describe('mindmapGraph', () => {
+  it('returns error when no input source is provided', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn(),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    expect(result.error).toContain('请提供输入来源')
+    expect(mockProvider.reasoningModel.invoke).not.toHaveBeenCalled()
+  })
+
+  it('produces YAML output for text input', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: `
+人工智能导论:
+  - 机器学习:
+    - 监督学习
+    - 无监督学习
+  - 深度学习:
+    - 神经网络
+    - 反向传播
+`,
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      intent: 'mindmap',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+      mindmapInputTitle: '人工智能导论',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    expect(result.mindmapYaml).toBeTruthy()
+    expect(result.mindmapTitle).toBe('人工智能导论')
+    expect(result.error).toBe('')
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+  })
+
   it('includes stack trace in state.error when generation fails', async () => {
     const mockProvider = {
       reasoningModel: {
@@ -21,11 +103,19 @@ describe('MindmapGraph error with stack', () => {
       intent: 'mindmap',
       response: '',
       error: '',
-      mindmapInputText: 'some document text',
+      mindmapInputSource: { type: 'text', content: 'some document text' },
       mindmapInputTitle: '',
-      mindmapNodes: [],
-      mindmapEdges: [],
+      mindmapYaml: '',
       mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
     })
 
     expect(result.error).toContain('LLM timeout')

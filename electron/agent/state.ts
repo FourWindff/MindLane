@@ -187,8 +187,16 @@ export const MindmapStateAnnotations = {
     default: () => [],
   }),
   mergeResults: Annotation<Array<{ groupIndex: number; tree: unknown }>>({
-    reducer: (prev, next) => [...prev, ...next],
+    reducer: (_prev, next) => next,
     default: () => [],
+  }),
+  pendingMergeGroups: Annotation<Array<{ groupIndex: number; trees: unknown[] }>>({
+    reducer: (_prev, next) => next,
+    default: () => [],
+  }),
+  finalTree: Annotation<unknown | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
   documentRef: Annotation<DocumentRef | null>({
     reducer: (_prev, next) => next,

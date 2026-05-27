@@ -126,7 +126,7 @@ describe('MindmapSubgraphState', () => {
     expect(result.leafResults[1].chunkId).toBe('c2')
   })
 
-  it('accumulates mergeResults via reducer', async () => {
+  it('replaces mergeResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addMerge', async () => {
         return { mergeResults: [{ groupIndex: 1, tree: { root: 'b' } }] }
@@ -154,9 +154,8 @@ describe('MindmapSubgraphState', () => {
       documentRef: null,
     })
 
-    expect(result.mergeResults).toHaveLength(2)
-    expect(result.mergeResults[0].groupIndex).toBe(0)
-    expect(result.mergeResults[1].groupIndex).toBe(1)
+    expect(result.mergeResults).toHaveLength(1)
+    expect(result.mergeResults[0].groupIndex).toBe(1)
   })
 })
 
