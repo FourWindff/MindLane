@@ -68,11 +68,21 @@ export class MindLaneAgent extends BaseAgent {
     }
 
     // Preset intent with input source: skip LLM routing and go directly to subgraph
-    if (state.intent === 'mindmap' && state.mindmapInputSource) {
+    // But if subgraph has already run (produced yaml or error), handle it normally
+    if (state.intent === 'mindmap' && state.mindmapInputSource && !state.mindmapYaml && !state.error) {
       return { messages: [] };
     }
-    if (state.intent === 'palace' && state.palaceInputText) {
+    if (state.intent === 'palace' && state.palaceInputText && !state.memoryRoute?.length && !state.error) {
       return { messages: [] };
+    }
+
+    // Surface subgraph errors
+    if (state.error) {
+      return {
+        messages: [new AIMessage({ content: state.response || state.error })],
+        intent: 'qa',
+        response: state.response || state.error,
+      };
     }
 
     try {
