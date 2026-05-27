@@ -18,7 +18,7 @@ export type AiPipelineStep =
   | 'generating-map'
   | 'chatting'
 
-import type { ChatToolCall } from '@/shared/lib/fileFormat'
+import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -50,6 +50,10 @@ interface AiState {
 
   // Float panel
   isMinimized: boolean
+
+  // Attachment
+  attachedDocument: DocumentRef | null
+  setAttachedDocument: (doc: DocumentRef | null) => void
 
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
@@ -85,6 +89,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   sessions: [],
   showSessionList: false,
   isMinimized: false,
+  attachedDocument: null,
 
   setBusy: (busy) => set({ busy }),
   setStep: (step) => set({ step }),
@@ -105,11 +110,13 @@ export const useAiStore = create<AiState>((set, get) => ({
     streamText: '',
     errorMessage: null,
     showSessionList: false,
+    attachedDocument: null,
   }),
 
   setSessions: (sessions) => set({ sessions }),
   setShowSessionList: (show) => set({ showSessionList: show }),
   setIsMinimized: (val) => set({ isMinimized: val }),
+  setAttachedDocument: (doc) => set({ attachedDocument: doc }),
 
   loadSession: async (sessionId: string) => {
     const state = get()

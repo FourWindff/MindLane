@@ -2,8 +2,10 @@ import { useRef, useCallback } from 'react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useAiStore } from '@/features/chat/model/aiStore'
 import { extractNodeInfo } from '@/features/chat/lib/chatUtils'
 import type { ContextNodeInfo } from '@/features/chat/lib/chatUtils'
+import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 function useShallowById<T, U extends { id: string }>(
   selector: (state: T) => U[]
@@ -31,6 +33,8 @@ export interface ChatContext {
   hasDocumentOpen?: boolean
   workspacePath?: string
   workspaceFiles?: { name: string; filePath: string }[]
+  /** Attached document reference for mindmap generation */
+  attachedDocument?: DocumentRef
 }
 
 export interface QuickAction {
@@ -70,6 +74,12 @@ export function useChatContext() {
         name: f.name,
         filePath: f.filePath,
       }))
+    }
+
+    // Include attached document reference
+    const aiState = useAiStore.getState()
+    if (aiState.attachedDocument) {
+      ctx.attachedDocument = aiState.attachedDocument
     }
 
     return ctx
