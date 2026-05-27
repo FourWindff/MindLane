@@ -100,7 +100,11 @@ export function ChatPanel() {
     if ((!text && !doc) || busy) return
     if (!apiKey) return
 
-    const userMsg = { role: 'user' as const, content: text || `请根据「${doc?.filename}」生成思维导图` }
+    const userMsg = {
+      role: 'user' as const,
+      content: text || `请根据「${doc?.filename}」生成思维导图`,
+      ...(doc ? { attachment: { name: doc.filename, type: doc.type } } : {}),
+    }
     addMessage(userMsg)
     if (inputRef.current) inputRef.current.value = ''
     setInputRows(1)

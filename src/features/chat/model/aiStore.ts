@@ -24,6 +24,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   toolCalls?: ChatToolCall[]
+  /** Optional attachment reference for this message */
+  attachment?: { name: string; type: 'pdf' | 'url' | 'text' }
 }
 
 export interface ChatSession {
@@ -136,6 +138,7 @@ export const useAiStore = create<AiState>((set, get) => ({
         step: 'idle',
         streamText: '',
         errorMessage: null,
+        attachedDocument: null,
       })
     }
   },

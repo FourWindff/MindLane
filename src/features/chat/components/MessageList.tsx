@@ -1,5 +1,5 @@
 import { forwardRef } from 'react'
-import { Sparkles, Check } from 'lucide-react'
+import { Sparkles, Check, FileText } from 'lucide-react'
 import type { ChatMessage } from '@/features/chat/model/aiStore'
 import { MarkdownContent } from './MarkdownContent'
 import { toolDisplayName } from '@/features/chat/lib/chatUtils'
@@ -54,6 +54,12 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
             )}
             {msg.role === 'user' ? (
               <div className="chat-float-bubble chat-float-bubble--user">
+                {msg.attachment && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', marginBottom: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '4px', fontSize: '12px', color: '#555' }}>
+                    <FileText size={12} strokeWidth={2} />
+                    <span>{msg.attachment.name}</span>
+                  </div>
+                )}
                 <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
               </div>
             ) : (
