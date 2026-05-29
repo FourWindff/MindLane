@@ -51,20 +51,10 @@ export class MindLaneAgent extends BaseAgent {
   async invoke(
     state: MainGraphStateType,
   ): Promise<Partial<MainGraphStateType>> {
-    // If subgraph has output YAML but not yet inserted, generate tool call
-    if (state.mindmapYaml && !state.response) {
-      return {
-        messages: [new AIMessage({
-          content: `已从 ${state.mindmapInputSource?.type || '来源'} 生成思维导图「${state.mindmapTitle}」，正在插入...`,
-          tool_calls: [{
-            name: 'batchAddMindmapNodes',
-            args: {
-              yamlFragment: state.mindmapYaml,
-            },
-            id: `tc-mindmap-${Date.now()}`,
-          }],
-        })],
-      };
+    // If subgraph has output YAML but not yet handled, return a direct AI message
+    let mindmapyamlResponse='' ;
+    if (state.mindmapYaml) {
+      mindmapyamlResponse = `已从 ${state.mindmapInputSource?.type || '来源'} 生成思维导图「${state.mindmapTitle}」，正在插入...`;
     }
 
     // Preset intent with input source: skip LLM routing and go directly to subgraph
@@ -99,6 +89,8 @@ export class MindLaneAgent extends BaseAgent {
       const messagesWithSystem = [
         new SystemMessage(systemPrompt),
         ...state.messages,
+        ...(mindmapyamlResponse ? [new AIMessage({ content: mindmapyamlResponse
+        })] : [])
       ];
 
       const response = await this.modelWithTools.invoke(messagesWithSystem);
