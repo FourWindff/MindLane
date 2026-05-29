@@ -36,6 +36,7 @@ import {
 } from "./tools/subgraphRoutingTools.js";
 import { AGENT_LIMITS } from "./config.js";
 import { extractTextContent } from "./utils.js";
+import { checkpointMessagesToSessionMessages } from "./memory/checkpointer.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -54,8 +55,15 @@ export interface ChatRequest {
   documentRef?: DocumentRef;
 }
 
+export interface AssistantMessage {
+  role: "assistant";
+  content: string;
+  toolCalls?: ChatToolCall[];
+}
+
 export interface ChatResponse {
   content: string;
+  messages?: AssistantMessage[];
   toolCalls?: ChatToolCall[];
   mindmapData?: {
     nodes: MindLaneNode[];
@@ -73,6 +81,7 @@ export interface ChatResponse {
  * 流回调接口
  */
 export interface StreamCallbacks {
+  onMessageStart?: () => void;
   onToken: (token: string) => void;
   onToolStart: (name: string, input: Record<string, unknown>) => void;
   onToolEnd: (name: string, output: string) => void;
@@ -150,6 +159,8 @@ export class AgentOrchestrator {
     const app = this.getCompiledMainGraph();
 
     let fullContent = "";
+    let currentSegmentContent = "";
+    let hasStartedSegment = false;
 
     try {
       const streamConfig = {
@@ -170,10 +181,20 @@ export class AgentOrchestrator {
       for await (const event of stream) {
         if (signal?.aborted) break;
 
-        if (event.event === "on_chat_model_stream") {
+        const nodeName = (event.metadata as Record<string, unknown> | undefined)?.langgraph_node;
+
+        if (event.event === "on_chat_model_start") {
+          if (nodeName && nodeName !== "supervisor") {
+            continue;
+          }
+          if (hasStartedSegment && currentSegmentContent.trim()) {
+            callbacks.onMessageStart?.();
+            currentSegmentContent = "";
+          }
+          hasStartedSegment = true;
+        } else if (event.event === "on_chat_model_stream") {
           // Only stream tokens from the supervisor node; subgraph LLM calls
           // (leaf_extract, merge_trees, text_extract, analyze, etc.) are internal.
-          const nodeName = (event.metadata as Record<string, unknown> | undefined)?.langgraph_node;
           if (nodeName && nodeName !== "supervisor") {
             continue;
           }
@@ -181,6 +202,7 @@ export class AgentOrchestrator {
           const token = extractTextContent(chunk?.content);
           if (token) {
             fullContent += token;
+            currentSegmentContent += token;
             callbacks.onToken(token);
           }
         } else if (event.event === "on_tool_start") {
@@ -311,21 +333,22 @@ export class AgentOrchestrator {
       tools.push(actionTools.addPalaceNodeTool);
     }
     const toolNode = new ToolNode(tools);
-    const mindmapSubgraphNode = async (state: MainGraphStateType) => {
-      const result = await this.getCompiledMindmapSubgraph().invoke(state, {
+    const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
+      subgraph: { invoke: (state: MainGraphStateType, config: { recursionLimit: number }) => Promise<T> },
+      state: MainGraphStateType,
+    ): Promise<Partial<MainGraphStateType>> => {
+      const result = await subgraph.invoke(state, {
         recursionLimit: AGENT_LIMITS.recursionLimit,
       });
-      const { messages: _messages, ...updates } = result;
-      return updates;
+      const { messages: _, ...updates } = result as MainGraphStateType & T;
+      return updates as Partial<MainGraphStateType>;
     };
 
-    const palaceSubgraphNode = async (state: MainGraphStateType) => {
-      const result = await this.getCompiledPalaceSubgraph().invoke(state, {
-        recursionLimit: AGENT_LIMITS.recursionLimit,
-      });
-      const { messages: _messages, ...updates } = result;
-      return updates;
-    };
+    const mindmapSubgraphNode = async (state: MainGraphStateType) =>
+      invokeSubgraph(this.getCompiledMindmapSubgraph(), state);
+
+    const palaceSubgraphNode = async (state: MainGraphStateType) =>
+      invokeSubgraph(this.getCompiledPalaceSubgraph(), state);
 
     // 工具执行节点：过滤掉虚拟子图路由工具（已在 supervisor.invoke 中处理）
     const toolsNode = async (state: MainGraphStateType) => {
@@ -471,9 +494,11 @@ export class AgentOrchestrator {
   ): ChatResponse {
     const rawContent =
       streamingContent || result.response || "抱歉，我无法生成回复。";
+    const messages = this.extractCurrentTurnAssistantMessages(result.messages);
 
     const response: ChatResponse = {
       content: rawContent,
+      messages,
       toolCalls: this.extractToolCalls(result.messages),
     };
 
@@ -489,6 +514,19 @@ export class AgentOrchestrator {
     }
 
     return response;
+  }
+
+  private extractCurrentTurnAssistantMessages(
+    messages: BaseMessage[],
+  ): ChatResponse["messages"] {
+    const lastHumanIndex = messages.findLastIndex((m: BaseMessage) => m.type === "human");
+    const currentTurnMessages =
+      lastHumanIndex >= 0 ? messages.slice(lastHumanIndex + 1) : messages;
+    const sessionMessages = checkpointMessagesToSessionMessages(currentTurnMessages);
+    const assistantMessages = sessionMessages.filter(
+      (msg): msg is AssistantMessage => msg.role === "assistant",
+    );
+    return assistantMessages.length > 0 ? assistantMessages : undefined;
   }
 
   private extractToolCalls(messages: BaseMessage[]): ChatResponse["toolCalls"] {

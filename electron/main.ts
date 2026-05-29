@@ -295,10 +295,10 @@ function registerIpcHandlers() {
           context: payload.context
             ? {
                 ...payload.context,
-                selectedNodes: payload.context.selectedNodes?.map((n) => ({
-                  ...n,
-                  type: n.type as 'text' | 'palace' | 'document',
-                })),
+                selectedNodes: payload.context.selectedNodes?.filter(
+                  (n): n is { id: string; type: 'text' | 'palace'; label: string; extra?: Record<string, unknown> } =>
+                    n.type === 'text' || n.type === 'palace',
+                ),
               }
             : undefined,
           documentRef: payload.context?.attachedDocument,
@@ -311,6 +311,11 @@ function registerIpcHandlers() {
             onToken: (token) => {
               if (!abortController.signal.aborted) {
                 win?.webContents.send('ai:chat-stream-token', token)
+              }
+            },
+            onMessageStart: () => {
+              if (!abortController.signal.aborted) {
+                win?.webContents.send('ai:chat-stream-message-start')
               }
             },
             onToolStart: (name, input) => {

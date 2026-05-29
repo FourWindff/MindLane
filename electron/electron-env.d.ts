@@ -21,7 +21,7 @@ type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
 
 type _ContextNodeInfo = {
   id: string
-  type: 'text' | 'palace' | 'document'
+  type: 'text' | 'palace'
   label: string
   extra?: Record<string, unknown>
 }
@@ -76,10 +76,12 @@ interface Window {
       }) => Promise<void>
       stopStream: () => Promise<void>
       onStreamToken: (callback: (token: string) => void) => () => void
+      onStreamMessageStart: (callback: () => void) => () => void
       onStreamToolStart: (callback: (data: { name: string; input: Record<string, unknown> }) => void) => () => void
       onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => () => void
       onStreamEnd: (callback: (response: {
         content: string
+        messages?: Array<{ role: 'assistant'; content: string; toolCalls?: _ChatToolCall[] }>
         toolCalls?: _ChatToolCall[]
         mindmapData?: {
           nodes: _MindLaneNode[]
