@@ -100,7 +100,7 @@ Nodes are stored with serialized `data` fields (type-specific). On load, `nodeRe
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLane** (4006 symbols, 7233 relationships, 217 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLane** (3890 symbols, 7047 relationships, 227 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

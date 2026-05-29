@@ -346,6 +346,10 @@ function parseOutlineObjectEntry(
   rawTitle: string,
   rawChildren: unknown,
 ): MindmapYamlNode | null {
+  if (isScalarOutlineValue(rawChildren)) {
+    return titleToTreeNode(formatScalarOutlineTitle(rawTitle, rawChildren), [])
+  }
+
   const children = parseOutlineChildren(rawChildren)
   if (children === null) return null
   return titleToTreeNode(rawTitle, children)
@@ -376,6 +380,14 @@ function parseOutlineChildren(value: unknown): MindmapYamlNode[] | null {
   }
 
   return null
+}
+
+function isScalarOutlineValue(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+}
+
+function formatScalarOutlineTitle(rawTitle: string, value: string | number | boolean): string {
+  return `${rawTitle}: ${String(value).trim()}`
 }
 
 function titleToTreeNode(

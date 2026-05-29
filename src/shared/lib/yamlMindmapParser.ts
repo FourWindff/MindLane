@@ -241,8 +241,10 @@ function parseOutlineEntry(entry: unknown): MindmapYamlNode | null {
     const entries = Object.entries(obj)
     if (entries.length === 0) return null
     const [titleKey, body] = entries[0]!
-    const parsed = parseTitleString(titleKey)
-    const children = parseChildren(body)
+    const parsed = parseTitleString(isScalarOutlineValue(body)
+      ? formatScalarOutlineTitle(titleKey, body)
+      : titleKey)
+    const children = isScalarOutlineValue(body) ? [] : parseChildren(body)
     const node: MindmapYamlNode = { label: parsed.label }
     if (parsed.pageRange) node.page_range = parsed.pageRange
     if (parsed.summary) node.summary = parsed.summary
@@ -251,6 +253,14 @@ function parseOutlineEntry(entry: unknown): MindmapYamlNode | null {
   }
 
   return null
+}
+
+function isScalarOutlineValue(value: unknown): value is string | number | boolean {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+}
+
+function formatScalarOutlineTitle(rawTitle: string, value: string | number | boolean): string {
+  return `${rawTitle}: ${String(value).trim()}`
 }
 
 interface ParsedTitle {

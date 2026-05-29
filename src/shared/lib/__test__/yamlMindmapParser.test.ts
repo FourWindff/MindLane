@@ -174,6 +174,27 @@ mindmap:
       expect(result.rootIds).toHaveLength(2)
     })
 
+    it('should parse key-value fragment entries as leaf labels', () => {
+      const yaml = `
+- 模块: 导入器
+- 优先级: 高
+- 状态: 待开发
+- 验收标准:
+  - 支持 Markdown
+  - 支持 PDF
+  - 保留层级
+  - 返回错误提示
+`
+      const result = parseYamlFragment(yaml)
+
+      expect(result.rootIds).toHaveLength(4)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '模块: 导入器')).toBe(true)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '优先级: 高')).toBe(true)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '状态: 待开发')).toBe(true)
+      expect(result.nodes.some(n => (n.data as { label: string }).label === '验收标准')).toBe(true)
+      expect(result.nodes).toHaveLength(9)
+    })
+
     it('should throw EmptyMindmapError for empty fragment', () => {
       expect(() => parseYamlFragment('')).toThrow(EmptyMindmapError)
     })
