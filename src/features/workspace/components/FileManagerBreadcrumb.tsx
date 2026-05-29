@@ -41,8 +41,8 @@ export function FileManagerBreadcrumb({
         </div>
         <p className="file-manager__subtitle">
           {currentFolder
-            ? `Scanning Cluster: ${currentFolder}`
-            : 'Neural Projection of consciousness'}
+            ? `当前位置：${currentFolder}`
+            : '浏览工作区中的文件和文件夹'}
         </p>
       </div>
 

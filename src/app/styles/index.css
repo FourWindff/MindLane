@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -7,30 +7,30 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --ml-bg: #f5f5f5;
+  --ml-bg: #f5f4f2;
   --ml-bg-elevated: #ffffff;
-  --ml-bg-subtle: #ececec;
-  --ml-text: #171717;
-  --ml-text-muted: rgba(23, 23, 23, 0.52);
-  --ml-text-faint: rgba(23, 23, 23, 0.34);
-  --ml-border: rgba(0, 0, 0, 0.09);
-  --ml-border-strong: rgba(0, 0, 0, 0.16);
-  --ml-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --ml-shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.09);
-  --ml-fill-soft: rgba(0, 0, 0, 0.035);
-  --ml-fill-medium: rgba(0, 0, 0, 0.065);
-  --ml-accent: #202020;
-  --ml-accent-soft: rgba(0, 0, 0, 0.045);
-  --ml-accent-hover: #0a0a0a;
-  --ml-danger: #e5484d;
-  --ml-success: #10b981;
-  --ml-warning: #f59e0b;
-  --ml-info: #3b82f6;
-  --ml-edge-stroke: #c8c8c8;
+  --ml-bg-subtle: #ebe9e6;
+  --ml-text: #1c1917;
+  --ml-text-muted: rgba(28, 25, 23, 0.5);
+  --ml-text-faint: rgba(28, 25, 23, 0.3);
+  --ml-border: rgba(28, 25, 23, 0.07);
+  --ml-border-strong: rgba(28, 25, 23, 0.13);
+  --ml-shadow: 0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px rgba(28, 25, 23, 0.03);
+  --ml-shadow-strong: 0 4px 20px rgba(28, 25, 23, 0.06), 0 16px 48px rgba(28, 25, 23, 0.04);
+  --ml-fill-soft: rgba(28, 25, 23, 0.025);
+  --ml-fill-medium: rgba(28, 25, 23, 0.055);
+  --ml-accent: #2d2a27;
+  --ml-accent-soft: rgba(28, 25, 23, 0.035);
+  --ml-accent-hover: #1a1816;
+  --ml-danger: #c9373d;
+  --ml-success: #0d9e6e;
+  --ml-warning: #d4920b;
+  --ml-info: #2563b0;
+  --ml-edge-stroke: #d4d1cc;
   --ml-code-bg: #1c1c1c;
-  --ml-code-text: #e0e0e0;
-  --ml-palace-accent-1: #a855f7;
-  --ml-palace-accent-2: #ec4899;
+  --ml-code-text: #e8e6e3;
+  --ml-palace-accent-1: #8b6bb0;
+  --ml-palace-accent-2: #b85c8e;
 }
 
 *,

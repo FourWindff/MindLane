@@ -13,7 +13,6 @@ import '../file-manager.css'
 interface FileManagerProps {
   isOpen: boolean
   onClose: () => void
-  onOpenSettings?: () => void
 }
 
 type DialogState =
@@ -28,7 +27,7 @@ type ContextMenuState =
   | { scope: 'empty'; x: number; y: number }
   | { scope: 'entry'; x: number; y: number; entry: WorkspaceTreeEntry }
 
-export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProps) {
+export function FileManager({ isOpen, onClose }: FileManagerProps) {
   const busy = useWorkspaceStore((s) => s.busy)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const tree = useWorkspaceStore((s) => s.tree)
@@ -60,6 +59,20 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
     return current
   }, [tree, navigationPath])
   const currentFolder = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null
+  const currentDirectoryPath = useMemo((): string | null => {
+    if (!workspacePath) return null
+    if (navigationPath.length === 0) return workspacePath
+
+    let current = tree
+    let currentPath = workspacePath
+    for (const segment of navigationPath) {
+      const found = current.find((e) => e.name === segment && e.type === 'directory')
+      if (!found?.children) return null
+      currentPath = found.path
+      current = found.children
+    }
+    return currentPath
+  }, [tree, workspacePath, navigationPath])
 
   const handleContextMenu = useCallback((e: MouseEvent, entry: WorkspaceTreeEntry | null) => {
     e.preventDefault()
@@ -84,14 +97,16 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
         case 'new-file': {
           const parentPath = entry?.type === 'directory'
             ? entry.path
-            : workspacePath
+            : currentDirectoryPath
+          if (!parentPath) return
           setDialog({ type: 'new-file', parentPath })
           break
         }
         case 'new-folder': {
           const parentPath = entry?.type === 'directory'
             ? entry.path
-            : workspacePath
+            : currentDirectoryPath
+          if (!parentPath) return
           setDialog({ type: 'new-folder', parentPath })
           break
         }
@@ -103,7 +118,7 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
           break
       }
     },
-    [workspacePath, openWorkspaceFile],
+    [workspacePath, currentDirectoryPath, openWorkspaceFile],
   )
 
   const closeDialog = () => setDialog({ type: 'none' })
@@ -151,14 +166,14 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
   }, [onClose])
 
   const handleToolbarNewFile = useCallback(() => {
-    if (!workspacePath) return
-    setDialog({ type: 'new-file', parentPath: workspacePath })
-  }, [workspacePath])
+    if (!currentDirectoryPath) return
+    setDialog({ type: 'new-file', parentPath: currentDirectoryPath })
+  }, [currentDirectoryPath])
 
   const handleToolbarNewFolder = useCallback(() => {
-    if (!workspacePath) return
-    setDialog({ type: 'new-folder', parentPath: workspacePath })
-  }, [workspacePath])
+    if (!currentDirectoryPath) return
+    setDialog({ type: 'new-folder', parentPath: currentDirectoryPath })
+  }, [currentDirectoryPath])
 
   if (!isOpen) return null
 
@@ -183,7 +198,6 @@ export function FileManager({ isOpen, onClose, onOpenSettings }: FileManagerProp
             onNewFile={handleToolbarNewFile}
             onNewFolder={handleToolbarNewFolder}
             onRefresh={() => void refreshWorkspaceFiles()}
-            onOpenSettings={onOpenSettings}
             onSwitchWorkspace={() => void switchWorkspace()}
             onClose={handleClose}
           />

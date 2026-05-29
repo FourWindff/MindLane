@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 import { SettingsPanel } from './SettingsPanel'
 import '@/features/shell/styles/side-panel.css'
 
@@ -47,14 +48,18 @@ export function SettingsModal({ open, onClose }: Props) {
         }}
       >
         <div className="settings-modal__header">
-          <div>
-            <div className="settings-modal__eyebrow">Preferences</div>
+          <div className="settings-modal__header-brand">
             <h2 id="settings-modal-title" className="settings-modal__title">
               设置
             </h2>
           </div>
-          <button type="button" className="settings-modal__close" onClick={onClose}>
-            关闭
+          <button
+            type="button"
+            className="settings-modal__close"
+            onClick={onClose}
+            aria-label="关闭"
+          >
+            <X size={18} strokeWidth={2} />
           </button>
         </div>
         <div className="settings-modal__body">

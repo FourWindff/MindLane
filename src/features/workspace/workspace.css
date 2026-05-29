@@ -176,12 +176,21 @@
   background: var(--ml-accent);
   color: #fff;
   border-color: var(--ml-accent);
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .workspace-home__action--primary:hover,
 .workspace-empty__action--primary:hover {
   background: var(--ml-accent-hover);
   border-color: var(--ml-accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(28, 25, 23, 0.12);
+}
+
+.workspace-home__action--primary:active,
+.workspace-empty__action--primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
 }
 
 .workspace-home__error,
@@ -191,9 +200,10 @@
   justify-content: space-between;
   gap: 1rem;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--ml-border-strong);
-  border-radius: 16px;
-  background: var(--ml-bg);
+  border: 1px solid rgba(201, 55, 61, 0.12);
+  border-radius: 12px;
+  background: rgba(201, 55, 61, 0.03);
+  color: var(--ml-danger);
 }
 
 .workspace-home__error-close,
@@ -211,8 +221,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(4px);
+  background: rgba(28, 25, 23, 0.2);
+  backdrop-filter: blur(12px) saturate(1.1);
 }
 
 .workspace-modal-backdrop {
@@ -222,18 +232,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(4px);
+  background: rgba(28, 25, 23, 0.2);
+  backdrop-filter: blur(12px) saturate(1.1);
 }
 
 .workspace-home__modal,
 .workspace-modal {
   width: min(420px, calc(100% - 2rem));
-  padding: 1.25rem;
+  padding: 1.5rem;
   border: 1px solid var(--ml-border);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--ml-bg-elevated);
-  box-shadow: var(--ml-shadow-strong);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.6) inset,
+    0 20px 60px rgba(28, 25, 23, 0.1),
+    0 4px 16px rgba(28, 25, 23, 0.05);
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -241,9 +254,9 @@
 
 .workspace-home__modal-label,
 .workspace-modal__label {
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
   color: var(--ml-text-faint);
 }
 
@@ -264,17 +277,19 @@
 .workspace-modal__input {
   width: 100%;
   border: 1px solid var(--ml-border-strong);
-  border-radius: 14px;
+  border-radius: 12px;
   padding: 0.8rem 0.9rem;
   font: inherit;
   color: var(--ml-text);
   background: var(--ml-bg);
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .workspace-home__modal-input:focus,
 .workspace-modal__input:focus {
   border-color: var(--ml-accent);
+  box-shadow: 0 0 0 3px rgba(45, 42, 39, 0.06);
 }
 
 .workspace-home__modal-actions,
@@ -380,6 +395,8 @@
   min-height: 0;
   flex: 1;
   position: relative;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .workspace-sidebar__file {
@@ -392,6 +409,8 @@
   flex-direction: column;
   gap: 0.2rem;
   cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease;
+  contain: layout paint style;
 }
 
 .workspace-sidebar__file:hover {
@@ -409,6 +428,7 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  contain: layout style;
 }
 
 .file-tree__item {
@@ -425,8 +445,9 @@
   font-size: 0.88rem;
   text-align: left;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background-color 80ms ease;
   line-height: 1.35;
+  contain: layout paint style;
 }
 
 .file-tree__item:hover {
@@ -450,7 +471,7 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  transition: transform 0.15s ease;
+  transition: transform 120ms ease;
   color: var(--ml-text-muted);
 }
 
@@ -510,14 +531,29 @@
 .context-menu {
   position: absolute;
   z-index: 20;
-  min-width: 160px;
-  padding: 4px;
+  min-width: 170px;
+  padding: 5px;
   border: 1px solid var(--ml-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--ml-bg-elevated);
-  box-shadow: var(--ml-shadow-strong);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset,
+    0 8px 24px rgba(28, 25, 23, 0.08),
+    0 2px 8px rgba(28, 25, 23, 0.04);
   display: flex;
   flex-direction: column;
+  animation: ctx-menu-in 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ctx-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .context-menu__item {
@@ -526,18 +562,23 @@
   width: 100%;
   padding: 7px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   background: transparent;
   color: var(--ml-text);
   font: inherit;
   font-size: 0.88rem;
   text-align: left;
   cursor: pointer;
-  transition: background 0.1s;
+  transition: all 0.12s ease;
 }
 
 .context-menu__item:hover {
   background: var(--ml-bg-subtle);
+}
+
+.context-menu__item:focus-visible {
+  outline: 2px solid var(--ml-accent);
+  outline-offset: -1px;
 }
 
 .context-menu__item--danger {
@@ -545,7 +586,7 @@
 }
 
 .context-menu__item--danger:hover {
-  background: rgba(229, 72, 77, 0.07);
+  background: rgba(201, 55, 61, 0.06);
 }
 
 /* --- Danger button variant for confirm dialog --- */
@@ -554,11 +595,19 @@
   background: var(--ml-danger);
   color: #fff;
   border-color: var(--ml-danger);
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .workspace-home__action--danger:hover {
-  background: #dc3d43;
-  border-color: #dc3d43;
+  background: #b52f35;
+  border-color: #b52f35;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 55, 61, 0.18);
+}
+
+.workspace-home__action--danger:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
 }
 
 .workspace-empty {

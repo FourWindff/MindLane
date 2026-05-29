@@ -12,6 +12,7 @@ import {
   useWorkspaceStore,
 } from '@/features/workspace/store'
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
+import { AppToolbar } from '@/features/shell/components/AppToolbar'
 import { ShortcutRegistryProvider, useShortcut } from '@/shared/shortcuts'
 import './styles/app-shell.css'
 import '@/features/workspace/workspace.css'
@@ -111,11 +112,7 @@ function AppContent() {
 
   return (
     <div className="app-frame">
-      <AppWindowBar
-        onOpenFileManager={() => setFileManagerOpen(true)}
-        fileManagerOpen={fileManagerOpen}
-        filePath={filePath ?? undefined}
-      />
+      <AppWindowBar />
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (
           <div className="app-shell app-shell--loading">
@@ -126,6 +123,13 @@ function AppContent() {
         ) : (
           <div className="app-shell">
             <main className="app-shell__main">
+              {workspacePath && (
+                <AppToolbar
+                  onOpenFileManager={() => setFileManagerOpen(true)}
+                  fileManagerOpen={fileManagerOpen}
+                  filePath={filePath ?? undefined}
+                />
+              )}
               {hasDocumentOpen ? (
                 <MindMapView
                   onSwitchWorkspace={() => void switchWorkspace()}
@@ -140,7 +144,6 @@ function AppContent() {
             <FileManager
               isOpen={fileManagerOpen}
               onClose={() => setFileManagerOpen(false)}
-              onOpenSettings={() => setSettingsOpen(true)}
             />
           </div>
         )}
