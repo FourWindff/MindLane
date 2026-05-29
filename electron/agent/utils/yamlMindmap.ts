@@ -80,6 +80,9 @@ export function extractYaml(text: string): unknown {
     if (expandedCandidateResult !== undefined) return expandedCandidateResult
   }
 
+  const bulletOutline = tryParseMarkdownBulletOutline(trimmed)
+  if (bulletOutline) return bulletOutline
+
   throw new Error('无法从模型输出中提取 YAML')
 }
 
@@ -156,6 +159,70 @@ function tryParseYaml(text: string): unknown | undefined {
 
 function expandIndent(text: string): string {
   return text.replace(/^( +)/gm, (match) => '  '.repeat(match.length))
+}
+
+function tryParseMarkdownBulletOutline(text: string): MindmapYamlNode | null {
+  const lines = text
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+
+  const firstBulletIndex = lines.findIndex((line) => parseMarkdownBulletLine(line) !== null)
+  if (firstBulletIndex < 0) return null
+
+  const rootLabel = lines
+    .slice(0, firstBulletIndex)
+    .map((line) => stripMarkdownDecorators(line.trim()))
+    .filter(Boolean)
+    .join(' ')
+
+  if (!rootLabel) return null
+
+  const root: MindmapYamlNode = {
+    label: rootLabel,
+    page_range: '',
+    children: [],
+  }
+  const stack: Array<{ level: number; node: MindmapYamlNode }> = [{ level: 0, node: root }]
+
+  for (const line of lines.slice(firstBulletIndex)) {
+    const parsed = parseMarkdownBulletLine(line)
+    if (!parsed) continue
+
+    const node = titleToTreeNode(parsed.label, [])
+    while (stack.length > 1 && stack[stack.length - 1]!.level >= parsed.level) {
+      stack.pop()
+    }
+
+    const parent = stack[stack.length - 1]!.node
+    parent.children ??= []
+    parent.children.push(node)
+    stack.push({ level: parsed.level, node })
+  }
+
+  return root.children && root.children.length > 0 ? root : null
+}
+
+function parseMarkdownBulletLine(line: string): { level: number; label: string } | null {
+  const match = line.match(/^(\s*)([-*+•◦▪▫○●])\s+(.+)$/u)
+  if (!match) return null
+
+  const indentLevel = Math.floor(match[1]!.length / 2)
+  const bullet = match[2]!
+  const bulletLevel = bullet === '○' || bullet === '◦' ? 2 : bullet === '▪' || bullet === '▫' ? 3 : 1
+  const level = Math.max(1, indentLevel + 1, bulletLevel)
+  const label = stripMarkdownDecorators(match[3]!)
+
+  return label ? { level, label } : null
+}
+
+function stripMarkdownDecorators(value: string): string {
+  return value
+    .trim()
+    .replace(/^node:\s*/i, '')
+    .replace(/^child:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function sanitizeStructuredTree(value: unknown): unknown {

@@ -2,10 +2,10 @@ import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
-import { extractYaml, sanitizeTreeCandidate } from '../../utils/yamlMindmap.js'
+import { extractYaml, sanitizeTreeCandidate, serializeMindmapOutline } from '../../utils/yamlMindmap.js'
 import { PdfDocumentLoader, chunkPages } from './loaders/pdfLoader.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
-import { extractRootTree } from './shared/flattenTree.js'
+import { extractRootTree } from './shared/rootTree.js'
 
 // ===== 配置选项 =====
 
@@ -60,42 +60,6 @@ Remove duplicates and combine related topics.`,
       content: `Merge the following YAML trees into one unified tree:\n\n${treesYaml}`,
     },
   ]
-}
-
-function treeToYamlString(tree: unknown): string {
-  if (!tree || typeof tree !== 'object') return ''
-  const record = tree as Record<string, unknown>
-  if ('label' in record && typeof record.label === 'string') {
-    const children = Array.isArray(record.children) ? record.children : []
-    if (children.length === 0) {
-      return `${record.label}: []`
-    }
-    const childLines = children
-      .map((child) => {
-        if (!child || typeof child !== 'object') return ''
-        const c = child as Record<string, unknown>
-        const label = 'label' in c && typeof c.label === 'string' ? c.label : String(child)
-        const cChildren = Array.isArray(c.children) ? c.children : []
-        if (cChildren.length === 0) {
-          return `  - ${label}`
-        }
-        return `  - ${label}:\n` + cChildren
-          .map((cc) => {
-            if (!cc || typeof cc !== 'object') return ''
-            const ccRecord = cc as Record<string, unknown>
-            const ccLabel = 'label' in ccRecord && typeof ccRecord.label === 'string'
-              ? ccRecord.label
-              : String(cc)
-            return `    - ${ccLabel}`
-          })
-          .filter(Boolean)
-          .join('\n')
-      })
-      .filter(Boolean)
-      .join('\n')
-    return `${record.label}:\n${childLines}`
-  }
-  return String(tree)
 }
 
 // ===== Node implementations =====
@@ -266,7 +230,12 @@ async function mergeTreesNode(
   const results: Array<{ groupIndex: number; tree: unknown }> = []
 
   for (const group of groups) {
-    const treesYaml = group.trees.map((t, i) => `--- Tree ${i + 1} ---\n${treeToYamlString(t)}`).join('\n\n')
+    const treesYaml = group.trees
+      .map((tree, i) => {
+        const rootTree = extractRootTree(tree, `Tree ${i + 1}`)
+        return `--- Tree ${i + 1} ---\n${rootTree ? serializeMindmapOutline(rootTree) : String(tree)}`
+      })
+      .join('\n\n')
 
     try {
       const response = await options.provider.reasoningModel.invoke(
@@ -355,10 +324,8 @@ async function buildOutputNode(
     }
   }
 
-  const yamlOutput = treeToYamlString(rootTree)
-
   return {
-    mindmapYaml: yamlOutput,
+    mindmapYaml: serializeMindmapOutline(rootTree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
   }
@@ -412,10 +379,8 @@ async function textInputExtractNode(
       }
     }
 
-    const yamlOutput = treeToYamlString(rootTree)
-
     return {
-      mindmapYaml: yamlOutput,
+      mindmapYaml: serializeMindmapOutline(rootTree),
       mindmapTitle: finalTitle,
       response: `已生成思维导图「${finalTitle}」。`,
     }

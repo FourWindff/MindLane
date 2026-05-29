@@ -29,6 +29,55 @@ describe('extractYaml', () => {
     expect(result).toEqual({ root: ['child', 'child2'] })
   })
 
+  it('parses markdown bullet outline when the model returns a rendered list source', () => {
+    const text = `
+项目交付复盘
+- 目标管理
+  - 明确验收标准
+  - 拆分阶段里程碑
+- 风险控制
+  - 识别外部依赖
+  - 预留回滚方案
+- node: Main Topic
+  - node: Subtopic A
+    - child: Item 1
+    - child: Item 2
+`
+    const result = extractYaml(text)
+
+    expect(result).toMatchObject({
+      label: '项目交付复盘',
+      children: [
+        {
+          label: '目标管理',
+          children: [
+            { label: '明确验收标准' },
+            { label: '拆分阶段里程碑' },
+          ],
+        },
+        {
+          label: '风险控制',
+          children: [
+            { label: '识别外部依赖' },
+            { label: '预留回滚方案' },
+          ],
+        },
+        {
+          label: 'Main Topic',
+          children: [
+            {
+              label: 'Subtopic A',
+              children: [
+                { label: 'Item 1' },
+                { label: 'Item 2' },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  })
+
   it('throws on empty text', () => {
     expect(() => extractYaml('')).toThrow('模型返回为空')
   })
