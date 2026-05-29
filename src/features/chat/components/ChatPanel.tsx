@@ -119,7 +119,7 @@ export function ChatPanel() {
 
     const context = buildContext()
     setAttachedDocument(null) // clear after context captures the doc
-    await api.chatStream({ threadId, message: text, context })
+    await api.chatStream({ threadId, message: text || `请根据「${doc?.filename}」生成思维导图`, context })
   }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {

@@ -57,11 +57,7 @@ export class MindLaneAgent extends BaseAgent {
       mindmapyamlResponse = `已从 ${state.mindmapInputSource?.type || '来源'} 生成思维导图「${state.mindmapTitle}」，正在插入...`;
     }
 
-    // Preset intent with input source: skip LLM routing and go directly to subgraph
-    // But if subgraph has already run (produced yaml or error), handle it normally
-    if (state.intent === 'mindmap' && state.mindmapInputSource && !state.mindmapYaml && !state.error) {
-      return { messages: [] };
-    }
+    // Palace fast-path: if subgraph already decided the route, skip redundant LLM call
     if (state.intent === 'palace' && state.palaceInputText && !state.memoryRoute?.length && !state.error) {
       return { messages: [] };
     }

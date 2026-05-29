@@ -159,25 +159,18 @@ export class AgentOrchestrator {
         context: request.context ?? null,
       };
 
-      // If a document is attached, pre-populate the mindmap input source
-      if (request.documentRef) {
-        const doc = request.documentRef;
-        initialState.mindmapInputSource = {
-          type: doc.type,
-          path: doc.type === 'pdf' ? doc.source : undefined,
-          url: doc.type === 'url' ? doc.source : undefined,
-        };
-        initialState.mindmapInputTitle = doc.title || doc.filename || '思维导图';
-        initialState.intent = 'mindmap';
-        initialState.documentRef = doc;
-      }
-
       const stream = app.streamEvents(initialState, streamConfig);
 
       for await (const event of stream) {
         if (signal?.aborted) break;
 
         if (event.event === "on_chat_model_stream") {
+          // Only stream tokens from the supervisor node; subgraph LLM calls
+          // (leaf_extract, merge_trees, text_extract, analyze, etc.) are internal.
+          const nodeName = (event.metadata as Record<string, unknown> | undefined)?.langgraph_node;
+          if (nodeName && nodeName !== "supervisor") {
+            continue;
+          }
           const chunk = event.data?.chunk;
           if (chunk && typeof chunk.content === "string" && chunk.content) {
             fullContent += chunk.content;

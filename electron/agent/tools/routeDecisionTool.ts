@@ -46,7 +46,7 @@ export type RouteDecision = {
  */
 export function createRouteDecisionTool(hasPalace: boolean): DynamicStructuredTool {
   const routes = [
-    '当用户想要生成思维导图或梳理知识结构时设置 target="mindmap"',
+    '当用户想要生成思维导图、梳理知识结构，或已附加文档需要基于文档内容生成思维导图时设置 target="mindmap"',
   ]
   if (hasPalace) {
     routes.push('当用户想要生成记忆宫殿或进行记忆训练时设置 target="palace"')
