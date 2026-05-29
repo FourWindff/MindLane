@@ -79,6 +79,11 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.on('ai:chat-stream-token', handler)
       return () => { ipcRenderer.off('ai:chat-stream-token', handler) }
     },
+    onStreamMessageStart: (callback: () => void) => {
+      const handler = () => callback()
+      ipcRenderer.on('ai:chat-stream-message-start', handler)
+      return () => { ipcRenderer.off('ai:chat-stream-message-start', handler) }
+    },
     onStreamToolStart: (callback: (data: { name: string; input: Record<string, unknown> }) => void) => {
       const handler = (_event: unknown, data: { name: string; input: Record<string, unknown> }) => callback(data)
       ipcRenderer.on('ai:chat-stream-tool-start', handler)
@@ -91,6 +96,7 @@ contextBridge.exposeInMainWorld('mindlane', {
     },
     onStreamEnd: (callback: (response: {
       content: string
+      messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
       toolCalls?: ChatToolCall[]
       mindmapData?: {
         nodes: Array<{ id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown> }>
