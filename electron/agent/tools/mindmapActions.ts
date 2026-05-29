@@ -1,5 +1,6 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
+import { validateMindmapYaml } from '../utils/yamlValidation.js'
 
 // AI 操作 Mindmap 节点的工具集
 // 方案一：AI 返回操作指令，前端执行
@@ -185,6 +186,11 @@ const batchAddNodesTool = tool(
       return { ok: false, error: 'YAML 片段不能为空' }
     }
 
+    const validation = validateMindmapYaml(yamlFragment, { mode: 'fragment' })
+    if (!validation.ok) {
+      return { ok: false, error: `YAML 片段无效：${validation.reason}` }
+    }
+
     return {
       ok: true,
       action: 'batchAddNodes',
@@ -242,4 +248,3 @@ export function createMindmapActionTools(hasPalace = true): MindmapActionTools {
   }
   return tools
 }
-

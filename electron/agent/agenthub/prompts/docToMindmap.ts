@@ -23,6 +23,7 @@ export function buildExtractStructureMessages(documentText: string): WorkflowPro
 - 根节点顶格写，不要在前面加 -
 - 只能使用空格缩进，绝对不要使用 Tab
 - 每下降一级，就在上一层前缀基础上只多 2 个前导空格，然后接"- "
+- 下一行若在上一行基础上缩进，就表示上一行的子节点
 - 冒号后面不要再写同一行内容；有子节点就换行后继续缩进
 - 节点内容优先保留真实信息，而不是标题化改写`,
     },

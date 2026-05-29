@@ -54,6 +54,17 @@ describe('batchAddMindmapNodes', () => {
     })
   })
 
+  it('should reject invalid yamlFragment', async () => {
+    const result = await tools.batchAddNodesTool.invoke({
+      yamlFragment: 'mindmap: ":\n  - "unclosed',
+    })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'YAML 片段无效：Unexpected scalar at node end',
+    })
+  })
+
   it('should work without parentId (defaults to root)', async () => {
     const result = await tools.batchAddNodesTool.invoke({
       yamlFragment: '- "主题"',

@@ -95,6 +95,15 @@ export function sanitizeTreeCandidate(value: unknown): unknown {
   return sanitizeStructuredTree(value)
 }
 
+export function sanitizeForestCandidate(value: unknown): MindmapYamlNode[] | null {
+  const outlineForest = tryParseOutlineForest(value)
+  if (outlineForest) {
+    return outlineForest.map((tree) => sanitizeStructuredTree(tree) as MindmapYamlNode)
+  }
+
+  return null
+}
+
 export function normalizeTree(
   node: MindmapYamlNode,
   fallbackRange: string,
@@ -298,6 +307,20 @@ function tryParseOutlineTree(value: unknown): MindmapYamlNode | null {
   const entries = Object.entries(record)
   if (entries.length !== 1) return null
   return parseOutlineObjectEntry(entries[0][0], entries[0][1])
+}
+
+function tryParseOutlineForest(value: unknown): MindmapYamlNode[] | null {
+  if (!value) return null
+
+  if (Array.isArray(value)) {
+    const nodes = value
+      .map((item) => parseOutlineEntry(item))
+      .filter((item): item is MindmapYamlNode => item !== null)
+    return nodes.length === value.length ? nodes : null
+  }
+
+  const tree = tryParseOutlineTree(value)
+  return tree ? [tree] : null
 }
 
 function parseOutlineEntry(value: unknown): MindmapYamlNode | null {

@@ -2,7 +2,8 @@ import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
-import { extractYaml, sanitizeTreeCandidate, serializeMindmapOutline } from '../../utils/yamlMindmap.js'
+import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
+import { validateMindmapYaml } from '../../utils/yamlValidation.js'
 import { PdfDocumentLoader, chunkPages } from './loaders/pdfLoader.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
@@ -16,10 +17,13 @@ export interface MindmapSubgraphOptions {
 const LEAF_BATCH_SIZE = 5
 const MERGE_GROUP_SIZE = 8
 const CHUNK_CHAR_LIMIT = 4000
+const YAML_GENERATION_ATTEMPTS = 3
+
+type PromptMessage = { role: string; content: string }
 
 // ===== Prompt builders =====
 
-function buildLeafExtractPrompt(chunksText: string): Array<{ role: string; content: string }> {
+function buildLeafExtractPrompt(chunksText: string): PromptMessage[] {
   return [
     {
       role: 'system',
@@ -44,7 +48,7 @@ Root Topic:
   ]
 }
 
-function buildMergePrompt(treesYaml: string): Array<{ role: string; content: string }> {
+function buildMergePrompt(treesYaml: string): PromptMessage[] {
   return [
     {
       role: 'system',
@@ -58,6 +62,57 @@ Remove duplicates and combine related topics.`,
     {
       role: 'user',
       content: `Merge the following YAML trees into one unified tree:\n\n${treesYaml}`,
+    },
+  ]
+}
+
+async function generateValidMindmapYaml(
+  provider: LLMProvider,
+  initialMessages: PromptMessage[],
+  fallbackTitle: string,
+): Promise<MindmapYamlNode> {
+  let messages = initialMessages
+  let lastReason = 'YAML 校验失败'
+  let lastOutput = ''
+
+  for (let attempt = 1; attempt <= YAML_GENERATION_ATTEMPTS; attempt += 1) {
+    const response = await provider.reasoningModel.invoke(messages)
+    const content = extractTextContent(response.content)
+    const validation = validateMindmapYaml(content, {
+      mode: 'tree',
+      fallbackTitle,
+    })
+
+    if (validation.ok) {
+      return validation.tree
+    }
+
+    lastReason = validation.reason
+    lastOutput = content
+    messages = buildYamlRepairPrompt(initialMessages, lastOutput, lastReason)
+  }
+
+  throw new Error(`YAML 校验失败：${lastReason}`)
+}
+
+function buildYamlRepairPrompt(
+  originalMessages: PromptMessage[],
+  previousOutput: string,
+  reason: string,
+): PromptMessage[] {
+  return [
+    ...originalMessages,
+    {
+      role: 'assistant',
+      content: previousOutput,
+    },
+    {
+      role: 'user',
+      content: `上一次输出的 YAML 无效，原因：${reason}
+
+请根据原始任务重新生成完整的 outline YAML。
+只输出 YAML，不要 JSON，不要 Markdown 解释，不要额外前后缀。
+使用缩进表达层级：有子节点的节点写成“节点内容:”，子节点在下一行缩进后用“- 节点内容”。`,
     },
   ]
 }
@@ -158,17 +213,16 @@ async function leafExtractNode(
   const chunksText = chunks.map((c) => c.text).join('\n\n---\n\n')
 
   try {
-    const response = await options.provider.reasoningModel.invoke(
+    const tree = await generateValidMindmapYaml(
+      options.provider,
       buildLeafExtractPrompt(chunksText),
+      `Chunk ${range.start + 1}`,
     )
-    const content = extractTextContent(response.content)
-    const parsedYaml = extractYaml(content)
-    const treeCandidate = sanitizeTreeCandidate(parsedYaml)
 
     const newResults = chunks.map((chunk, idx) => ({
       chunkIndex: range.start + idx,
       chunkId: chunk.id,
-      tree: treeCandidate,
+      tree,
     }))
 
     return {
@@ -238,16 +292,15 @@ async function mergeTreesNode(
       .join('\n\n')
 
     try {
-      const response = await options.provider.reasoningModel.invoke(
+      const tree = await generateValidMindmapYaml(
+        options.provider,
         buildMergePrompt(treesYaml),
+        `Merged Tree ${group.groupIndex + 1}`,
       )
-      const content = extractTextContent(response.content)
-      const parsedYaml = extractYaml(content)
-      const treeCandidate = sanitizeTreeCandidate(parsedYaml)
 
       results.push({
         groupIndex: group.groupIndex,
-        tree: treeCandidate,
+        tree,
       })
     } catch (error) {
       const formatted = formatAgentError(error)
@@ -354,21 +407,11 @@ async function textInputExtractNode(
 
   try {
     const text = content.slice(0, 8000)
-    const extractResponse = await options.provider.reasoningModel.invoke(
+    const rootTree = await generateValidMindmapYaml(
+      options.provider,
       buildExtractStructureMessages(text),
+      title,
     )
-    const extractContent = extractTextContent(extractResponse.content)
-
-    const parsedYaml = extractYaml(extractContent)
-    const treeCandidate = sanitizeTreeCandidate(parsedYaml)
-    const rootTree = extractRootTree(treeCandidate, title)
-
-    if (!rootTree) {
-      return {
-        error: 'AI 未返回有效的思维导图结构',
-        response: '生成思维导图失败：无法解析结构',
-      }
-    }
 
     const finalTitle = rootTree.label || title
 
