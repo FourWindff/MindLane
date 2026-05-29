@@ -81,6 +81,8 @@ export type DocumentChunk = {
   text: string
 }
 
+export type PendingSubgraph = 'mindmap' | 'palace'
+
 // ===== 状态切片定义（用于组合和复用） =====
 
 /**
@@ -95,9 +97,17 @@ export const BaseStateAnnotations = {
     reducer: (_prev, next) => next,
     default: () => null,
   }),
-  intent: Annotation<'qa' | 'palace' | 'mindmap'>({
+  pendingSubgraph: Annotation<PendingSubgraph | null>({
     reducer: (_prev, next) => next,
-    default: () => 'qa',
+    default: () => null,
+  }),
+  pendingSubgraphToolCallId: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => '',
+  }),
+  pendingSubgraphToolName: Annotation<string>({
+    reducer: (_prev, next) => next,
+    default: () => '',
   }),
   response: Annotation<string>({
     reducer: (_prev, next) => next,
@@ -221,6 +231,7 @@ export const MainGraphState = Annotation.Root({
   palaceInputText: PalaceStateAnnotations.palaceInputText,
   palaceInputNodes: PalaceStateAnnotations.palaceInputNodes,
   // Palace 子图输出（需要同步回主图用于构建响应）
+  palace: PalaceStateAnnotations.palace,
   imageUrls: PalaceStateAnnotations.imageUrls,
   memoryRoute: PalaceStateAnnotations.memoryRoute,
 })

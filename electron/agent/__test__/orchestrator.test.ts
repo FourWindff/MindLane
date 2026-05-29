@@ -113,6 +113,8 @@ describe("AgentOrchestrator buildGraph 结构", () => {
     const graphWithout = buildGraphWithout();
 
     expect(Object.keys(graphWith.nodes)).toContain("palaceSubgraph");
+    expect(Object.keys(graphWith.nodes)).toContain("mindmapToolResult");
+    expect(Object.keys(graphWith.nodes)).toContain("palaceToolResult");
     expect(Object.keys(graphWithout.nodes)).toContain("palaceSubgraph");
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes));
   });
@@ -130,7 +132,9 @@ describe("AgentOrchestrator stream() 消息输入", () => {
         capturedInputs.push(input);
         yield { event: "on_chat_model_stream", data: { chunk: { content: "ok" } } };
       }),
-      getState: vi.fn().mockResolvedValue({ values: { messages: [], intent: "qa", response: "ok" } }),
+      getState: vi.fn().mockResolvedValue({
+        values: { messages: [], pendingSubgraph: null, response: "ok", memoryRoute: [], imageUrls: [] },
+      }),
     };
 
     (orchestrator as unknown as { compiledMainGraph: typeof mockGraph }).compiledMainGraph = mockGraph;
@@ -162,14 +166,20 @@ describe("AgentOrchestrator stream() 消息输入", () => {
             chunk: {
               content: [
                 { type: "text", text: "我来生成思维导图。" },
-                { type: "tool_use", id: "tool-1", name: "routeDecision", input: "" },
+                { type: "tool_use", id: "tool-1", name: "generateMindmapFragment", input: "" },
               ],
             },
           },
         };
       }),
       getState: vi.fn().mockResolvedValue({
-        values: { messages: [], intent: "mindmap", response: "我来生成思维导图。" },
+        values: {
+          messages: [],
+          pendingSubgraph: null,
+          response: "我来生成思维导图。",
+          memoryRoute: [],
+          imageUrls: [],
+        },
       }),
     };
 
@@ -188,7 +198,7 @@ describe("AgentOrchestrator stream() 消息输入", () => {
 });
 
 describe("AgentOrchestrator extractToolCalls", () => {
-  let extractToolCalls: (msgs: BaseMessage[]) => unknown;
+  let extractToolCalls: (msgs: BaseMessage[]) => Array<{ name: string; result: string }> | undefined;
 
   beforeEach(() => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockAiService());

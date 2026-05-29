@@ -59,6 +59,7 @@ export function stripMarkers(text: string): string {
 export function toolDisplayName(name: string): string {
   const map = {
     generateMindmap: '生成思维导图',
+    generateMindmapFragment: '生成思维导图片段',
     generatePalace: '生成记忆宫殿',
     getMindmapContext: '读取导图',
     getSelectedNodes: '读取选中节点',

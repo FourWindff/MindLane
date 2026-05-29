@@ -32,7 +32,9 @@ describe('MindLaneAgent error handling', () => {
     const state = {
       messages: [],
       context: null,
-      intent: 'qa',
+      pendingSubgraph: null,
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
     } as unknown as MainGraphStateType

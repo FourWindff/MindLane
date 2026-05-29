@@ -2,24 +2,29 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMProvider } from "../../providers/index.js";
-import type { MainGraphStateType, MindmapInputSource } from "../../state.js";
+import type { MainGraphStateType } from "../../state.js";
 import { BaseAgent } from "../base.js";
 import { ContextBuilder } from "./context.js";
 import { extractTextContent, formatAgentError } from "../../utils.js";
 import { logger } from "../../../shared/logger.js";
 import {
-  createRouteDecisionTool,
-  type RouteDecision,
-} from "../../tools/routeDecisionTool.js";
+  createGenerateMindmapFragmentTool,
+  createGeneratePalaceTool,
+  GENERATE_MINDMAP_FRAGMENT_TOOL,
+  GENERATE_PALACE_TOOL,
+  isVirtualSubgraphTool,
+  type GenerateMindmapFragmentArgs,
+  type GeneratePalaceArgs,
+} from "../../tools/subgraphRoutingTools.js";
 
 /**
  * MindLaneAgent - 中央智能体，负责路由决策和上下文管理
  *
  * 架构职责：
  * 1. 上下文管理：使用 ContextBuilder 生成 XML 格式的系统 prompt
- * 2. 路由决策：决定用户请求应该路由到 qa/mindmap/palace 哪个功能
+ * 2. 子图路由：通过虚拟工具决定是否进入 mindmap/palace 子图
  * 3. 工具调用：管理知识库搜索、思维导图操作等工具
- * 4. 直接响应：处理普通问答和思维导图生成
+ * 4. 直接响应：处理普通对话
  *
  * 记忆与状态：
  * - 是唯一拥有持久化记忆访问权限的 Agent
@@ -41,9 +46,13 @@ export class MindLaneAgent extends BaseAgent {
     capabilityFlags?: CapabilityFlags,
   ) {
     super(provider);
-    const routeTool = createRouteDecisionTool(capabilityFlags?.hasPalace ?? true);
-    this.tools = [...tools, routeTool];
-    // ToolNode 只包含原始工具，路由决策工具在 invoke() 中直接处理
+    const routingTools: StructuredToolInterface[] = [
+      createGenerateMindmapFragmentTool(),
+    ];
+    if (capabilityFlags?.hasPalace ?? true) {
+      routingTools.push(createGeneratePalaceTool());
+    }
+    this.tools = [...tools, ...routingTools];
     this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
     this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
   }
@@ -51,17 +60,13 @@ export class MindLaneAgent extends BaseAgent {
   async invoke(
     state: MainGraphStateType,
   ): Promise<Partial<MainGraphStateType>> {
-    // Palace fast-path: if subgraph already decided the route, skip redundant LLM call
-    if (state.intent === 'palace' && state.palaceInputText && !state.memoryRoute?.length && !state.error) {
-      return { messages: [] };
-    }
-
     // Surface subgraph errors
     if (state.error) {
       return {
         messages: [new AIMessage({ content: state.response || state.error })],
-        intent: 'qa',
+        pendingSubgraph: null,
         response: state.response || state.error,
+        error: '',
       };
     }
 
@@ -85,9 +90,11 @@ export class MindLaneAgent extends BaseAgent {
       const content = extractTextContent(response.content);
       const toolCalls = (response as AIMessage).tool_calls ?? [];
 
-      const routeToolName = this.tools[this.tools.length - 1].name;
-      const nonRouteToolCalls = toolCalls.filter(
-        (tc) => tc.name !== routeToolName,
+      const virtualToolCalls = toolCalls.filter((tc) =>
+        isVirtualSubgraphTool(tc.name),
+      );
+      const actionToolCalls = toolCalls.filter((tc) =>
+        !isVirtualSubgraphTool(tc.name),
       );
 
       logger.info('[MindLaneAgent] 模型输出:', {
@@ -97,26 +104,25 @@ export class MindLaneAgent extends BaseAgent {
           name: tc.name,
           args: tc.args,
         })),
-        nonRouteToolCalls: nonRouteToolCalls.map((tc) => ({
+        actionToolCalls: actionToolCalls.map((tc) => ({
           id: tc.id,
           name: tc.name,
           args: tc.args,
         })),
       });
 
-      if (nonRouteToolCalls.length > 0) {
+      if (actionToolCalls.length > 0) {
         return { messages: [response] };
       }
 
-      const routeToolCall = toolCalls.find((tc) => tc.name === routeToolName);
-      if (routeToolCall) {
-        const decision = routeToolCall.args as RouteDecision;
-        return this.executeRouteDecision(response, decision, content);
+      const virtualToolCall = virtualToolCalls[0];
+      if (virtualToolCall) {
+        return this.executeVirtualToolRoute(response, virtualToolCall, content);
       }
 
       return {
         messages: [response],
-        intent: "qa",
+        pendingSubgraph: null,
         response: content,
       };
     } catch (err) {
@@ -135,15 +141,14 @@ export class MindLaneAgent extends BaseAgent {
 
     if (lastMessage && lastMessage.type === "ai") {
       const msg = lastMessage as AIMessage;
-      const routeToolName = this.tools[this.tools.length - 1].name;
-      const nonRouteToolCalls =
-        msg.tool_calls?.filter((tc) => tc.name !== routeToolName) ?? [];
-      if (nonRouteToolCalls.length > 0) {
+      const actionToolCalls =
+        msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? [];
+      if (actionToolCalls.length > 0) {
         return "tools";
       }
     }
 
-    switch (state.intent) {
+    switch (state.pendingSubgraph) {
       case "palace":
         return this.capabilityFlags.hasPalace ? "palaceSubgraph" : "__end__";
       case "mindmap":
@@ -153,52 +158,50 @@ export class MindLaneAgent extends BaseAgent {
     }
   }
 
-  private executeRouteDecision(
+  private executeVirtualToolRoute(
     response: AIMessage,
-    decision: RouteDecision,
+    toolCall: NonNullable<AIMessage["tool_calls"]>[number],
     content: string,
   ): Partial<MainGraphStateType> {
-    // 路由决策已被本地拦截处理，不应将 routeDecision 的 tool_use/tool_calls 存入状态，
-    // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误。
-    const cleanResponse = new AIMessage({ content });
-    switch (decision.target) {
-      case "mindmap": {
-        const source = decision.parameters?.mindmapSource;
-        if (source) {
-          return {
-            messages: [cleanResponse],
-            intent: "mindmap",
-            mindmapInputSource: {
-              type: source.type,
-              path: source.path,
-              url: source.url,
-            } as MindmapInputSource,
-            mindmapInputTitle: decision.parameters?.mindmapTitle || undefined,
-            response: content,
-          };
-        }
-        // No external source — pure text request. Let tools handle it.
+    if (toolCall.name === GENERATE_MINDMAP_FRAGMENT_TOOL) {
+      const args = toolCall.args as GenerateMindmapFragmentArgs;
+      const source = args.source;
+      if (!source) {
         return {
-          messages: [cleanResponse],
-          intent: "qa",
-          response: content,
+          messages: [new AIMessage({ content: '请提供要生成思维导图的文档或文本。' })],
+          pendingSubgraph: null,
+          response: '请提供要生成思维导图的文档或文本。',
         };
       }
-      case "palace":
-        return {
-          messages: [cleanResponse],
-          intent: "palace",
-          palaceInputText: decision.parameters?.palaceInput || content,
-          response: content,
-        };
-      case "qa":
-      default:
-        return {
-          messages: [cleanResponse],
-          intent: "qa",
-          response: content,
-        };
+      return {
+        messages: [createToolCallMessage(response, content)],
+        pendingSubgraph: "mindmap",
+        pendingSubgraphToolCallId: toolCall.id ?? '',
+        pendingSubgraphToolName: toolCall.name,
+        mindmapInputSource: source,
+        mindmapInputTitle: args.title || '',
+        response: content,
+      };
     }
+
+    if (toolCall.name === GENERATE_PALACE_TOOL) {
+      const args = toolCall.args as GeneratePalaceArgs;
+      return {
+        messages: [createToolCallMessage(response, content)],
+        pendingSubgraph: "palace",
+        pendingSubgraphToolCallId: toolCall.id ?? '',
+        pendingSubgraphToolName: toolCall.name,
+        palaceInputText: args.inputText || content,
+        palaceInputNodes: args.inputNodes || [],
+        response: content,
+      };
+    }
+
+    return {
+      messages: [response],
+      pendingSubgraph: null,
+      response: content,
+    };
   }
 }
 
@@ -227,5 +230,12 @@ function summarizeMessageContent(content: unknown): unknown {
     }
 
     return record;
+  });
+}
+
+function createToolCallMessage(response: AIMessage, content: string): AIMessage {
+  return new AIMessage({
+    content,
+    tool_calls: response.tool_calls ?? [],
   });
 }

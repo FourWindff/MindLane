@@ -276,9 +276,9 @@ describe('checkpointMessagesToSessionMessages', () => {
       new AIMessage({
         content: [
           { type: 'text', text: '我将为您扩展思维导图。' },
-          { type: 'tool_use', id: 'tool_abc', name: 'routeDecision', input: { target: 'mindmap' } },
+          { type: 'tool_use', id: 'tool_abc', name: 'generateMindmapFragment', input: { source: { type: 'text', content: '内容' } } },
         ],
-        tool_calls: [{ id: 'tool_abc', name: 'routeDecision', args: { target: 'mindmap' } }],
+        tool_calls: [{ id: 'tool_abc', name: 'generateMindmapFragment', args: { source: { type: 'text', content: '内容' } } }],
       }),
     ]
     const result = checkpointMessagesToSessionMessages(messages)
@@ -286,7 +286,7 @@ describe('checkpointMessagesToSessionMessages', () => {
     expect(result[0]).toEqual({
       role: 'assistant',
       content: '我将为您扩展思维导图。',
-      toolCalls: [{ name: 'routeDecision', args: { target: 'mindmap' }, result: '' }],
+      toolCalls: [{ name: 'generateMindmapFragment', args: { source: { type: 'text', content: '内容' } }, result: '' }],
     })
   })
 })

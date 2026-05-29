@@ -378,7 +378,7 @@ async function buildOutputNode(
   }
 
   return {
-    intent: 'qa',
+    pendingSubgraph: null,
     mindmapYaml: serializeMindmapOutline(rootTree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
@@ -424,7 +424,7 @@ async function textInputExtractNode(
     }
 
     return {
-      intent: 'qa',
+      pendingSubgraph: null,
       mindmapYaml: serializeMindmapOutline(rootTree),
       mindmapTitle: finalTitle,
       response: `已生成思维导图「${finalTitle}」。`,

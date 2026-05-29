@@ -1,4 +1,4 @@
-import { HumanMessage, AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { END, START, StateGraph } from "@langchain/langgraph";
 import type { CompiledStateGraph } from "@langchain/langgraph";
@@ -29,6 +29,11 @@ import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
+import {
+  GENERATE_MINDMAP_FRAGMENT_TOOL,
+  GENERATE_PALACE_TOOL,
+  isVirtualSubgraphTool,
+} from "./tools/subgraphRoutingTools.js";
 import { AGENT_LIMITS } from "./config.js";
 import { extractTextContent } from "./utils.js";
 
@@ -306,15 +311,30 @@ export class AgentOrchestrator {
       tools.push(actionTools.addPalaceNodeTool);
     }
     const toolNode = new ToolNode(tools);
+    const mindmapSubgraphNode = async (state: MainGraphStateType) => {
+      const result = await this.getCompiledMindmapSubgraph().invoke(state, {
+        recursionLimit: AGENT_LIMITS.recursionLimit,
+      });
+      const { messages: _messages, ...updates } = result;
+      return updates;
+    };
 
-    // 工具执行节点：过滤掉路由决策工具的调用（已在 supervisor.invoke 中处理）
+    const palaceSubgraphNode = async (state: MainGraphStateType) => {
+      const result = await this.getCompiledPalaceSubgraph().invoke(state, {
+        recursionLimit: AGENT_LIMITS.recursionLimit,
+      });
+      const { messages: _messages, ...updates } = result;
+      return updates;
+    };
+
+    // 工具执行节点：过滤掉虚拟子图路由工具（已在 supervisor.invoke 中处理）
     const toolsNode = async (state: MainGraphStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage && lastMessage.type === "ai") {
         const msg = lastMessage as AIMessage;
-        const nonRouteToolCalls =
-          msg.tool_calls?.filter((tc) => tc.name !== "routeDecision") ?? [];
-        if (nonRouteToolCalls.length === 0) {
+        const actionToolCalls =
+          msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? [];
+        if (actionToolCalls.length === 0) {
           return { messages: [] };
         }
         const filteredState = {
@@ -323,7 +343,7 @@ export class AgentOrchestrator {
             ...state.messages.slice(0, -1),
             new AIMessage({
               content: msg.content,
-              tool_calls: nonRouteToolCalls,
+              tool_calls: actionToolCalls,
             }),
           ],
         };
@@ -334,6 +354,78 @@ export class AgentOrchestrator {
       const result = await toolNode.invoke(state);
       const messages = result.messages ?? result;
       return { messages: Array.isArray(messages) ? messages : [messages] };
+    };
+
+    const mindmapToolResultNode = async (state: MainGraphStateType) => {
+      const content = state.error
+        ? {
+            ok: false,
+            error: state.response || state.error,
+          }
+        : {
+            ok: true,
+            title: state.mindmapTitle,
+            yamlFragment: state.mindmapYaml,
+          };
+
+      return {
+        messages: [
+          new ToolMessage({
+            tool_call_id: state.pendingSubgraphToolCallId,
+            name: state.pendingSubgraphToolName || GENERATE_MINDMAP_FRAGMENT_TOOL,
+            content: JSON.stringify(content),
+          }),
+        ],
+        pendingSubgraph: null,
+        pendingSubgraphToolCallId: '',
+        pendingSubgraphToolName: '',
+      };
+    };
+
+    const palaceToolResultNode = async (state: MainGraphStateType) => {
+      let imageUrl = "";
+      if (!state.error && state.imageUrls.length > 0) {
+        const url = state.imageUrls[0]!;
+        try {
+          imageUrl = url.startsWith("data:") ? url : await urlToDataUrl(url);
+        } catch {
+          imageUrl = url;
+        }
+      }
+
+      const content = state.error
+        ? {
+            ok: false,
+            error: state.response || state.error,
+          }
+        : {
+            ok: true,
+            label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
+            stations: state.memoryRoute.map((s: MemoryPalaceStation) => ({
+              order: s.order,
+              content: s.content,
+              anchorVisual: s.anchorVisual ?? "",
+              association: s.association,
+              x: s.x,
+              y: s.y,
+              linkedNodeId: s.linkedNodeId ?? "",
+            })),
+            imageUrl,
+            sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
+          };
+
+      return {
+        messages: [
+          new ToolMessage({
+            tool_call_id: state.pendingSubgraphToolCallId,
+            name: state.pendingSubgraphToolName || GENERATE_PALACE_TOOL,
+            content: JSON.stringify(content),
+          }),
+        ],
+        pendingSubgraph: null,
+        pendingSubgraphToolCallId: '',
+        pendingSubgraphToolName: '',
+      };
     };
 
     const supervisor = new MindLaneAgent(
@@ -350,8 +442,10 @@ export class AgentOrchestrator {
     const graph = new StateGraph(MainGraphState)
       .addNode("supervisor", (state) => supervisor.invoke(state))
       .addNode("tools", toolsNode)
-      .addNode("mindmapSubgraph", this.getCompiledMindmapSubgraph())
-      .addNode("palaceSubgraph", this.getCompiledPalaceSubgraph())
+      .addNode("mindmapSubgraph", mindmapSubgraphNode)
+      .addNode("palaceSubgraph", palaceSubgraphNode)
+      .addNode("mindmapToolResult", mindmapToolResultNode)
+      .addNode("palaceToolResult", palaceToolResultNode)
       .addEdge(START, "supervisor")
       .addConditionalEdges("supervisor", routeFn, {
         tools: "tools",
@@ -359,8 +453,10 @@ export class AgentOrchestrator {
         palaceSubgraph: "palaceSubgraph",
         __end__: END,
       })
-      .addEdge("mindmapSubgraph", "supervisor")
-      .addEdge("palaceSubgraph", END)
+      .addEdge("mindmapSubgraph", "mindmapToolResult")
+      .addEdge("mindmapToolResult", "supervisor")
+      .addEdge("palaceSubgraph", "palaceToolResult")
+      .addEdge("palaceToolResult", "supervisor")
       .addEdge("tools", "supervisor");
 
     return graph;
@@ -384,7 +480,7 @@ export class AgentOrchestrator {
     // Mindmap data now flows through YAML → batchAddMindmapNodes tool calls
     // The insertion is handled by the tool execution in the supervisor loop
 
-    if (result.intent === "palace" && result.memoryRoute.length > 0) {
+    if (result.memoryRoute.length > 0) {
       response.palaceData = {
         content: rawContent,
         imageUrls: result.imageUrls,

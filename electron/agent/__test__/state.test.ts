@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { StateGraph } from '@langchain/langgraph'
+import { SystemMessage } from '@langchain/core/messages'
 import { MainGraphState, MindmapSubgraphState } from '../state.js'
 
 describe('MindmapSubgraphState', () => {
@@ -16,7 +17,9 @@ describe('MindmapSubgraphState', () => {
     await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
@@ -46,7 +49,9 @@ describe('MindmapSubgraphState', () => {
     await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: null,
@@ -76,7 +81,9 @@ describe('MindmapSubgraphState', () => {
     await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: null,
@@ -105,7 +112,9 @@ describe('MindmapSubgraphState', () => {
     const result = await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: null,
@@ -138,7 +147,9 @@ describe('MindmapSubgraphState', () => {
     const result = await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: null,
@@ -175,7 +186,9 @@ describe('MainGraphState', () => {
     await compiled.invoke({
       messages: [],
       context: null,
-      intent: 'mindmap',
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
@@ -191,6 +204,7 @@ describe('MainGraphState', () => {
       documentRef: null,
       palaceInputText: ' palace text',
       palaceInputNodes: [],
+      palace: null,
       imageUrls: [],
       memoryRoute: [],
     })
@@ -206,9 +220,11 @@ describe('MainGraphState', () => {
 
     const compiled = graph.compile()
     const result = await compiled.invoke({
-      messages: [{ type: 'system', content: 'sys' }],
+      messages: [new SystemMessage('sys')],
       context: null,
-      intent: 'qa',
+      pendingSubgraph: null,
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
       response: '',
       error: '',
       mindmapInputSource: null,
@@ -224,6 +240,7 @@ describe('MainGraphState', () => {
       documentRef: null,
       palaceInputText: '',
       palaceInputNodes: [],
+      palace: null,
       imageUrls: [],
       memoryRoute: [],
     })
