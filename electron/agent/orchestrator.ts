@@ -30,6 +30,7 @@ import { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
 import { AGENT_LIMITS } from "./config.js";
+import { extractTextContent } from "./utils.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -172,9 +173,10 @@ export class AgentOrchestrator {
             continue;
           }
           const chunk = event.data?.chunk;
-          if (chunk && typeof chunk.content === "string" && chunk.content) {
-            fullContent += chunk.content;
-            callbacks.onToken(chunk.content);
+          const token = extractTextContent(chunk?.content);
+          if (token) {
+            fullContent += token;
+            callbacks.onToken(token);
           }
         } else if (event.event === "on_tool_start") {
           const toolName = event.name ?? "unknown";

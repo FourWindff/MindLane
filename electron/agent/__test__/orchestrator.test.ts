@@ -145,6 +145,46 @@ describe("AgentOrchestrator stream() 消息输入", () => {
     expect(capturedInputs[0].messages[0]).toBeInstanceOf(HumanMessage);
     expect((capturedInputs[0].messages[0] as HumanMessage).content).toBe("扩展子主题C");
   });
+
+  it("流式转发数组格式 chunk 中的文本内容", async () => {
+    const provider = createMockProvider();
+    const aiService = createMockAiService();
+    const orchestrator = new AgentOrchestrator(provider, aiService);
+    const onToken = vi.fn();
+    const onEnd = vi.fn();
+
+    const mockGraph = {
+      streamEvents: vi.fn().mockImplementation(async function* () {
+        yield {
+          event: "on_chat_model_stream",
+          metadata: { langgraph_node: "supervisor" },
+          data: {
+            chunk: {
+              content: [
+                { type: "text", text: "我来生成思维导图。" },
+                { type: "tool_use", id: "tool-1", name: "routeDecision", input: "" },
+              ],
+            },
+          },
+        };
+      }),
+      getState: vi.fn().mockResolvedValue({
+        values: { messages: [], intent: "mindmap", response: "我来生成思维导图。" },
+      }),
+    };
+
+    (orchestrator as unknown as { compiledMainGraph: typeof mockGraph }).compiledMainGraph = mockGraph;
+
+    await orchestrator.stream(
+      { threadId: "test-thread", message: "生成思维导图" },
+      { onToken, onToolStart: vi.fn(), onToolEnd: vi.fn(), onEnd, onError: vi.fn() },
+    );
+
+    expect(onToken).toHaveBeenCalledWith("我来生成思维导图。");
+    expect(onEnd).toHaveBeenCalledWith(expect.objectContaining({
+      content: "我来生成思维导图。",
+    }));
+  });
 });
 
 describe("AgentOrchestrator extractToolCalls", () => {

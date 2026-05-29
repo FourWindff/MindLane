@@ -51,12 +51,6 @@ export class MindLaneAgent extends BaseAgent {
   async invoke(
     state: MainGraphStateType,
   ): Promise<Partial<MainGraphStateType>> {
-    // If subgraph has output YAML but not yet handled, return a direct AI message
-    let mindmapyamlResponse='' ;
-    if (state.mindmapYaml) {
-      mindmapyamlResponse = `已从 ${state.mindmapInputSource?.type || '来源'} 生成思维导图「${state.mindmapTitle}」，正在插入...`;
-    }
-
     // Palace fast-path: if subgraph already decided the route, skip redundant LLM call
     if (state.intent === 'palace' && state.palaceInputText && !state.memoryRoute?.length && !state.error) {
       return { messages: [] };
@@ -85,8 +79,6 @@ export class MindLaneAgent extends BaseAgent {
       const messagesWithSystem = [
         new SystemMessage(systemPrompt),
         ...state.messages,
-        ...(mindmapyamlResponse ? [new AIMessage({ content: mindmapyamlResponse
-        })] : [])
       ];
 
       const response = await this.modelWithTools.invoke(messagesWithSystem);
@@ -97,6 +89,20 @@ export class MindLaneAgent extends BaseAgent {
       const nonRouteToolCalls = toolCalls.filter(
         (tc) => tc.name !== routeToolName,
       );
+
+      logger.info('[MindLaneAgent] 模型输出:', {
+        rawContent: summarizeMessageContent(response.content),
+        toolCalls: toolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          args: tc.args,
+        })),
+        nonRouteToolCalls: nonRouteToolCalls.map((tc) => ({
+          id: tc.id,
+          name: tc.name,
+          args: tc.args,
+        })),
+      });
 
       if (nonRouteToolCalls.length > 0) {
         return { messages: [response] };
@@ -152,10 +158,9 @@ export class MindLaneAgent extends BaseAgent {
     decision: RouteDecision,
     content: string,
   ): Partial<MainGraphStateType> {
-    // 路由决策已被本地拦截处理，不应将 tool_calls 存入状态，
-    // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误
-    const cleanResponse = response;
-    (cleanResponse as AIMessage).tool_calls = undefined;
+    // 路由决策已被本地拦截处理，不应将 routeDecision 的 tool_use/tool_calls 存入状态，
+    // 否则后续模型调用会因缺少对应 tool response 而触发 API 验证错误。
+    const cleanResponse = new AIMessage({ content });
     switch (decision.target) {
       case "mindmap": {
         const source = decision.parameters?.mindmapSource;
@@ -195,4 +200,32 @@ export class MindLaneAgent extends BaseAgent {
         };
     }
   }
+}
+
+function summarizeMessageContent(content: unknown): unknown {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return content;
+
+  return content.map((block) => {
+    if (!block || typeof block !== 'object') return block;
+
+    const record = block as Record<string, unknown>;
+    if (record.type === 'text') {
+      return {
+        type: record.type,
+        text: record.text,
+      };
+    }
+
+    if (record.type === 'tool_use') {
+      return {
+        type: record.type,
+        id: record.id,
+        name: record.name,
+        input: record.input,
+      };
+    }
+
+    return record;
+  });
 }

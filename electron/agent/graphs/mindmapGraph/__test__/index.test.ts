@@ -98,6 +98,7 @@ describe('mindmapGraph', () => {
 
     expect(result.mindmapYaml).toBeTruthy()
     expect(result.mindmapTitle).toBe('人工智能导论')
+    expect(result.intent).toBe('qa')
     expect(result.error).toBe('')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
   })
@@ -178,6 +179,7 @@ describe('mindmapGraph', () => {
 
     expect(result.error).toBe('')
     expect(result.mindmapYaml).toContain('人工智能导论')
+    expect(result.intent).toBe('qa')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
   })
 
@@ -272,6 +274,7 @@ Merged Root:
     expect(result.error).toBe('')
     expect(result.leafResults).toHaveLength(1)
     expect(result.mindmapYaml).toContain('Merged Root')
+    expect(result.intent).toBe('qa')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
   })
 
@@ -332,6 +335,7 @@ Merged Root:
     expect(result.error).toBe('')
     expect(result.mergeResults).toHaveLength(1)
     expect(result.mindmapYaml).toContain('Merged Root')
+    expect(result.intent).toBe('qa')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
   })
 })

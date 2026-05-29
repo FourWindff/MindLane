@@ -88,7 +88,10 @@ describe('MindLaneAgent.invoke()', () => {
   it('routeDecision with mindmapSource sets mindmapInputSource and intent', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '从 PDF 生成思维导图',
+        content: [
+          { type: 'text', text: '从 PDF 生成思维导图' },
+          { type: 'tool_use', id: 'call-1', name: 'routeDecision', input: { target: 'mindmap' } },
+        ],
         tool_calls: [
           {
             name: 'routeDecision',
@@ -115,6 +118,8 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
     expect(result.mindmapInputTitle).toBe('PDF 导图')
     expect(result.messages).toHaveLength(1)
+    expect((result.messages?.[0] as AIMessage).content).toBe('从 PDF 生成思维导图')
+    expect((result.messages?.[0] as AIMessage).tool_calls).toHaveLength(0)
   })
 
   it('普通工具调用时返回 messages 走 ToolNode', async () => {
