@@ -137,7 +137,7 @@ contextBridge.exposeInMainWorld('mindlane', {
       >,
     selectDocument: () =>
       ipcRenderer.invoke('file:select-document') as Promise<
-        | { ok: true; data: { path: string; name: string; size: number } }
+        | { ok: true; data: { path: string; name: string; size: number; mtimeMs: number; sha256: string } }
         | { ok: false; error: string }
       >,
   },

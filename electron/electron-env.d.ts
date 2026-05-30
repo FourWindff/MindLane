@@ -36,6 +36,8 @@ type _ChatContext = {
   hasDocumentOpen?: boolean
   workspacePath?: string
   workspaceFiles?: { name: string; filePath: string }[]
+  attachedDocument?: import('../src/shared/lib/fileFormat').DocumentRef
+  linkedDocuments?: import('../src/shared/lib/fileFormat').DocumentRef[]
 }
 
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
@@ -155,7 +157,7 @@ interface Window {
         | { ok: false; error: string }
       >
       selectDocument: () => Promise<
-        | { ok: true; data: { path: string; name: string; size: number } }
+        | { ok: true; data: { path: string; name: string; size: number; mtimeMs: number; sha256: string } }
         | { ok: false; error: string }
       >
     }

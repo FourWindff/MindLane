@@ -3,7 +3,7 @@ import type { Node, Edge } from '@xyflow/react'
 import { useAiStore, saveChatHistory } from '@/features/chat/model/aiStore'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { nodeRegistry } from '@/features/mindmap/nodes'
-import type { MindLaneNode } from '@/shared/lib/fileFormat'
+import type { DocumentRef, MindLaneNode } from '@/shared/lib/fileFormat'
 import { stripMarkers } from '@/features/chat/lib/chatUtils'
 import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 
@@ -56,6 +56,20 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
     },
     [],
   )
+
+  const extractGeneratedDocumentRef = useCallback((toolCalls: Array<{ name: string; result: string }> | undefined): DocumentRef | null => {
+    if (!toolCalls) return null
+    for (const toolCall of toolCalls) {
+      if (toolCall.name !== 'generateMindmapFragment') continue
+      try {
+        const result = JSON.parse(toolCall.result) as { ok?: boolean; documentRef?: DocumentRef | null }
+        if (result.ok && result.documentRef) return result.documentRef
+      } catch {
+        return null
+      }
+    }
+    return null
+  }, [])
 
   useEffect(() => {
     const api = window.mindlane?.ai
@@ -124,10 +138,15 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
 
         if (response.toolCalls) {
           const mindmapStore = useMindmapStore.getState()
+          const generatedDocumentRef = extractGeneratedDocumentRef(response.toolCalls)
+          let appliedMindmapChange = false
           for (const toolCall of response.toolCalls) {
             if (MINDMAP_ACTION_TOOLS.includes(toolCall.name)) {
-              handleMindmapToolCall(toolCall, mindmapStore)
+              appliedMindmapChange = handleMindmapToolCall(toolCall, mindmapStore) || appliedMindmapChange
             }
+          }
+          if (generatedDocumentRef && appliedMindmapChange) {
+            mindmapStore.addDocumentRef(generatedDocumentRef)
           }
         }
 
@@ -145,7 +164,7 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
     )
 
     return () => unsubs.forEach((fn) => fn())
-  }, [addMessage, applyMindmapData, scrollToBottom, finishStream])
+  }, [addMessage, applyMindmapData, extractGeneratedDocumentRef, scrollToBottom, finishStream])
 
   return {
     streamingText,

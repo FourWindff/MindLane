@@ -159,6 +159,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       dirty: false,
       editingNodeId: null,
       viewport: f.mindmap.viewport,
+      documentRefs: [],
     })
   },
 
@@ -190,7 +191,10 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
 
   addDocumentRef: (ref) => {
     set((s) => ({
-      documentRefs: [...s.documentRefs, ref],
+      documentRefs: [
+        ...s.documentRefs.filter((doc) => doc.id !== ref.id),
+        ref,
+      ],
       dirty: true,
     }))
   },

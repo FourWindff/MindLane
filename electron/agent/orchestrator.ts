@@ -29,6 +29,7 @@ import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
+import { createSearchLinkedDocumentTool } from "./tools/linkedDocumentSearch.js";
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
@@ -37,6 +38,7 @@ import {
 import { AGENT_LIMITS } from "./config.js";
 import { extractTextContent } from "./utils.js";
 import { checkpointMessagesToSessionMessages } from "./memory/checkpointer.js";
+import type { CacheManager } from "../fs/cacheManager.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -89,6 +91,10 @@ export interface StreamCallbacks {
   onError: (error: string) => void;
 }
 
+export interface AgentOrchestratorOptions {
+  cacheManager?: CacheManager;
+}
+
 export interface PalaceFromNodesResult {
   ok: true;
   label: string;
@@ -116,10 +122,12 @@ export class AgentOrchestrator {
   private compiledMainGraph: CompiledStateGraph<MainGraphStateType, unknown, string> | null = null;
   private compiledMindmapSubgraph: CompiledStateGraph<MindmapSubgraphStateType, unknown, string> | null = null;
   private compiledPalaceSubgraph: CompiledStateGraph<PalaceSubgraphStateType, unknown, string> | null = null;
+  private activeContext: MindmapContextData | null = null;
 
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
+    private options: AgentOrchestratorOptions = {},
   ) {}
 
   private getCompiledMainGraph() {
@@ -137,6 +145,24 @@ export class AgentOrchestrator {
     if (!this.compiledMindmapSubgraph) {
       this.compiledMindmapSubgraph = buildMindmapSubgraph({
         provider: this.provider,
+        cacheDocumentText: this.options.cacheManager
+          ? async (docRef, text) => {
+              const metadataTextCacheKey = docRef.metadata?.textCacheKey;
+              const textCacheKey = typeof metadataTextCacheKey === 'string' && /^[A-Za-z0-9_-]+$/.test(metadataTextCacheKey)
+                ? metadataTextCacheKey
+                : docRef.id;
+              await this.options.cacheManager!.cacheDocumentText(textCacheKey, text);
+              return {
+                ...docRef,
+                metadata: {
+                  ...docRef.metadata,
+                  originalPath: docRef.metadata?.originalPath || docRef.source,
+                  textCacheKey,
+                  textCachedAt: new Date().toISOString(),
+                },
+              };
+            }
+          : undefined,
       }).compile();
     }
     return this.compiledMindmapSubgraph;
@@ -157,6 +183,7 @@ export class AgentOrchestrator {
     signal?: AbortSignal,
   ): Promise<void> {
     const app = this.getCompiledMainGraph();
+    this.activeContext = request.context ?? null;
 
     let fullContent = "";
     let currentSegmentContent = "";
@@ -174,6 +201,7 @@ export class AgentOrchestrator {
       const initialState: Partial<MainGraphStateType> = {
         messages: [new HumanMessage(request.message)],
         context: request.context ?? null,
+        documentRef: request.documentRef ?? null,
       };
 
       const stream = app.streamEvents(initialState, streamConfig);
@@ -332,6 +360,14 @@ export class AgentOrchestrator {
     if (hasPalace && actionTools.addPalaceNodeTool) {
       tools.push(actionTools.addPalaceNodeTool);
     }
+    if (this.options.cacheManager) {
+      tools.push(
+        createSearchLinkedDocumentTool({
+          documents: () => this.activeContext?.linkedDocuments ?? [],
+          cacheManager: this.options.cacheManager,
+        }),
+      );
+    }
     const toolNode = new ToolNode(tools);
     const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
       subgraph: { invoke: (state: MainGraphStateType, config: { recursionLimit: number }) => Promise<T> },
@@ -389,6 +425,7 @@ export class AgentOrchestrator {
             ok: true,
             title: state.mindmapTitle,
             yamlFragment: state.mindmapYaml,
+            documentRef: state.documentRef,
           };
 
       return {

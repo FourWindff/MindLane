@@ -24,4 +24,6 @@ export interface MindmapContextData {
   workspaceFiles?: WorkspaceFileInfo[]
   /** Optional attached document reference for mindmap generation */
   attachedDocument?: DocumentRef
+  /** Documents already linked to the currently opened .mindlane file */
+  linkedDocuments?: DocumentRef[]
 }

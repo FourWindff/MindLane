@@ -52,7 +52,15 @@ export interface DocumentRef {
   importedAt: string
   title?: string
   pageCount?: number
-  metadata?: Record<string, unknown>
+  metadata?: {
+    originalPath?: string
+    textCacheKey?: string
+    size?: number
+    mtimeMs?: number
+    sha256?: string
+    textCachedAt?: string
+    [key: string]: unknown
+  }
 }
 
 export interface ChatToolCall {
@@ -101,4 +109,3 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
     documents: [],
   }
 }
-

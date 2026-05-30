@@ -11,8 +11,9 @@ import {
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
-import type { MindLaneFile } from '../src/shared/lib/fileFormat.js'
+import type { DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
@@ -38,6 +39,11 @@ let forceClose = false
 
 let fsService: FileSystemService
 let aiService: AiService
+
+async function fileSha256(filePath: string): Promise<string> {
+  const buffer = await fs.promises.readFile(filePath)
+  return crypto.createHash('sha256').update(buffer).digest('hex')
+}
 
 function pathExists(targetPath: string | null | undefined): boolean {
   if (!targetPath) return false
@@ -258,7 +264,8 @@ function registerIpcHandlers() {
           hasDocumentOpen?: boolean
           workspacePath?: string
           workspaceFiles?: { name: string; filePath: string }[]
-          attachedDocument?: { id: string; type: 'pdf' | 'url' | 'text'; source: string; filename: string; importedAt: string; title?: string }
+          attachedDocument?: DocumentRef
+          linkedDocuments?: DocumentRef[]
         }
       },
     ) => {
@@ -304,7 +311,9 @@ function registerIpcHandlers() {
           documentRef: payload.context?.attachedDocument,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService)
+        const orchestrator = new AgentOrchestrator(provider, aiService, {
+          cacheManager: fsService.cache,
+        })
         await orchestrator.stream(
           request,
           {
@@ -391,7 +400,9 @@ function registerIpcHandlers() {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const orchestrator = new AgentOrchestrator(provider, aiService)
+      const orchestrator = new AgentOrchestrator(provider, aiService, {
+        cacheManager: fsService.cache,
+      })
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
   )
@@ -508,12 +519,15 @@ function registerIpcHandlers() {
     const filePath = result.filePaths[0]
     try {
       const stats = await fs.promises.stat(filePath)
+      const hash = await fileSha256(filePath)
       return {
         ok: true,
         data: {
           path: filePath,
           name: path.basename(filePath),
           size: stats.size,
+          mtimeMs: stats.mtimeMs,
+          sha256: hash,
         },
       }
     } catch (error) {
