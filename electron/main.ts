@@ -13,12 +13,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { AppSettings } from './fs/types.js'
-import type { DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
+import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
-import { SessionMessage } from './agent/db/chatDb.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -753,18 +752,14 @@ function registerIpcHandlers() {
       payload: {
         workspacePath: string
         sessionId: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
+        messages: ChatMessage[]
       },
     ) => {
       try {
         aiService.sessionManager.setWorkspace(payload.workspacePath)
         await aiService.sessionManager.saveSession(
           payload.sessionId,
-          payload.messages as SessionMessage[],
+          payload.messages,
         )
         return { ok: true }
       } catch (err) {
@@ -813,11 +808,7 @@ function registerIpcHandlers() {
       _e,
       payload: {
         workspacePath: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
+        messages: ChatMessage[]
       },
     ) => {
       try {
@@ -826,7 +817,7 @@ function registerIpcHandlers() {
           || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
         await aiService.sessionManager.saveSession(
           sessionId,
-          payload.messages as SessionMessage[],
+          payload.messages,
         )
         return { ok: true }
       } catch (err) {

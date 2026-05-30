@@ -171,10 +171,53 @@ describe('SessionManager', () => {
     expect(ws1Sessions[0].title).toBe('Workspace 1')
   })
 
-  it('loadHistory 从 checkpoint 读取消息（无 checkpoint 时返回空）', async () => {
-    // Without a LangGraph checkpoint, loadHistory returns empty
-    const loaded = await manager.loadHistory('non-existent-session')
-    expect(loaded).toHaveLength(0)
+  it('loadHistory returns UI messages saved for the session', async () => {
+    const messages: SessionMessage[] = [
+      {
+        role: 'user',
+        content: 'Use this document',
+        attachment: { name: 'doc.pdf', type: 'pdf' },
+        timestamp: '2024-01-01T00:00:00Z',
+      },
+      {
+        role: 'assistant',
+        content: 'Done',
+        toolCalls: [{ name: 'batchAddMindmapNodes', args: { count: 1 }, result: 'ok' }],
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+    ]
+
+    await manager.saveSession('session-ui-history', messages)
+
+    await expect(manager.loadHistory('session-ui-history')).resolves.toEqual(messages)
+  })
+
+  it('saveSession appends only new frontend messages without rewriting existing history', async () => {
+    await manager.saveSession('session-replace', [{ role: 'user', content: 'first' }])
+    await manager.saveSession('session-replace', [
+      { role: 'user', content: 'edited first' },
+      { role: 'assistant', content: 'second' },
+    ])
+
+    await expect(manager.loadHistory('session-replace')).resolves.toEqual([
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'second' },
+    ])
+  })
+
+  it('deleteSession removes UI messages and checkpoint thread', async () => {
+    const deletedThreads: string[] = []
+    manager.setCheckpointer({
+      deleteThread: async (threadId: string) => {
+        deletedThreads.push(threadId)
+      },
+    } as never)
+
+    await manager.saveSession('session-delete-linked', [{ role: 'user', content: 'delete me' }])
+    await manager.deleteSession('session-delete-linked')
+
+    await expect(manager.loadHistory('session-delete-linked')).resolves.toEqual([])
+    expect(deletedThreads).toEqual(['session-delete-linked'])
   })
 
   it('loadHistoryAsMessages 无 checkpoint 时返回空', async () => {

@@ -70,6 +70,19 @@ export interface ChatToolCall {
   result: string
 }
 
+export interface ChatMessageAttachment {
+  name: string
+  type: 'pdf' | 'url' | 'text'
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  toolCalls?: ChatToolCall[]
+  attachment?: ChatMessageAttachment
+  timestamp?: string
+}
+
 export function isTextNodeData(data: unknown): data is TextNodeData {
   return (
     typeof data === 'object' &&

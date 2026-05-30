@@ -41,6 +41,7 @@ type _ChatContext = {
 }
 
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
+type _ChatMessage = import('../src/shared/lib/fileFormat').ChatMessage
 
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
 type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge
@@ -236,20 +237,12 @@ interface Window {
         ok: true
         data: {
           threadId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
+          messages: _ChatMessage[]
         }
       }>
       saveHistory: (payload: {
         workspacePath: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
+        messages: _ChatMessage[]
       }) => Promise<{ ok: true } | { ok: false; error: string }>
       // Multi-session APIs
       listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) => Promise<
@@ -260,21 +253,13 @@ interface Window {
         ok: true
         data: {
           sessionId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
+          messages: _ChatMessage[]
         }
       }>
       saveSession: (payload: {
         workspacePath: string
         sessionId: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
+        messages: _ChatMessage[]
       }) => Promise<{ ok: true } | { ok: false; error: string }>
       deleteSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{ ok: true } | { ok: false; error: string }>
     }

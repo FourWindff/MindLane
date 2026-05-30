@@ -36,7 +36,7 @@ type ChatContext = {
   workspaceFiles?: { name: string; filePath: string }[]
 }
 
-import type { ChatToolCall } from '../src/shared/lib/fileFormat'
+import type { ChatMessage, ChatToolCall } from '../src/shared/lib/fileFormat'
 
 type ChatSessionMeta = {
   id: string
@@ -186,20 +186,12 @@ contextBridge.exposeInMainWorld('mindlane', {
         ok: true
         data: {
           threadId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
+          messages: ChatMessage[]
         }
       }>,
     saveHistory: (payload: {
       workspacePath: string
-      messages: Array<{
-        role: string
-        content: string
-        toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-      }>
+      messages: ChatMessage[]
     }) => ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     // New multi-session APIs
     listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
@@ -212,21 +204,13 @@ contextBridge.exposeInMainWorld('mindlane', {
         ok: true
         data: {
           sessionId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
+          messages: ChatMessage[]
         }
       }>,
     saveSession: (payload: {
       workspacePath: string
       sessionId: string
-      messages: Array<{
-        role: string
-        content: string
-        toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-      }>
+      messages: ChatMessage[]
     }) => ipcRenderer.invoke('chat:save-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     deleteSession: (payload: { workspacePath: string; sessionId: string }) =>
       ipcRenderer.invoke('chat:delete-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
