@@ -4,10 +4,10 @@ import type { BaseMessage } from '@langchain/core/messages'
 import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import path from 'node:path'
 import fs from 'node:fs'
-import type { SessionMessage } from '../db/chatDb.js'
+import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
 import { extractTextContent } from '../utils.js'
 
-export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): SessionMessage[] {
+export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): ChatMessage[] {
   const toolResults = new Map<string, string>()
 
   for (const msg of messages) {
@@ -19,8 +19,8 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Se
     }
   }
 
-  const result: SessionMessage[] = []
-  const pendingToolCalls: NonNullable<SessionMessage['toolCalls']> = []
+  const result: ChatMessage[] = []
+  const pendingToolCalls: NonNullable<ChatMessage['toolCalls']> = []
 
   for (const msg of messages) {
     const type = msg.type
@@ -92,7 +92,7 @@ export class CheckpointerManager {
     return this.saver ?? undefined
   }
 
-  async getMessages(threadId: string): Promise<SessionMessage[]> {
+  async getMessages(threadId: string): Promise<ChatMessage[]> {
     if (!this.saver) return []
     const tuple = await this.saver.getTuple({ configurable: { thread_id: threadId } })
     if (!tuple) return []

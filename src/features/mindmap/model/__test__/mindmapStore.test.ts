@@ -45,6 +45,57 @@ describe('mindmapStore.viewport', () => {
   })
 })
 
+describe('mindmapStore.documentRefs', () => {
+  beforeEach(() => {
+    useMindmapStore.getState().newFile('测试')
+  })
+
+  it('should persist document refs in toMindLaneFile', () => {
+    const store = useMindmapStore.getState()
+    store.addDocumentRef({
+      id: 'doc-1',
+      type: 'pdf',
+      source: '/tmp/source.pdf',
+      filename: 'source.pdf',
+      importedAt: '2026-05-30T00:00:00.000Z',
+      metadata: {
+        textCacheKey: 'doc-1',
+      },
+    })
+
+    const file = store.toMindLaneFile()
+
+    expect(file.documents).toEqual([
+      expect.objectContaining({
+        id: 'doc-1',
+        filename: 'source.pdf',
+        metadata: expect.objectContaining({ textCacheKey: 'doc-1' }),
+      }),
+    ])
+  })
+
+  it('should replace document refs with the same id', () => {
+    const store = useMindmapStore.getState()
+    store.addDocumentRef({
+      id: 'doc-1',
+      type: 'pdf',
+      source: '/tmp/old.pdf',
+      filename: 'old.pdf',
+      importedAt: '2026-05-30T00:00:00.000Z',
+    })
+    store.addDocumentRef({
+      id: 'doc-1',
+      type: 'pdf',
+      source: '/tmp/new.pdf',
+      filename: 'new.pdf',
+      importedAt: '2026-05-30T00:00:01.000Z',
+    })
+
+    expect(useMindmapStore.getState().documentRefs).toHaveLength(1)
+    expect(useMindmapStore.getState().documentRefs[0]!.filename).toBe('new.pdf')
+  })
+})
+
 describe('mindmapStore.insertNodesFromYaml', () => {
   beforeEach(() => {
     useMindmapStore.getState().newFile('测试')

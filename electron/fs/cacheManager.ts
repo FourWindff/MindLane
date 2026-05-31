@@ -36,13 +36,15 @@ export class CacheManager {
   }
 
   async cacheDocumentText(docId: string, text: string): Promise<string> {
-    const filePath = path.join(this.documentsDir, `${docId}.txt`)
+    const safeDocId = this.normalizeCacheKey(docId)
+    const filePath = path.join(this.documentsDir, `${safeDocId}.txt`)
     await fs.promises.writeFile(filePath, text, 'utf-8')
     return filePath
   }
 
   async readDocumentText(docId: string): Promise<string | null> {
-    const filePath = path.join(this.documentsDir, `${docId}.txt`)
+    const safeDocId = this.normalizeCacheKey(docId)
+    const filePath = path.join(this.documentsDir, `${safeDocId}.txt`)
     try {
       return await fs.promises.readFile(filePath, 'utf-8')
     } catch {
@@ -97,6 +99,11 @@ export class CacheManager {
 
   private hashString(input: string): string {
     return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16)
+  }
+
+  private normalizeCacheKey(input: string): string {
+    if (/^[A-Za-z0-9_-]+$/.test(input)) return input
+    return this.hashString(input)
   }
 
   private extractExt(url: string, fallback: string): string {

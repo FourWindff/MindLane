@@ -6,15 +6,15 @@ import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages
 import { compressMessages } from '../memory/compression.js'
 import type { LLMProvider } from '../providers/index.js'
 import { ChatDb } from '../db/chatDb.js'
-import type { ChatSessionRow, SessionMessage, SessionMeta } from '../db/chatDb.js'
+import type { ChatMessage, ChatSessionRow, SessionMeta } from '../db/chatDb.js'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
-export type { SessionMessage, SessionMeta } from '../db/chatDb.js'
+export type { ChatMessage as SessionMessage, SessionMeta } from '../db/chatDb.js'
 
 /**
  * 聊天历史管理器 - SQLite 版本
  *
  * 职责：
- * 1. 从 LangGraph checkpoints 加载指定会话的历史消息
+ * 1. 从 UI chat_messages 表加载指定会话的历史消息
  * 2. 将存储格式转换为 LangChain Message 格式
  * 3. 提供消息压缩/截断策略
  * 4. 支持会话的 CRUD 操作
@@ -102,9 +102,9 @@ export class SessionManager {
           if (!fs.existsSync(sessionFilePath)) continue
 
           const sessionData = JSON.parse(fs.readFileSync(sessionFilePath, 'utf-8'))
-          const messages: SessionMessage[] = Array.isArray(sessionData.messages) ? sessionData.messages : []
+          const messages: ChatMessage[] = Array.isArray(sessionData.messages) ? sessionData.messages : []
 
-          // Insert session metadata only (messages are in checkpoints)
+          // Insert session metadata and preserve migrated UI messages.
           const row: ChatSessionRow = {
             id: session.id,
             workspace_hash: dir.name,
@@ -114,6 +114,7 @@ export class SessionManager {
             message_count: messages.length,
           }
           this.db!.upsertSession(row)
+          this.db!.replaceMessages(session.id, messages)
         }
       }
 
@@ -132,11 +133,11 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的历史消息（从 LangGraph checkpoints）
+   * 加载指定会话的 UI 历史消息。
    */
-  async loadHistory(threadId: string): Promise<SessionMessage[]> {
-    if (!this.checkpointer) return []
-    return this.checkpointer.getMessages(threadId)
+  async loadHistory(threadId: string): Promise<ChatMessage[]> {
+    if (!this.db) throw new Error('SessionManager not initialized')
+    return this.db.listMessages(threadId)
   }
 
   /**
@@ -214,11 +215,11 @@ export class SessionManager {
   }
 
   /**
-   * 保存会话元数据（消息内容已存储在 LangGraph checkpoints 中）
+   * 保存会话元数据和 UI 消息历史。
    */
   async saveSession(
     sessionId: string,
-    messages: SessionMessage[],
+    messages: ChatMessage[],
   ): Promise<void> {
     if (!this.db) throw new Error('SessionManager not initialized')
 
@@ -226,6 +227,9 @@ export class SessionManager {
 
     // Check if session exists and has a non-empty title
     const existing = this.db.getSession(sessionId)
+    const storedMessages = this.db.listMessages(sessionId)
+    const messagesToAppend = messages.slice(storedMessages.length)
+    const nextMessageCount = storedMessages.length + messagesToAppend.length
     let title: string
 
     if (existing && existing.title) {
@@ -252,8 +256,9 @@ export class SessionManager {
       title,
       created_at: existing?.created_at ?? now,
       updated_at: now,
-      message_count: messages.length,
+      message_count: nextMessageCount,
     })
+    this.db.appendMessages(sessionId, messagesToAppend)
   }
 
   /**

@@ -18,15 +18,9 @@ export type AiPipelineStep =
   | 'generating-map'
   | 'chatting'
 
-import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
 
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  toolCalls?: ChatToolCall[]
-  /** Optional attachment reference for this message */
-  attachment?: { name: string; type: 'pdf' | 'url' | 'text' }
-}
+export type { ChatMessage }
 
 export interface ChatSession {
   id: string

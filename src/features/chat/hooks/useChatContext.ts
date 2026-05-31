@@ -35,6 +35,8 @@ export interface ChatContext {
   workspaceFiles?: { name: string; filePath: string }[]
   /** Attached document reference for mindmap generation */
   attachedDocument?: DocumentRef
+  /** Documents already linked to the current mindmap file */
+  linkedDocuments?: DocumentRef[]
 }
 
 export interface QuickAction {
@@ -61,6 +63,22 @@ export function useChatContext() {
 
     if (typeof mindmapState.getContextSummary === 'function') {
       ctx.mindmapSummary = mindmapState.getContextSummary()
+    }
+
+    if (mindmapState.documentRefs.length > 0) {
+      ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({
+        id: doc.id,
+        type: doc.type,
+        source: doc.source,
+        filename: doc.filename,
+        importedAt: doc.importedAt,
+        title: doc.title,
+        pageCount: doc.pageCount,
+        metadata: {
+          originalPath: doc.metadata?.originalPath,
+          textCacheKey: doc.metadata?.textCacheKey,
+        },
+      }))
     }
 
     const selected = mindmapState.nodes.filter((n) => n.selected)

@@ -36,9 +36,37 @@ type _ChatContext = {
   hasDocumentOpen?: boolean
   workspacePath?: string
   workspaceFiles?: { name: string; filePath: string }[]
+  attachedDocument?: import('../src/shared/lib/fileFormat').DocumentRef
+  linkedDocuments?: import('../src/shared/lib/fileFormat').DocumentRef[]
 }
 
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
+type _ChatMessage = import('../src/shared/lib/fileFormat').ChatMessage
+
+type _ChatLoadHistoryResult = {
+  ok: true
+  data: {
+    threadId: string
+    messages: _ChatMessage[]
+  }
+}
+
+type _ChatSaveHistoryPayload = {
+  workspacePath: string
+  messages: _ChatMessage[]
+}
+
+type _ChatLoadSessionResult = {
+  ok: true
+  data: {
+    sessionId: string
+    messages: _ChatMessage[]
+  }
+}
+
+type _ChatSaveSessionPayload = _ChatSaveHistoryPayload & {
+  sessionId: string
+}
 
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
 type _MindLaneEdge = import('../src/shared/lib/fileFormat').MindLaneEdge
@@ -155,7 +183,7 @@ interface Window {
         | { ok: false; error: string }
       >
       selectDocument: () => Promise<
-        | { ok: true; data: { path: string; name: string; size: number } }
+        | { ok: true; data: { path: string; name: string; size: number; mtimeMs: number; sha256: string } }
         | { ok: false; error: string }
       >
     }
@@ -230,50 +258,15 @@ interface Window {
       }) => Promise<_FsResult<{ newPath: string }>>
     }
     chat: {
-      loadHistory: (payload: { workspacePath: string }) => Promise<{
-        ok: true
-        data: {
-          threadId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
-        }
-      }>
-      saveHistory: (payload: {
-        workspacePath: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
-      }) => Promise<{ ok: true } | { ok: false; error: string }>
+      loadHistory: (payload: { workspacePath: string }) => Promise<_ChatLoadHistoryResult>
+      saveHistory: (payload: _ChatSaveHistoryPayload) => Promise<{ ok: true } | { ok: false; error: string }>
       // Multi-session APIs
       listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) => Promise<
         | { ok: true; data: { sessions: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }> } }
         | { ok: false; error: string }
       >
-      loadSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{
-        ok: true
-        data: {
-          sessionId: string
-          messages: Array<{
-            role: 'user' | 'assistant' | 'system'
-            content: string
-            toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-          }>
-        }
-      }>
-      saveSession: (payload: {
-        workspacePath: string
-        sessionId: string
-        messages: Array<{
-          role: string
-          content: string
-          toolCalls?: Array<{ name: string; args: Record<string, unknown>; result: string }>
-        }>
-      }) => Promise<{ ok: true } | { ok: false; error: string }>
+      loadSession: (payload: { workspacePath: string; sessionId: string }) => Promise<_ChatLoadSessionResult>
+      saveSession: (payload: _ChatSaveSessionPayload) => Promise<{ ok: true } | { ok: false; error: string }>
       deleteSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{ ok: true } | { ok: false; error: string }>
     }
     kb: {

@@ -1,6 +1,6 @@
 import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
-import { MindmapSubgraphState } from '../../state.js'
+import { MindmapSubgraphState, type DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
@@ -12,6 +12,7 @@ import { extractRootTree } from './shared/rootTree.js'
 
 export interface MindmapSubgraphOptions {
   provider: LLMProvider
+  cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
 }
 
 const LEAF_BATCH_SIZE = 5
@@ -121,6 +122,7 @@ function buildYamlRepairPrompt(
 
 async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
+  options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
   const source = state.mindmapInputSource
 
@@ -159,6 +161,7 @@ async function loadDocumentNode(
     try {
       const loader = new PdfDocumentLoader()
       const pages = await loader.load(source)
+      const fullText = pages.map((page) => page.text).join('\n\n')
       const chunks = chunkPages(pages, CHUNK_CHAR_LIMIT)
 
       if (chunks.length === 0) {
@@ -168,10 +171,19 @@ async function loadDocumentNode(
         }
       }
 
+      let documentRef = state.documentRef
+      if (documentRef && options.cacheDocumentText) {
+        const cachedRef = await options.cacheDocumentText(documentRef, fullText)
+        if (cachedRef) {
+          documentRef = cachedRef
+        }
+      }
+
       return {
         documentChunks: chunks,
         leafCursor: 0,
         pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, chunks.length) },
+        documentRef,
       }
     } catch (error) {
       const formatted = formatAgentError(error)
@@ -477,7 +489,7 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
-    .addNode('load_document', (state) => loadDocumentNode(state))
+    .addNode('load_document', (state) => loadDocumentNode(state, options))
     .addNode('dispatch_leaf', (state) => dispatchLeafNode(state))
     .addNode('leaf_extract', (state) => leafExtractNode(state, options))
     .addNode('collect_leaf', (state) => collectLeafNode(state))

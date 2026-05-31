@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import Database from 'better-sqlite3'
 import { ChatDb } from '../chatDb.js'
 
 describe('ChatDb', () => {
@@ -92,6 +96,83 @@ describe('ChatDb', () => {
     expect(db.getSession('s1')).toBeUndefined()
   })
 
+  it('stores and loads UI chat messages in insertion order', () => {
+    db.upsertSession({
+      id: 's-msg',
+      workspace_hash: 'ws1',
+      title: 'Messages',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      message_count: 0,
+    })
+
+    db.appendMessages('s-msg', [
+      {
+        role: 'user',
+        content: 'Read this PDF',
+        attachment: { name: 'notes.pdf', type: 'pdf' },
+        timestamp: '2024-01-01T00:00:00Z',
+      },
+      {
+        role: 'assistant',
+        content: 'I created the mindmap.',
+        toolCalls: [{ name: 'batchAddMindmapNodes', args: { count: 2 }, result: 'ok' }],
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+    ])
+
+    expect(db.listMessages('s-msg')).toEqual([
+      {
+        role: 'user',
+        content: 'Read this PDF',
+        attachment: { name: 'notes.pdf', type: 'pdf' },
+        timestamp: '2024-01-01T00:00:00Z',
+      },
+      {
+        role: 'assistant',
+        content: 'I created the mindmap.',
+        toolCalls: [{ name: 'batchAddMindmapNodes', args: { count: 2 }, result: 'ok' }],
+        timestamp: '2024-01-01T00:00:01Z',
+      },
+    ])
+  })
+
+  it('appendMessages is append-only for a session', () => {
+    db.upsertSession({
+      id: 's-append',
+      workspace_hash: 'ws1',
+      title: 'Append',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      message_count: 0,
+    })
+
+    db.appendMessages('s-append', [{ role: 'user', content: 'first' }])
+    db.appendMessages('s-append', [{ role: 'assistant', content: 'second' }])
+
+    expect(db.listMessages('s-append')).toEqual([
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'second' },
+    ])
+  })
+
+  it('deleteSession deletes stored UI messages', () => {
+    db.upsertSession({
+      id: 's-delete-messages',
+      workspace_hash: 'ws1',
+      title: 'Delete',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      message_count: 1,
+    })
+    db.appendMessages('s-delete-messages', [{ role: 'user', content: 'remove me' }])
+
+    db.deleteSession('s-delete-messages')
+
+    expect(db.getSession('s-delete-messages')).toBeUndefined()
+    expect(db.listMessages('s-delete-messages')).toEqual([])
+  })
+
   it('getMostRecentSession 返回最近更新的会话', () => {
     db.upsertSession({
       id: 's1',
@@ -139,5 +220,36 @@ describe('ChatDb', () => {
     const wsBSessions = db.listSessions('ws-b')
     expect(wsBSessions).toHaveLength(1)
     expect(wsBSessions[0].id).toBe('s2')
+  })
+
+  it('rebuilds legacy chat_messages schema without message_json column', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mindlane-chatdb-'))
+    const dbPath = path.join(tempDir, 'legacy.db')
+    const legacyDb = new Database(dbPath)
+    legacyDb.exec(`
+      CREATE TABLE chat_messages (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `)
+    legacyDb.close()
+
+    const migrated = new ChatDb(dbPath)
+    migrated.upsertSession({
+      id: 's-migrated',
+      workspace_hash: 'ws1',
+      title: 'Migrated',
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      message_count: 0,
+    })
+    migrated.appendMessages('s-migrated', [{ role: 'user', content: 'new schema' }])
+
+    expect(migrated.listMessages('s-migrated')).toEqual([{ role: 'user', content: 'new schema' }])
+    migrated.close()
+    fs.rmSync(tempDir, { recursive: true, force: true })
   })
 })

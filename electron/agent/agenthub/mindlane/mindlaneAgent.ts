@@ -6,6 +6,7 @@ import type { MainGraphStateType } from "../../state.js";
 import { BaseAgent } from "../base.js";
 import { ContextBuilder } from "./context.js";
 import { extractTextContent, formatAgentError } from "../../utils.js";
+import { MemoryManager } from "../../memory/memoryManager.js";
 import { logger } from "../../../shared/logger.js";
 import {
   createGenerateMindmapFragmentTool,
@@ -39,11 +40,13 @@ export class MindLaneAgent extends BaseAgent {
   private tools: StructuredToolInterface[];
   private capabilityFlags: CapabilityFlags;
   private modelWithTools: ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
+  private memoryManager?: MemoryManager;
 
   constructor(
     provider: LLMProvider,
     tools: StructuredToolInterface[],
     capabilityFlags?: CapabilityFlags,
+    memoryManager?: MemoryManager,
   ) {
     super(provider);
     const routingTools: StructuredToolInterface[] = [
@@ -55,6 +58,7 @@ export class MindLaneAgent extends BaseAgent {
     this.tools = [...tools, ...routingTools];
     this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
     this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
+    this.memoryManager = memoryManager;
   }
 
   async invoke(
@@ -71,15 +75,19 @@ export class MindLaneAgent extends BaseAgent {
     }
 
     try {
-      const systemPrompt = new ContextBuilder()
+      const builder = new ContextBuilder()
         .withMessages(state.messages)
         .withContext(state.context ?? undefined)
         .withCapabilityFlags(this.capabilityFlags)
-        .buildSystemPrompt()
+        .withMemory(this.memoryManager)
+
+      await builder.buildMemoryContext()
+      builder.buildSystemPrompt()
         .buildEnvironmentPrompt()
         .buildMindmapContext()
         .buildHistory()
-        .build();
+
+      const systemPrompt = builder.build();
 
       const messagesWithSystem = [
         new SystemMessage(systemPrompt),

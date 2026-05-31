@@ -17,6 +17,7 @@ export interface MindLaneFile {
     title: string
     createdAt: string
     updatedAt: string
+    tags?: string[]
   }
   mindmap: {
     nodes: MindLaneNode[]
@@ -52,13 +53,34 @@ export interface DocumentRef {
   importedAt: string
   title?: string
   pageCount?: number
-  metadata?: Record<string, unknown>
+  metadata?: {
+    originalPath?: string
+    textCacheKey?: string
+    size?: number
+    mtimeMs?: number
+    sha256?: string
+    textCachedAt?: string
+    [key: string]: unknown
+  }
 }
 
 export interface ChatToolCall {
   name: string
   args: Record<string, unknown>
   result: string
+}
+
+export interface ChatMessageAttachment {
+  name: string
+  type: 'pdf' | 'url' | 'text'
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  toolCalls?: ChatToolCall[]
+  attachment?: ChatMessageAttachment
+  timestamp?: string
 }
 
 export function isTextNodeData(data: unknown): data is TextNodeData {
@@ -101,4 +123,3 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
     documents: [],
   }
 }
-

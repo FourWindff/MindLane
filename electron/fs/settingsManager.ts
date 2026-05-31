@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { AppSettings } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
+import { atomicWrite } from './atomicWrite.js'
 
 export class SettingsManager {
   private filePath: string
@@ -39,12 +40,12 @@ export class SettingsManager {
       merged.providerConfigs = mergedConfigs
     }
     this.cache = this.merge(merged)
-    await this.atomicWrite(JSON.stringify(this.cache, null, 2))
+    await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
   }
 
   async reset(): Promise<void> {
     this.cache = { ...DEFAULT_SETTINGS }
-    await this.atomicWrite(JSON.stringify(this.cache, null, 2))
+    await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
   }
 
   private merge(partial: Partial<AppSettings>): AppSettings {
@@ -70,11 +71,4 @@ export class SettingsManager {
     }
   }
 
-  private async atomicWrite(content: string): Promise<void> {
-    const dir = path.dirname(this.filePath)
-    await fs.promises.mkdir(dir, { recursive: true })
-    const tmpPath = this.filePath + '.tmp.' + Date.now()
-    await fs.promises.writeFile(tmpPath, content, 'utf-8')
-    await fs.promises.rename(tmpPath, this.filePath)
-  }
 }

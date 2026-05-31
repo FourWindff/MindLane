@@ -78,12 +78,20 @@ export function ChatPanel() {
 
     const result = await api.selectDocument()
     if (result?.ok && result.data) {
+      const id = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
       const docRef: DocumentRef = {
-        id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        id,
         type: 'pdf',
         source: result.data.path,
         filename: result.data.name,
         importedAt: new Date().toISOString(),
+        metadata: {
+          originalPath: result.data.path,
+          textCacheKey: id,
+          size: result.data.size,
+          mtimeMs: result.data.mtimeMs,
+          sha256: result.data.sha256,
+        },
       }
       setAttachedDocument(docRef)
     }
