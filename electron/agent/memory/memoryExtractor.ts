@@ -4,6 +4,7 @@ import { MemoryManager } from './memoryManager.js'
 import type { SessionMessage } from '../db/chatDb.js'
 import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
+import { logger } from '../../shared/logger.js'
 
 export interface ExtractedPattern {
   discipline: string
@@ -37,10 +38,17 @@ export class MemoryExtractor {
     mindmapSummary: string,
     filePath: string,
   ): Promise<void> {
+    logger.info('[MemoryExtractor] Starting extraction for file:', filePath)
     const patterns = await this.extract(provider, messages, mindmapSummary)
-    if (patterns.length === 0) return
+    if (patterns.length === 0) {
+      logger.info('[MemoryExtractor] No patterns extracted, skipping persist')
+      return
+    }
+    logger.info(`[MemoryExtractor] Extracted ${patterns.length} pattern(s):`, patterns.map(p => `${p.discipline}-${p.subTag}`))
 
     await this.persist(patterns)
+    logger.info('[MemoryExtractor] Patterns persisted successfully')
+
     await this.updateMindlaneTags(filePath, patterns)
   }
 
@@ -79,8 +87,9 @@ export class MemoryExtractor {
       data.metadata.tags = Array.from(existing)
       data.metadata.updatedAt = new Date().toISOString()
       await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      logger.info('[MemoryExtractor] Updated .mindlane tags:', Array.from(existing), 'file:', filePath)
     } catch (e) {
-      // Best-effort: if .mindlane file can't be updated, memory extraction still succeeded
+      logger.warn('[MemoryExtractor] Failed to update .mindlane tags:', e, 'file:', filePath)
     }
   }
 
