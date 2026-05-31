@@ -6,8 +6,19 @@ import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { logger } from '../../shared/logger.js'
 
+const DISCIPLINES = [
+  'formal-sciences',
+  'natural-sciences',
+  'engineering',
+  'humanities',
+  'social-sciences',
+  'creative-arts',
+] as const
+
+export type Discipline = typeof DISCIPLINES[number]
+
 export interface ExtractedPattern {
-  discipline: string
+  discipline: Discipline
   subTag: string
   description: string
   observation: string
@@ -25,6 +36,13 @@ interface LLMExtractionResponse {
   }>
 }
 
+export interface ExtractOptions {
+  provider: LLMProvider
+  messages: SessionMessage[]
+  mindmapSummary: string
+  filePath: string
+}
+
 export class MemoryExtractor {
   constructor(private manager: MemoryManager) {}
 
@@ -32,12 +50,8 @@ export class MemoryExtractor {
    * Extract thinking patterns from conversation using LLM,
    * persist them to memory files, and update .mindlane tags.
    */
-  async extractAndPersist(
-    provider: LLMProvider,
-    messages: SessionMessage[],
-    mindmapSummary: string,
-    filePath: string,
-  ): Promise<void> {
+  async extractAndPersist(options: ExtractOptions): Promise<void> {
+    const { provider, messages, mindmapSummary, filePath } = options
     logger.info('[MemoryExtractor] Starting extraction for file:', filePath)
     const patterns = await this.extract(provider, messages, mindmapSummary)
     if (patterns.length === 0) {
@@ -46,10 +60,11 @@ export class MemoryExtractor {
     }
     logger.info(`[MemoryExtractor] Extracted ${patterns.length} pattern(s):`, patterns.map(p => `${p.discipline}-${p.subTag}`))
 
-    await this.persist(patterns)
-    logger.info('[MemoryExtractor] Patterns persisted successfully')
-
-    await this.updateMindlaneTags(filePath, patterns)
+    await Promise.all([
+      this.persist(patterns),
+      this.updateMindlaneTags(filePath, patterns),
+    ])
+    logger.info('[MemoryExtractor] Persist and tag update completed')
   }
 
   /** Call LLM to extract thinking patterns from conversation. */
@@ -63,12 +78,13 @@ export class MemoryExtractor {
     return this.parseExtractionResponse(response.content)
   }
 
-  /** Persist extracted patterns to memory files and rebuild index. */
+  /** Persist extracted patterns to memory files and rebuild index once. */
   async persist(patterns: ExtractedPattern[]): Promise<void> {
     for (const p of patterns) {
       const tag = `${p.discipline}-${p.subTag}`
-      await this.manager.writeMemory(tag, p.description, p.observation)
+      await this.manager.writeMemory(tag, p.description, p.observation, { skipIndexRebuild: true })
     }
+    await this.manager.rebuildIndex()
 
     if (await this.manager.shouldConsolidate()) {
       await this.manager.consolidate()
@@ -81,8 +97,13 @@ export class MemoryExtractor {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
       const data = JSON.parse(raw) as MindLaneFile
       const existing = new Set(data.metadata.tags || [])
+      const originalSize = existing.size
       for (const p of patterns) {
         existing.add(p.discipline)
+      }
+      if (existing.size === originalSize) {
+        logger.info('[MemoryExtractor] No new tags to add, skipping .mindlane rewrite')
+        return
       }
       data.metadata.tags = Array.from(existing)
       data.metadata.updatedAt = new Date().toISOString()
@@ -94,7 +115,9 @@ export class MemoryExtractor {
   }
 
   private buildExtractionPrompt(messages: SessionMessage[], mindmapSummary: string): string {
-    const conversation = messages
+    // Limit to last 20 exchanges to avoid unbounded prompt size
+    const recentMessages = messages.slice(-40)
+    const conversation = recentMessages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .map(m => {
         const role = m.role === 'user' ? '用户' : 'AI'
@@ -162,7 +185,6 @@ ${mindmapSummary || '（无）'}
   private parseExtractionResponse(content: unknown): ExtractedPattern[] {
     const text = typeof content === 'string' ? content : JSON.stringify(content)
 
-    // Extract JSON from markdown code blocks if present
     const jsonText = text
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
@@ -175,8 +197,10 @@ ${mindmapSummary || '（无）'}
       for (const d of parsed.disciplines || []) {
         for (const p of d.patterns || []) {
           if (d.name && p.subTag && p.description && p.observation) {
+            const discipline = d.name as Discipline
+            if (!DISCIPLINES.includes(discipline)) continue
             patterns.push({
-              discipline: d.name,
+              discipline,
               subTag: p.subTag,
               description: p.description,
               observation: p.observation,
@@ -186,7 +210,8 @@ ${mindmapSummary || '（无）'}
       }
 
       return patterns
-    } catch {
+    } catch (e) {
+      logger.warn('[MemoryExtractor] Failed to parse LLM response:', e, 'raw:', text.slice(0, 500))
       return []
     }
   }

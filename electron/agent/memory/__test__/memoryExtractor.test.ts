@@ -75,15 +75,15 @@ describe('MemoryExtractor', () => {
     const mockProvider = createMockProvider(mockResponse)
 
     const extractor = new MemoryExtractor(manager)
-    await extractor.extractAndPersist(
-      mockProvider as any,
-      [
+    await extractor.extractAndPersist({
+      provider: mockProvider as any,
+      messages: [
         { role: 'user', content: '我们把这个拆成几个模块来做' },
         { role: 'assistant', content: '好的，我来帮你设计模块结构' },
       ],
-      '',
-      mindlanePath,
-    )
+      mindmapSummary: '',
+      filePath: mindlanePath,
+    })
 
     // Verify memory file was created
     const index = await manager.loadIndex()
@@ -108,12 +108,12 @@ describe('MemoryExtractor', () => {
     const mockProvider = createMockProvider('{"disciplines": []}')
 
     const extractor = new MemoryExtractor(manager)
-    await extractor.extractAndPersist(
-      mockProvider as any,
-      [{ role: 'user', content: 'hello' }],
-      '',
-      mindlanePath,
-    )
+    await extractor.extractAndPersist({
+      provider: mockProvider as any,
+      messages: [{ role: 'user', content: 'hello' }],
+      mindmapSummary: '',
+      filePath: mindlanePath,
+    })
 
     // No memory file should be created
     const index = await manager.loadIndex()
@@ -143,12 +143,12 @@ describe('MemoryExtractor', () => {
     const mockProvider = createMockProvider(mockResponse)
 
     const extractor = new MemoryExtractor(manager)
-    await extractor.extractAndPersist(
-      mockProvider as any,
-      [{ role: 'user', content: '拆模块' }],
-      '',
-      mindlanePath,
-    )
+    await extractor.extractAndPersist({
+      provider: mockProvider as any,
+      messages: [{ role: 'user', content: '拆模块' }],
+      mindmapSummary: '',
+      filePath: mindlanePath,
+    })
 
     const updatedRaw = await fs.promises.readFile(mindlanePath, 'utf-8')
     const updated = JSON.parse(updatedRaw) as MindLaneFile
@@ -161,12 +161,12 @@ describe('MemoryExtractor', () => {
 
     const mockProvider = createMockProvider('```json\n{"disciplines": [{"name": "engineering", "patterns": [{"subTag": "mvp", "description": "先跑MVP", "observation": "用户偏好快速验证"}]}]}\n```')
 
-    await extractor.extractAndPersist(
-      mockProvider as any,
-      [{ role: 'user', content: '先做个最小版本试试' }],
-      '',
-      path.join(tempDir, 'dummy.mindlane'),
-    )
+    await extractor.extractAndPersist({
+      provider: mockProvider as any,
+      messages: [{ role: 'user', content: '先做个最小版本试试' }],
+      mindmapSummary: '',
+      filePath: path.join(tempDir, 'dummy.mindlane'),
+    })
 
     const index = await manager.loadIndex()
     expect(index).toContain('engineering-mvp')

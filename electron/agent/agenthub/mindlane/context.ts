@@ -3,6 +3,9 @@ import type { MindmapContextData } from "../../tools/mindmapContext.js";
 import type { CapabilityFlags } from "./mindlaneAgent.js";
 import { MemoryManager } from "../../memory/memoryManager.js";
 
+const MEMORY_INDEX_TAG = 'USER_MEMORY_INDEX';
+const RELEVANT_MEMORIES_TAG = 'RELEVANT_MEMORIES';
+
 /**
  * 主上下文构建器 - 组装 System Prompt
  */
@@ -13,51 +16,38 @@ export class ContextBuilder {
     private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true };
     private memoryManager?: MemoryManager;
 
-    /**
-     * 设置消息历史（由 Orchestrator 加载后传入）
-     */
     withMessages(messages: BaseMessage[]): this {
         this.messages = messages;
         return this;
     }
 
-    /**
-     * 设置思维导图上下文
-     */
     withContext(context?: MindmapContextData): this {
         this.context = context;
         return this;
     }
 
-    /**
-     * 设置能力标志
-     */
     withCapabilityFlags(flags?: CapabilityFlags): this {
         if (flags) this.capabilityFlags = flags;
         return this;
     }
 
-    /**
-     * 设置记忆管理器
-     */
     withMemory(manager: MemoryManager | undefined): this {
         this.memoryManager = manager;
         return this;
     }
 
-    /** async: must be awaited before buildSystemPrompt() */
     async buildMemoryContext(): Promise<this> {
         if (!this.memoryManager) return this;
-        const index = await this.memoryManager.loadIndex();
-        if (index.trim()) {
-            this.prompt += `<USER_MEMORY_INDEX>\n${index.trim()}\n</USER_MEMORY_INDEX>\n`;
-        }
         const tags = this.context?.fileTags;
-        if (tags && tags.length > 0) {
-            const memories = await this.memoryManager.loadMemoriesForTags(tags);
-            if (memories.length > 0) {
-                this.prompt += `<RELEVANT_MEMORIES tags="${tags.join(',')}">\n${memories.join('\n\n')}\n</RELEVANT_MEMORIES>\n`;
-            }
+        const [index, memories] = await Promise.all([
+            this.memoryManager.loadIndex(),
+            tags?.length ? this.memoryManager.loadMemoriesForTags(tags) : Promise.resolve([] as string[]),
+        ]);
+        if (index.trim()) {
+            this.prompt += `<${MEMORY_INDEX_TAG}>\n${index.trim()}\n</${MEMORY_INDEX_TAG}>\n`;
+        }
+        if (memories.length > 0 && tags) {
+            this.prompt += `<${RELEVANT_MEMORIES_TAG} tags="${tags.join(',')}">\n${memories.join('\n\n')}\n</${RELEVANT_MEMORIES_TAG}>\n`;
         }
         return this;
     }

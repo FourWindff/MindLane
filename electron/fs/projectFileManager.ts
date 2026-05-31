@@ -3,6 +3,7 @@ import path from 'node:path'
 import { dialog, type BrowserWindow } from 'electron'
 import type { FsResult } from './types.js'
 import type { MindLaneFile } from '../../src/shared/lib/fileFormat'
+import { atomicWrite } from './atomicWrite.js'
 
 export class ProjectFileManager {
   private backupsDir: string
@@ -73,7 +74,7 @@ export class ProjectFileManager {
       if (options?.createBackup !== false) {
         await this.createBackup(filePath)
       }
-      await this.atomicWrite(filePath, JSON.stringify(data, null, 2))
+      await atomicWrite(filePath, JSON.stringify(data, null, 2))
       return { ok: true, data: { filePath } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
@@ -151,11 +152,4 @@ export class ProjectFileManager {
     }
   }
 
-  private async atomicWrite(targetPath: string, content: string): Promise<void> {
-    const dir = path.dirname(targetPath)
-    await fs.promises.mkdir(dir, { recursive: true })
-    const tmpPath = targetPath + '.tmp.' + Date.now()
-    await fs.promises.writeFile(tmpPath, content, 'utf-8')
-    await fs.promises.rename(tmpPath, targetPath)
-  }
 }

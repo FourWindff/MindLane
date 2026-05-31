@@ -262,17 +262,17 @@ export class AgentOrchestrator {
       }
 
       // Phase 2: Fire-and-forget LLM-based memory extraction after session ends.
+      const ctx = request.context
       void (async () => {
-        if (this.aiService.memoryExtractor && request.context?.filePath) {
+        if (this.aiService.memoryExtractor && ctx?.filePath) {
           try {
             const messages = await this.aiService.checkpointer.getMessages(request.threadId)
-            const summary = request.context?.mindmapSummary || ''
-            await this.aiService.memoryExtractor.extractAndPersist(
-              this.provider,
+            await this.aiService.memoryExtractor.extractAndPersist({
+              provider: this.provider,
               messages,
-              summary,
-              request.context.filePath,
-            )
+              mindmapSummary: ctx.mindmapSummary || '',
+              filePath: ctx.filePath,
+            })
           } catch (e) {
             logger.warn('[Orchestrator] Memory extraction failed:', e)
           }
@@ -394,7 +394,8 @@ export class AgentOrchestrator {
       const result = await subgraph.invoke(state, {
         recursionLimit: AGENT_LIMITS.recursionLimit,
       });
-      const { messages: _, ...updates } = result as MainGraphStateType & T;
+      const updates = { ...(result as MainGraphStateType & T) };
+      delete (updates as Record<string, unknown>).messages;
       return updates as Partial<MainGraphStateType>;
     };
 
