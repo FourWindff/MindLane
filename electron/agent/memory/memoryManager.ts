@@ -8,7 +8,7 @@ export class MemoryManager {
   private indexPath: string
 
   constructor(userDataPath: string) {
-    this.dir = path.join(userDataPath, 'mindlnememory')
+    this.dir = path.join(userDataPath, 'mindlanememory')
     this.indexPath = path.join(this.dir, 'MEMORY.md')
   }
 
