@@ -46,6 +46,31 @@ type ChatSessionMeta = {
   messageCount: number
 }
 
+type ChatLoadHistoryResult = {
+  ok: true
+  data: {
+    threadId: string
+    messages: ChatMessage[]
+  }
+}
+
+type ChatSaveHistoryPayload = {
+  workspacePath: string
+  messages: ChatMessage[]
+}
+
+type ChatLoadSessionResult = {
+  ok: true
+  data: {
+    sessionId: string
+    messages: ChatMessage[]
+  }
+}
+
+type ChatSaveSessionPayload = ChatSaveHistoryPayload & {
+  sessionId: string
+}
+
 type SelectedNodeContent = { id: string; label: string }
 
 type WorkspaceFileEntry = {
@@ -182,17 +207,9 @@ contextBridge.exposeInMainWorld('mindlane', {
   },
   chat: {
     loadHistory: (payload: { workspacePath: string }) =>
-      ipcRenderer.invoke('chat:load-history', payload) as Promise<{
-        ok: true
-        data: {
-          threadId: string
-          messages: ChatMessage[]
-        }
-      }>,
-    saveHistory: (payload: {
-      workspacePath: string
-      messages: ChatMessage[]
-    }) => ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
+      ipcRenderer.invoke('chat:load-history', payload) as Promise<ChatLoadHistoryResult>,
+    saveHistory: (payload: ChatSaveHistoryPayload) =>
+      ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     // New multi-session APIs
     listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke('chat:list-sessions', payload) as Promise<
@@ -200,18 +217,9 @@ contextBridge.exposeInMainWorld('mindlane', {
         | { ok: false; error: string }
       >,
     loadSession: (payload: { workspacePath: string; sessionId: string }) =>
-      ipcRenderer.invoke('chat:load-session', payload) as Promise<{
-        ok: true
-        data: {
-          sessionId: string
-          messages: ChatMessage[]
-        }
-      }>,
-    saveSession: (payload: {
-      workspacePath: string
-      sessionId: string
-      messages: ChatMessage[]
-    }) => ipcRenderer.invoke('chat:save-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
+      ipcRenderer.invoke('chat:load-session', payload) as Promise<ChatLoadSessionResult>,
+    saveSession: (payload: ChatSaveSessionPayload) =>
+      ipcRenderer.invoke('chat:save-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
     deleteSession: (payload: { workspacePath: string; sessionId: string }) =>
       ipcRenderer.invoke('chat:delete-session', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
   },

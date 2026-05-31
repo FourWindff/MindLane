@@ -101,21 +101,17 @@ export class ChatDb {
   appendMessages(sessionId: string, messages: ChatMessage[]): void {
     if (messages.length === 0) return
 
-    const nextSeqRow = this.db.prepare(`
-      SELECT COALESCE(MAX(seq), -1) + 1 AS next_seq
-      FROM chat_messages
-      WHERE session_id = ?
-    `).get(sessionId) as { next_seq: number }
-
     const insert = this.db.prepare(`
       INSERT INTO chat_messages (session_id, seq, message_json, created_at)
-      VALUES (?, ?, ?, ?)
+      SELECT ?, COALESCE(MAX(seq), -1) + 1, ?, ?
+      FROM chat_messages
+      WHERE session_id = ?
     `)
 
     const transaction = this.db.transaction((items: ChatMessage[]) => {
-      items.forEach((message, index) => {
+      items.forEach((message) => {
         const createdAt = message.timestamp ?? new Date().toISOString()
-        insert.run(sessionId, nextSeqRow.next_seq + index, JSON.stringify(message), createdAt)
+        insert.run(sessionId, JSON.stringify(message), createdAt, sessionId)
       })
     })
 
