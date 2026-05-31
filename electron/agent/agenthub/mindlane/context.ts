@@ -40,7 +40,7 @@ export class ContextBuilder {
     /**
      * 设置记忆管理器
      */
-    withMemory(manager: MemoryManager): this {
+    withMemory(manager: MemoryManager | undefined): this {
         this.memoryManager = manager;
         return this;
     }
