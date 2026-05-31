@@ -1,4 +1,5 @@
 import { MemoryManager } from './memoryManager.js'
+import type { SessionMessage } from '../db/chatDb.js'
 
 export interface ExtractedPattern {
   discipline: string
@@ -9,6 +10,16 @@ export interface ExtractedPattern {
 
 export class MemoryExtractor {
   constructor(private manager: MemoryManager) {}
+
+  /** Phase 1 placeholder. Phase 2: LLM-driven extraction. */
+  async extractAndPersist(
+    _messages: SessionMessage[],
+    _mindmapSummary: string,
+    _filePath: string,
+  ): Promise<void> {
+    // Phase 1: Manual tagging only. No automatic LLM extraction.
+    // Phase 2: Build extraction prompt, invoke LLM, parse JSON, call persist().
+  }
 
   /** Persist extracted patterns to memory files and rebuild index */
   async persist(patterns: ExtractedPattern[], userDataPath: string): Promise<void> {

@@ -260,6 +260,20 @@ export class AgentOrchestrator {
       } else {
         callbacks.onEnd({ content: fullContent || "抱歉，我无法生成回复。" });
       }
+
+      // Phase 1: Memory extraction framework is ready but extraction is manual only.
+      // Phase 2: Will trigger LLM-based automatic extraction here.
+      void (async () => {
+        if (this.aiService.memoryExtractor && request.context?.filePath) {
+          try {
+            const messages = await this.aiService.checkpointer.getMessages(request.threadId)
+            const summary = request.context?.mindmapSummary || ''
+            await this.aiService.memoryExtractor.extractAndPersist(messages, summary, request.context.filePath)
+          } catch (e) {
+            logger.warn('[Orchestrator] Memory extraction failed:', e)
+          }
+        }
+      })()
     } catch (err) {
       if (signal?.aborted) {
         callbacks.onEnd({ content: fullContent || "（已停止生成）" });
@@ -492,6 +506,7 @@ export class AgentOrchestrator {
       this.provider,
       tools,
       { hasEmbeddings: false, hasPalace },
+      this.aiService.memoryManager,
     );
 
     // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退

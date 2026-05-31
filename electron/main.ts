@@ -296,6 +296,15 @@ function registerIpcHandlers() {
           return
         }
 
+        let fileTags: string[] | undefined
+        if (payload.context?.filePath) {
+          try {
+            const raw = await fs.promises.readFile(payload.context.filePath, 'utf-8')
+            const data = JSON.parse(raw) as MindLaneFile
+            fileTags = data.metadata.tags
+          } catch { /* ignore */ }
+        }
+
         const request: ChatRequest = {
           threadId: payload.threadId || crypto.randomUUID(),
           message: payload.message,
@@ -306,6 +315,7 @@ function registerIpcHandlers() {
                   (n): n is { id: string; type: 'text' | 'palace'; label: string; extra?: Record<string, unknown> } =>
                     n.type === 'text' || n.type === 'palace',
                 ),
+                fileTags,
               }
             : undefined,
           documentRef: payload.context?.attachedDocument,
