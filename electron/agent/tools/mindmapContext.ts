@@ -26,4 +26,6 @@ export interface MindmapContextData {
   attachedDocument?: DocumentRef
   /** Documents already linked to the currently opened .mindlane file */
   linkedDocuments?: DocumentRef[]
+  /** Optional tags from the .mindlane file metadata */
+  fileTags?: string[]
 }
