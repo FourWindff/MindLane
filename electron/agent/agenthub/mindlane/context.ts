@@ -1,6 +1,7 @@
 import { BaseMessage } from "@langchain/core/messages";
 import type { MindmapContextData } from "../../tools/mindmapContext.js";
 import type { CapabilityFlags } from "./mindlaneAgent.js";
+import { MemoryManager } from "../../memory/memoryManager.js";
 
 /**
  * 主上下文构建器 - 组装 System Prompt
@@ -10,6 +11,7 @@ export class ContextBuilder {
     private messages: BaseMessage[] = [];
     private context?: MindmapContextData;
     private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true };
+    private memoryManager?: MemoryManager;
 
     /**
      * 设置消息历史（由 Orchestrator 加载后传入）
@@ -32,6 +34,31 @@ export class ContextBuilder {
      */
     withCapabilityFlags(flags?: CapabilityFlags): this {
         if (flags) this.capabilityFlags = flags;
+        return this;
+    }
+
+    /**
+     * 设置记忆管理器
+     */
+    withMemory(manager: MemoryManager): this {
+        this.memoryManager = manager;
+        return this;
+    }
+
+    /** async: must be awaited before buildSystemPrompt() */
+    async buildMemoryContext(): Promise<this> {
+        if (!this.memoryManager) return this;
+        const index = await this.memoryManager.loadIndex();
+        if (index.trim()) {
+            this.prompt += `<USER_MEMORY_INDEX>\n${index.trim()}\n</USER_MEMORY_INDEX>\n`;
+        }
+        const tags = this.context?.fileTags;
+        if (tags && tags.length > 0) {
+            const memories = await this.memoryManager.loadMemoriesForTags(tags);
+            if (memories.length > 0) {
+                this.prompt += `<RELEVANT_MEMORIES tags="${tags.join(',')}">\n${memories.join('\n\n')}\n</RELEVANT_MEMORIES>\n`;
+            }
+        }
         return this;
     }
 
