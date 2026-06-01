@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { AIMessage, HumanMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, RemoveMessage } from '@langchain/core/messages'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { MindLaneAgent } from '../mindlaneAgent.js'
@@ -8,6 +8,8 @@ import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
 } from '../../../tools/subgraphRoutingTools.js'
+import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
+import { isPromptTooLongError } from '../../../memory/contextCompact.js'
 
 function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
   return {
@@ -268,5 +270,101 @@ describe('MindLaneAgent.route()', () => {
     }
 
     expect(agent.route(state)).toBe('__end__')
+  })
+})
+
+describe('MindLaneAgent reactive compact', () => {
+  it('triggers reactive compact on prompt-too-long error', async () => {
+    const error = new Error('prompt_too_long')
+    const mockInvoke = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(
+        new AIMessage({ content: 'Compacted response' }),
+      )
+
+    const provider = createMockProvider(mockInvoke)
+    const agent = new MindLaneAgent(provider, [mockSearchTool])
+
+    const state = createInitialState()
+    // Fill state with enough messages to make compact believable
+    state.messages = [
+      new HumanMessage('msg1'),
+      new AIMessage('reply1'),
+      new HumanMessage('msg2'),
+      new AIMessage('reply2'),
+      new HumanMessage('msg3'),
+      new AIMessage('reply3'),
+      new HumanMessage('current'),
+    ]
+
+    const result = await agent.invoke(state)
+
+    // Should have retried: first call fails, second succeeds
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
+    expect(result.response).toBe('Compacted response')
+  })
+
+  it('returns RemoveMessage + compacted + response after reactive compact', async () => {
+    const error = new Error('prompt_too_long')
+    const mockInvoke = vi.fn()
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(
+        new AIMessage({ content: 'Retry success' }),
+      )
+
+    const provider = createMockProvider(mockInvoke)
+    const agent = new MindLaneAgent(provider, [mockSearchTool])
+
+    const state = createInitialState()
+    state.messages = [
+      new HumanMessage('old1'),
+      new AIMessage('old reply'),
+      new HumanMessage('recent1'),
+      new AIMessage('recent reply'),
+      new HumanMessage('current'),
+    ]
+
+    const result = await agent.invoke(state)
+
+    expect(result.messages).toBeDefined()
+    expect(result.messages!.length).toBeGreaterThan(1)
+    expect(result.messages![0]).toBeInstanceOf(RemoveMessage)
+    expect((result.messages![0] as RemoveMessage).id).toBe(REMOVE_ALL_MESSAGES)
+  })
+
+  it('retries at most once for reactive compact', async () => {
+    const error = new Error('prompt_too_long')
+    const mockInvoke = vi.fn().mockRejectedValue(error)
+
+    const provider = createMockProvider(mockInvoke)
+    const agent = new MindLaneAgent(provider, [mockSearchTool])
+
+    const state = createInitialState()
+    state.messages = [
+      new HumanMessage('msg1'),
+      new AIMessage('reply1'),
+      new HumanMessage('current'),
+    ]
+
+    const result = await agent.invoke(state)
+
+    // First call fails, retry once, then gives up -> 2 calls total
+    expect(mockInvoke).toHaveBeenCalledTimes(2)
+    expect(result.error).toBeDefined()
+    expect(result.response).toContain('处理请求时出错')
+  })
+
+  it('does not trigger reactive compact on non-context errors', async () => {
+    const error = new Error('network timeout')
+    const mockInvoke = vi.fn().mockRejectedValue(error)
+
+    const provider = createMockProvider(mockInvoke)
+    const agent = new MindLaneAgent(provider, [mockSearchTool])
+
+    const result = await agent.invoke(createInitialState())
+
+    expect(mockInvoke).toHaveBeenCalledTimes(1)
+    expect(result.error).toBeDefined()
+    expect(result.response).toContain('处理请求时出错')
   })
 })

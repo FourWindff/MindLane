@@ -1,4 +1,4 @@
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, SystemMessage, RemoveMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { LLMProvider } from "../../providers/index.js";
@@ -17,6 +17,9 @@ import {
   type GenerateMindmapFragmentArgs,
   type GeneratePalaceArgs,
 } from "../../tools/subgraphRoutingTools.js";
+import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
+import { isPromptTooLongError } from "../../memory/contextCompact.js";
+import { AGENT_LIMITS } from "../../config.js";
 
 /**
  * MindLaneAgent - 中央智能体，负责路由决策和上下文管理
@@ -89,50 +92,7 @@ export class MindLaneAgent extends BaseAgent {
 
       const systemPrompt = builder.build();
 
-      const messagesWithSystem = [
-        new SystemMessage(systemPrompt),
-        ...state.messages,
-      ];
-
-      const response = await this.modelWithTools.invoke(messagesWithSystem);
-      const content = extractTextContent(response.content);
-      const toolCalls = (response as AIMessage).tool_calls ?? [];
-
-      const virtualToolCalls = toolCalls.filter((tc) =>
-        isVirtualSubgraphTool(tc.name),
-      );
-      const actionToolCalls = toolCalls.filter((tc) =>
-        !isVirtualSubgraphTool(tc.name),
-      );
-
-      logger.info('[MindLaneAgent] 模型输出:', {
-        rawContent: summarizeMessageContent(response.content),
-        toolCalls: toolCalls.map((tc) => ({
-          id: tc.id,
-          name: tc.name,
-          args: tc.args,
-        })),
-        actionToolCalls: actionToolCalls.map((tc) => ({
-          id: tc.id,
-          name: tc.name,
-          args: tc.args,
-        })),
-      });
-
-      if (actionToolCalls.length > 0) {
-        return { messages: [response] };
-      }
-
-      const virtualToolCall = virtualToolCalls[0];
-      if (virtualToolCall) {
-        return this.executeVirtualToolRoute(response, virtualToolCall, content);
-      }
-
-      return {
-        messages: [response],
-        pendingSubgraph: null,
-        response: content,
-      };
+      return await this.invokeModel(state, systemPrompt, 0)
     } catch (err) {
       const formatted = formatAgentError(err);
       logger.error('[MindLaneAgent] invoke 失败:\n', formatted);
@@ -163,6 +123,122 @@ export class MindLaneAgent extends BaseAgent {
         return "mindmapSubgraph";
       default:
         return "__end__";
+    }
+  }
+
+  private async invokeModel(
+    state: MainGraphStateType,
+    systemPrompt: string,
+    retryCount: number,
+  ): Promise<Partial<MainGraphStateType>> {
+    const messagesWithSystem = [
+      new SystemMessage(systemPrompt),
+      ...state.messages,
+    ];
+
+    let response: AIMessage
+    let didReactiveCompact = false
+
+    try {
+      response = (await this.modelWithTools.invoke(messagesWithSystem)) as AIMessage
+    } catch (err) {
+      if (!isPromptTooLongError(err) || retryCount >= AGENT_LIMITS.reactiveCompactMaxRetries) {
+        throw err
+      }
+
+      logger.warn(
+        '[MindLaneAgent] Prompt too long, performing reactive compact (retry %d/%d)',
+        retryCount + 1,
+        AGENT_LIMITS.reactiveCompactMaxRetries,
+      )
+
+      const compactedMessages = await this.performReactiveCompact(state.messages)
+      didReactiveCompact = true
+
+      const compactedWithSystem = [
+        new SystemMessage(systemPrompt),
+        ...compactedMessages,
+      ]
+
+      response = (await this.modelWithTools.invoke(compactedWithSystem)) as AIMessage
+    }
+
+    const content = extractTextContent(response.content)
+    const toolCalls = response.tool_calls ?? []
+
+    const virtualToolCalls = toolCalls.filter((tc) =>
+      isVirtualSubgraphTool(tc.name),
+    )
+    const actionToolCalls = toolCalls.filter((tc) =>
+      !isVirtualSubgraphTool(tc.name),
+    )
+
+    logger.info('[MindLaneAgent] 模型输出:', {
+      rawContent: summarizeMessageContent(response.content),
+      toolCalls: toolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        args: tc.args,
+      })),
+      actionToolCalls: actionToolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        args: tc.args,
+      })),
+    })
+
+    let resultMessages: BaseMessage[]
+    if (didReactiveCompact) {
+      const compactedMessages = await this.performReactiveCompact(state.messages)
+      resultMessages = [
+        new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
+        ...compactedMessages,
+        response,
+      ]
+    } else {
+      resultMessages = [response]
+    }
+
+    if (actionToolCalls.length > 0) {
+      return { messages: resultMessages }
+    }
+
+    const virtualToolCall = virtualToolCalls[0]
+    if (virtualToolCall) {
+      const routeResult = this.executeVirtualToolRoute(response, virtualToolCall, content)
+      if (didReactiveCompact) {
+        return { ...routeResult, messages: resultMessages }
+      }
+      return routeResult
+    }
+
+    return {
+      messages: resultMessages,
+      pendingSubgraph: null,
+      response: content,
+    }
+  }
+
+  private async performReactiveCompact(messages: BaseMessage[]): Promise<BaseMessage[]> {
+    try {
+      const summaryPrompt = new SystemMessage(
+        '请用中文简要总结以下对话的关键信息。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续的任务。保持简短具体。',
+      )
+
+      const summaryResponse = await this.provider.reasoningModel.invoke([
+        summaryPrompt,
+        ...messages,
+        new HumanMessage('请总结以上对话。'),
+      ])
+
+      const summary = extractTextContent(summaryResponse.content)
+      const summaryMsg = new AIMessage({ content: `[Reactive compact] ${summary}` })
+      const tailMessages = messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
+
+      return [summaryMsg, ...tailMessages]
+    } catch (err) {
+      logger.warn('[MindLaneAgent] Reactive summary failed, trimming to tail:', err)
+      return messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
     }
   }
 
