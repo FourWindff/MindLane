@@ -15,11 +15,23 @@
  *   使用 js-tiktoken (cl100k_base) 精确计数。
  * - summaryTriggerTokens: 历史消息总 token 数超过此阈值后切换为"摘要 + 最近若干条"
  *   策略，单位：token。
+ * - contextWindowTokens: 模型上下文窗口总 token 数，用于计算输入预算。
+ * - maxCompletionTokens: 为模型响应预留的 token 数。
+ * - contextSafetyBufferTokens: 输入预算安全缓冲，防止估算误差导致超限。
+ * - contextCompactRecentMessages: 主动压缩时保留的最近消息条数。
+ * - reactiveCompactTailMessages: 被动压缩时保留的历史尾部消息条数。
+ * - reactiveCompactMaxRetries: 被动压缩最大重试次数。
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
   maxTokens: 4000,
   summaryTriggerTokens: 6000,
+  contextWindowTokens: 64_000,
+  maxCompletionTokens: 8_000,
+  contextSafetyBufferTokens: 1_024,
+  contextCompactRecentMessages: 10,
+  reactiveCompactTailMessages: 5,
+  reactiveCompactMaxRetries: 1,
 } as const
 
 /**

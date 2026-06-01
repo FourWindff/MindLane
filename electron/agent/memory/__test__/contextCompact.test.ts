@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { RemoveMessage, HumanMessage, AIMessage } from '@langchain/core/messages'
 import { REMOVE_ALL_MESSAGES, messagesStateReducer } from '@langchain/langgraph'
+import { AGENT_LIMITS } from '../../config.js'
 
 describe('messagesStateReducer', () => {
   it('replaces all messages when RemoveMessage(REMOVE_ALL_MESSAGES) is passed', () => {
@@ -29,5 +30,24 @@ describe('messagesStateReducer', () => {
     expect(result).toHaveLength(2)
     expect(result[0].content).toBe('hello')
     expect(result[1].content).toBe('hi')
+  })
+})
+
+describe('AGENT_LIMITS context compact config', () => {
+  it('has all required context compact fields', () => {
+    expect(AGENT_LIMITS).toHaveProperty('contextWindowTokens')
+    expect(AGENT_LIMITS).toHaveProperty('maxCompletionTokens')
+    expect(AGENT_LIMITS).toHaveProperty('contextSafetyBufferTokens')
+    expect(AGENT_LIMITS).toHaveProperty('contextCompactRecentMessages')
+    expect(AGENT_LIMITS).toHaveProperty('reactiveCompactTailMessages')
+    expect(AGENT_LIMITS).toHaveProperty('reactiveCompactMaxRetries')
+  })
+
+  it('computes inputBudget correctly from defaults', () => {
+    const inputBudget =
+      AGENT_LIMITS.contextWindowTokens -
+      AGENT_LIMITS.maxCompletionTokens -
+      AGENT_LIMITS.contextSafetyBufferTokens
+    expect(inputBudget).toBe(54976)
   })
 })
