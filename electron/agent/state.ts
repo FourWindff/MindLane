@@ -1,4 +1,4 @@
-import { Annotation } from '@langchain/langgraph'
+import { Annotation, messagesStateReducer } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { DetectedAnchor } from './providers/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
@@ -90,7 +90,7 @@ export type PendingSubgraph = 'mindmap' | 'palace'
  */
 export const BaseStateAnnotations = {
   messages: Annotation<BaseMessage[]>({
-    reducer: (prev, next) => [...prev, ...next],
+    reducer: messagesStateReducer,
     default: () => [],
   }),
   context: Annotation<MindmapContextData | null>({
