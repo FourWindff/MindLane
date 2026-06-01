@@ -9,7 +9,6 @@ import {
   GENERATE_PALACE_TOOL,
 } from '../../../tools/subgraphRoutingTools.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
-import { isPromptTooLongError } from '../../../memory/contextCompact.js'
 
 function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
   return {
