@@ -197,6 +197,35 @@ describe("AgentOrchestrator stream() 消息输入", () => {
   });
 });
 
+describe("AgentOrchestrator contextCompact node", () => {
+  it("graph includes contextCompact node", () => {
+    const provider = createMockProvider();
+    const orchestrator = new AgentOrchestrator(provider, createMockAiService());
+
+    const buildGraph = (orchestrator as unknown as Record<string, () => { nodes: Record<string, unknown> }>)["buildGraph"].bind(orchestrator);
+    const graph = buildGraph();
+
+    expect(Object.keys(graph.nodes)).toContain("contextCompact");
+  });
+
+  it("START edge points to contextCompact, not supervisor", () => {
+    const provider = createMockProvider();
+    const orchestrator = new AgentOrchestrator(provider, createMockAiService());
+
+    const buildGraph = (orchestrator as unknown as Record<string, () => { edges: Array<{ source: string; target: string }> }>)["buildGraph"].bind(orchestrator);
+    const graph = buildGraph();
+
+    let startTarget = null;
+    for (const edge of graph.edges) {
+      if (edge[0] === "__start__") {
+        startTarget = edge[1];
+        break;
+      }
+    }
+    expect(startTarget).toBe("contextCompact");
+  });
+});
+
 describe("AgentOrchestrator extractToolCalls", () => {
   let extractToolCalls: (msgs: BaseMessage[]) => Array<{ name: string; result: string }> | undefined;
 

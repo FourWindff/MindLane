@@ -36,6 +36,7 @@ import {
   isVirtualSubgraphTool,
 } from "./tools/subgraphRoutingTools.js";
 import { AGENT_LIMITS } from "./config.js";
+import { compactContext } from "./memory/contextCompact.js";
 import { extractTextContent } from "./utils.js";
 import { checkpointMessagesToSessionMessages } from "./memory/checkpointer.js";
 import type { CacheManager } from "../fs/cacheManager.js";
@@ -514,19 +515,26 @@ export class AgentOrchestrator {
       this.aiService.memoryManager,
     );
 
+    // 主动压缩节点：在 supervisor 前估算输入预算并压缩历史
+    const contextCompactNode = async (state: MainGraphStateType) => {
+      return compactContext(state, tools, this.provider, this.aiService.memoryManager)
+    }
+
     // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退
     const routeFn = (state: MainGraphStateType) => supervisor.route(state);
 
     // 统一 graph 结构：始终包含 palaceSubgraph 节点
     // hasPalace=false 时子图仍会被编译但永远不会被执行（route() 已保证）
     const graph = new StateGraph(MainGraphState)
+      .addNode("contextCompact", contextCompactNode)
       .addNode("supervisor", (state) => supervisor.invoke(state))
       .addNode("tools", toolsNode)
       .addNode("mindmapSubgraph", mindmapSubgraphNode)
       .addNode("palaceSubgraph", palaceSubgraphNode)
       .addNode("mindmapToolResult", mindmapToolResultNode)
       .addNode("palaceToolResult", palaceToolResultNode)
-      .addEdge(START, "supervisor")
+      .addEdge(START, "contextCompact")
+      .addEdge("contextCompact", "supervisor")
       .addConditionalEdges("supervisor", routeFn, {
         tools: "tools",
         mindmapSubgraph: "mindmapSubgraph",
