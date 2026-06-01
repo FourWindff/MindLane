@@ -226,6 +226,37 @@ describe("AgentOrchestrator contextCompact node", () => {
   });
 });
 
+describe("AgentOrchestrator long history handling", () => {
+  it("stream passes current message through contextCompact to graph", async () => {
+    const provider = createMockProvider();
+    const aiService = createMockAiService();
+    const orchestrator = new AgentOrchestrator(provider, aiService);
+
+    const capturedInputs: Array<{ messages: BaseMessage[] }> = [];
+    const mockGraph = {
+      streamEvents: vi.fn().mockImplementation(async function* (input: { messages: BaseMessage[] }) {
+        capturedInputs.push(input);
+        yield { event: "on_chat_model_stream", data: { chunk: { content: "ok" } } };
+      }),
+      getState: vi.fn().mockResolvedValue({
+        values: { messages: [], pendingSubgraph: null, response: "ok", memoryRoute: [], imageUrls: [] },
+      }),
+    };
+
+    (orchestrator as unknown as { compiledMainGraph: typeof mockGraph }).compiledMainGraph = mockGraph;
+
+    await orchestrator.stream(
+      { threadId: "test-thread", message: "hello" },
+      { onToken: vi.fn(), onToolStart: vi.fn(), onToolEnd: vi.fn(), onEnd: vi.fn(), onError: vi.fn() },
+    );
+
+    // The initial state still only has the current message; compact happens inside the graph
+    expect(capturedInputs).toHaveLength(1);
+    expect(capturedInputs[0].messages).toHaveLength(1);
+    expect(capturedInputs[0].messages[0]).toBeInstanceOf(HumanMessage);
+  });
+});
+
 describe("AgentOrchestrator extractToolCalls", () => {
   let extractToolCalls: (msgs: BaseMessage[]) => Array<{ name: string; result: string }> | undefined;
 
