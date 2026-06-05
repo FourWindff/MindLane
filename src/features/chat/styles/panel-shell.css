@@ -14,3 +14,10 @@
   background: var(--ml-bg-elevated);
   box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.5);
 }
+
+/* 宽窗口：toolbar 与 chat panel 水平不重叠，向上扩展利用空间 */
+@media (min-width: 700px) {
+  .chat-float-panel {
+    top: 56px; /* window-bar 46px + 10px gap */
+  }
+}
