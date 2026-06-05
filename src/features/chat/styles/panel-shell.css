@@ -1,7 +1,7 @@
 /* ── 展开面板容器 ── */
 .chat-float-panel {
   position: fixed;
-  top: 110px;
+  top: 56px;
   right: 24px;
   bottom: 24px;
   width: 380px;
@@ -14,3 +14,4 @@
   background: var(--ml-bg-elevated);
   box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.5);
 }
+
