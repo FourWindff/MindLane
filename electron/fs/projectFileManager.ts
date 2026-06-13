@@ -116,7 +116,7 @@ export class ProjectFileManager {
       return { ok: false, error: '已取消' }
     }
     try {
-      await this.atomicWrite(result.filePath, JSON.stringify(data, null, 2))
+      await atomicWrite(result.filePath, JSON.stringify(data, null, 2))
       return { ok: true, data: { filePath: result.filePath } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }

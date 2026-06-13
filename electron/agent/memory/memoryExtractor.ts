@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages'
 import type { LLMProvider } from '../providers/index.js'
 import { MemoryManager } from './memoryManager.js'
-import type { SessionMessage } from '../db/chatDb.js'
+import type { ChatMessage as SessionMessage } from '../../../src/shared/lib/fileFormat.js'
 import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { logger } from '../../shared/logger.js'

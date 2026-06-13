@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { AIMessage, HumanMessage, RemoveMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { MindLaneAgent } from '../mindlaneAgent.js'
@@ -29,7 +29,7 @@ const mockSearchTool = new DynamicStructuredTool({
 
 function createInitialState() {
   return {
-    messages: [new HumanMessage('hello')],
+    messages: [new HumanMessage('hello')] as BaseMessage[],
     context: null,
     pendingSubgraph: null,
     pendingSubgraphToolCallId: '',

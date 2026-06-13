@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
@@ -46,10 +46,6 @@ export function SettingsPanel() {
   const visionEnabled = capabilities.includes('vision')
   const imageGenEnabled = capabilities.includes('imageGen')
   const embeddingsEnabled = capabilities.includes('embeddings')
-  const activeSectionMeta = useMemo(
-    () => SETTINGS_SECTIONS.find((section) => section.id === activeSection) ?? SETTINGS_SECTIONS[0],
-    [activeSection],
-  )
 
   return (
     <div className="settings-page">

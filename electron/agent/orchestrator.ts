@@ -1,6 +1,6 @@
-import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, type BaseMessage, RemoveMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
-import { END, START, StateGraph } from "@langchain/langgraph";
+import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
 import type { CompiledStateGraph } from "@langchain/langgraph";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import { type LLMProvider, ProviderCapability } from "./providers/index.js";
@@ -190,7 +190,37 @@ export class AgentOrchestrator {
     let currentSegmentContent = "";
     let hasStartedSegment = false;
 
+    const sessionManager = this.aiService.sessionManager;
+
     try {
+      // 1. 持久化用户消息到 JSONL，并从 JSONL 加载完整历史。
+      // 如果 UI 已经保存了同一条用户消息（例如 ChatPanel 在发送前调用 saveChatHistory），
+      // 则不再重复追加，避免会话中出现重复的第一条消息。
+      const humanMessage = new HumanMessage({
+        content: request.message,
+        additional_kwargs: request.documentRef
+          ? { attachment: { name: request.documentRef.filename, type: request.documentRef.type } }
+          : {},
+      });
+
+      let history: BaseMessage[];
+      if (sessionManager?.isReady()) {
+        let existingMessages = await sessionManager.loadHistoryAsMessages(request.threadId, { includeSystem: false });
+        const lastMessage = existingMessages[existingMessages.length - 1];
+        const alreadySaved =
+          lastMessage?.getType() === "human" &&
+          extractTextContent(lastMessage.content) === request.message &&
+          JSON.stringify(lastMessage.additional_kwargs?.attachment) ===
+            JSON.stringify(humanMessage.additional_kwargs?.attachment);
+        if (!alreadySaved) {
+          await sessionManager.saveMessage(request.threadId, humanMessage);
+          existingMessages = await sessionManager.loadHistoryAsMessages(request.threadId, { includeSystem: false });
+        }
+        history = [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...existingMessages];
+      } else {
+        history = [humanMessage];
+      }
+
       const streamConfig = {
         version: "v2" as const,
         signal,
@@ -200,7 +230,7 @@ export class AgentOrchestrator {
 
       // Build initial state from request
       const initialState: Partial<MainGraphStateType> = {
-        messages: [new HumanMessage(request.message)],
+        messages: history,
         context: request.context ?? null,
         documentRef: request.documentRef ?? null,
       };
@@ -258,6 +288,20 @@ export class AgentOrchestrator {
 
       if (result) {
         callbacks.onEnd(this.buildResponse(result, fullContent));
+
+        // 将本轮新增的 AI/Tool 消息持久化到 JSONL
+        if (sessionManager?.isReady()) {
+          try {
+            const lastHumanIndex = result.messages.findLastIndex((m: BaseMessage) => m.type === "human");
+            const newMessages =
+              lastHumanIndex >= 0
+                ? result.messages.slice(lastHumanIndex + 1)
+                : result.messages;
+            await sessionManager.saveMessages(request.threadId, newMessages);
+          } catch (err) {
+            logger.warn('[AgentOrchestrator] 持久化 AI/Tool 消息失败:', err);
+          }
+        }
       } else {
         callbacks.onEnd({ content: fullContent || "抱歉，我无法生成回复。" });
       }
@@ -267,7 +311,9 @@ export class AgentOrchestrator {
       void (async () => {
         if (this.aiService.memoryExtractor && ctx?.filePath) {
           try {
-            const messages = await this.aiService.checkpointer.getMessages(request.threadId)
+            const messages = sessionManager?.isReady()
+              ? await sessionManager.loadHistory(request.threadId)
+              : await this.aiService.checkpointer.getMessages(request.threadId)
             await this.aiService.memoryExtractor.extractAndPersist({
               provider: this.provider,
               messages,

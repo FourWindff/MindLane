@@ -4,6 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { MemoryExtractor } from '../memoryExtractor.js'
 import { MemoryManager } from '../memoryManager.js'
+import type { LLMProvider } from '../../providers/index.js'
 import type { MindLaneFile } from '../../../../src/shared/lib/fileFormat.js'
 
 // Minimal mock provider for testing
@@ -76,7 +77,7 @@ describe('MemoryExtractor', () => {
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
-      provider: mockProvider as any,
+      provider: mockProvider as unknown as LLMProvider,
       messages: [
         { role: 'user', content: '我们把这个拆成几个模块来做' },
         { role: 'assistant', content: '好的，我来帮你设计模块结构' },
@@ -109,7 +110,7 @@ describe('MemoryExtractor', () => {
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
-      provider: mockProvider as any,
+      provider: mockProvider as unknown as LLMProvider,
       messages: [{ role: 'user', content: 'hello' }],
       mindmapSummary: '',
       filePath: mindlanePath,
@@ -144,7 +145,7 @@ describe('MemoryExtractor', () => {
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
-      provider: mockProvider as any,
+      provider: mockProvider as unknown as LLMProvider,
       messages: [{ role: 'user', content: '拆模块' }],
       mindmapSummary: '',
       filePath: mindlanePath,
@@ -162,7 +163,7 @@ describe('MemoryExtractor', () => {
     const mockProvider = createMockProvider('```json\n{"disciplines": [{"name": "engineering", "patterns": [{"subTag": "mvp", "description": "先跑MVP", "observation": "用户偏好快速验证"}]}]}\n```')
 
     await extractor.extractAndPersist({
-      provider: mockProvider as any,
+      provider: mockProvider as unknown as LLMProvider,
       messages: [{ role: 'user', content: '先做个最小版本试试' }],
       mindmapSummary: '',
       filePath: path.join(tempDir, 'dummy.mindlane'),

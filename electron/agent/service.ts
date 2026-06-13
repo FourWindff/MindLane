@@ -16,7 +16,7 @@ export class AiService {
     await fs.promises.mkdir(dbDir, { recursive: true })
     const dbPath = path.join(dbDir, 'app.db')
 
-    this.sessionManager.init(dbPath, { userDataPath })
+    await this.sessionManager.init(dbPath, { userDataPath })
     await this.checkpointer.initWithDbPath(dbPath)
     this.sessionManager.setCheckpointer(this.checkpointer)
 

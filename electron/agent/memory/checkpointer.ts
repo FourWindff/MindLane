@@ -22,6 +22,11 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
   const result: ChatMessage[] = []
   const pendingToolCalls: NonNullable<ChatMessage['toolCalls']> = []
 
+  function readTimestamp(msg: BaseMessage): string | undefined {
+    const metadata = (msg as unknown as { response_metadata?: Record<string, unknown> }).response_metadata
+    return metadata?.timestamp ? String(metadata.timestamp) : undefined
+  }
+
   for (const msg of messages) {
     const type = msg.type
 
@@ -30,12 +35,21 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
     }
 
     if (type === 'human') {
-      result.push({ role: 'user', content: extractTextContent(msg.content) })
+      const chatMsg: ChatMessage = { role: 'user', content: extractTextContent(msg.content) }
+      if (msg.additional_kwargs?.attachment) {
+        chatMsg.attachment = msg.additional_kwargs.attachment as ChatMessage['attachment']
+      }
+      const ts = readTimestamp(msg)
+      if (ts) chatMsg.timestamp = ts
+      result.push(chatMsg)
       continue
     }
 
     if (type === 'system') {
-      result.push({ role: 'system', content: extractTextContent(msg.content) })
+      const chatMsg: ChatMessage = { role: 'system', content: extractTextContent(msg.content) }
+      const ts = readTimestamp(msg)
+      if (ts) chatMsg.timestamp = ts
+      result.push(chatMsg)
       continue
     }
 
@@ -53,11 +67,14 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
       }
 
       if (content) {
-        result.push({
+        const chatMsg: ChatMessage = {
           role: 'assistant',
           content,
           toolCalls: pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined,
-        })
+        }
+        const ts = readTimestamp(msg)
+        if (ts) chatMsg.timestamp = ts
+        result.push(chatMsg)
         pendingToolCalls.length = 0
       }
     }

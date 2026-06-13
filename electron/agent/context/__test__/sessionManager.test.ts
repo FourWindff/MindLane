@@ -1,36 +1,40 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { SessionManager } from '../sessionManager.js'
-import type { SessionMessage } from '../../db/chatDb.js'
+import type { ChatMessage } from '../../../../src/shared/lib/fileFormat.js'
 
 describe('SessionManager', () => {
   let manager: SessionManager
+  let tmpDir: string
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-manager-'))
     manager = new SessionManager()
-    manager.init(':memory:')
+    await manager.init(path.join(tmpDir, 'app.db'), { userDataPath: tmpDir })
     manager.setWorkspace('/workspace/test')
   })
 
   afterEach(() => {
     manager.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
   it('setWorkspace 计算正确的哈希', () => {
     expect(manager.workspacePath).toBe('/workspace/test')
     expect(manager.workspaceHash).toHaveLength(12)
-    // MD5 of '/workspace/test' should be consistent
-    const expectedHash = '1ba3970dc3ef' // precomputed md5('/workspace/test').slice(0,12)
+    const expectedHash = '1ba3970dc3ef'
     expect(manager.workspaceHash).toBe(expectedHash)
   })
 
   it('saveSession 保存会话元数据', async () => {
-    const messages: SessionMessage[] = [
+    const messages: ChatMessage[] = [
       { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00Z' },
       { role: 'assistant', content: 'Hi there', timestamp: '2024-01-01T00:00:01Z' },
     ]
     await manager.saveSession('session-1', messages)
 
-    // Verify session metadata is saved
     const sessions = await manager.listSessions()
     expect(sessions).toHaveLength(1)
     expect(sessions[0].id).toBe('session-1')
@@ -39,7 +43,7 @@ describe('SessionManager', () => {
 
   it('saveSession 自动从第一条用户消息生成标题', async () => {
     const longMessage = 'This is a very long user message that should be truncated for the title'
-    const messages: SessionMessage[] = [
+    const messages: ChatMessage[] = [
       { role: 'user', content: longMessage, timestamp: '2024-01-01T00:00:00Z' },
     ]
     await manager.saveSession('session-title', messages)
@@ -49,7 +53,7 @@ describe('SessionManager', () => {
   })
 
   it('saveSession 更新时保留原有标题', async () => {
-    const messages1: SessionMessage[] = [
+    const messages1: ChatMessage[] = [
       { role: 'user', content: 'First message', timestamp: '2024-01-01T00:00:00Z' },
     ]
     await manager.saveSession('session-preserve', messages1)
@@ -58,8 +62,7 @@ describe('SessionManager', () => {
     const originalTitle = sessions1[0].title
     expect(originalTitle).toBe('First message')
 
-    // Save again with more messages
-    const messages2: SessionMessage[] = [
+    const messages2: ChatMessage[] = [
       { role: 'user', content: 'First message', timestamp: '2024-01-01T00:00:00Z' },
       { role: 'assistant', content: 'Response', timestamp: '2024-01-01T00:00:01Z' },
       { role: 'user', content: 'Second message', timestamp: '2024-01-01T00:00:02Z' },
@@ -72,15 +75,14 @@ describe('SessionManager', () => {
   })
 
   it('listSessions 返回按 updatedAt 排序的结果', async () => {
-    const messages1: SessionMessage[] = [
+    const messages1: ChatMessage[] = [
       { role: 'user', content: 'Msg 1', timestamp: '2024-01-01T00:00:00Z' },
     ]
-    const messages2: SessionMessage[] = [
+    const messages2: ChatMessage[] = [
       { role: 'user', content: 'Msg 2', timestamp: '2024-01-02T00:00:00Z' },
     ]
 
     await manager.saveSession('session-older', messages1)
-    // Small delay to ensure different updatedAt
     await new Promise((r) => setTimeout(r, 10))
     await manager.saveSession('session-newer', messages2)
 
@@ -92,7 +94,7 @@ describe('SessionManager', () => {
 
   it('listSessions 支持分页', async () => {
     for (let i = 1; i <= 5; i++) {
-      const messages: SessionMessage[] = [
+      const messages: ChatMessage[] = [
         { role: 'user', content: `Message ${i}`, timestamp: `2024-01-0${i}T00:00:00Z` },
       ]
       await manager.saveSession(`session-${i}`, messages)
@@ -116,7 +118,7 @@ describe('SessionManager', () => {
   })
 
   it('deleteSession 删除会话元数据', async () => {
-    const messages: SessionMessage[] = [
+    const messages: ChatMessage[] = [
       { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00Z' },
     ]
     await manager.saveSession('session-delete', messages)
@@ -131,10 +133,10 @@ describe('SessionManager', () => {
   })
 
   it('getMostRecentSessionId 返回最近更新的会话', async () => {
-    const messages1: SessionMessage[] = [
+    const messages1: ChatMessage[] = [
       { role: 'user', content: 'Older', timestamp: '2024-01-01T00:00:00Z' },
     ]
-    const messages2: SessionMessage[] = [
+    const messages2: ChatMessage[] = [
       { role: 'user', content: 'Newer', timestamp: '2024-01-02T00:00:00Z' },
     ]
 
@@ -147,24 +149,21 @@ describe('SessionManager', () => {
   })
 
   it('不同 workspace 的数据互相隔离', async () => {
-    const messages1: SessionMessage[] = [
+    const messages1: ChatMessage[] = [
       { role: 'user', content: 'Workspace 1', timestamp: '2024-01-01T00:00:00Z' },
     ]
     await manager.saveSession('session-ws1', messages1)
 
-    // Switch to workspace 2
     manager.setWorkspace('/workspace/other')
-    const messages2: SessionMessage[] = [
+    const messages2: ChatMessage[] = [
       { role: 'user', content: 'Workspace 2', timestamp: '2024-01-01T00:00:00Z' },
     ]
     await manager.saveSession('session-ws2', messages2)
 
-    // WS2 should only see its own session
     const ws2Sessions = await manager.listSessions()
     expect(ws2Sessions).toHaveLength(1)
     expect(ws2Sessions[0].title).toBe('Workspace 2')
 
-    // Switch back to WS1
     manager.setWorkspace('/workspace/test')
     const ws1Sessions = await manager.listSessions()
     expect(ws1Sessions).toHaveLength(1)
@@ -172,7 +171,7 @@ describe('SessionManager', () => {
   })
 
   it('loadHistory returns UI messages saved for the session', async () => {
-    const messages: SessionMessage[] = [
+    const messages: ChatMessage[] = [
       {
         role: 'user',
         content: 'Use this document',
@@ -189,7 +188,8 @@ describe('SessionManager', () => {
 
     await manager.saveSession('session-ui-history', messages)
 
-    await expect(manager.loadHistory('session-ui-history')).resolves.toEqual(messages)
+    const loaded = await manager.loadHistory('session-ui-history')
+    expect(loaded).toEqual(messages)
   })
 
   it('saveSession appends only new frontend messages without rewriting existing history', async () => {
@@ -199,7 +199,8 @@ describe('SessionManager', () => {
       { role: 'assistant', content: 'second' },
     ])
 
-    await expect(manager.loadHistory('session-replace')).resolves.toEqual([
+    const loaded = await manager.loadHistory('session-replace')
+    expect(loaded).toEqual([
       { role: 'user', content: 'first' },
       { role: 'assistant', content: 'second' },
     ])
@@ -220,7 +221,7 @@ describe('SessionManager', () => {
     expect(deletedThreads).toEqual(['session-delete-linked'])
   })
 
-  it('loadHistoryAsMessages 无 checkpoint 时返回空', async () => {
+  it('loadHistoryAsMessages 无消息时返回空', async () => {
     const loaded = await manager.loadHistoryAsMessages('non-existent-session')
     expect(loaded).toHaveLength(0)
   })
