@@ -7,7 +7,7 @@ import type { DocumentRef, MindLaneNode } from '@/shared/lib/fileFormat'
 import { stripMarkers } from '@/features/chat/lib/chatUtils'
 import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 
-export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
+export function useChatStream() {
   const addMessage = useAiStore((s) => s.addChatMessage)
 
   const [streamingText, setStreamingText] = useState('')
@@ -21,8 +21,7 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
     setStreamingText('')
     setActiveTools([])
     useAiStore.getState().reset()
-    scrollToBottom()
-  }, [scrollToBottom])
+  }, [])
 
   const applyMindmapData = useCallback(
     (data: { nodes: MindLaneNode[]; edges: { id: string; source: string; target: string; type?: string }[] }) => {
@@ -81,7 +80,6 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
       api.onStreamToken((token) => {
         streamTextRef.current += token
         setStreamingText(stripMarkers(streamTextRef.current))
-        scrollToBottom()
       }),
     )
 
@@ -96,7 +94,6 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
       finalizedSegmentCountRef.current += 1
       streamTextRef.current = ''
       setStreamingText('')
-      scrollToBottom()
     })
     if (unsubMessageStart) {
       unsubs.push(unsubMessageStart)
@@ -164,7 +161,7 @@ export function useChatStream(scrollToBottom: (instant?: boolean) => void) {
     )
 
     return () => unsubs.forEach((fn) => fn())
-  }, [addMessage, applyMindmapData, extractGeneratedDocumentRef, scrollToBottom, finishStream])
+  }, [addMessage, applyMindmapData, extractGeneratedDocumentRef, finishStream])
 
   return {
     streamingText,

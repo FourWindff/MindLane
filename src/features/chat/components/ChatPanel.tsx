@@ -32,7 +32,6 @@ export function ChatPanel() {
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
 
-  const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [inputRows, setInputRows] = useState(1)
 
@@ -45,16 +44,7 @@ export function ChatPanel() {
     quickActions,
   } = useChatContext()
 
-  const scrollToBottom = useCallback((instant?: boolean) => {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: instant ? 'instant' : 'smooth',
-      })
-    })
-  }, [])
-
-  const { streamingText, activeTools } = useChatStream(scrollToBottom)
+  const { streamingText, activeTools } = useChatStream()
 
   // Load chat history when workspace changes
   useEffect(() => {
@@ -64,13 +54,6 @@ export function ChatPanel() {
       useAiStore.setState({ threadId: '', chatMessages: [], workspacePath: null })
     }
   }, [workspacePath])
-
-  // Scroll to bottom on initial load
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom(true)
-    }
-  }, [threadId, messages.length, scrollToBottom])
 
   const handleSelectAttachment = useCallback(async () => {
     const api = window.mindlane?.file
@@ -117,7 +100,6 @@ export function ChatPanel() {
     if (inputRef.current) inputRef.current.value = ''
     setInputRows(1)
 
-    scrollToBottom()
     useAiStore.getState().setBusy(true)
     useAiStore.getState().setStep('chatting')
     void saveChatHistory()
@@ -128,7 +110,7 @@ export function ChatPanel() {
     const context = buildContext()
     setAttachedDocument(null) // clear after context captures the doc
     await api.chatStream({ threadId, message: text || `请根据「${doc?.filename}」生成思维导图`, context })
-  }, [apiKey, busy, threadId, addMessage, scrollToBottom, buildContext, setAttachedDocument])
+  }, [apiKey, busy, threadId, addMessage, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {
     const api = window.mindlane?.ai
@@ -210,7 +192,6 @@ export function ChatPanel() {
       />
 
       <MessageList
-        ref={scrollRef}
         messages={messages}
         streamingText={streamingText}
         activeTools={activeTools}
