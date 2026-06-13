@@ -15,6 +15,7 @@ export class ContextBuilder {
     private context?: MindmapContextData;
     private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true };
     private memoryManager?: MemoryManager;
+    private lastSummary?: string;
 
     withMessages(messages: BaseMessage[]): this {
         this.messages = messages;
@@ -33,6 +34,11 @@ export class ContextBuilder {
 
     withMemory(manager: MemoryManager | undefined): this {
         this.memoryManager = manager;
+        return this;
+    }
+
+    withLastSummary(summary: string | undefined): this {
+        this.lastSummary = summary;
         return this;
     }
 
@@ -61,14 +67,21 @@ export class ContextBuilder {
             features.push('记忆训练');
         }
 
-        this.prompt += `<SYSTEM_PROMPT>
+        let systemPrompt = `<SYSTEM_PROMPT>
 你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。
 当用户需要从文档、URL 或文本生成思维导图时，先调用 generateMindmapFragment；工具返回 YAML 后，再根据当前思维导图上下文调用 batchAddMindmapNodes 选择插入位置。
 当用户要求根据已关联的原文件、原文、文档章节或文档内容修改当前思维导图时，先调用 searchLinkedDocument 检索相关片段，再调用思维导图操作工具修改节点。
 当用户需要生成记忆宫殿时，先调用 generatePalace；工具返回宫殿数据后，再根据当前思维导图上下文调用 addPalaceNode 选择插入位置。
 generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要直接复制给用户。
-</SYSTEM_PROMPT>
 `;
+
+        if (this.lastSummary) {
+            systemPrompt += `\n## 历史摘要\n${this.lastSummary}\n`;
+        }
+
+        systemPrompt += `</SYSTEM_PROMPT>
+`;
+        this.prompt += systemPrompt;
         return this;
     }
 

@@ -1,4 +1,4 @@
-import { HumanMessage, AIMessage, ToolMessage, type BaseMessage, RemoveMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, SystemMessage, type BaseMessage, RemoveMessage } from "@langchain/core/messages";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
 import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
 import type { CompiledStateGraph } from "@langchain/langgraph";
@@ -40,6 +40,8 @@ import { compactContext } from "./memory/contextCompact.js";
 import { extractTextContent } from "./utils.js";
 import { checkpointMessagesToSessionMessages } from "./memory/checkpointer.js";
 import type { CacheManager } from "../fs/cacheManager.js";
+import { ContextBuilder } from "./agenthub/mindlane/context.js";
+import { Consolidator } from "./context/consolidator.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
@@ -561,9 +563,81 @@ export class AgentOrchestrator {
       this.aiService.memoryManager,
     );
 
-    // 主动压缩节点：在 supervisor 前估算输入预算并压缩历史
-    const contextCompactNode = async (state: MainGraphStateType) => {
-      return compactContext(state, tools, this.provider, this.aiService.memoryManager)
+    // 主动压缩节点：先持久化归档，再按预算读取未归档消息，最后内存级兜底
+    const contextCompactNode = async (
+      state: MainGraphStateType,
+      config?: { configurable?: Record<string, unknown> },
+    ) => {
+      const sessionManager = this.aiService.sessionManager
+      const threadId = config?.configurable?.thread_id as string | undefined
+
+      if (!sessionManager?.isReady() || !threadId) {
+        return compactContext(state, tools, this.provider, this.aiService.memoryManager, { hasEmbeddings: false, hasPalace })
+      }
+
+      const buildMessages = async (
+        messages: BaseMessage[],
+        lastSummary?: string,
+      ): Promise<BaseMessage[]> => {
+        const builder = new ContextBuilder()
+          .withMessages(messages)
+          .withContext(state.context ?? undefined)
+          .withCapabilityFlags({ hasEmbeddings: false, hasPalace })
+          .withMemory(this.aiService.memoryManager)
+          .withLastSummary(lastSummary)
+
+        await builder.buildMemoryContext()
+        builder
+          .buildSystemPrompt()
+          .buildEnvironmentPrompt()
+          .buildMindmapContext()
+          .buildHistory()
+
+        return [new SystemMessage(builder.build()), ...messages]
+      }
+
+      const getToolDefinitions = () => tools
+
+      const consolidator = new Consolidator(
+        {
+          sessionManager,
+          provider: this.provider,
+          buildMessages,
+          getToolDefinitions,
+        },
+        {
+          safetyBuffer: AGENT_LIMITS.consolidationSafetyBuffer,
+          consolidationRatio: AGENT_LIMITS.consolidationRatio,
+          maxContextMessages: AGENT_LIMITS.maxContextMessages,
+          maxMessagesBeforeTokenCheck: AGENT_LIMITS.maxMessagesBeforeTokenCheck,
+          maxConsolidationRounds: AGENT_LIMITS.maxConsolidationRounds,
+        },
+      )
+
+      try {
+        await consolidator.maybe_consolidate_by_tokens(threadId)
+        const contextMessages = await consolidator.getMessagesForContext(threadId, {
+          maxMessages: AGENT_LIMITS.maxContextMessages,
+          budget:
+            AGENT_LIMITS.contextWindowTokens -
+            AGENT_LIMITS.maxCompletionTokens -
+            AGENT_LIMITS.consolidationSafetyBuffer,
+        })
+
+        return {
+          messages: [
+            new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
+            ...contextMessages,
+          ],
+        }
+      } catch (err) {
+        logger.warn(
+          '[contextCompact] Consolidator failed for session %s, falling back to compactContext:',
+          threadId,
+          err,
+        )
+        return compactContext(state, tools, this.provider, this.aiService.memoryManager, { hasEmbeddings: false, hasPalace })
+      }
     }
 
     // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退

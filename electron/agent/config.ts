@@ -21,6 +21,11 @@
  * - contextCompactRecentMessages: 主动压缩时保留的最近消息条数。
  * - reactiveCompactTailMessages: 被动压缩时保留的历史尾部消息条数。
  * - reactiveCompactMaxRetries: 被动压缩最大重试次数。
+ * - consolidationRatio: 归档目标占输入预算的比例。
+ * - consolidationSafetyBuffer: 归档时预留的安全缓冲 token 数。
+ * - maxContextMessages: 归档后进入 LLM 的最大消息条数。
+ * - maxMessagesBeforeTokenCheck: 触发精确 token 估算的消息数量阈值。
+ * - maxConsolidationRounds: 单次调用最多执行归档轮数。
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
@@ -32,6 +37,11 @@ export const AGENT_LIMITS = {
   contextCompactRecentMessages: 10,
   reactiveCompactTailMessages: 5,
   reactiveCompactMaxRetries: 1,
+  consolidationRatio: 0.5,
+  consolidationSafetyBuffer: 1_024,
+  maxContextMessages: 120,
+  maxMessagesBeforeTokenCheck: 120,
+  maxConsolidationRounds: 5,
 } as const
 
 /**

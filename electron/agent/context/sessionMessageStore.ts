@@ -19,6 +19,10 @@ export interface SessionMeta {
   createdAt: string
   updatedAt: string
   messageCount: number
+  /** 已归档到的消息行索引（0 表示未归档） */
+  lastConsolidated?: number
+  /** 最近一次归档生成的历史摘要，用于注入系统提示词 */
+  _lastSummary?: string
 }
 
 export interface SessionMessageStoreOptions {
@@ -188,11 +192,15 @@ export class SessionMessageStore {
     })
   }
 
-  private resolveSessionPath(sessionId: string): string {
+  resolveSessionPath(sessionId: string): string {
     if (!this.workspaceHash) {
       throw new Error('[SessionMessageStore] workspaceHash 未设置，请先调用 setWorkspace()')
     }
     return path.join(this.baseDir, this.workspaceHash, `${sessionId}.jsonl`)
+  }
+
+  getBaseDir(): string {
+    return this.baseDir
   }
 
   private defaultMeta(sessionId: string): SessionMeta {
@@ -222,7 +230,17 @@ export class SessionMessageStore {
         typeof parsed.updatedAt === 'string' &&
         typeof parsed.messageCount === 'number'
       ) {
-        return parsed as SessionMeta
+        return {
+          ...parsed,
+          lastConsolidated:
+            typeof parsed.lastConsolidated === 'number'
+              ? parsed.lastConsolidated
+              : undefined,
+          _lastSummary:
+            typeof parsed._lastSummary === 'string'
+              ? parsed._lastSummary
+              : undefined,
+        } as SessionMeta
       }
     } catch {
       // ignore

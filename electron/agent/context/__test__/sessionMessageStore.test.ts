@@ -61,6 +61,32 @@ describe('SessionMessageStore', () => {
     expect(ws2.map((s) => s.id)).toEqual(['s2'])
   })
 
+  it('保存并读取含 lastConsolidated 与 _lastSummary 的元数据', async () => {
+    const meta: SessionMeta = {
+      id: 'meta-extra',
+      title: 't',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messageCount: 0,
+      lastConsolidated: 5,
+      _lastSummary: '用户讨论了技术栈选择',
+    }
+    await store.createSession('meta-extra', meta)
+
+    const read = store.getSessionMeta('meta-extra')
+    expect(read).toMatchObject({
+      id: 'meta-extra',
+      lastConsolidated: 5,
+      _lastSummary: '用户讨论了技术栈选择',
+    })
+
+    const sessions = await store.listSessions('ws1')
+    expect(sessions[0]).toMatchObject({
+      lastConsolidated: 5,
+      _lastSummary: '用户讨论了技术栈选择',
+    })
+  })
+
   it('删除会话后无法读取', async () => {
     await store.saveMessage('del', new HumanMessage('x'))
     await store.deleteSession('del')

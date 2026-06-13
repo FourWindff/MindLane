@@ -41,6 +41,26 @@ describe('SessionManager', () => {
     expect(sessions[0].messageCount).toBe(2)
   })
 
+  it('saveSession 更新时保留 lastConsolidated 与 _lastSummary', async () => {
+    await manager.saveSession('session-preserve-extra', [{ role: 'user', content: 'first' }])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const store = (manager as any).store as import('../sessionMessageStore.js').SessionMessageStore
+    await store.updateSessionMeta('session-preserve-extra', {
+      ...(await store.getSessionMeta('session-preserve-extra'))!,
+      lastConsolidated: 3,
+      _lastSummary: 'summary',
+    })
+
+    await manager.saveSession('session-preserve-extra', [
+      { role: 'user', content: 'first' },
+      { role: 'assistant', content: 'second' },
+    ])
+
+    const meta = await store.getSessionMeta('session-preserve-extra')
+    expect(meta?.lastConsolidated).toBe(3)
+    expect(meta?._lastSummary).toBe('summary')
+  })
+
   it('saveSession 自动从第一条用户消息生成标题', async () => {
     const longMessage = 'This is a very long user message that should be truncated for the title'
     const messages: ChatMessage[] = [

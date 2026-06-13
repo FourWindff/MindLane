@@ -91,6 +91,39 @@ export class SessionManager {
   }
 
   /**
+   * 加载指定会话的原始 LangChain 消息（含 system 消息）。
+   */
+  async loadMessages(threadId: string): Promise<BaseMessage[]> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    return this.store.loadMessages(threadId)
+  }
+
+  /**
+   * 读取会话元数据。
+   */
+  getSessionMeta(sessionId: string): SessionMeta | null {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    return this.store.getSessionMeta(sessionId)
+  }
+
+  /**
+   * 更新会话元数据。
+   */
+  async updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    await this.store.updateSessionMeta(sessionId, meta)
+  }
+
+  /**
+   * 获取会话历史文件路径（{sessionId}.history.jsonl）。
+   */
+  resolveHistoryPath(sessionId: string): string {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    const sessionPath = this.store.resolveSessionPath(sessionId)
+    return sessionPath.replace(/\.jsonl$/, '.history.jsonl')
+  }
+
+  /**
    * 加载指定会话的历史消息并转换为 LangChain Message 格式
    */
   async loadHistoryAsMessages(
@@ -209,6 +242,8 @@ export class SessionManager {
         createdAt: existingMeta?.createdAt ?? now,
         updatedAt: now,
         messageCount: storedMessages.length + baseMessagesToAppend.length,
+        lastConsolidated: existingMeta?.lastConsolidated,
+        _lastSummary: existingMeta?._lastSummary,
       }
       await this.store.updateSessionMeta(sessionId, meta)
     }
