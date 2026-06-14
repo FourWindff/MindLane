@@ -232,7 +232,7 @@ function createWindow() {
   }
 }
 
-function registerIpcHandlers() {
+function registerIpcHandlers(userDataPath: string) {
   const createProviderForRequest = async (apiKey: string, model: string) => {
     const settings = await fsService.settings.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
@@ -332,6 +332,7 @@ function registerIpcHandlers() {
 
         const orchestrator = new AgentOrchestrator(provider, aiService, {
           cacheManager: fsService.cache,
+          userDataPath,
         })
         await orchestrator.stream(
           request,
@@ -421,6 +422,7 @@ function registerIpcHandlers() {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
       const orchestrator = new AgentOrchestrator(provider, aiService, {
         cacheManager: fsService.cache,
+        userDataPath,
       })
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
@@ -927,12 +929,14 @@ app.whenReady().then(async () => {
       })
     }
     await aiService.init(userDataPath)
+    // TODO: 应用启动时清理 userData/tool-results/ 下过期的转存文件，
+    // 避免工具结果文件无限累积占用磁盘。
     aiServiceReady = true
   } catch (err) {
     console.error('AI service init failed:', err)
   }
 
-  registerIpcHandlers()
+  registerIpcHandlers(userDataPath)
   setupApplicationMenu()
   createWindow()
 })

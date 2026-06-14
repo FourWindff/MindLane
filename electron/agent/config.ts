@@ -26,6 +26,10 @@
  * - maxContextMessages: 归档后进入 LLM 的最大消息条数。
  * - maxMessagesBeforeTokenCheck: 触发精确 token 估算的消息数量阈值。
  * - maxConsolidationRounds: 单次调用最多执行归档轮数。
+ * - toolResultOffloadChars: 工具结果字符数超过此阈值时转存到磁盘，单位：字符。
+ * - toolResultMaxChars: 工具结果最大允许字符数，超过则硬截断，单位：字符。
+ * - toolResultSummaryChars: 转存后返回给模型的摘要长度，单位：字符。
+ * - toolResultOffloadDirName: 转存目录名，位于 userData 下。
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
@@ -42,6 +46,10 @@ export const AGENT_LIMITS = {
   maxContextMessages: 120,
   maxMessagesBeforeTokenCheck: 120,
   maxConsolidationRounds: 5,
+  toolResultOffloadChars: 8_000,
+  toolResultMaxChars: 32_000,
+  toolResultSummaryChars: 1_000,
+  toolResultOffloadDirName: "tool-results",
 } as const
 
 /**

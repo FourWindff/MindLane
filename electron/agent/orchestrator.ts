@@ -35,6 +35,7 @@ import {
   GENERATE_PALACE_TOOL,
   isVirtualSubgraphTool,
 } from "./tools/subgraphRoutingTools.js";
+import { _normalize_tool_result } from "./tools/toolResultNormalizer.js";
 import { AGENT_LIMITS } from "./config.js";
 import { compactContext } from "./memory/contextCompact.js";
 import { extractTextContent } from "./utils.js";
@@ -96,6 +97,7 @@ export interface StreamCallbacks {
 
 export interface AgentOrchestratorOptions {
   cacheManager?: CacheManager;
+  userDataPath?: string;
 }
 
 export interface PalaceFromNodesResult {
@@ -455,6 +457,27 @@ export class AgentOrchestrator {
       invokeSubgraph(this.getCompiledPalaceSubgraph(), state);
 
     // 工具执行节点：过滤掉虚拟子图路由工具（已在 supervisor.invoke 中处理）
+    const normalizeToolMessages = async (messages: BaseMessage[]): Promise<BaseMessage[]> => {
+      return Promise.all(
+        messages.map(async (msg) => {
+          if (msg.type !== "tool") return msg;
+          const toolMsg = msg as ToolMessage;
+          const normalized = await _normalize_tool_result(
+            toolMsg.name ?? "unknown",
+            toolMsg.content,
+            toolMsg.tool_call_id,
+            this.options.userDataPath,
+          );
+          return new ToolMessage({
+            tool_call_id: toolMsg.tool_call_id,
+            name: toolMsg.name,
+            content: normalized,
+            additional_kwargs: toolMsg.additional_kwargs,
+          });
+        }),
+      );
+    };
+
     const toolsNode = async (state: MainGraphStateType) => {
       const lastMessage = state.messages[state.messages.length - 1];
       if (lastMessage && lastMessage.type === "ai") {
@@ -476,11 +499,11 @@ export class AgentOrchestrator {
         };
         const result = await toolNode.invoke(filteredState);
         const messages = result.messages ?? result;
-        return { messages: Array.isArray(messages) ? messages : [messages] };
+        return { messages: normalizeToolMessages(Array.isArray(messages) ? messages : [messages]) };
       }
       const result = await toolNode.invoke(state);
       const messages = result.messages ?? result;
-      return { messages: Array.isArray(messages) ? messages : [messages] };
+      return { messages: normalizeToolMessages(Array.isArray(messages) ? messages : [messages]) };
     };
 
     const mindmapToolResultNode = async (state: MainGraphStateType) => {
