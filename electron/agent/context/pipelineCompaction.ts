@@ -161,28 +161,3 @@ async function createOffloadReference(
   return `[Tool result exceeded ${budget} bytes budget (${totalBytes} bytes total).]\n${refLine}\n\nFirst ${headChars} characters:\n${head}`
 }
 
-/**
- * 读取引用文件中的完整工具结果内容。
- */
-export async function readOffloadReference(filePath: string): Promise<string | undefined> {
-  try {
-    return await fs.readFile(filePath, 'utf8')
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * 清理 userData 下的临时引用目录，避免磁盘膨胀。
- */
-export async function cleanupOffloadDirectory(userDataPath: string): Promise<void> {
-  const dir = path.join(userDataPath, 'message-pipeline-offloads')
-  try {
-    const entries = await fs.readdir(dir)
-    for (const entry of entries) {
-      await fs.unlink(path.join(dir, entry)).catch(() => {})
-    }
-  } catch {
-    /* directory may not exist */
-  }
-}

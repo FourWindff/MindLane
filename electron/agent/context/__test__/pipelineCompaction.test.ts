@@ -3,7 +3,7 @@ import { ToolMessage } from '@langchain/core/messages'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { microcompact, applyToolResultBudget, cleanupOffloadDirectory } from '../pipelineCompaction.js'
+import { microcompact, applyToolResultBudget } from '../pipelineCompaction.js'
 import type { MessagePipelineConfig } from '../pipelineTypes.js'
 
 function makeConfig(partial: Partial<MessagePipelineConfig> = {}): MessagePipelineConfig {
@@ -137,18 +137,3 @@ describe('applyToolResultBudget', () => {
   })
 })
 
-describe('cleanupOffloadDirectory', () => {
-  it('清理临时引用目录', async () => {
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ml-cleanup-'))
-    const offloadDir = path.join(tmpDir, 'message-pipeline-offloads')
-    await fs.mkdir(offloadDir, { recursive: true })
-    await fs.writeFile(path.join(offloadDir, 'test.txt'), 'data')
-
-    await cleanupOffloadDirectory(tmpDir)
-
-    const entries = await fs.readdir(offloadDir).catch(() => [])
-    expect(entries).toHaveLength(0)
-
-    await fs.rm(tmpDir, { recursive: true, force: true })
-  })
-})

@@ -11,7 +11,7 @@ type ShortcutConfig = Omit<ShortcutRegistration, 'handler' | 'enabled'> & {
  * 向当前应用的 ShortcutRegistry 注册一条快捷键。
  * handler / enabled 始终指向最新实现（内部 ref），仅在元信息变化时重新挂载注册。
  */
-export function useRegisterShortcut(config: ShortcutConfig) {
+export function useShortcut(config: ShortcutConfig) {
   const registry = useShortcutRegistry()
   const handlerRef = useRef(config.handler)
   const enabledRef = useRef(config.enabled)
@@ -44,6 +44,3 @@ export function useRegisterShortcut(config: ShortcutConfig) {
     config.showInHelp,
   ])
 }
-
-/** `useRegisterShortcut` 的别名 */
-export const useShortcut = useRegisterShortcut

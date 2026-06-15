@@ -88,7 +88,7 @@ export type PendingSubgraph = 'mindmap' | 'palace'
 /**
  * 基础状态切片 - 所有图共享的状态
  */
-export const BaseStateAnnotations = {
+const BaseStateAnnotations = {
   messages: Annotation<BaseMessage[]>({
     reducer: messagesStateReducer,
     default: () => [],
@@ -122,7 +122,7 @@ export const BaseStateAnnotations = {
 /**
  * 记忆宫殿状态切片
  */
-export const PalaceStateAnnotations = {
+const PalaceStateAnnotations = {
   palaceInputText: Annotation<string>({
     reducer: (_prev, next) => next,
     default: () => '',
@@ -164,7 +164,7 @@ export const PalaceStateAnnotations = {
 /**
  * 思维导图状态切片
  */
-export const MindmapStateAnnotations = {
+const MindmapStateAnnotations = {
   mindmapInputSource: Annotation<MindmapInputSource | null>({
     reducer: (_prev, next) => next,
     default: () => null,

@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLaneHarness** (4949 symbols, 9130 relationships, 282 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLane** (4890 symbols, 9031 relationships, 278 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -24,10 +24,10 @@ This project is indexed by GitNexus as **MindLaneHarness** (4949 symbols, 9130 r
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/MindLaneHarness/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/MindLaneHarness/clusters` | All functional areas |
-| `gitnexus://repo/MindLaneHarness/processes` | All execution flows |
-| `gitnexus://repo/MindLaneHarness/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/MindLane/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/MindLane/clusters` | All functional areas |
+| `gitnexus://repo/MindLane/processes` | All execution flows |
+| `gitnexus://repo/MindLane/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
