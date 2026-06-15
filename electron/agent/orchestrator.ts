@@ -41,12 +41,12 @@ import { compactContext } from "./memory/contextCompact.js";
 import { extractTextContent } from "./utils.js";
 import { checkpointMessagesToSessionMessages } from "./memory/checkpointer.js";
 import type { CacheManager } from "../fs/cacheManager.js";
+import type { MessagePipelineConfig } from "./context/pipeline.js";
 import { ContextBuilder } from "./agenthub/mindlane/context.js";
 import { Consolidator } from "./context/consolidator.js";
 
 /**
  * 聊天请求 - 后端统一管理历史消息
- *
  * 只需要传递：
  * - threadId: 会话 ID，后端据此加载历史
  * - message: 当前用户输入（单条）
@@ -98,6 +98,7 @@ export interface StreamCallbacks {
 export interface AgentOrchestratorOptions {
   cacheManager?: CacheManager;
   userDataPath?: string;
+  messagePipeline?: MessagePipelineConfig;
 }
 
 export interface PalaceFromNodesResult {
@@ -479,31 +480,41 @@ export class AgentOrchestrator {
     };
 
     const toolsNode = async (state: MainGraphStateType) => {
-      const lastMessage = state.messages[state.messages.length - 1];
-      if (lastMessage && lastMessage.type === "ai") {
-        const msg = lastMessage as AIMessage;
-        const actionToolCalls =
-          msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? [];
-        if (actionToolCalls.length === 0) {
-          return { messages: [] };
+      try {
+        const lastMessage = state.messages[state.messages.length - 1];
+        logger.info('[toolsNode] last message type: %s, tool_calls: %o', lastMessage?.getType(), (lastMessage as AIMessage)?.tool_calls?.map((tc) => ({ id: tc.id, name: tc.name })))
+        if (lastMessage && lastMessage.type === "ai") {
+          const msg = lastMessage as AIMessage;
+          const actionToolCalls =
+            msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? [];
+          if (actionToolCalls.length === 0) {
+            return { messages: [] };
+          }
+          const filteredState = {
+            ...state,
+            messages: [
+              ...state.messages.slice(0, -1),
+              new AIMessage({
+                content: msg.content,
+                tool_calls: actionToolCalls,
+              }),
+            ],
+          };
+          logger.info('[toolsNode] invoking toolNode with %d calls', actionToolCalls.length)
+          const result = await toolNode.invoke(filteredState);
+          const messages = result.messages ?? result;
+          logger.info('[toolsNode] toolNode returned %d messages', Array.isArray(messages) ? messages.length : 1)
+          const normalized = await normalizeToolMessages(Array.isArray(messages) ? messages : [messages]);
+          logger.info('[toolsNode] normalized messages: %o', normalized.map((m) => ({ type: m.getType(), content: typeof m.content === 'string' ? m.content.slice(0, 200) : JSON.stringify(m.content).slice(0, 200) })))
+          return { messages: normalized };
         }
-        const filteredState = {
-          ...state,
-          messages: [
-            ...state.messages.slice(0, -1),
-            new AIMessage({
-              content: msg.content,
-              tool_calls: actionToolCalls,
-            }),
-          ],
-        };
-        const result = await toolNode.invoke(filteredState);
+        const result = await toolNode.invoke(state);
         const messages = result.messages ?? result;
-        return { messages: normalizeToolMessages(Array.isArray(messages) ? messages : [messages]) };
+        return { messages: await normalizeToolMessages(Array.isArray(messages) ? messages : [messages]) };
+      } catch (err) {
+        logger.error('[toolsNode] error:', err)
+        throw err
       }
-      const result = await toolNode.invoke(state);
-      const messages = result.messages ?? result;
-      return { messages: normalizeToolMessages(Array.isArray(messages) ? messages : [messages]) };
     };
 
     const mindmapToolResultNode = async (state: MainGraphStateType) => {
@@ -584,6 +595,10 @@ export class AgentOrchestrator {
       tools,
       { hasEmbeddings: false, hasPalace },
       this.aiService.memoryManager,
+      {
+        userDataPath: this.options.userDataPath,
+        messagePipeline: this.options.messagePipeline,
+      },
     );
 
     // 主动压缩节点：先持久化归档，再按预算读取未归档消息，最后内存级兜底

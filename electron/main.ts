@@ -18,6 +18,7 @@ import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/f
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
+import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -250,6 +251,16 @@ function registerIpcHandlers(userDataPath: string) {
     })
   }
 
+  const resolveMessagePipelineConfig = async () => {
+    const settings = await fsService.settings.load()
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerOverride = settings.providerConfigs[providerId]?.messagePipeline
+    return mergeMessagePipelineConfig({
+      ...settings.messagePipeline,
+      ...providerOverride,
+    })
+  }
+
   // -- AI chat stream (with abort support) --
   let streamAbortController: AbortController | null = null
 
@@ -333,6 +344,7 @@ function registerIpcHandlers(userDataPath: string) {
         const orchestrator = new AgentOrchestrator(provider, aiService, {
           cacheManager: fsService.cache,
           userDataPath,
+          messagePipeline: await resolveMessagePipelineConfig(),
         })
         await orchestrator.stream(
           request,
@@ -423,6 +435,7 @@ function registerIpcHandlers(userDataPath: string) {
       const orchestrator = new AgentOrchestrator(provider, aiService, {
         cacheManager: fsService.cache,
         userDataPath,
+        messagePipeline: await resolveMessagePipelineConfig(),
       })
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },

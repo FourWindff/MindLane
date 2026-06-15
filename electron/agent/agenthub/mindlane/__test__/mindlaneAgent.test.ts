@@ -206,6 +206,58 @@ describe('MindLaneAgent.invoke()', () => {
     expect(tools.some((tool) => tool.name === GENERATE_MINDMAP_FRAGMENT_TOOL)).toBe(true)
     expect(tools.some((tool) => tool.name === GENERATE_PALACE_TOOL)).toBe(false)
   })
+
+  it('does not duplicate chat history in the system prompt', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: 'ok' }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      [mockSearchTool],
+      undefined,
+      undefined,
+      {
+        messagePipeline: {
+          maxContextTokens: 20,
+          toolResultMaxBytes: 0,
+          microcompactToolNames: [],
+        },
+      },
+    )
+    const state = createInitialState()
+    state.messages = [
+      new HumanMessage('old private history '.repeat(80)),
+      new AIMessage('old assistant reply '.repeat(80)),
+      new HumanMessage('current request'),
+    ]
+
+    await agent.invoke(state)
+
+    const invokedMessages = mockInvoke.mock.calls[0][0] as BaseMessage[]
+    const systemPrompt = invokedMessages[0].content as string
+    const messageContents = invokedMessages.slice(1).map((m) => String(m.content))
+    expect(systemPrompt).not.toContain('<HISTORY>')
+    expect(systemPrompt).not.toContain('old private history')
+    expect(systemPrompt).not.toContain('current request')
+    expect(messageContents).toContain('current request')
+  })
+
+  it('redacts message content in model error logs', async () => {
+    const privateText = 'PRIVATE_DOCUMENT_CONTENT_SHOULD_NOT_BE_LOGGED_' + 'x'.repeat(500)
+    const mockInvoke = vi.fn().mockRejectedValue(new Error('network timeout'))
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const agent = new MindLaneAgent(createMockProvider(mockInvoke), [mockSearchTool])
+    const state = createInitialState()
+    state.messages = [new HumanMessage(privateText)]
+
+    await agent.invoke(state)
+
+    const logged = errorSpy.mock.calls
+      .map((call) => call.map((arg) => String(arg)).join(' '))
+      .join('\n')
+    expect(logged).not.toContain(privateText)
+    expect(logged).toContain('PRIVATE_DOCUMENT_CONTENT_SHOULD_NOT_BE_LOGGED_')
+
+    errorSpy.mockRestore()
+  })
 })
 
 describe('MindLaneAgent.route()', () => {
