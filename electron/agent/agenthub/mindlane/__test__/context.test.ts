@@ -29,4 +29,15 @@ describe('ContextBuilder memory', () => {
 
     await fs.promises.rm(dir, { recursive: true, force: true })
   })
+
+  it('injects last summary into system prompt', () => {
+    const builder = new ContextBuilder()
+    builder.withLastSummary('用户想做一个 AI 助手项目')
+    builder.buildSystemPrompt()
+    const prompt = builder.build()
+
+    expect(prompt).toContain('历史摘要')
+    expect(prompt).toContain('用户想做一个 AI 助手项目')
+    expect(prompt).toContain('</SYSTEM_PROMPT>')
+  })
 })

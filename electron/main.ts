@@ -18,6 +18,7 @@ import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/f
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
+import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -38,6 +39,11 @@ let forceClose = false
 
 let fsService: FileSystemService
 let aiService: AiService
+let aiServiceReady = false
+
+function aiNotReadyResponse(): { ok: false; error: string } {
+  return { ok: false, error: 'AI service not initialized' }
+}
 
 async function fileSha256(filePath: string): Promise<string> {
   const buffer = await fs.promises.readFile(filePath)
@@ -227,7 +233,7 @@ function createWindow() {
   }
 }
 
-function registerIpcHandlers() {
+function registerIpcHandlers(userDataPath: string) {
   const createProviderForRequest = async (apiKey: string, model: string) => {
     const settings = await fsService.settings.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
@@ -242,6 +248,16 @@ function registerIpcHandlers() {
       apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
       chatModel: normalizedModel,
       baseUrl: providerConfig?.baseUrl,
+    })
+  }
+
+  const resolveMessagePipelineConfig = async () => {
+    const settings = await fsService.settings.load()
+    const providerId = settings.activeProviders.chat || 'dashscope'
+    const providerOverride = settings.providerConfigs[providerId]?.messagePipeline
+    return mergeMessagePipelineConfig({
+      ...settings.messagePipeline,
+      ...providerOverride,
     })
   }
 
@@ -271,6 +287,11 @@ function registerIpcHandlers() {
       streamAbortController?.abort()
       const abortController = new AbortController()
       streamAbortController = abortController
+
+      if (!aiServiceReady) {
+        win?.webContents.send('ai:chat-stream-error', 'AI service not initialized')
+        return
+      }
 
       try {
         const settings = await fsService.settings.load()
@@ -322,6 +343,8 @@ function registerIpcHandlers() {
 
         const orchestrator = new AgentOrchestrator(provider, aiService, {
           cacheManager: fsService.cache,
+          userDataPath,
+          messagePipeline: await resolveMessagePipelineConfig(),
         })
         await orchestrator.stream(
           request,
@@ -411,6 +434,8 @@ function registerIpcHandlers() {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
       const orchestrator = new AgentOrchestrator(provider, aiService, {
         cacheManager: fsService.cache,
+        userDataPath,
+        messagePipeline: await resolveMessagePipelineConfig(),
       })
       return orchestrator.runPalaceFromNodes(payload.selectedNodes)
     },
@@ -714,6 +739,7 @@ function registerIpcHandlers() {
   // -- Chat History (Multi-session support) --
 
   ipcMain.handle('chat:list-sessions', async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
+    if (!aiServiceReady) return aiNotReadyResponse()
     try {
       aiService.sessionManager.setWorkspace(payload.workspacePath)
       const sessions = await aiService.sessionManager.listSessions(payload.limit, payload.offset)
@@ -724,6 +750,15 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('chat:load-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
+    if (!aiServiceReady) {
+      return {
+        ok: true,
+        data: {
+          sessionId: payload.sessionId,
+          messages: [],
+        },
+      }
+    }
     try {
       aiService.sessionManager.setWorkspace(payload.workspacePath)
       const messages = await aiService.sessionManager.loadHistory(payload.sessionId)
@@ -755,6 +790,7 @@ function registerIpcHandlers() {
         messages: ChatMessage[]
       },
     ) => {
+      if (!aiServiceReady) return aiNotReadyResponse()
       try {
         aiService.sessionManager.setWorkspace(payload.workspacePath)
         await aiService.sessionManager.saveSession(
@@ -769,6 +805,7 @@ function registerIpcHandlers() {
   )
 
   ipcMain.handle('chat:delete-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
+    if (!aiServiceReady) return aiNotReadyResponse()
     try {
       aiService.sessionManager.setWorkspace(payload.workspacePath)
       await aiService.sessionManager.deleteSession(payload.sessionId)
@@ -779,6 +816,15 @@ function registerIpcHandlers() {
   })
 
   ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
+    if (!aiServiceReady) {
+      return {
+        ok: true,
+        data: {
+          threadId: `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          messages: [],
+        },
+      }
+    }
     try {
       aiService.sessionManager.setWorkspace(payload.workspacePath)
       const sessionId = await aiService.sessionManager.getMostRecentSessionId()
@@ -811,6 +857,7 @@ function registerIpcHandlers() {
         messages: ChatMessage[]
       },
     ) => {
+      if (!aiServiceReady) return aiNotReadyResponse()
       try {
         aiService.sessionManager.setWorkspace(payload.workspacePath)
         const sessionId = await aiService.sessionManager.getMostRecentSessionId()
@@ -895,11 +942,14 @@ app.whenReady().then(async () => {
       })
     }
     await aiService.init(userDataPath)
+    // TODO: 应用启动时清理 userData/tool-results/ 下过期的转存文件，
+    // 避免工具结果文件无限累积占用磁盘。
+    aiServiceReady = true
   } catch (err) {
     console.error('AI service init failed:', err)
   }
 
-  registerIpcHandlers()
+  registerIpcHandlers(userDataPath)
   setupApplicationMenu()
   createWindow()
 })

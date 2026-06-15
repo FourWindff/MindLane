@@ -1,39 +1,43 @@
-import fs from 'node:fs'
 import path from 'node:path'
 import nodeCrypto from 'node:crypto'
 import type { BaseMessage } from '@langchain/core/messages'
-import { HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
+import { HumanMessage } from '@langchain/core/messages'
 import { compressMessages } from '../memory/compression.js'
 import type { LLMProvider } from '../providers/index.js'
-import { ChatDb } from '../db/chatDb.js'
-import type { ChatMessage, ChatSessionRow, SessionMeta } from '../db/chatDb.js'
+import { SessionMessageStore, type SessionMeta } from './sessionMessageStore.js'
+import { uiMessageToBaseMessages } from './sessionMessageStore.js'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
-export type { ChatMessage as SessionMessage, SessionMeta } from '../db/chatDb.js'
+import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
+import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
+
+export type { ChatMessage as SessionMessage, SessionMeta }
 
 /**
- * 聊天历史管理器 - SQLite 版本
+ * 聊天历史管理器 - JSONL 版本
  *
  * 职责：
- * 1. 从 UI chat_messages 表加载指定会话的历史消息
- * 2. 将存储格式转换为 LangChain Message 格式
- * 3. 提供消息压缩/截断策略
- * 4. 支持会话的 CRUD 操作
- * 5. 支持从旧版 JSON 文件迁移数据
+ * 1. 基于 JSONL 文件持久化每个会话的元数据与消息
+ * 2. 为 LangGraph 提供 BaseMessage[] 格式的历史消息
+ * 3. 为 UI 提供 ChatMessage[] 格式的历史消息
+ * 4. 提供消息压缩/截断策略
+ * 5. 支持会话的 CRUD 操作
+ * 6. 在首次初始化时自动从旧版 SQLite 迁移数据
  */
 export class SessionManager {
-  private db: ChatDb | null = null
+  private store: SessionMessageStore | null = null
   private checkpointer: CheckpointerManager | null = null
   private _workspacePath: string = ''
   private _workspaceHash: string = ''
 
   /**
-   * 初始化 ChatDb，可选从旧版数据迁移
+   * 初始化 JSONL 存储，可选从旧版 SQLite 迁移
    */
-  init(dbPath: string, options?: { userDataPath?: string }): void {
-    this.db = new ChatDb(dbPath)
-    if (options?.userDataPath) {
-      this.migrateFromLegacy(options.userDataPath)
-    }
+  async init(dbPath: string, options?: { userDataPath?: string }): Promise<void> {
+    const userDataPath = options?.userDataPath ?? path.dirname(dbPath)
+    const baseDir = path.join(userDataPath, 'memory', 'sessions')
+
+    this.store = new SessionMessageStore()
+    await this.store.init(baseDir, { legacyDbPath: dbPath })
   }
 
   /**
@@ -67,77 +71,56 @@ export class SessionManager {
       .update(workspacePath)
       .digest('hex')
       .slice(0, 12)
+    this.store?.setWorkspace(this._workspaceHash)
   }
 
   /**
-   * 从旧版 JSON 文件迁移数据到 SQLite
+   * 检查存储是否已完成初始化。
    */
-  private migrateFromLegacy(userDataPath: string): void {
-    const chatHistoryDir = path.join(userDataPath, 'chat-history')
-    if (!fs.existsSync(chatHistoryDir)) {
-      return
-    }
-
-    try {
-      const entries = fs.readdirSync(chatHistoryDir, { withFileTypes: true })
-      const workspaceDirs = entries.filter((e) => e.isDirectory())
-
-      for (const dir of workspaceDirs) {
-        const wsDir = path.join(chatHistoryDir, dir.name)
-        const sessionsMetaPath = path.join(wsDir, 'sessions.json')
-
-        if (!fs.existsSync(sessionsMetaPath)) continue
-
-        const metaData = JSON.parse(fs.readFileSync(sessionsMetaPath, 'utf-8'))
-        const sessions: Array<{
-          id: string
-          title: string
-          createdAt: string
-          updatedAt: string
-          messageCount: number
-        }> = Array.isArray(metaData.sessions) ? metaData.sessions : []
-
-        for (const session of sessions) {
-          const sessionFilePath = path.join(wsDir, `${session.id}.json`)
-          if (!fs.existsSync(sessionFilePath)) continue
-
-          const sessionData = JSON.parse(fs.readFileSync(sessionFilePath, 'utf-8'))
-          const messages: ChatMessage[] = Array.isArray(sessionData.messages) ? sessionData.messages : []
-
-          // Insert session metadata and preserve migrated UI messages.
-          const row: ChatSessionRow = {
-            id: session.id,
-            workspace_hash: dir.name,
-            title: session.title,
-            created_at: session.createdAt,
-            updated_at: session.updatedAt,
-            message_count: messages.length,
-          }
-          this.db!.upsertSession(row)
-          this.db!.replaceMessages(session.id, messages)
-        }
-      }
-
-      // Rename chat-history to chat-history.migrated (avoid ENOTEMPTY if already exists)
-      let migratedPath = `${chatHistoryDir}.migrated`
-      let suffix = 1
-      while (fs.existsSync(migratedPath)) {
-        migratedPath = `${chatHistoryDir}.migrated-${suffix}`
-        suffix++
-      }
-      fs.renameSync(chatHistoryDir, migratedPath)
-      console.log('[SessionManager] Legacy data migration completed successfully')
-    } catch (error) {
-      console.error('[SessionManager] Legacy data migration failed:', error)
-    }
+  isReady(): boolean {
+    return this.store !== null
   }
 
   /**
    * 加载指定会话的 UI 历史消息。
    */
   async loadHistory(threadId: string): Promise<ChatMessage[]> {
-    if (!this.db) throw new Error('SessionManager not initialized')
-    return this.db.listMessages(threadId)
+    if (!this.store) throw new Error('SessionManager not initialized')
+    const messages = await this.store.loadMessages(threadId)
+    return checkpointMessagesToSessionMessages(messages)
+  }
+
+  /**
+   * 加载指定会话的原始 LangChain 消息（含 system 消息）。
+   */
+  async loadMessages(threadId: string): Promise<BaseMessage[]> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    return this.store.loadMessages(threadId)
+  }
+
+  /**
+   * 读取会话元数据。
+   */
+  getSessionMeta(sessionId: string): SessionMeta | null {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    return this.store.getSessionMeta(sessionId)
+  }
+
+  /**
+   * 更新会话元数据。
+   */
+  async updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    await this.store.updateSessionMeta(sessionId, meta)
+  }
+
+  /**
+   * 获取会话历史文件路径（{sessionId}.history.jsonl）。
+   */
+  resolveHistoryPath(sessionId: string): string {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    const sessionPath = this.store.resolveSessionPath(sessionId)
+    return sessionPath.replace(/\.jsonl$/, '.history.jsonl')
   }
 
   /**
@@ -152,28 +135,22 @@ export class SessionManager {
       maxMessages?: number
     } = {},
   ): Promise<BaseMessage[]> {
+    if (!this.store) throw new Error('SessionManager not initialized')
     const { includeSystem = true, maxMessages } = options
 
-    const stored = await this.loadHistory(threadId)
-    const messages: BaseMessage[] = []
+    const messages = await this.store.loadMessages(threadId)
+    const filtered: BaseMessage[] = []
 
-    for (const msg of stored) {
-      if (msg.role === 'system' && !includeSystem) continue
-
-      if (msg.role === 'user') {
-        messages.push(new HumanMessage(msg.content))
-      } else if (msg.role === 'assistant') {
-        messages.push(new AIMessage(msg.content))
-      } else if (msg.role === 'system') {
-        messages.push(new SystemMessage(msg.content))
-      }
+    for (const msg of messages) {
+      if (msg.getType() === 'system' && !includeSystem) continue
+      filtered.push(msg)
     }
 
-    if (maxMessages && messages.length > maxMessages) {
-      return messages.slice(-maxMessages)
+    if (maxMessages && filtered.length > maxMessages) {
+      return filtered.slice(-maxMessages)
     }
 
-    return messages
+    return filtered
   }
 
   /**
@@ -202,44 +179,52 @@ export class SessionManager {
     limit?: number,
     offset?: number,
   ): Promise<SessionMeta[]> {
-    if (!this.db) throw new Error('SessionManager not initialized')
+    if (!this.store) throw new Error('SessionManager not initialized')
 
-    const rows = this.db.listSessions(this._workspaceHash, limit, offset)
-    return rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      messageCount: row.message_count,
-    }))
+    const sessions = await this.store.listSessions(this._workspaceHash)
+    if (limit === undefined) return sessions
+    const start = offset ?? 0
+    return sessions.slice(start, start + limit)
   }
 
   /**
    * 保存会话元数据和 UI 消息历史。
+   *
+   * 仅追加本地尚未持久化的新消息，避免重复写入。
    */
   async saveSession(
     sessionId: string,
     messages: ChatMessage[],
   ): Promise<void> {
-    if (!this.db) throw new Error('SessionManager not initialized')
+    if (!this.store) throw new Error('SessionManager not initialized')
 
+    const storedMessages = await this.store.loadMessages(sessionId)
+    const existingMeta = this.store.getSessionMeta(sessionId)
     const now = new Date().toISOString()
 
-    // Check if session exists and has a non-empty title
-    const existing = this.db.getSession(sessionId)
-    const storedMessages = this.db.listMessages(sessionId)
-    const messagesToAppend = messages.slice(storedMessages.length)
-    const nextMessageCount = storedMessages.length + messagesToAppend.length
-    let title: string
+    // 与旧版 ChatDb 保持一致：按 UI 消息（ChatMessage）数量进行追加去重，
+    // 避免 assistant 消息带 toolCalls 时 BaseMessage 数量膨胀导致切片错误。
+    const storedChatMessages = checkpointMessagesToSessionMessages(storedMessages)
+    const messagesToAppend = messages.slice(storedChatMessages.length)
 
-    if (existing && existing.title) {
-      title = existing.title
+    const baseMessagesToAppend: BaseMessage[] = []
+    for (const msg of messagesToAppend) {
+      baseMessagesToAppend.push(...uiMessageToBaseMessages(msg))
+    }
+
+    if (baseMessagesToAppend.length > 0) {
+      await this.store.saveMessages(sessionId, baseMessagesToAppend)
+    }
+
+    // 更新标题与元数据
+    let title: string
+    if (existingMeta?.title) {
+      title = existingMeta.title
     } else {
       const firstUserMessage = messages.find((m) => m.role === 'user')
       if (firstUserMessage) {
         const content = firstUserMessage.content
-        title =
-          content.slice(0, 30) + (content.length > 30 ? '...' : '')
+        title = content.slice(0, 30) + (content.length > 30 ? '...' : '')
       } else {
         title = `新对话 ${new Date().toLocaleString('zh-CN', {
           month: 'short',
@@ -250,23 +235,26 @@ export class SessionManager {
       }
     }
 
-    this.db.upsertSession({
-      id: sessionId,
-      workspace_hash: this._workspaceHash,
-      title,
-      created_at: existing?.created_at ?? now,
-      updated_at: now,
-      message_count: nextMessageCount,
-    })
-    this.db.appendMessages(sessionId, messagesToAppend)
+    if (title !== existingMeta?.title) {
+      const meta: SessionMeta = {
+        id: sessionId,
+        title,
+        createdAt: existingMeta?.createdAt ?? now,
+        updatedAt: now,
+        messageCount: storedMessages.length + baseMessagesToAppend.length,
+        lastConsolidated: existingMeta?.lastConsolidated,
+        _lastSummary: existingMeta?._lastSummary,
+      }
+      await this.store.updateSessionMeta(sessionId, meta)
+    }
   }
 
   /**
-   * 删除会话（包括元数据和 checkpoint）
+   * 删除会话（包括元数据文件和 checkpoint）
    */
   async deleteSession(sessionId: string): Promise<void> {
-    if (!this.db) throw new Error('SessionManager not initialized')
-    this.db.deleteSession(sessionId)
+    if (!this.store) throw new Error('SessionManager not initialized')
+    await this.store.deleteSession(sessionId)
     await this.checkpointer?.deleteThread(sessionId)
   }
 
@@ -274,17 +262,32 @@ export class SessionManager {
    * 获取最近使用的会话 ID
    */
   async getMostRecentSessionId(): Promise<string | null> {
-    if (!this.db) throw new Error('SessionManager not initialized')
-    const recent = this.db.getMostRecentSession(this._workspaceHash)
-    return recent ? recent.id : null
+    if (!this.store) throw new Error('SessionManager not initialized')
+    const sessions = await this.store.listSessions(this._workspaceHash)
+    return sessions[0]?.id ?? null
   }
 
   /**
-   * 关闭数据库连接
+   * 持久化单条 LangChain 消息。
+   */
+  async saveMessage(sessionId: string, message: BaseMessage): Promise<void> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    await this.store.saveMessage(sessionId, message)
+  }
+
+  /**
+   * 批量持久化 LangChain 消息。
+   */
+  async saveMessages(sessionId: string, messages: BaseMessage[]): Promise<void> {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    await this.store.saveMessages(sessionId, messages)
+  }
+
+  /**
+   * 关闭资源
    */
   close(): void {
-    this.db?.close()
-    this.db = null
+    this.store = null
     this.checkpointer = null
   }
 }

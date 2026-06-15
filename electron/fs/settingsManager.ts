@@ -35,7 +35,14 @@ export class SettingsManager {
     if (partial.providerConfigs) {
       const mergedConfigs = { ...current.providerConfigs }
       for (const [key, value] of Object.entries(partial.providerConfigs)) {
-        mergedConfigs[key] = { ...mergedConfigs[key], ...value }
+        mergedConfigs[key] = {
+          ...mergedConfigs[key],
+          ...value,
+          messagePipeline: {
+            ...mergedConfigs[key]?.messagePipeline,
+            ...value?.messagePipeline,
+          },
+        }
       }
       merged.providerConfigs = mergedConfigs
     }
@@ -68,6 +75,7 @@ export class SettingsManager {
       restoreLastWorkspaceOnLaunch:
         partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
       expandedFolderPaths: partial.expandedFolderPaths ?? DEFAULT_SETTINGS.expandedFolderPaths,
+      messagePipeline: partial.messagePipeline,
     }
   }
 

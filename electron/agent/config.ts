@@ -21,6 +21,15 @@
  * - contextCompactRecentMessages: 主动压缩时保留的最近消息条数。
  * - reactiveCompactTailMessages: 被动压缩时保留的历史尾部消息条数。
  * - reactiveCompactMaxRetries: 被动压缩最大重试次数。
+ * - consolidationRatio: 归档目标占输入预算的比例。
+ * - consolidationSafetyBuffer: 归档时预留的安全缓冲 token 数。
+ * - maxContextMessages: 归档后进入 LLM 的最大消息条数。
+ * - maxMessagesBeforeTokenCheck: 触发精确 token 估算的消息数量阈值。
+ * - maxConsolidationRounds: 单次调用最多执行归档轮数。
+ * - toolResultOffloadChars: 工具结果字符数超过此阈值时转存到磁盘，单位：字符。
+ * - toolResultMaxChars: 工具结果最大允许字符数，超过则硬截断，单位：字符。
+ * - toolResultSummaryChars: 转存后返回给模型的摘要长度，单位：字符。
+ * - toolResultOffloadDirName: 转存目录名，位于 userData 下。
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
@@ -32,6 +41,15 @@ export const AGENT_LIMITS = {
   contextCompactRecentMessages: 10,
   reactiveCompactTailMessages: 5,
   reactiveCompactMaxRetries: 1,
+  consolidationRatio: 0.5,
+  consolidationSafetyBuffer: 1_024,
+  maxContextMessages: 120,
+  maxMessagesBeforeTokenCheck: 120,
+  maxConsolidationRounds: 5,
+  toolResultOffloadChars: 8_000,
+  toolResultMaxChars: 32_000,
+  toolResultSummaryChars: 1_000,
+  toolResultOffloadDirName: "tool-results",
 } as const
 
 /**

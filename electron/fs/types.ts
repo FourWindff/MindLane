@@ -1,3 +1,5 @@
+import type { MessagePipelineConfig } from '../agent/context/pipelineTypes.js'
+
 export type FsResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string }
@@ -43,11 +45,13 @@ export interface AppSettings {
   lastOpenedFilePath: string | null
   restoreLastWorkspaceOnLaunch: boolean
   expandedFolderPaths: string[]
+  messagePipeline?: MessagePipelineConfig
 }
 
 export interface ProviderConfig {
   apiKey: string
   baseUrl?: string
+  messagePipeline?: Partial<MessagePipelineConfig>
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

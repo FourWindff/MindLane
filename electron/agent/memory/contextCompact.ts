@@ -11,6 +11,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { AGENT_LIMITS } from '../config.js'
 import { estimateTokenCount, estimateMessageTokens } from '../lib/tokenCounter.js'
 import { ContextBuilder } from '../agenthub/mindlane/context.js'
+import type { CapabilityFlags } from '../agenthub/mindlane/mindlaneAgent.js'
 import type { MainGraphStateType } from '../state.js'
 import type { LLMProvider } from '../providers/index.js'
 import type { MemoryManager } from './memoryManager.js'
@@ -35,7 +36,7 @@ export function isPromptTooLongError(error: unknown): boolean {
 /**
  * 估算工具 schema 的 token 数
  */
-function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): number {
+export function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): number {
   let total = 0
   for (const tool of tools) {
     const toolAny = tool as unknown as Record<string, unknown>
@@ -53,10 +54,12 @@ function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): number {
 async function estimateSystemPromptTokens(
   state: MainGraphStateType,
   memoryManager?: MemoryManager,
+  capabilityFlags?: CapabilityFlags,
 ): Promise<number> {
   const builder = new ContextBuilder()
     .withMessages(state.messages)
     .withContext(state.context ?? undefined)
+    .withCapabilityFlags(capabilityFlags)
     .withMemory(memoryManager)
 
   await builder.buildMemoryContext()
@@ -76,8 +79,9 @@ export async function estimateFullInputTokens(
   tools: StructuredToolInterface[],
   _provider: LLMProvider,
   memoryManager?: MemoryManager,
+  capabilityFlags?: CapabilityFlags,
 ): Promise<number> {
-  const systemTokens = await estimateSystemPromptTokens(state, memoryManager)
+  const systemTokens = await estimateSystemPromptTokens(state, memoryManager, capabilityFlags)
   const toolsTokens = estimateToolsSchemaTokens(tools)
   const messagesTokens = estimateMessageTokens(state.messages)
 
@@ -139,6 +143,7 @@ export async function compactContext(
   tools: StructuredToolInterface[],
   provider: LLMProvider,
   memoryManager?: MemoryManager,
+  capabilityFlags?: CapabilityFlags,
 ): Promise<Partial<MainGraphStateType>> {
   const inputBudget =
     AGENT_LIMITS.contextWindowTokens -
@@ -150,6 +155,7 @@ export async function compactContext(
     tools,
     provider,
     memoryManager,
+    capabilityFlags,
   )
 
   if (estimatedTokens <= inputBudget) {
@@ -173,6 +179,7 @@ export async function compactContext(
     tools,
     provider,
     memoryManager,
+    capabilityFlags,
   )
 
   if (compactedEstimate <= inputBudget) {
@@ -208,6 +215,7 @@ export async function compactContext(
       tools,
       provider,
       memoryManager,
+      capabilityFlags,
     )
 
     logger.info(

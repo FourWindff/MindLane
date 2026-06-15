@@ -48,6 +48,47 @@ export function messageContentToString(content: unknown): string {
   return "";
 }
 
+type ContentBlock = { type?: string; [key: string]: unknown }
+
+/**
+ * 清理 AI 消息 content 数组中的 Anthropic 流式伪影。
+ *
+ * 某些 provider（如 Anthropic）在完整响应中仍保留 `input_json_delta`
+ * 块；这些块不属于标准消息类型，会在 LangGraph checkpoint / reducer
+ * 序列化时导致 "Unable to coerce message from array: Received: {}" 错误。
+ * 该函数把 delta 内容合并到对应索引的 `tool_use` 块，并移除所有 delta。
+ */
+export function sanitizeAIMessageContent(content: unknown): unknown {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content
+
+  const deltas = new Map<number, string>()
+  for (let i = 0; i < content.length; i++) {
+    const block = content[i] as ContentBlock
+    if (
+      block &&
+      typeof block === 'object' &&
+      block.type === 'input_json_delta' &&
+      typeof block.input === 'string'
+    ) {
+      deltas.set(i, (deltas.get(i) ?? '') + block.input)
+    }
+  }
+
+  return content
+    .map((block, idx) => {
+      const b = block as ContentBlock
+      if (b && typeof b === 'object' && b.type === 'tool_use' && deltas.has(idx)) {
+        return { ...b, input: (b.input ?? '') + (deltas.get(idx) ?? '') }
+      }
+      return block
+    })
+    .filter((block) => {
+      const b = block as ContentBlock
+      return !(b && typeof b === 'object' && b.type === 'input_json_delta')
+    })
+}
+
 /**
  * 统一格式化 Agent 层错误，确保错误信息包含消息和堆栈。
  *

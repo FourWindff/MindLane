@@ -63,8 +63,9 @@ Node type descriptors implement `serialize()`/`deserialize()` for persistence. A
 - `graphs/` — LangGraph state graphs: `mindmapGraph.ts` (mindmap generation/editing), `palaceGraph.ts` (memory palace creation pipeline).
 - `tools/` — Tool definitions exposed to agents: `mindmapActions.ts` (add/delete/rename nodes), `mindmapContext.ts` (read current mindmap state), `routeDecisionTool.ts` (intent routing).
 - `providers/` — Pluggable LLM provider system. Currently supports DashScope, MiniMax, Kimi. Each provider implements chat, streaming, and optional image generation. Registry in `providers/registry.ts`.
-- `memory/` — Persistence layer: `checkpointer.ts` (LangGraph checkpointing), `userProfile.ts`, `compression.ts`.
-- `context/sessionManager.ts` — Multi-session chat history stored in SQLite via `better-sqlite3`.
+- `memory/contextCompact.ts` — In-memory token-budget compaction; trims or summarizes messages when the prompt is still over budget after archival.
+- `context/sessionManager.ts` — Multi-session chat history stored as JSONL (`session.jsonl`) via `SessionMessageStore`.
+- `context/consolidator.ts` — Persistent session-history consolidation: archives old messages to `{sessionId}.history.jsonl`, tracks a `lastConsolidated` cursor and `_lastSummary`, and feeds the most recent unarchived messages into the LLM context.
 
 **File system** (`electron/fs/`):
 - `FileSystemService` (`fs/index.ts`) coordinates file operations.
@@ -74,6 +75,16 @@ Node type descriptors implement `serialize()`/`deserialize()` for persistence. A
 - `recentFilesManager.ts` — Recently opened files with thumbnails.
 
 **Lab workflow** (`electron/lab/mindmapworkflow/`) — Experimental pipeline for generating mindmaps from PDF documents using a multi-stage agent workflow (extract → chunk → summarize → merge → YAML output).
+
+## Context Compaction and Session Archival
+
+Long conversations are managed in two layers:
+
+1. **Persistent archival** — Before each supervisor call, the `contextCompact` node runs `Consolidator.maybe_consolidate_by_tokens()`. It reads `session.jsonl`, and when the unarchived messages exceed the configured count/token budget it compresses the oldest messages into `{sessionId}.history.jsonl`. The archive cursor `lastConsolidated` and the latest summary `_lastSummary` are stored in `SessionMeta`.
+2. **Recent-context retrieval** — `Consolidator.getMessagesForContext()` returns up to `maxContextMessages` unarchived messages, trimmed by token budget while always preserving system messages and the current user message.
+3. **Memory-level fallback** — `memory/contextCompact.ts` still performs a lightweight in-memory trim or LLM summary if the retrieved context is still over budget.
+
+The latest `_lastSummary` is injected into the system prompt by `ContextBuilder.withLastSummary()`, so the model retains a high-level view of earlier conversation even after the raw messages have been archived.
 
 ### File Format
 
@@ -100,7 +111,7 @@ Nodes are stored with serialized `data` fields (type-specific). On load, `nodeRe
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLane** (4289 symbols, 7956 relationships, 254 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLaneHarness** (4949 symbols, 9130 relationships, 282 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -123,10 +134,10 @@ This project is indexed by GitNexus as **MindLane** (4289 symbols, 7956 relation
 
 | Resource | Use for |
 |----------|---------|
-| `gitnexus://repo/MindLane/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/MindLane/clusters` | All functional areas |
-| `gitnexus://repo/MindLane/processes` | All execution flows |
-| `gitnexus://repo/MindLane/process/{name}` | Step-by-step execution trace |
+| `gitnexus://repo/MindLaneHarness/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/MindLaneHarness/clusters` | All functional areas |
+| `gitnexus://repo/MindLaneHarness/processes` | All execution flows |
+| `gitnexus://repo/MindLaneHarness/process/{name}` | Step-by-step execution trace |
 
 ## CLI
 
