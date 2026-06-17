@@ -48,6 +48,19 @@ export function messageContentToString(content: unknown): string {
   return "";
 }
 
+/**
+ * 把任意字符串转成适合作为文件名的安全形式：仅保留字母、数字、下划线和连字符，
+ * 其余字符替换为下划线，并截断到指定长度（默认 64）。
+ */
+export function sanitizeFileName(name: string, maxLength = 64): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, maxLength)
+}
+
+/** 把 value 限制在 [min, max] 范围内。 */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
 type ContentBlock = { type?: string; [key: string]: unknown }
 
 /**

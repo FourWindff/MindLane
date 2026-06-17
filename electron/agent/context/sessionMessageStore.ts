@@ -11,6 +11,7 @@ import {
   mapStoredMessageToChatMessage,
 } from '@langchain/core/messages'
 import { logger } from '../../shared/logger.js'
+import { atomicWrite } from '../../fs/atomicWrite.js'
 import type { ChatMessage, ChatToolCall } from '../../../src/shared/lib/fileFormat.js'
 
 export interface SessionMeta {
@@ -85,7 +86,7 @@ export class SessionMessageStore {
       meta.messageCount = lines.length - 1
       meta.updatedAt = new Date().toISOString()
       lines[0] = JSON.stringify(meta)
-      this.atomicWrite(sessionPath, lines)
+      await atomicWrite(sessionPath, lines.join('\n') + (lines.length > 0 ? '\n' : ''))
     })
   }
 
@@ -172,7 +173,7 @@ export class SessionMessageStore {
         const stored = mapChatMessagesToStoredMessages(messages)
         for (const s of stored) lines.push(JSON.stringify(s))
       }
-      this.atomicWrite(sessionPath, lines)
+      await atomicWrite(sessionPath, lines.join('\n') + (lines.length > 0 ? '\n' : ''))
     })
   }
 
@@ -188,7 +189,7 @@ export class SessionMessageStore {
       } else {
         lines[0] = JSON.stringify(meta)
       }
-      this.atomicWrite(sessionPath, lines)
+      await atomicWrite(sessionPath, lines.join('\n') + (lines.length > 0 ? '\n' : ''))
     })
   }
 
@@ -279,13 +280,6 @@ export class SessionMessageStore {
       logger.warn(`[SessionMessageStore] 读取会话首行失败 (${filePath}):`, err)
       return null
     }
-  }
-
-  private atomicWrite(filePath: string, lines: string[]): void {
-    const tempPath = `${filePath}.tmp`
-    const data = lines.join('\n') + (lines.length > 0 ? '\n' : '')
-    fs.writeFileSync(tempPath, data, 'utf-8')
-    fs.renameSync(tempPath, filePath)
   }
 
   private async ensureDir(dir: string): Promise<void> {

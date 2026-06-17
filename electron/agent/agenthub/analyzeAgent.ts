@@ -1,6 +1,7 @@
 import { z } from 'zod/v3'
 import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryItem, StationDesign, SelectedNodeContent } from '../state.js'
+import type { LLMProvider } from '../providers/index.js'
 import { PalaceAgent } from './base.js'
 import { logger } from '../../shared/logger.js'
 import { formatAgentError } from '../utils.js'
@@ -129,6 +130,15 @@ function normalizeRouteStyle(value: string | undefined, stationCount: number): s
  * - 输出结果写入 state 返回
  */
 export class AnalyzeAgent extends PalaceAgent {
+  private readonly analyzeModel
+  private readonly designModel
+
+  constructor(provider: LLMProvider) {
+    super(provider)
+    this.analyzeModel = this.provider.reasoningModel.withStructuredOutput(analyzeSchema)
+    this.designModel = this.provider.reasoningModel.withStructuredOutput(designSchema)
+  }
+
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
     if (state.palaceInputNodes.length > 0) {
       return this.analyzeFromNodes(state.palaceInputNodes)
@@ -156,17 +166,13 @@ export class AnalyzeAgent extends PalaceAgent {
     text: string,
     messages: Array<{ role: string; content: string }>,
   ): Promise<Partial<PalaceSubgraphStateType>> {
-    const model = this.provider.reasoningModel
-    const analyzeModel = model.withStructuredOutput(analyzeSchema)
-    const designModel = model.withStructuredOutput(designSchema)
-
     const conversation = messages
       .map((m) => `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`)
       .join('\n')
     const inputText = conversation || text
 
     try {
-      const analyzeResult = (await analyzeModel.invoke(
+      const analyzeResult = (await this.analyzeModel.invoke(
         buildAnalyzeInputMessages(inputText),
       )) as AnalyzeResult
 
@@ -183,7 +189,7 @@ export class AnalyzeAgent extends PalaceAgent {
         return { error: '未拆解出有效记忆条目' }
       }
 
-      const designResult = (await designModel.invoke(
+      const designResult = (await this.designModel.invoke(
         buildDesignMnemonicsMessages(memoryItems),
       )) as DesignResult
 

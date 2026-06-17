@@ -12,26 +12,6 @@ export function overwriteArray<T>(value: T[]): T[] {
   return new Overwrite(value) as unknown as T[]
 }
 
-export function responseToText(response: unknown): string {
-  const content = response && typeof response === 'object' && 'content' in response
-    ? (response as { content?: unknown }).content
-    : response
-
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === 'string') return item
-        if (item && typeof item === 'object' && 'text' in item) {
-          return String((item as { text?: unknown }).text ?? '')
-        }
-        return ''
-      })
-      .join('')
-  }
-  return String(content ?? '')
-}
-
 export async function withRetries<T>(
   fn: () => Promise<T>,
   retries: number,

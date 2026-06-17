@@ -8,7 +8,7 @@
  * - 不可重试错误：认证 4xx（除 429 外）、其他明确客户端错误。
  */
 
-import { TimeoutError } from './timeout.js'
+import { TimeoutError, sleepWithAbort } from './abort.js'
 
 export type RetryOptions = {
   /** 最多重试次数（默认 3） */
@@ -98,7 +98,7 @@ export async function withRetry<T>(
         break
       }
       const delay = computeBackoffDelay(attempt, { baseDelay, maxDelay, jitterMs })
-      await sleep(delay)
+      await sleepWithAbort(delay)
     }
   }
 
@@ -108,8 +108,4 @@ export async function withRetry<T>(
     lastErr,
     attempts,
   )
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }

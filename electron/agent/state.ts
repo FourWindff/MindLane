@@ -3,6 +3,11 @@ import type { BaseMessage } from '@langchain/core/messages'
 import type { DetectedAnchor } from './providers/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
 
+/** 简单替换型 reducer：直接用新值覆盖旧值。 */
+function replaceReducer<T>(_prev: T, next: T): T {
+  return next
+}
+
 // ===== 基础类型定义 =====
 
 export type SelectedNodeContent = {
@@ -94,27 +99,27 @@ const BaseStateAnnotations = {
     default: () => [],
   }),
   context: Annotation<MindmapContextData | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   pendingSubgraph: Annotation<PendingSubgraph | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   pendingSubgraphToolCallId: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   pendingSubgraphToolName: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   response: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   error: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
 }
@@ -124,39 +129,39 @@ const BaseStateAnnotations = {
  */
 const PalaceStateAnnotations = {
   palaceInputText: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   palaceInputNodes: Annotation<SelectedNodeContent[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   memoryItems: Annotation<MemoryItem[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   palace: Annotation<PalaceDesign | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   imagePrompt: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   imageUrls: Annotation<string[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   imageError: Annotation<string | undefined>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => undefined,
   }),
   detectedCoords: Annotation<DetectedAnchor[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   memoryRoute: Annotation<MemoryPalaceStation[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
 }
@@ -166,31 +171,31 @@ const PalaceStateAnnotations = {
  */
 const MindmapStateAnnotations = {
   mindmapInputSource: Annotation<MindmapInputSource | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   mindmapInputTitle: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   mindmapYaml: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   mindmapTitle: Annotation<string>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => '',
   }),
   documentChunks: Annotation<DocumentChunk[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   leafCursor: Annotation<number>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => 0,
   }),
   pendingLeafRange: Annotation<{ start: number; end: number } | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   leafResults: Annotation<Array<{ chunkIndex: number; chunkId: string; tree: unknown }>>({
@@ -198,23 +203,23 @@ const MindmapStateAnnotations = {
     default: () => [],
   }),
   mergeInputs: Annotation<unknown[]>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   mergeResults: Annotation<Array<{ groupIndex: number; tree: unknown }>>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   pendingMergeGroups: Annotation<Array<{ groupIndex: number; trees: unknown[] }>>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => [],
   }),
   finalTree: Annotation<unknown | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
   documentRef: Annotation<DocumentRef | null>({
-    reducer: (_prev, next) => next,
+    reducer: replaceReducer,
     default: () => null,
   }),
 }

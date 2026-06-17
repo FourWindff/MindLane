@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { AGENT_LIMITS } from '../config.js'
-import { messageContentToString } from '../utils.js'
+import { messageContentToString, sanitizeFileName } from '../utils.js'
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
@@ -11,10 +11,6 @@ const EXEMPT_TOOLS = new Set([
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
 ])
-
-function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
-}
 
 export interface NormalizeOptions {
   /** 工具名称 */

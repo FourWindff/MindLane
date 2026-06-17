@@ -7,7 +7,6 @@ import {
   formatPageRange,
   serializeMindmapOutline,
   serializeMindmapForestOutline,
-  responseToText,
   withRetries,
   overwriteArray,
 } from '../yamlMindmap.js'
@@ -211,17 +210,15 @@ describe('serializeMindmapForestOutline', () => {
   })
 })
 
-describe('responseToText', () => {
-  it('extracts text from string content', () => {
-    expect(responseToText({ content: 'hello' })).toBe('hello')
-  })
-
-  it('extracts text from array of text blocks', () => {
-    expect(responseToText({ content: [{ text: 'hello ' }, { text: 'world' }] })).toBe('hello world')
-  })
-
-  it('handles plain string', () => {
-    expect(responseToText('hello')).toBe('hello')
+describe('serializeMindmapForestOutline', () => {
+  it('serializes multiple trees', () => {
+    const trees = [
+      { label: 'Tree1', page_range: '', children: [] },
+      { label: 'Tree2', page_range: '', children: [] },
+    ]
+    const yaml = serializeMindmapForestOutline(trees)
+    expect(yaml).toContain('- Tree1')
+    expect(yaml).toContain('- Tree2')
   })
 })
 

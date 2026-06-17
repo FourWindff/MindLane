@@ -2,7 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import type { MessagePipelineConfig } from './pipelineTypes.js'
-import { messageContentToString } from '../utils.js'
+import { messageContentToString, sanitizeFileName } from '../utils.js'
 
 const MICROCOMPACT_SUMMARY =
   '[Content compressed by message pipeline: original text exceeded configured threshold.]'
@@ -137,8 +137,8 @@ async function createOffloadReference(
   userDataPath?: string,
 ): Promise<string> {
   const toolName = getToolName(toolMsg)
-  const safeToolName = toolName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
-  const safeCallId = toolMsg.tool_call_id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
+  const safeToolName = sanitizeFileName(toolName)
+  const safeCallId = sanitizeFileName(toolMsg.tool_call_id)
 
   const headChars = Math.max(0, budget - 256)
   const head = text.slice(0, headChars)

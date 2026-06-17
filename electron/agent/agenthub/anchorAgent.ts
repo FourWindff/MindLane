@@ -4,16 +4,12 @@ import type { MemoryPalaceStation, StationDesign } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
 import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
-import { messageContentToString, formatAgentError } from '../utils.js'
+import { messageContentToString, formatAgentError, clamp } from '../utils.js'
 import { PALACE_LAYOUT } from '../config.js'
 import { logger } from '../../shared/logger.js'
 
 const COORD_PAD = PALACE_LAYOUT.coordPad
 const MIN_DISTANCE = PALACE_LAYOUT.minDistance
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value))
-}
 
 function enforceMinDistance(points: MemoryPalaceStation[]): MemoryPalaceStation[] {
   if (points.length <= 1) return points
