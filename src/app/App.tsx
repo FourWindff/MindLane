@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { MindMapView } from '@/features/mindmap'
+import { MindMapView } from '@/features/mindmap/components/MindMapView'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
-import { ChatPanel } from '@/features/chat'
+import { ChatPanel } from '@/features/chat/components/ChatPanel'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
-import { FileManager } from '@/features/workspace'
+import { FileManager } from '@/features/workspace/components/FileManager'
 import {
   initializeWorkspaceSession,
   saveCurrentDocumentSilently,
@@ -13,12 +13,11 @@ import {
 } from '@/features/workspace/store'
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
 import { AppToolbar } from '@/features/shell/components/AppToolbar'
-import { ShortcutRegistryProvider, useShortcut } from '@/shared/shortcuts'
+import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryContext'
+import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import './styles/app-shell.css'
 import '@/features/workspace/workspace.css'
-import '@/features/workspace/file-manager.css'
 import '@/features/mindmap/styles/mindmap.css'
-import '@/features/chat/styles/chat-panel.css'
 
 function WorkspaceEmptyState() {
   const busy = useWorkspaceStore((s) => s.busy)

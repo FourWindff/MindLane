@@ -5,52 +5,7 @@ import {
   linkSignals,
   sleepWithAbort,
 } from '../middleware/index.js'
-import {
-  isRetryableError,
-  computeBackoffDelay,
-  RetryExhaustedError,
-} from '../middleware/retry.js'
 import { TimeoutError } from '../middleware/timeout.js'
-
-describe('isRetryableError', () => {
-  it('treats TimeoutError as retryable', () => {
-    expect(isRetryableError(new TimeoutError())).toBe(true)
-  })
-
-  it('treats network TypeError as retryable', () => {
-    expect(isRetryableError(new TypeError('fetch failed'))).toBe(true)
-  })
-
-  it('treats HTTP 5xx as retryable', () => {
-    expect(isRetryableError(new Error('上游异常 HTTP 503'))).toBe(true)
-    expect(isRetryableError(new Error('HTTP 500 internal'))).toBe(true)
-  })
-
-  it('treats HTTP 429 as retryable', () => {
-    expect(isRetryableError(new Error('HTTP 429 too many requests'))).toBe(true)
-  })
-
-  it('treats HTTP 4xx (except 429) as non-retryable', () => {
-    expect(isRetryableError(new Error('HTTP 401 unauthorized'))).toBe(false)
-    expect(isRetryableError(new Error('HTTP 400 bad request'))).toBe(false)
-    expect(isRetryableError(new Error('HTTP 404 not found'))).toBe(false)
-  })
-
-  it('treats unknown errors as non-retryable', () => {
-    expect(isRetryableError(new Error('some random failure'))).toBe(false)
-    expect(isRetryableError('string error')).toBe(false)
-  })
-})
-
-describe('computeBackoffDelay', () => {
-  it('follows exponential growth bounded by maxDelay', () => {
-    const opt = { baseDelay: 500, maxDelay: 8000, jitterMs: 0 }
-    expect(computeBackoffDelay(0, opt)).toBe(500)
-    expect(computeBackoffDelay(1, opt)).toBe(1000)
-    expect(computeBackoffDelay(2, opt)).toBe(2000)
-    expect(computeBackoffDelay(10, opt)).toBe(8000) // capped
-  })
-})
 
 describe('withRetry', () => {
   beforeEach(() => {
@@ -74,22 +29,100 @@ describe('withRetry', () => {
     expect(op).toHaveBeenCalledTimes(3)
   })
 
+  it('retries TimeoutError, network errors, HTTP 5xx, and HTTP 429', async () => {
+    const retryableErrors = [
+      new TimeoutError(),
+      new TypeError('fetch failed'),
+      new Error('上游异常 HTTP 503'),
+      new Error('HTTP 500 internal'),
+      new Error('HTTP 429 too many requests'),
+    ]
+    const op = vi
+      .fn()
+      .mockRejectedValueOnce(retryableErrors[0])
+      .mockRejectedValueOnce(retryableErrors[1])
+      .mockRejectedValueOnce(retryableErrors[2])
+      .mockRejectedValueOnce(retryableErrors[3])
+      .mockRejectedValueOnce(retryableErrors[4])
+      .mockResolvedValueOnce('ok')
+
+    const promise = withRetry(op, { maxRetries: 5, baseDelay: 10, maxDelay: 100, jitterMs: 0 })
+    const expectation = expect(promise).resolves.toBe('ok')
+    await vi.runAllTimersAsync()
+    await expectation
+    expect(op).toHaveBeenCalledTimes(6)
+  })
+
   it('stops immediately on non-retryable error', async () => {
     const err = new Error('HTTP 401 unauthorized')
     const op = vi.fn().mockRejectedValue(err)
 
     const promise = withRetry(op, { baseDelay: 10, maxDelay: 100, jitterMs: 0 })
-    const expectation = expect(promise).rejects.toBeInstanceOf(RetryExhaustedError)
+    const expectation = expect(promise).rejects.toMatchObject({
+      name: 'RetryExhaustedError',
+      attempts: 4,
+      cause: err,
+    })
     await vi.runAllTimersAsync()
     await expectation
     expect(op).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats unknown errors and non-429 HTTP 4xx as non-retryable', async () => {
+    for (const err of [
+      new Error('HTTP 400 bad request'),
+      new Error('HTTP 404 not found'),
+      new Error('some random failure'),
+      'string error',
+    ]) {
+      const op = vi.fn().mockRejectedValue(err)
+      const promise = withRetry(op, { baseDelay: 10, maxDelay: 100, jitterMs: 0 })
+      const expectation = expect(promise).rejects.toMatchObject({
+        name: 'RetryExhaustedError',
+        attempts: 4,
+        cause: err,
+      })
+      await vi.runAllTimersAsync()
+      await expectation
+      expect(op).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('uses exponential backoff bounded by maxDelay', async () => {
+    const op = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('HTTP 500'))
+      .mockRejectedValueOnce(new Error('HTTP 500'))
+      .mockRejectedValueOnce(new Error('HTTP 500'))
+      .mockResolvedValueOnce('ok')
+
+    const promise = withRetry(op, { maxRetries: 3, baseDelay: 500, maxDelay: 1_000, jitterMs: 0 })
+    const expectation = expect(promise).resolves.toBe('ok')
+
+    expect(op).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(499)
+    expect(op).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(op).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(op).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(op).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(op).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(op).toHaveBeenCalledTimes(4)
+    await expectation
   })
 
   it('exhausts retries and throws RetryExhaustedError', async () => {
     const op = vi.fn().mockRejectedValue(new Error('HTTP 500'))
 
     const promise = withRetry(op, { maxRetries: 2, baseDelay: 10, maxDelay: 100, jitterMs: 0 })
-    const expectation = expect(promise).rejects.toBeInstanceOf(RetryExhaustedError)
+    const expectation = expect(promise).rejects.toMatchObject({
+      name: 'RetryExhaustedError',
+      attempts: 3,
+    })
     await vi.runAllTimersAsync()
     await expectation
     expect(op).toHaveBeenCalledTimes(3) // 1 + 2 retries

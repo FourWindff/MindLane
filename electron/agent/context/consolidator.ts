@@ -15,9 +15,8 @@ import type { LLMProvider } from '../providers/index.js'
 import { estimateToolsSchemaTokens } from '../memory/contextCompact.js'
 import { extractTextContent, messageContentToString } from '../utils.js'
 import { SessionManager } from './sessionManager.js'
-import type { MemoryManager } from '../memory/memoryManager.js'
 
-export interface ConsolidatorDependencies {
+interface ConsolidatorDependencies {
   sessionManager: SessionManager
   provider: LLMProvider
   buildMessages: (
@@ -27,7 +26,7 @@ export interface ConsolidatorDependencies {
   getToolDefinitions: () => StructuredToolInterface[]
 }
 
-export interface ConsolidationLimits {
+interface ConsolidationLimits {
   contextWindowTokens: number
   maxCompletionTokens: number
   safetyBuffer: number
@@ -37,7 +36,7 @@ export interface ConsolidationLimits {
   maxConsolidationRounds: number
 }
 
-export interface GetMessagesForContextOptions {
+interface GetMessagesForContextOptions {
   /** 最大返回消息条数（不含系统消息） */
   maxMessages?: number
   /** 消息总 token 预算 */
@@ -267,26 +266,6 @@ export class Consolidator {
       ...history,
       ...(currentUserMsg ? [currentUserMsg] : []),
     ]
-  }
-
-  /**
-   * 将 `history.jsonl` 中的长期摘要归档到人格记忆文件。
-   *
-   * 本次仅预留接口，不实现具体提取逻辑。
-   */
-  async archiveHistoryToPersona(
-    sessionId: string,
-    memoryManager: MemoryManager,
-  ): Promise<void> {
-    const records = await this.readHistoryRecords(sessionId)
-    if (records.length === 0) return
-
-    const should = await memoryManager.shouldConsolidate()
-    if (!should) return
-
-    // TODO: 按主题/时间切片后调用 memoryManager.writeMemory。
-    void sessionId
-    await memoryManager.consolidate()
   }
 
   /**

@@ -30,7 +30,7 @@ function createMockProvider(
 
 function createMockSessionManager(
   history: BaseMessage[] = [],
-  loadedHistoryAsMessages: BaseMessage[] = [],
+  loadedSessionBaseMessages: BaseMessage[] = [],
 ) {
   const saved: BaseMessage[] = [];
   return {
@@ -41,9 +41,9 @@ function createMockSessionManager(
     saveMessages: vi.fn(async (_: string, msgs: BaseMessage[]) => {
       saved.push(...msgs);
     }),
-    loadHistory: vi.fn(async () => []),
-    loadHistoryAsMessages: vi.fn(async () =>
-      loadedHistoryAsMessages.length > 0 ? [...loadedHistoryAsMessages] : [...history],
+    loadSessionMessages: vi.fn(async () => []),
+    loadSessionBaseMessages: vi.fn(async () =>
+      loadedSessionBaseMessages.length > 0 ? [...loadedSessionBaseMessages] : [...history],
     ),
     saved,
   };
@@ -412,7 +412,7 @@ describe("AgentOrchestrator JSONL 消息持久化", () => {
         { onToken: vi.fn(), onToolStart: vi.fn(), onToolEnd: vi.fn(), onEnd: vi.fn(), onError: vi.fn() },
       );
 
-      const loaded = await sessionManager.loadHistoryAsMessages("thread-dedup", { includeSystem: false });
+      const loaded = await sessionManager.loadSessionBaseMessages("thread-dedup", { includeSystem: false });
       const humanMessages = loaded.filter((m) => m.getType() === "human");
       expect(humanMessages).toHaveLength(1);
     } finally {

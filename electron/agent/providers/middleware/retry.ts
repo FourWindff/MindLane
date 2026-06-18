@@ -10,7 +10,7 @@
 
 import { TimeoutError, sleepWithAbort } from './abort.js'
 
-export type RetryOptions = {
+type RetryOptions = {
   /** 最多重试次数（默认 3） */
   maxRetries?: number
   /** 初始退避间隔（默认 500ms） */
@@ -23,7 +23,7 @@ export type RetryOptions = {
   isRetryable?: (err: unknown) => boolean
 }
 
-export class RetryExhaustedError extends Error {
+class RetryExhaustedError extends Error {
   constructor(
     message: string,
     public readonly cause: unknown,
@@ -39,7 +39,7 @@ export class RetryExhaustedError extends Error {
  * 可重试：HTTP 5xx、429、网络错误（TypeError）、TimeoutError、AbortError。
  * 不可重试：4xx（除 429 外）。
  */
-export function isRetryableError(err: unknown): boolean {
+function isRetryableError(err: unknown): boolean {
   if (err instanceof TimeoutError) return true
   if (err instanceof TypeError) return true
 
@@ -68,7 +68,7 @@ export function isRetryableError(err: unknown): boolean {
 /**
  * 指数退避 + jitter 计算。
  */
-export function computeBackoffDelay(attempt: number, options: Required<Pick<RetryOptions, 'baseDelay' | 'maxDelay' | 'jitterMs'>>): number {
+function computeBackoffDelay(attempt: number, options: Required<Pick<RetryOptions, 'baseDelay' | 'maxDelay' | 'jitterMs'>>): number {
   const exponential = Math.min(options.baseDelay * Math.pow(2, attempt), options.maxDelay)
   const jitter = Math.random() * options.jitterMs
   return exponential + jitter

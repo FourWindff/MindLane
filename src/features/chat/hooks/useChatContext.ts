@@ -25,7 +25,7 @@ function useShallowById<T, U extends { id: string }>(
   }
 }
 
-export interface ChatContext {
+interface ChatContext {
   mindmapSummary?: string
   selectedNodes?: ContextNodeInfo[]
   filePath?: string

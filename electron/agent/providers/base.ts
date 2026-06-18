@@ -8,7 +8,7 @@ export enum ProviderCapability {
   Embeddings = 'embeddings',
 }
 
-export class UnsupportedCapabilityError extends Error {
+class UnsupportedCapabilityError extends Error {
   constructor(capability: string) {
     super(`当前 provider 不支持 ${capability} 能力`)
     this.name = 'UnsupportedCapabilityError'

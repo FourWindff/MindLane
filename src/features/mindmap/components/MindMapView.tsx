@@ -7,7 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import { toPng } from 'html-to-image'
-import { useShortcut } from '@/shared/shortcuts'
+import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import {
   Controls,
   MiniMap,
@@ -44,8 +44,8 @@ import {
   CHILD_OFFSET_X,
   CHILD_GAP_Y,
 } from '@/shared/lib/mindmapTree'
-import { PalaceNodeData } from '../nodes/palace'
-import { MindmapEdge } from '@/features/mindmap/edges'
+import type { PalaceNodeData } from '../nodes/palace/types'
+import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
 import { SelectionActionBar } from './SelectionActionBar'

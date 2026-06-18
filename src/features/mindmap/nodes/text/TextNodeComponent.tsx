@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { TextNodeData } from '.'
+import type { TextNodeData } from './types'
 
 function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TextNodeData

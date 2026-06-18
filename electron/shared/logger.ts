@@ -18,7 +18,7 @@ interface LoggerOptions {
   debugEnabled?: boolean
 }
 
-export class Logger {
+class Logger {
   private context: string
   private debugEnabled: boolean
 

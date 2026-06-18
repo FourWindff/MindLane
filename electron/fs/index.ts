@@ -34,9 +34,3 @@ export class FileSystemService {
     }
   }
 }
-
-export { ProjectFileManager } from './projectFileManager.js'
-export { CacheManager } from './cacheManager.js'
-export { SettingsManager } from './settingsManager.js'
-export { RecentFilesManager } from './recentFilesManager.js'
-export { WorkspaceManager } from './workspaceManager.js'

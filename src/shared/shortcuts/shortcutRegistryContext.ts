@@ -1,7 +1,7 @@
 import { createContext } from 'react'
 import type { ShortcutRegistry } from './ShortcutRegistry'
 
-export type RegistryContextValue = {
+type RegistryContextValue = {
   registry: ShortcutRegistry
 }
 

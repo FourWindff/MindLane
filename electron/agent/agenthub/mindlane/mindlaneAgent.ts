@@ -46,7 +46,7 @@ export interface CapabilityFlags {
   hasPalace: boolean;
 }
 
-export interface MindLaneAgentOptions {
+interface MindLaneAgentOptions {
   userDataPath?: string;
   messagePipeline?: MessagePipelineConfig;
 }

@@ -1,9 +1,7 @@
-import { PalaceNodeData } from "@/features/mindmap/nodes/palace"
-import { TextNodeData } from "@/features/mindmap/nodes/text"
+import type { PalaceNodeData } from "@/features/mindmap/nodes/palace/types"
+import type { TextNodeData } from "@/features/mindmap/nodes/text/types"
 
-export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace"
-export type { TextNodeData }
-
+export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace/types"
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
@@ -39,7 +37,7 @@ export type MindLaneNode =
   | { id: string; type: 'text'; position: XY; data: TextNodeData }
   | { id: string; type: 'palace'; position: XY; data: PalaceNodeData }
 
-export interface XY {
+interface XY {
   x: number
   y: number
 }
@@ -70,7 +68,7 @@ export interface ChatToolCall {
   result: string
 }
 
-export interface ChatMessageAttachment {
+interface ChatMessageAttachment {
   name: string
   type: 'pdf' | 'url' | 'text'
 }

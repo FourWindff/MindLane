@@ -8,6 +8,7 @@ import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
 } from '../../../tools/subgraphRoutingTools.js'
+import { mergeMessagePipelineConfig } from '../../../context/pipeline.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 
 function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
@@ -215,11 +216,11 @@ describe('MindLaneAgent.invoke()', () => {
       undefined,
       undefined,
       {
-        messagePipeline: {
+        messagePipeline: mergeMessagePipelineConfig({
           maxContextTokens: 20,
           toolResultMaxBytes: 0,
           microcompactToolNames: [],
-        },
+        }),
       },
     )
     const state = createInitialState()
@@ -406,7 +407,7 @@ describe('MindLaneAgent reactive compact', () => {
   })
 
   it('does not trigger reactive compact on non-context errors', async () => {
-    const error = new Error('network timeout')
+    const error = new Error('model connection refused')
     const mockInvoke = vi.fn().mockRejectedValue(error)
 
     const provider = createMockProvider(mockInvoke)
@@ -416,6 +417,8 @@ describe('MindLaneAgent reactive compact', () => {
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
     expect(result.error).toBeDefined()
+    expect(result.error).toContain('model connection refused')
+    expect(result.error).toContain('at')
     expect(result.response).toContain('处理请求时出错')
   })
 })

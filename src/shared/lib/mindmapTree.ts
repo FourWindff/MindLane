@@ -1,4 +1,4 @@
-import { TextNodeData } from '@/features/mindmap/nodes/text'
+import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import type { Edge, Node } from '@xyflow/react'
 
@@ -29,7 +29,7 @@ export function findParentId(edges: Edge[], nodeId: string): string | null {
   return e?.source ?? null
 }
 
-export function getChildIds(edges: Edge[], parentId: string): string[] {
+function getChildIds(edges: Edge[], parentId: string): string[] {
   return edges.filter((e) => e.source === parentId).map((e) => e.target)
 }
 

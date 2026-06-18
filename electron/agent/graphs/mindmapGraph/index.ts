@@ -10,7 +10,7 @@ import { extractRootTree } from './shared/rootTree.js'
 
 // ===== 配置选项 =====
 
-export interface MindmapSubgraphOptions {
+interface MindmapSubgraphOptions {
   provider: LLMProvider
   cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
 }

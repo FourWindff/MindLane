@@ -10,7 +10,7 @@ const DEFAULT_LIMIT = 5
 const MAX_LIMIT = 10
 const SNIPPET_CONTEXT_CHARS = 500
 
-export interface LinkedDocumentSearchOptions {
+interface LinkedDocumentSearchOptions {
   documents: DocumentRef[] | (() => DocumentRef[])
   cacheManager: CacheManager
 }

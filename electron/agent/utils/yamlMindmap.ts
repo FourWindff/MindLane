@@ -1,30 +1,10 @@
 import YAML from 'yaml'
-import { Overwrite } from '@langchain/langgraph'
 
 export interface MindmapYamlNode {
   label: string
   page_range: string
   summary?: string
   children?: MindmapYamlNode[]
-}
-
-export function overwriteArray<T>(value: T[]): T[] {
-  return new Overwrite(value) as unknown as T[]
-}
-
-export async function withRetries<T>(
-  fn: () => Promise<T>,
-  retries: number,
-): Promise<T> {
-  let lastError: unknown
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      return await fn()
-    } catch (error) {
-      lastError = error
-    }
-  }
-  throw lastError
 }
 
 export function extractYaml(text: string): unknown {
@@ -101,38 +81,11 @@ export function normalizeTree(
   }
 }
 
-export function parsePageRange(pageRange: string): [number, number] | null {
-  const normalized = normalizePageRangeValue(pageRange)
-  if (!normalized) return null
-
-  const singlePageMatch = normalized.match(/^(\d+)$/)
-  if (singlePageMatch) {
-    const page = Number(singlePageMatch[1])
-    return [page, page]
-  }
-
-  const match = normalized.match(/(\d+)\s*-\s*(\d+)/)
-  if (!match) return null
-  return [Number(match[1]), Number(match[2])]
-}
-
-export function formatPageRange(start: number, end: number): string {
-  return `${start}-${end}`
-}
-
 export function serializeMindmapOutline(
   node: MindmapYamlNode,
   indentLevel = 0,
 ): string {
   const lines = serializeOutlineNode(node, indentLevel, true)
-  return lines.join('\n')
-}
-
-export function serializeMindmapForestOutline(
-  trees: MindmapYamlNode[],
-  indentLevel = 0,
-): string {
-  const lines = trees.flatMap((tree) => serializeOutlineNode(tree, indentLevel, false))
   return lines.join('\n')
 }
 
@@ -241,7 +194,7 @@ function sanitizeStructuredTree(value: unknown): unknown {
   }
 }
 
-export function normalizePageRangeValue(value: unknown): string | null {
+function normalizePageRangeValue(value: unknown): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return formatPageRange(value, value)
   }
@@ -265,6 +218,10 @@ export function normalizePageRangeValue(value: unknown): string | null {
   }
 
   return trimmed
+}
+
+function formatPageRange(start: number, end: number): string {
+  return `${start}-${end}`
 }
 
 function tryParseOutlineTree(value: unknown): MindmapYamlNode | null {

@@ -29,8 +29,6 @@ type _ContextNodeInfo = {
 type _ChatContext = {
   mindmapSummary?: string
   selectedNodes?: _ContextNodeInfo[]
-  allNodes?: import('../src/shared/lib/fileFormat').MindLaneNode[]
-  allEdges?: import('../src/shared/lib/fileFormat').MindLaneEdge[]
   filePath?: string
   fileTitle?: string
   hasDocumentOpen?: boolean
@@ -43,15 +41,7 @@ type _ChatContext = {
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
 type _ChatMessage = import('../src/shared/lib/fileFormat').ChatMessage
 
-type _ChatLoadHistoryResult = {
-  ok: true
-  data: {
-    threadId: string
-    messages: _ChatMessage[]
-  }
-}
-
-type _ChatSaveHistoryPayload = {
+type _ChatSessionMessagesPayload = {
   workspacePath: string
   messages: _ChatMessage[]
 }
@@ -64,7 +54,7 @@ type _ChatLoadSessionResult = {
   }
 }
 
-type _ChatSaveSessionPayload = _ChatSaveHistoryPayload & {
+type _ChatSaveSessionPayload = _ChatSessionMessagesPayload & {
   sessionId: string
 }
 
@@ -252,9 +242,6 @@ interface Window {
       }) => Promise<_FsResult<{ newPath: string }>>
     }
     chat: {
-      loadHistory: (payload: { workspacePath: string }) => Promise<_ChatLoadHistoryResult>
-      saveHistory: (payload: _ChatSaveHistoryPayload) => Promise<{ ok: true } | { ok: false; error: string }>
-      // Multi-session APIs
       listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) => Promise<
         | { ok: true; data: { sessions: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }> } }
         | { ok: false; error: string }

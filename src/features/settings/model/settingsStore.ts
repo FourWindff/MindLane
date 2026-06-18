@@ -166,7 +166,7 @@ async function loadProviders(): Promise<void> {
       )
     }
   } catch {
-    // fallback: use existing providers
+    // Keep the local provider metadata initialized in the store.
   }
 }
 

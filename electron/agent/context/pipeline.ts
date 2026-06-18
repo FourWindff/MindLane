@@ -8,10 +8,7 @@ import { sanitizeAIMessageContent } from '../utils.js'
 import { logger } from '../../shared/logger.js'
 
 export type { MessagePipelineConfig } from './pipelineTypes.js'
-export { DEFAULT_MESSAGE_PIPELINE_CONFIG, mergeMessagePipelineConfig } from './pipelineTypes.js'
-export { dropOrphanToolResults, backfillMissingToolResults } from './pipelinePairing.js'
-export { microcompact, applyToolResultBudget } from './pipelineCompaction.js'
-export { snipHistory } from './pipelineSnip.js'
+export { mergeMessagePipelineConfig } from './pipelineTypes.js'
 
 /**
  * 预处理消息数组，按固定顺序组合 7 个步骤：

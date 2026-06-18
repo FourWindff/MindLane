@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { _normalize_tool_result } from "../toolResultNormalizer.js";
+import { _normalize_tool_result, cleanupToolResultOffloads } from "../toolResultNormalizer.js";
 import { AGENT_LIMITS } from "../../config.js";
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
@@ -166,5 +166,31 @@ describe("ToolResultNormalizer", () => {
     const files = await fs.promises.readdir(offloadDir);
     expect(files.length).toBe(1);
     expect(files[0]).toMatch(/^call-id_with_chars-tool_with_special_chars\.txt$/);
+  });
+
+  it("cleans up stale offloaded tool result files", async () => {
+    const offloadDir = path.join(tmpDir, AGENT_LIMITS.toolResultOffloadDirName);
+    fs.mkdirSync(offloadDir, { recursive: true });
+    const staleFile = path.join(offloadDir, "stale.txt");
+    const recentFile = path.join(offloadDir, "recent.txt");
+    const nestedDir = path.join(offloadDir, "nested");
+    fs.writeFileSync(staleFile, "old", "utf8");
+    fs.writeFileSync(recentFile, "new", "utf8");
+    fs.mkdirSync(nestedDir);
+
+    const now = new Date();
+    const stale = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+    fs.utimesSync(staleFile, stale, stale);
+    fs.utimesSync(recentFile, now, now);
+
+    const removed = await cleanupToolResultOffloads(tmpDir, {
+      maxAgeMs: 7 * 24 * 60 * 60 * 1000,
+      now: now.getTime(),
+    });
+
+    expect(removed).toBe(1);
+    expect(fs.existsSync(staleFile)).toBe(false);
+    expect(fs.existsSync(recentFile)).toBe(true);
+    expect(fs.existsSync(nestedDir)).toBe(true);
   });
 });

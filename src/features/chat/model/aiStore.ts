@@ -171,26 +171,15 @@ export async function saveChatHistory(): Promise<void> {
   const api = window.mindlane?.chat
   if (!api) return
 
-  // Use new saveSession API for multi-session support
-  if ('saveSession' in api && api.saveSession) {
-    await api.saveSession({
-      workspacePath: state.workspacePath,
-      sessionId: state.threadId || generateThreadId(),
-      messages: state.chatMessages,
-    })
-    // Refresh sessions list after saving
-    if ('listSessions' in api && api.listSessions) {
-      const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath, limit: 20, offset: 0 })
-      if (sessionsResult?.ok && sessionsResult.data) {
-        useAiStore.setState({ sessions: sessionsResult.data.sessions })
-      }
-    }
-  } else {
-    // Fallback to legacy API
-    await api.saveHistory({
-      workspacePath: state.workspacePath,
-      messages: state.chatMessages,
-    })
+  await api.saveSession({
+    workspacePath: state.workspacePath,
+    sessionId: state.threadId || generateThreadId(),
+    messages: state.chatMessages,
+  })
+
+  const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath, limit: 20, offset: 0 })
+  if (sessionsResult?.ok && sessionsResult.data) {
+    useAiStore.setState({ sessions: sessionsResult.data.sessions })
   }
 }
 
@@ -198,21 +187,27 @@ export async function loadWorkspaceChat(workspacePath: string): Promise<void> {
   const api = window.mindlane?.chat
   if (!api) return
 
-  // Load session list first
-  if ('listSessions' in api && api.listSessions) {
-    const sessionsResult = await api.listSessions({ workspacePath, limit: 20, offset: 0 })
-    if (sessionsResult?.ok && sessionsResult.data) {
-      useAiStore.setState({ sessions: sessionsResult.data.sessions })
-    }
+  const sessionsResult = await api.listSessions({ workspacePath, limit: 20, offset: 0 })
+  const sessions = sessionsResult?.ok && sessionsResult.data ? sessionsResult.data.sessions : []
+
+  if (sessions.length === 0) {
+    useAiStore.setState({
+      threadId: generateThreadId(),
+      chatMessages: [],
+      workspacePath,
+      sessions,
+    })
+    return
   }
 
-  // Then load the most recent session
-  const result = await api.loadHistory({ workspacePath })
+  const sessionId = sessions[0].id
+  const result = await api.loadSession({ workspacePath, sessionId })
   if (result.ok) {
     useAiStore.setState({
-      threadId: result.data.threadId,
+      threadId: result.data.sessionId,
       chatMessages: result.data.messages as ChatMessage[],
       workspacePath,
+      sessions,
     })
   }
 }

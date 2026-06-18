@@ -46,15 +46,7 @@ type ChatSessionMeta = {
   messageCount: number
 }
 
-type ChatLoadHistoryResult = {
-  ok: true
-  data: {
-    threadId: string
-    messages: ChatMessage[]
-  }
-}
-
-type ChatSaveHistoryPayload = {
+type ChatSessionMessagesPayload = {
   workspacePath: string
   messages: ChatMessage[]
 }
@@ -67,7 +59,7 @@ type ChatLoadSessionResult = {
   }
 }
 
-type ChatSaveSessionPayload = ChatSaveHistoryPayload & {
+type ChatSaveSessionPayload = ChatSessionMessagesPayload & {
   sessionId: string
 }
 
@@ -204,11 +196,6 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke('workspace:move-item', payload) as Promise<FsResult<{ newPath: string }>>,
   },
   chat: {
-    loadHistory: (payload: { workspacePath: string }) =>
-      ipcRenderer.invoke('chat:load-history', payload) as Promise<ChatLoadHistoryResult>,
-    saveHistory: (payload: ChatSaveHistoryPayload) =>
-      ipcRenderer.invoke('chat:save-history', payload) as Promise<{ ok: true } | { ok: false; error: string }>,
-    // New multi-session APIs
     listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke('chat:list-sessions', payload) as Promise<
         | { ok: true; data: { sessions: ChatSessionMeta[] } }

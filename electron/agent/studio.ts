@@ -1,5 +1,5 @@
 /**
- * LangSmith Studio 入口
+ * LangGraph Studio 入口
  *
  * 自动读取 MindLane 应用配置（settings.json）创建 Provider。
  * 支持所有已注册的 provider：dashscope、kimi-code、minimax。
@@ -86,7 +86,7 @@ function createProviderFromSettings(): LLMProvider {
     throw new Error(
       `缺少 API Key。\n` +
       `方式一：在 MindLane 应用中配置 provider，或通过 MINDLANE_SETTINGS_PATH 指定配置路径。\n` +
-      `方式二：设置环境变量启动 LangSmith Studio，例如：\n` +
+      `方式二：设置环境变量启动 LangGraph Studio，例如：\n` +
       `  MINDLANE_API_KEY=your_key npx @langchain/langgraph-cli dev\n\n` +
       `可选环境变量：\n` +
       `  MINDLANE_PROVIDER  - provider ID（默认 dashscope）\n` +

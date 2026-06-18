@@ -1,16 +1,11 @@
 import path from 'node:path'
 import nodeCrypto from 'node:crypto'
 import type { BaseMessage } from '@langchain/core/messages'
-import { HumanMessage } from '@langchain/core/messages'
-import { compressMessages } from '../memory/compression.js'
-import type { LLMProvider } from '../providers/index.js'
 import { SessionMessageStore, type SessionMeta } from './sessionMessageStore.js'
 import { uiMessageToBaseMessages } from './sessionMessageStore.js'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
 import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
 import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
-
-export type { ChatMessage as SessionMessage, SessionMeta }
 
 /**
  * 聊天历史管理器 - JSONL 版本
@@ -21,7 +16,6 @@ export type { ChatMessage as SessionMessage, SessionMeta }
  * 3. 为 UI 提供 ChatMessage[] 格式的历史消息
  * 4. 提供消息压缩/截断策略
  * 5. 支持会话的 CRUD 操作
- * 6. 在首次初始化时自动从旧版 SQLite 迁移数据
  */
 export class SessionManager {
   private store: SessionMessageStore | null = null
@@ -30,7 +24,7 @@ export class SessionManager {
   private _workspaceHash: string = ''
 
   /**
-   * 初始化 JSONL 存储，可选从旧版 SQLite 迁移
+   * 初始化 JSONL 存储，可选从旧版 SQLite 迁移。
    */
   async init(dbPath: string, options?: { userDataPath?: string }): Promise<void> {
     const userDataPath = options?.userDataPath ?? path.dirname(dbPath)
@@ -82,9 +76,9 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的 UI 历史消息。
+   * 加载指定会话的 UI 消息。
    */
-  async loadHistory(threadId: string): Promise<ChatMessage[]> {
+  async loadSessionMessages(threadId: string): Promise<ChatMessage[]> {
     if (!this.store) throw new Error('SessionManager not initialized')
     const messages = await this.store.loadMessages(threadId)
     return checkpointMessagesToSessionMessages(messages)
@@ -124,9 +118,9 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的历史消息并转换为 LangChain Message 格式
+   * 加载指定会话的消息并转换为 LangChain Message 格式
    */
-  async loadHistoryAsMessages(
+  async loadSessionBaseMessages(
     threadId: string,
     options: {
       /** 是否包含 system 消息（默认：true） */
@@ -151,25 +145,6 @@ export class SessionManager {
     }
 
     return filtered
-  }
-
-  /**
-   * 加载并压缩历史消息，用于 LLM 上下文
-   */
-  async buildContextMessages(
-    threadId: string,
-    provider: LLMProvider,
-    currentUserMessage?: string,
-  ): Promise<BaseMessage[]> {
-    const messages = await this.loadHistoryAsMessages(threadId, {
-      includeSystem: false,
-    })
-
-    if (currentUserMessage) {
-      messages.push(new HumanMessage(currentUserMessage))
-    }
-
-    return compressMessages(messages, provider.reasoningModel)
   }
 
   /**
@@ -202,8 +177,8 @@ export class SessionManager {
     const existingMeta = this.store.getSessionMeta(sessionId)
     const now = new Date().toISOString()
 
-    // 与旧版 ChatDb 保持一致：按 UI 消息（ChatMessage）数量进行追加去重，
-    // 避免 assistant 消息带 toolCalls 时 BaseMessage 数量膨胀导致切片错误。
+    // 按 UI 消息（ChatMessage）数量进行追加去重，避免 assistant 消息带
+    // toolCalls 时 BaseMessage 数量膨胀导致切片错误。
     const storedChatMessages = checkpointMessagesToSessionMessages(storedMessages)
     const messagesToAppend = messages.slice(storedChatMessages.length)
 

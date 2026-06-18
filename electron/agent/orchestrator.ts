@@ -16,8 +16,6 @@ import type {
 } from "./state.js";
 import { MainGraphState } from "./state.js";
 
-// 导出 MindmapContextData 供其他模块使用
-export type { MindmapContextData } from "./tools/mindmapContext.js";
 import { MindLaneAgent } from "./agenthub/mindlane/mindlaneAgent.js";
 import type {
   MindLaneNode,
@@ -26,7 +24,7 @@ import type {
 } from "../../src/shared/lib/fileFormat.js";
 import { buildPalaceSubgraph } from "./graphs/palaceGraph.js";
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import { MindmapContextData } from "./tools/mindmapContext.js";
+import type { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
 import { createSearchLinkedDocumentTool } from "./tools/linkedDocumentSearch.js";
@@ -61,13 +59,13 @@ export interface ChatRequest {
   documentRef?: DocumentRef;
 }
 
-export interface AssistantMessage {
+interface AssistantMessage {
   role: "assistant";
   content: string;
   toolCalls?: ChatToolCall[];
 }
 
-export interface ChatResponse {
+interface ChatResponse {
   content: string;
   messages?: AssistantMessage[];
   toolCalls?: ChatToolCall[];
@@ -86,7 +84,7 @@ export interface ChatResponse {
 /**
  * 流回调接口
  */
-export interface StreamCallbacks {
+interface StreamCallbacks {
   onMessageStart?: () => void;
   onToken: (token: string) => void;
   onToolStart: (name: string, input: Record<string, unknown>) => void;
@@ -95,13 +93,13 @@ export interface StreamCallbacks {
   onError: (error: string) => void;
 }
 
-export interface AgentOrchestratorOptions {
+interface AgentOrchestratorOptions {
   cacheManager?: CacheManager;
   userDataPath?: string;
   messagePipeline?: MessagePipelineConfig;
 }
 
-export interface PalaceFromNodesResult {
+interface PalaceFromNodesResult {
   ok: true;
   label: string;
   stations: Array<{
@@ -117,12 +115,12 @@ export interface PalaceFromNodesResult {
   sourceNodeIds: string[];
 }
 
-export interface PalaceFromNodesError {
+interface PalaceFromNodesError {
   ok: false;
   error: string;
 }
 
-export type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
+type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError;
 
 export class AgentOrchestrator {
   private compiledMainGraph: CompiledStateGraph<MainGraphStateType, unknown, string> | null = null;
@@ -210,7 +208,7 @@ export class AgentOrchestrator {
 
       let history: BaseMessage[];
       if (sessionManager?.isReady()) {
-        let existingMessages = await sessionManager.loadHistoryAsMessages(request.threadId, { includeSystem: false });
+        let existingMessages = await sessionManager.loadSessionBaseMessages(request.threadId, { includeSystem: false });
         const lastMessage = existingMessages[existingMessages.length - 1];
         const alreadySaved =
           lastMessage?.getType() === "human" &&
@@ -219,7 +217,7 @@ export class AgentOrchestrator {
             JSON.stringify(humanMessage.additional_kwargs?.attachment);
         if (!alreadySaved) {
           await sessionManager.saveMessage(request.threadId, humanMessage);
-          existingMessages = await sessionManager.loadHistoryAsMessages(request.threadId, { includeSystem: false });
+          existingMessages = await sessionManager.loadSessionBaseMessages(request.threadId, { includeSystem: false });
         }
         history = [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...existingMessages];
       } else {
@@ -317,7 +315,7 @@ export class AgentOrchestrator {
         if (this.aiService.memoryExtractor && ctx?.filePath) {
           try {
             const messages = sessionManager?.isReady()
-              ? await sessionManager.loadHistory(request.threadId)
+              ? await sessionManager.loadSessionMessages(request.threadId)
               : await this.aiService.checkpointer.getMessages(request.threadId)
             await this.aiService.memoryExtractor.extractAndPersist({
               provider: this.provider,
@@ -412,8 +410,7 @@ export class AgentOrchestrator {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  buildGraph(_ctx?: MindmapContextData) {
+  buildGraph() {
     const caps = this.provider.capabilities;
     const hasPalace =
       caps.has(ProviderCapability.ImageGen) &&

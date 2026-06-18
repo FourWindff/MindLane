@@ -1,1 +1,0 @@
-export { MindmapEdge } from './MindmapEdge'

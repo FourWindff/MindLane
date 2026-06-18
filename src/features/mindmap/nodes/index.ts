@@ -1,9 +1,4 @@
-import { nodeRegistry } from './registry'
-import { textDescriptor } from './text'
-import { palaceDescriptor } from './palace'
-
-nodeRegistry.register(textDescriptor)
-nodeRegistry.register(palaceDescriptor)
+import './text'
+import './palace'
 
 export { nodeRegistry } from './registry'
-export { NodeTypeDescriptor } from './types'

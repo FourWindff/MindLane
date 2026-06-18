@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { ShortcutsList } from '@/shared/shortcuts'
+import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
 import type { MindLaneFile } from '@/shared/lib/fileFormat'
 
 type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor'

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { SettingsPanel } from './SettingsPanel'
-import '@/features/shell/styles/side-panel.css'
+import '../settings.css'
 
 type Props = {
   open: boolean

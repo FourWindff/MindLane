@@ -1,16 +1,8 @@
 import { NodeTypeDescriptor } from '../types'
+import { nodeRegistry } from '../registry'
 import { TextNodeComponent } from './TextNodeComponent'
+import type { TextNodeData } from './types'
 
-export type TextNodeData = {
-  label: string
-  palaceId?: string
-  pageRange?: string
-  summary?: string
-  justAdded?: boolean
-  exiting?: boolean
-  editing?: boolean
-  processing?: boolean
-}
 class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
   readonly typeId = 'text'
   readonly component = TextNodeComponent
@@ -29,4 +21,6 @@ class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
   }
 }
 
-export const textDescriptor = new TextDescriptor()
+const textDescriptor = new TextDescriptor()
+
+nodeRegistry.register(textDescriptor)

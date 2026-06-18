@@ -60,8 +60,8 @@ Node type descriptors implement `serialize()`/`deserialize()` for persistence. A
 **AI system** (`electron/agent/`) is built on LangGraph (`@langchain/langgraph`):
 - `orchestrator.ts` — Main entry point. Routes chat requests through a state graph with tool-calling LLM agents.
 - `agenthub/` — Specialized agents: `analyzeAgent`, `anchorAgent`, `imageGenAgent`, `mindlaneAgent`. Each agent is a prompt + LLM call with structured output.
-- `graphs/` — LangGraph state graphs: `mindmapGraph.ts` (mindmap generation/editing), `palaceGraph.ts` (memory palace creation pipeline).
-- `tools/` — Tool definitions exposed to agents: `mindmapActions.ts` (add/delete/rename nodes), `mindmapContext.ts` (read current mindmap state), `routeDecisionTool.ts` (intent routing).
+- `graphs/` — LangGraph state graphs: `mindmapGraph/index.ts` (mindmap generation/editing), `palaceGraph.ts` (memory palace creation pipeline).
+- `tools/` — Tool definitions exposed to agents: `mindmapActions.ts` (add/delete/rename nodes), `mindmapContext.ts` (read current mindmap state), `linkedDocumentSearch.ts` (search linked document text), `subgraphRoutingTools.ts` (virtual subgraph routing), and `toolResultNormalizer.ts` (tool-result cleanup/offloading).
 - `providers/` — Pluggable LLM provider system. Currently supports DashScope, MiniMax, Kimi. Each provider implements chat, streaming, and optional image generation. Registry in `providers/registry.ts`.
 - `memory/contextCompact.ts` — In-memory token-budget compaction; trims or summarizes messages when the prompt is still over budget after archival.
 - `context/sessionManager.ts` — Multi-session chat history stored as JSONL (`session.jsonl`) via `SessionMessageStore`.
@@ -73,8 +73,6 @@ Node type descriptors implement `serialize()`/`deserialize()` for persistence. A
 - `workspaceManager.ts` — Directory listing, tree traversal, CRUD on workspace items.
 - `settingsManager.ts` — JSON settings persisted in Electron's `userData`.
 - `recentFilesManager.ts` — Recently opened files with thumbnails.
-
-**Lab workflow** (`electron/lab/mindmapworkflow/`) — Experimental pipeline for generating mindmaps from PDF documents using a multi-stage agent workflow (extract → chunk → summarize → merge → YAML output).
 
 ## Context Compaction and Session Archival
 
@@ -94,7 +92,7 @@ The latest `_lastSummary` is injected into the system prompt by `ContextBuilder.
   version: '1.0',
   metadata: { title, createdAt, updatedAt },
   mindmap: { nodes: [...], edges: [...], viewport: { x, y, zoom } },
-  documents: [] // future use
+  documents: [] // linked document metadata
 }
 ```
 
@@ -104,14 +102,14 @@ Nodes are stored with serialized `data` fields (type-specific). On load, `nodeRe
 
 - Path alias `@/` maps to `src/`. Electron code uses relative imports or `../../src/...` for shared types.
 - Electron main entry: `electron/main.ts`. Preload: `electron/preload.ts`.
-- `electron-builder.json5` configures packaging. Native modules (`better-sqlite3`, `pdf-parse`, `mammoth`) are marked external in `vite.config.ts` and included in `asarUnpack`.
+- `electron-builder.json5` configures packaging. Native modules (`better-sqlite3`, `pdf-parse`) are marked external in `vite.config.ts`; `better-sqlite3` is included in `asarUnpack`.
 - DevTools toggle: F12 or Ctrl/Cmd+Shift+I.
 - Window is frameless; custom title bar in `AppWindowBar.tsx` with minimize/maximize/close via IPC.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLane** (4890 symbols, 9031 relationships, 278 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLane** (3653 symbols, 7684 relationships, 267 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

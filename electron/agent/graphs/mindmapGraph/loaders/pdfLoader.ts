@@ -1,5 +1,21 @@
 import fs from 'node:fs/promises'
-import type { DocumentLoader, DocumentPage, MindmapInputSource } from './index.js'
+
+interface DocumentPage {
+  text: string
+  index: number
+}
+
+interface MindmapInputSource {
+  type: 'pdf' | 'url' | 'text'
+  path?: string
+  url?: string
+  content?: string
+}
+
+interface DocumentLoader {
+  load(source: MindmapInputSource): Promise<DocumentPage[]>
+  supports(type: string): boolean
+}
 
 export class PdfDocumentLoader implements DocumentLoader {
   supports(type: string): boolean {

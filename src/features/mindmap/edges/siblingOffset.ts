@@ -1,5 +1,5 @@
-export const BASE_CURVATURE = 0.25
-export const CURVATURE_SPREAD = 0.04
+const BASE_CURVATURE = 0.25
+const CURVATURE_SPREAD = 0.04
 
 export function computeSiblingCurvature(
   siblingIndex: number,

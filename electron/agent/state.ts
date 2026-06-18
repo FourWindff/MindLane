@@ -29,7 +29,7 @@ export type StationDesign = {
   linkedNodeId?: string
 }
 
-export type PalaceDesign = {
+type PalaceDesign = {
   theme: string
   sceneBrief?: string
   routeStyle?: string
@@ -47,20 +47,7 @@ export type MemoryPalaceStation = {
   linkedNodeId?: string
 }
 
-export type GeneratedNode = {
-  id: string
-  type: 'text'
-  data: Record<string, unknown>
-}
-
-export type GeneratedEdge = {
-  id: string
-  source: string
-  target: string
-  type: string
-}
-
-export interface MindmapInputSource {
+interface MindmapInputSource {
   type: 'pdf' | 'url' | 'text'
   path?: string
   url?: string
@@ -78,7 +65,7 @@ export interface DocumentRef {
   metadata?: Record<string, unknown>
 }
 
-export type DocumentChunk = {
+type DocumentChunk = {
   id: string
   index: number
   startPage: number
@@ -86,7 +73,7 @@ export type DocumentChunk = {
   text: string
 }
 
-export type PendingSubgraph = 'mindmap' | 'palace'
+type PendingSubgraph = 'mindmap' | 'palace'
 
 // ===== 状态切片定义（用于组合和复用） =====
 

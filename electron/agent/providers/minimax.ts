@@ -46,7 +46,7 @@ function errMsg(body: unknown, fallback: string): string {
   return fallback
 }
 
-export function mapSizeToAspectRatio(size?: string): string {
+function mapSizeToAspectRatio(size?: string): string {
   const trimmed = size?.trim()
   if (!trimmed) return '1:1'
 

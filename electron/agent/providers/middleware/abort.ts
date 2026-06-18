@@ -14,14 +14,14 @@ export class TimeoutError extends Error {
   }
 }
 
-export class AbortError extends Error {
+class AbortError extends Error {
   constructor(message = '操作已取消') {
     super(message)
     this.name = 'AbortError'
   }
 }
 
-export type LinkedAbort = {
+type LinkedAbort = {
   signal: AbortSignal
   cleanup: () => void
 }

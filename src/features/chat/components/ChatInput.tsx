@@ -2,7 +2,7 @@ import { forwardRef } from 'react'
 import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
 import type { Node } from '@xyflow/react'
 
-export interface AttachmentInfo {
+interface AttachmentInfo {
   name: string
   path: string
   size: number

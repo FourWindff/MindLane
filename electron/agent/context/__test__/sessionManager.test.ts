@@ -190,7 +190,7 @@ describe('SessionManager', () => {
     expect(ws1Sessions[0].title).toBe('Workspace 1')
   })
 
-  it('loadHistory returns UI messages saved for the session', async () => {
+  it('loadSessionMessages returns UI messages saved for the session', async () => {
     const messages: ChatMessage[] = [
       {
         role: 'user',
@@ -208,7 +208,7 @@ describe('SessionManager', () => {
 
     await manager.saveSession('session-ui-history', messages)
 
-    const loaded = await manager.loadHistory('session-ui-history')
+    const loaded = await manager.loadSessionMessages('session-ui-history')
     expect(loaded).toEqual(messages)
   })
 
@@ -219,7 +219,7 @@ describe('SessionManager', () => {
       { role: 'assistant', content: 'second' },
     ])
 
-    const loaded = await manager.loadHistory('session-replace')
+    const loaded = await manager.loadSessionMessages('session-replace')
     expect(loaded).toEqual([
       { role: 'user', content: 'first' },
       { role: 'assistant', content: 'second' },
@@ -237,12 +237,12 @@ describe('SessionManager', () => {
     await manager.saveSession('session-delete-linked', [{ role: 'user', content: 'delete me' }])
     await manager.deleteSession('session-delete-linked')
 
-    await expect(manager.loadHistory('session-delete-linked')).resolves.toEqual([])
+    await expect(manager.loadSessionMessages('session-delete-linked')).resolves.toEqual([])
     expect(deletedThreads).toEqual(['session-delete-linked'])
   })
 
-  it('loadHistoryAsMessages 无消息时返回空', async () => {
-    const loaded = await manager.loadHistoryAsMessages('non-existent-session')
+  it('loadSessionBaseMessages 无消息时返回空', async () => {
+    const loaded = await manager.loadSessionBaseMessages('non-existent-session')
     expect(loaded).toHaveLength(0)
   })
 })

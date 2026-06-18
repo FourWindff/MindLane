@@ -1,7 +1,7 @@
 import { SystemMessage } from '@langchain/core/messages'
 import type { LLMProvider } from '../providers/index.js'
 import { MemoryManager } from './memoryManager.js'
-import type { ChatMessage as SessionMessage } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
 import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { logger } from '../../shared/logger.js'
@@ -15,9 +15,9 @@ const DISCIPLINES = [
   'creative-arts',
 ] as const
 
-export type Discipline = typeof DISCIPLINES[number]
+type Discipline = typeof DISCIPLINES[number]
 
-export interface ExtractedPattern {
+interface ExtractedPattern {
   discipline: Discipline
   subTag: string
   description: string
@@ -36,9 +36,9 @@ interface LLMExtractionResponse {
   }>
 }
 
-export interface ExtractOptions {
+interface ExtractOptions {
   provider: LLMProvider
-  messages: SessionMessage[]
+  messages: ChatMessage[]
   mindmapSummary: string
   filePath: string
 }
@@ -70,7 +70,7 @@ export class MemoryExtractor {
   /** Call LLM to extract thinking patterns from conversation. */
   private async extract(
     provider: LLMProvider,
-    messages: SessionMessage[],
+    messages: ChatMessage[],
     mindmapSummary: string,
   ): Promise<ExtractedPattern[]> {
     const prompt = this.buildExtractionPrompt(messages, mindmapSummary)
@@ -114,7 +114,7 @@ export class MemoryExtractor {
     }
   }
 
-  private buildExtractionPrompt(messages: SessionMessage[], mindmapSummary: string): string {
+  private buildExtractionPrompt(messages: ChatMessage[], mindmapSummary: string): string {
     // Limit to last 20 exchanges to avoid unbounded prompt size
     const recentMessages = messages.slice(-40)
     const conversation = recentMessages

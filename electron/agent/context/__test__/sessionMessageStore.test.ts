@@ -163,9 +163,34 @@ describe('SessionMessageStore', () => {
       'INSERT INTO chat_messages (session_id, seq, message_json, created_at) VALUES (?, ?, ?, ?)',
     )
 
-    insertSession.run('mig-s1', 'ws1', 'Migrated Session', '2024-01-01T00:00:00Z', '2024-01-02T00:00:00Z', 2)
-    insertMessage.run('mig-s1', 0, JSON.stringify({ role: 'user', content: 'hello', timestamp: '2024-01-01T00:00:00Z' }), '2024-01-01T00:00:00Z')
-    insertMessage.run('mig-s1', 1, JSON.stringify({ role: 'assistant', content: 'hi', timestamp: '2024-01-01T00:00:01Z' }), '2024-01-01T00:00:01Z')
+    insertSession.run(
+      'mig-s1',
+      'ws1',
+      'Migrated Session',
+      '2024-01-01T00:00:00Z',
+      '2024-01-02T00:00:00Z',
+      2,
+    )
+    insertMessage.run(
+      'mig-s1',
+      0,
+      JSON.stringify({
+        role: 'user',
+        content: 'hello',
+        timestamp: '2024-01-01T00:00:00Z',
+      }),
+      '2024-01-01T00:00:00Z',
+    )
+    insertMessage.run(
+      'mig-s1',
+      1,
+      JSON.stringify({
+        role: 'assistant',
+        content: 'hi',
+        timestamp: '2024-01-01T00:00:01Z',
+      }),
+      '2024-01-01T00:00:01Z',
+    )
     db.close()
 
     const migrationStore = new SessionMessageStore()

@@ -93,14 +93,6 @@ export class CheckpointerManager {
     this.saver = SqliteSaver.fromConnString(dbPath)
   }
 
-  /** 兼容旧初始化方式（使用独立的 checkpoints.db） */
-  async init(userDataPath: string): Promise<void> {
-    const dir = path.join(userDataPath, 'memory')
-    await fs.promises.mkdir(dir, { recursive: true })
-    const dbPath = path.join(dir, 'checkpoints.db')
-    this.saver = SqliteSaver.fromConnString(dbPath)
-  }
-
   get(): SqliteSaver | null {
     return this.saver
   }

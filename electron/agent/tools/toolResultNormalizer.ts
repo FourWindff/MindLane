@@ -12,16 +12,7 @@ const EXEMPT_TOOLS = new Set([
   GENERATE_PALACE_TOOL,
 ])
 
-export interface NormalizeOptions {
-  /** 工具名称 */
-  toolName: string
-  /** 原始结果内容，支持字符串或对象数组 */
-  rawResult: unknown
-  /** 工具调用 ID，用于生成转存文件名 */
-  toolCallId: string
-  /** Electron userData 目录路径 */
-  userDataDir?: string
-}
+const DEFAULT_OFFLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * 将工具结果统一规范化为适合进入 LLM 上下文的字符串。
@@ -61,6 +52,42 @@ export async function _normalize_tool_result(
   }
 
   return content
+}
+
+export async function cleanupToolResultOffloads(
+  userDataDir: string,
+  options: {
+    maxAgeMs?: number
+    now?: number
+  } = {},
+): Promise<number> {
+  const dir = path.join(userDataDir, AGENT_LIMITS.toolResultOffloadDirName)
+  const maxAgeMs = options.maxAgeMs ?? DEFAULT_OFFLOAD_MAX_AGE_MS
+  const now = options.now ?? Date.now()
+
+  let entries: Array<import('node:fs').Dirent>
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true })
+  } catch {
+    return 0
+  }
+
+  let removed = 0
+  for (const entry of entries) {
+    if (!entry.isFile()) continue
+
+    const filePath = path.join(dir, entry.name)
+    try {
+      const stat = await fs.stat(filePath)
+      if (now - stat.mtimeMs <= maxAgeMs) continue
+      await fs.unlink(filePath)
+      removed += 1
+    } catch {
+      // Best-effort cleanup; ignore files that disappear or cannot be removed.
+    }
+  }
+
+  return removed
 }
 
 function fallbackEmpty(toolName: string): string {

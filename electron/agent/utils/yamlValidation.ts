@@ -7,9 +7,9 @@ import {
   type MindmapYamlNode,
 } from './yamlMindmap.js'
 
-export type MindmapYamlValidationMode = 'tree' | 'fragment'
+type MindmapYamlValidationMode = 'tree' | 'fragment'
 
-export type MindmapYamlValidationResult =
+type MindmapYamlValidationResult =
   | { ok: true; tree: MindmapYamlNode }
   | { ok: false; reason: string }
 

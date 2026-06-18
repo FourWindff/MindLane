@@ -74,7 +74,7 @@ async function estimateSystemPromptTokens(
 /**
  * 估算 supervisor 调用前的完整输入 token 数
  */
-export async function estimateFullInputTokens(
+async function estimateFullInputTokens(
   state: MainGraphStateType,
   tools: StructuredToolInterface[],
   _provider: LLMProvider,

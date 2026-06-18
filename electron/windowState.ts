@@ -5,8 +5,8 @@ import path from 'node:path'
 const FILE_NAME = 'window-state.json'
 
 /** 首次打开或没有记录时的默认尺寸（避免过小） */
-export const DEFAULT_WIDTH = 1280
-export const DEFAULT_HEIGHT = 820
+const DEFAULT_WIDTH = 1280
+const DEFAULT_HEIGHT = 820
 export const MIN_WIDTH = 880
 export const MIN_HEIGHT = 560
 

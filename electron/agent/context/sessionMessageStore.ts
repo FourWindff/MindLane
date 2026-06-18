@@ -337,56 +337,55 @@ export class SessionMessageStore {
           }>
 
         const messageStmt = this.prepareLegacyMessageStmt(db)
-      if (!messageStmt) {
-        logger.warn('[SessionMessageStore] 旧版数据库缺少 message_json 列，跳过消息迁移')
-      } else {
-        for (const row of sessionRows) {
-          const messageRows = messageStmt.all(row.id) as Array<{ message_json: string }>
-          const messages: BaseMessage[] = []
-          for (const { message_json } of messageRows) {
+        if (!messageStmt) {
+          logger.warn('[SessionMessageStore] 旧版数据库缺少 message_json 列，跳过消息迁移')
+        } else {
+          for (const row of sessionRows) {
+            const messageRows = messageStmt.all(row.id) as Array<{ message_json: string }>
+            const messages: BaseMessage[] = []
+            for (const { message_json } of messageRows) {
+              try {
+                const chatMsg = JSON.parse(message_json) as ChatMessage
+                messages.push(...uiMessageToBaseMessages(chatMsg))
+              } catch (err) {
+                logger.warn(
+                  `[SessionMessageStore] 迁移时跳过损坏的消息 (session=${row.id}):`,
+                  err,
+                )
+              }
+            }
+
+            const meta: SessionMeta = {
+              id: row.id,
+              title: row.title,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at,
+              messageCount: messages.length,
+            }
+
+            const savedHash = this.workspaceHash
+            this.workspaceHash = row.workspace_hash
             try {
-              const chatMsg = JSON.parse(message_json) as ChatMessage
-              messages.push(...uiMessageToBaseMessages(chatMsg))
-            } catch (err) {
-              logger.warn(
-                `[SessionMessageStore] 迁移时跳过损坏的消息 (session=${row.id}):`,
-                err,
-              )
+              await this.createSession(row.id, meta, messages)
+            } finally {
+              this.workspaceHash = savedHash
             }
           }
-
-          const meta: SessionMeta = {
-            id: row.id,
-            title: row.title,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-            messageCount: messages.length,
-          }
-
-          // 临时设置 workspaceHash 以写入正确目录
-          const savedHash = this.workspaceHash
-          this.workspaceHash = row.workspace_hash
-          try {
-            await this.createSession(row.id, meta, messages)
-          } finally {
-            this.workspaceHash = savedHash
-          }
         }
+      } finally {
+        db.close()
       }
-    } finally {
-      db.close()
-    }
 
-    const timestamp = Date.now()
-    const backupPath = `${this.legacyDbPath!}.bak.${timestamp}`
-    fs.renameSync(this.legacyDbPath!, backupPath)
-    fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8')
-    logger.info('[SessionMessageStore] 迁移完成，原数据库已备份到:', backupPath)
-  } catch (err) {
-    logger.error('[SessionMessageStore] 迁移失败，保留原数据库:', err)
-    // 不阻断启动，下次初始化仍会重试
+      const timestamp = Date.now()
+      const backupPath = `${this.legacyDbPath!}.bak.${timestamp}`
+      fs.renameSync(this.legacyDbPath!, backupPath)
+      fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8')
+      logger.info('[SessionMessageStore] 迁移完成，原数据库已备份到:', backupPath)
+    } catch (err) {
+      logger.error('[SessionMessageStore] 迁移失败，保留原数据库:', err)
+      // 不阻断启动，下次初始化仍会重试
+    }
   }
-}
 
   private prepareLegacyMessageStmt(db: unknown): { all: (sessionId: string) => unknown[] } | null {
     type ColumnInfo = { name: string }
@@ -395,7 +394,7 @@ export class SessionMessageStore {
     }
     const typedDb = db as BetterSqlite3Database
     try {
-      const columns = typedDb.prepare("PRAGMA table_info(chat_messages)").all() as ColumnInfo[]
+      const columns = typedDb.prepare('PRAGMA table_info(chat_messages)').all() as ColumnInfo[]
       if (!columns.some((c) => c.name === 'message_json')) {
         return null
       }
@@ -406,6 +405,7 @@ export class SessionMessageStore {
       return null
     }
   }
+
 }
 
 export function uiMessageToBaseMessages(msg: ChatMessage): BaseMessage[] {

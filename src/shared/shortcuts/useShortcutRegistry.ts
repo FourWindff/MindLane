@@ -9,7 +9,3 @@ export function useShortcutRegistry(): ShortcutRegistry {
   }
   return ctx.registry
 }
-
-export function useOptionalShortcutRegistry(): ShortcutRegistry | null {
-  return useContext(ShortcutRegistryContext)?.registry ?? null
-}

@@ -227,7 +227,7 @@ const batchAddNodesTool = tool(
   }
 )
 
-export type MindmapActionTools = {
+type MindmapActionTools = {
   addTextNodeTool: typeof addTextNodeTool
   updateNodeTool: typeof updateNodeTool
   deleteNodeTool: typeof deleteNodeTool

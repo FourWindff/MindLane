@@ -22,7 +22,7 @@ export interface MessagePipelineConfig {
   snipPreserveLastUser: boolean
 }
 
-export const DEFAULT_MESSAGE_PIPELINE_CONFIG: MessagePipelineConfig = {
+const DEFAULT_MESSAGE_PIPELINE_CONFIG: MessagePipelineConfig = {
   enabled: true,
   maxContextTokens: 16_000,
   toolResultMaxBytes: 8_000,

@@ -1,9 +1,9 @@
 import { LLMProvider, ProviderCapability } from './base.js'
 import type { ProviderConfig } from '../../fs/types.js'
 
-export type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
+type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
 
-export type ProviderMeta = {
+type ProviderMeta = {
   id: string
   displayName: string
   capabilities: ProviderCapability[]
@@ -13,7 +13,7 @@ export type ProviderMeta = {
 const factories = new Map<string, ProviderFactory>()
 const metaMap = new Map<string, ProviderMeta>()
 
-export function registerProvider(
+function registerProvider(
   meta: ProviderMeta,
   factory: ProviderFactory,
 ): void {

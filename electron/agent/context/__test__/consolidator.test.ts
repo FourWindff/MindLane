@@ -63,7 +63,7 @@ describe('Consolidator', () => {
     const sessionId = 'skip'
     await manager.saveMessages(sessionId, makeMessages(2))
 
-    const provider = new FakeProvider(new FakeListChatModel({}))
+    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
@@ -85,7 +85,7 @@ describe('Consolidator', () => {
   })
 
   it('pickConsolidationBoundary 优先在 user 消息边界处结束', () => {
-    const provider = new FakeProvider(new FakeListChatModel({}))
+    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
@@ -150,7 +150,7 @@ describe('Consolidator', () => {
     const messages = makeMessages(20)
     await manager.saveMessages(sessionId, messages)
 
-    const throwingModel = new FakeListChatModel({})
+    const throwingModel = new FakeListChatModel({ responses: [] })
     throwingModel.invoke = async () => {
       throw new Error('model error')
     }
@@ -184,7 +184,7 @@ describe('Consolidator', () => {
     const messages = makeMessages(11)
     await manager.saveMessages(sessionId, messages)
 
-    const provider = new FakeProvider(new FakeListChatModel({}))
+    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
@@ -221,7 +221,7 @@ describe('Consolidator', () => {
     ]
     await manager.saveMessages(sessionId, messages)
 
-    const provider = new FakeProvider(new FakeListChatModel({}))
+    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {

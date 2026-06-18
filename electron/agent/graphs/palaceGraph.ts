@@ -7,7 +7,7 @@ import { PalaceSubgraphState } from '../state.js'
 
 // ===== 配置选项 =====
 
-export interface PalaceSubgraphOptions {
+interface PalaceSubgraphOptions {
   provider: LLMProvider
 }
 

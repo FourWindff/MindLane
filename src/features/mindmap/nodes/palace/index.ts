@@ -1,24 +1,9 @@
 import { NodeTypeDescriptor } from '../types'
+import { nodeRegistry } from '../registry'
 
 import { PalaceNodeComponent } from './PalaceNodeComponent'
-export type PalaceNodeData = {
-  label: string
-  imageUrl: string
-  stations: PalaceStation[]
-  sourceNodeIds: string[]
-  expanded?: boolean
-  generating?: boolean
-}
+import type { PalaceNodeData } from './types'
 
-export type PalaceStation = {
-  order: number
-  content: string
-  anchorVisual: string
-  association?: string
-  x: number
-  y: number
-  linkedNodeId: string
-}
 class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   readonly typeId = 'palace'
   readonly component = PalaceNodeComponent
@@ -37,4 +22,6 @@ class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   }
 }
 
-export const palaceDescriptor = new PalaceDescriptor()
+const palaceDescriptor = new PalaceDescriptor()
+
+nodeRegistry.register(palaceDescriptor)

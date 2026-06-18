@@ -15,7 +15,7 @@ import {
   raceWithAbort,
 } from './abort.js'
 
-export type WithTimeoutOptions = {
+type WithTimeoutOptions = {
   /** 外部 AbortSignal，可与超时联动 */
   signal?: AbortSignal | null
   /** 超时时抛出的错误消息（仅用作 TimeoutError 的 message） */

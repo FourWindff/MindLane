@@ -19,13 +19,14 @@ import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
 import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
+import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = path.join(__dirname, '..')
 
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
@@ -747,7 +748,7 @@ function registerIpcHandlers(userDataPath: string) {
     }
     try {
       aiService.sessionManager.setWorkspace(payload.workspacePath)
-      const messages = await aiService.sessionManager.loadHistory(payload.sessionId)
+      const messages = await aiService.sessionManager.loadSessionMessages(payload.sessionId)
       return {
         ok: true,
         data: {
@@ -800,64 +801,6 @@ function registerIpcHandlers(userDataPath: string) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
-
-  ipcMain.handle('chat:load-history', async (_e, payload: { workspacePath: string }) => {
-    if (!aiServiceReady) {
-      return {
-        ok: true,
-        data: {
-          threadId: `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-          messages: [],
-        },
-      }
-    }
-    try {
-      aiService.sessionManager.setWorkspace(payload.workspacePath)
-      const sessionId = await aiService.sessionManager.getMostRecentSessionId()
-      if (sessionId) {
-        const messages = await aiService.sessionManager.loadHistory(sessionId)
-        return {
-          ok: true,
-          data: {
-            threadId: sessionId,
-            messages,
-          },
-        }
-      }
-    } catch { /* corrupted, return empty */ }
-    return {
-      ok: true,
-      data: {
-        threadId: `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-        messages: [],
-      },
-    }
-  })
-
-  ipcMain.handle(
-    'chat:save-history',
-    async (
-      _e,
-      payload: {
-        workspacePath: string
-        messages: ChatMessage[]
-      },
-    ) => {
-      if (!aiServiceReady) return aiNotReadyResponse()
-      try {
-        aiService.sessionManager.setWorkspace(payload.workspacePath)
-        const sessionId = await aiService.sessionManager.getMostRecentSessionId()
-          || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-        await aiService.sessionManager.saveSession(
-          sessionId,
-          payload.messages,
-        )
-        return { ok: true }
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
-      }
-    },
-  )
 
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {
@@ -928,8 +871,7 @@ app.whenReady().then(async () => {
       })
     }
     await aiService.init(userDataPath)
-    // TODO: 应用启动时清理 userData/tool-results/ 下过期的转存文件，
-    // 避免工具结果文件无限累积占用磁盘。
+    await cleanupToolResultOffloads(userDataPath)
     aiServiceReady = true
   } catch (err) {
     console.error('AI service init failed:', err)

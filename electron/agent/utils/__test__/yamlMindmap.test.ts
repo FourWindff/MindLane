@@ -3,12 +3,7 @@ import {
   extractYaml,
   sanitizeTreeCandidate,
   normalizeTree,
-  parsePageRange,
-  formatPageRange,
   serializeMindmapOutline,
-  serializeMindmapForestOutline,
-  withRetries,
-  overwriteArray,
 } from '../yamlMindmap.js'
 
 describe('extractYaml', () => {
@@ -163,24 +158,6 @@ describe('normalizeTree', () => {
   })
 })
 
-describe('parsePageRange / formatPageRange', () => {
-  it('parses single page', () => {
-    expect(parsePageRange('5')).toEqual([5, 5])
-  })
-
-  it('parses page range', () => {
-    expect(parsePageRange('1-10')).toEqual([1, 10])
-  })
-
-  it('returns null for invalid range', () => {
-    expect(parsePageRange('invalid')).toBeNull()
-  })
-
-  it('formats page range', () => {
-    expect(formatPageRange(1, 10)).toBe('1-10')
-  })
-})
-
 describe('serializeMindmapOutline', () => {
   it('serializes simple tree to outline', () => {
     const tree = {
@@ -195,60 +172,5 @@ describe('serializeMindmapOutline', () => {
     expect(yaml).toContain('人工智能:')
     expect(yaml).toContain('- 机器学习')
     expect(yaml).toContain('- 深度学习')
-  })
-})
-
-describe('serializeMindmapForestOutline', () => {
-  it('serializes multiple trees', () => {
-    const trees = [
-      { label: 'Tree1', page_range: '', children: [] },
-      { label: 'Tree2', page_range: '', children: [] },
-    ]
-    const yaml = serializeMindmapForestOutline(trees)
-    expect(yaml).toContain('- Tree1')
-    expect(yaml).toContain('- Tree2')
-  })
-})
-
-describe('serializeMindmapForestOutline', () => {
-  it('serializes multiple trees', () => {
-    const trees = [
-      { label: 'Tree1', page_range: '', children: [] },
-      { label: 'Tree2', page_range: '', children: [] },
-    ]
-    const yaml = serializeMindmapForestOutline(trees)
-    expect(yaml).toContain('- Tree1')
-    expect(yaml).toContain('- Tree2')
-  })
-})
-
-describe('withRetries', () => {
-  it('succeeds on first try', async () => {
-    const result = await withRetries(() => Promise.resolve(42), 2)
-    expect(result).toBe(42)
-  })
-
-  it('retries and succeeds', async () => {
-    let attempts = 0
-    const result = await withRetries(() => {
-      attempts += 1
-      if (attempts < 3) return Promise.reject(new Error('fail'))
-      return Promise.resolve(42)
-    }, 3)
-    expect(result).toBe(42)
-    expect(attempts).toBe(3)
-  })
-
-  it('throws after exhausting retries', async () => {
-    await expect(withRetries(() => Promise.reject(new Error('fail')), 2)).rejects.toThrow('fail')
-  })
-})
-
-describe('overwriteArray', () => {
-  it('wraps value in Overwrite', () => {
-    const arr = [1, 2, 3]
-    const result = overwriteArray(arr)
-    // Overwrite is a LangGraph sentinel — verify it carries the data
-    expect((result as unknown as { __overwrite__: number[] }).__overwrite__).toEqual(arr)
   })
 })

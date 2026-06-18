@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { WorkspaceTreeEntry } from '../types'
 
-export interface ContextMenuAction {
+interface ContextMenuAction {
   label: string
   key: string
   danger?: boolean

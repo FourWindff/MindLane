@@ -4,7 +4,7 @@ import { nodeRegistry } from '@/features/mindmap/nodes'
 import { CHILD_OFFSET_X, CHILD_GAP_Y } from '@/shared/lib/mindmapTree'
 import type { ChatToolCall } from '@/shared/lib/fileFormat'
 
-export type ToolCallResult = ChatToolCall
+type ToolCallResult = ChatToolCall
 
 interface AddNodeAction {
   type: 'text' | 'palace'

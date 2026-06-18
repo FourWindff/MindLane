@@ -5,7 +5,7 @@ type SelectedNodePromptInput = {
   label: string
 }
 
-export type NodesPalaceRouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
+type NodesPalaceRouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
 
 type PalaceAnchorPromptInput = {
   order: number

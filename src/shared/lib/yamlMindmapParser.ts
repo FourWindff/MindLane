@@ -1,16 +1,16 @@
 import YAML from 'yaml'
 import type { Edge, Node } from '@xyflow/react'
-import type { TextNodeData } from '@/features/mindmap/nodes/text'
+import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import { newId } from '@/shared/lib/mindmapTree'
 
-export interface MindmapYamlNode {
+interface MindmapYamlNode {
   label: string
   page_range?: string
   summary?: string
   children?: MindmapYamlNode[]
 }
 
-export interface ParsedMindmap {
+interface ParsedMindmap {
   nodes: Node[]
   edges: Edge[]
   title: string
@@ -103,7 +103,7 @@ export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
   return { nodes, edges, title }
 }
 
-export interface ParsedFragment extends ParsedMindmap {
+interface ParsedFragment extends ParsedMindmap {
   /** 子树根节点 ID 列表（单根时为 1 个，多根时为多个） */
   rootIds: string[]
 }
