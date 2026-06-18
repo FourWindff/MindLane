@@ -400,20 +400,6 @@ function registerIpcHandlers(userDataPath: string) {
     streamAbortController = null
   })
 
-  // -- Direct text2image via runtime --
-  ipcMain.handle(
-    'ai:text2image',
-    async (_e, payload: { apiKey: string; prompt: string; size?: string; n?: number }) => {
-      try {
-        const provider = await createProviderForRequest(payload.apiKey, '')
-        const result = await provider.generateImage(payload)
-        return { ok: true, urls: result.urls }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
-    },
-  )
-
   // -- Image URL to base64 data URL --
   ipcMain.handle('image:url-to-data-url', async (_e, payload: { url: string }) => {
     try {

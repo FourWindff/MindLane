@@ -118,12 +118,6 @@ interface Window {
         }
       }) => void) => () => void
       onStreamError: (callback: (error: string) => void) => () => void
-      text2image: (payload: {
-        apiKey: string
-        prompt: string
-        size?: string
-        n?: number
-      }) => Promise<{ ok: true; urls: string[] } | { ok: false; error: string }>
       nodesToPalace: (payload: {
         apiKey: string
         model: string

@@ -138,8 +138,6 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.on('ai:chat-stream-error', handler)
       return () => { ipcRenderer.off('ai:chat-stream-error', handler) }
     },
-    text2image: (payload: { apiKey: string; prompt: string; size?: string; n?: number }) =>
-      ipcRenderer.invoke('ai:text2image', payload),
     nodesToPalace: (payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] }) =>
       ipcRenderer.invoke('ai:nodes-to-palace', payload),
     listProviders: () => ipcRenderer.invoke('ai:list-providers'),
