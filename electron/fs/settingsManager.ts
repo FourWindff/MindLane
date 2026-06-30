@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { AppSettings } from './types.js'
+import type { AppSettings, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
 
@@ -55,6 +55,56 @@ export class SettingsManager {
     await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
   }
 
+  /**
+   * One-time migration: read legacy workspace-scoped keys from global settings.json
+   * and remove them. Returns null if no legacy keys exist or if the last workspace
+   * does not match the requested path.
+   */
+  async migrateLegacyWorkspaceState(workspacePath: string): Promise<Partial<WorkspaceState> | null> {
+    const current = await this.load()
+    if (!current.lastWorkspacePath || path.resolve(current.lastWorkspacePath) !== path.resolve(workspacePath)) {
+      return null
+    }
+
+    const raw = await this.readRaw()
+    const migrated: Partial<WorkspaceState> = {}
+    let hasLegacy = false
+
+    if ('lastOpenedFilePath' in raw) {
+      const value = raw.lastOpenedFilePath
+      migrated.lastOpenedFilePath = typeof value === 'string' ? value : null
+      hasLegacy = true
+    }
+    if ('expandedFolderPaths' in raw) {
+      const value = raw.expandedFolderPaths
+      migrated.expandedFolderPaths = Array.isArray(value)
+        ? value.filter((p): p is string => typeof p === 'string')
+        : []
+      hasLegacy = true
+    }
+
+    if (!hasLegacy) return null
+
+    const cleaned = { ...raw }
+    delete cleaned.lastOpenedFilePath
+    delete cleaned.expandedFolderPaths
+    this.cache = this.merge(cleaned as Partial<AppSettings>)
+    await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
+    return migrated
+  }
+
+  private async readRaw(): Promise<Record<string, unknown>> {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const raw = await fs.promises.readFile(this.filePath, 'utf-8')
+        return JSON.parse(raw) as Record<string, unknown>
+      }
+    } catch {
+      /* fall through */
+    }
+    return {}
+  }
+
   private merge(partial: Partial<AppSettings>): AppSettings {
     return {
       apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
@@ -76,5 +126,4 @@ export class SettingsManager {
       messagePipeline: partial.messagePipeline,
     }
   }
-
 }

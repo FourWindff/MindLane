@@ -72,13 +72,13 @@ function collectAllFolderPaths(entries: WorkspaceTreeEntry[]): string[] {
   return result
 }
 
-async function saveExpandedFolders(folders: Set<string>) {
+function saveExpandedFolders(folders: Set<string>) {
   const workspacePath = useWorkspaceStore.getState().workspacePath
   if (!workspacePath) return
-  await window.mindlane?.workspace.updateState?.({
+  window.mindlane?.workspace.updateState?.({
     workspacePath,
     expandedFolderPaths: [...folders],
-  })
+  }).catch(() => {})
 }
 
 function updateWorkspaceState(

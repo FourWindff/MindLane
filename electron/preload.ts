@@ -37,6 +37,7 @@ type ChatContext = {
 }
 
 import type { ChatMessage, ChatToolCall } from '../src/shared/lib/fileFormat'
+import type { WorkspaceState } from './fs/types'
 
 type ChatSessionMeta = {
   id: string
@@ -180,11 +181,7 @@ contextBridge.exposeInMainWorld('mindlane', {
         expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>,
-    updateState: (payload: {
-      workspacePath: string
-      expandedFolderPaths?: string[]
-      lastOpenedFilePath?: string | null
-    }) =>
+    updateState: (payload: { workspacePath: string } & Partial<WorkspaceState>) =>
       ipcRenderer.invoke('workspace:update-state', payload) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
