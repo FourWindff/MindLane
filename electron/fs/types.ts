@@ -42,10 +42,13 @@ export interface AppSettings {
   recentFilesMax: number
   lastWorkspacePath: string | null
   recentWorkspacePaths: string[]
-  lastOpenedFilePath: string | null
   restoreLastWorkspaceOnLaunch: boolean
-  expandedFolderPaths: string[]
   messagePipeline?: MessagePipelineConfig
+}
+
+export interface WorkspaceState {
+  lastOpenedFilePath: string | null
+  expandedFolderPaths: string[]
 }
 
 export interface ProviderConfig {
@@ -67,7 +70,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   recentFilesMax: 10,
   lastWorkspacePath: null,
   recentWorkspacePaths: [],
-  lastOpenedFilePath: null,
   restoreLastWorkspaceOnLaunch: true,
-  expandedFolderPaths: [],
 }
