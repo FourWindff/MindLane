@@ -17,5 +17,6 @@ export interface WorkspaceSessionState {
   workspacePath: string | null
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
+  expandedFolderPaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
 }

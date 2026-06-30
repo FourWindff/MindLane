@@ -177,8 +177,17 @@ contextBridge.exposeInMainWorld('mindlane', {
         workspacePath: string | null
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
+        expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>,
+    updateState: (payload: {
+      workspacePath: string
+      expandedFolderPaths?: string[]
+      lastOpenedFilePath?: string | null
+    }) =>
+      ipcRenderer.invoke('workspace:update-state', payload) as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
     switchDirectory: (payload: { workspacePath: string }) =>
       ipcRenderer.invoke('workspace:switch', payload) as Promise<
         | { ok: true; data: { workspacePath: string; files: WorkspaceFileEntry[] } }

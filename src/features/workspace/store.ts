@@ -72,8 +72,13 @@ function collectAllFolderPaths(entries: WorkspaceTreeEntry[]): string[] {
   return result
 }
 
-function saveExpandedFolders(folders: Set<string>) {
-  void window.mindlane?.settings.update({ expandedFolderPaths: [...folders] })
+async function saveExpandedFolders(folders: Set<string>) {
+  const workspacePath = useWorkspaceStore.getState().workspacePath
+  if (!workspacePath) return
+  await window.mindlane?.workspace.updateState?.({
+    workspacePath,
+    expandedFolderPaths: [...folders],
+  })
 }
 
 function updateWorkspaceState(
@@ -232,12 +237,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       await applySessionState(session, { clearMindmapWhenEmpty: true })
 
-      const settings = await window.mindlane?.settings.load()
-      if (settings?.expandedFolderPaths?.length) {
+      if (session.expandedFolderPaths.length) {
         const tree = get().tree
         const validPaths = new Set(collectAllFolderPaths(tree))
         const restored = new Set(
-          settings.expandedFolderPaths.filter((p: string) => validPaths.has(p)),
+          session.expandedFolderPaths.filter((p: string) => validPaths.has(p)),
         )
         set({ expandedFolders: restored })
       }
@@ -289,6 +293,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath: result.data.workspacePath,
         recentWorkspacePaths: [result.data.workspacePath],
         lastOpenedFilePath: null,
+        expandedFolderPaths: [],
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
@@ -326,6 +331,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath: result.data.workspacePath,
         recentWorkspacePaths: [result.data.workspacePath],
         lastOpenedFilePath: null,
+        expandedFolderPaths: [],
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
@@ -361,6 +367,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath: result.data.workspacePath,
         recentWorkspacePaths: [result.data.workspacePath],
         lastOpenedFilePath: null,
+        expandedFolderPaths: [],
         restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
       }
       const tree = await listWorkspaceTree(sessionData.workspacePath)
@@ -435,6 +442,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
             workspacePath,
             recentWorkspacePaths: [workspacePath],
             lastOpenedFilePath: result.data.filePath,
+            expandedFolderPaths: [],
             restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
           },
           files,
@@ -482,6 +490,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       workspacePath: currentWorkspacePath ?? dirname(filePath),
       recentWorkspacePaths: [currentWorkspacePath ?? dirname(filePath)],
       lastOpenedFilePath: filePath,
+      expandedFolderPaths: [],
       restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
     }
     if (currentWorkspacePath && fallbackSession.workspacePath !== currentWorkspacePath) {

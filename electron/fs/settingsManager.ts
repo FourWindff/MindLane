@@ -71,10 +71,8 @@ export class SettingsManager {
       recentFilesMax: partial.recentFilesMax ?? DEFAULT_SETTINGS.recentFilesMax,
       lastWorkspacePath: partial.lastWorkspacePath ?? DEFAULT_SETTINGS.lastWorkspacePath,
       recentWorkspacePaths: partial.recentWorkspacePaths ?? DEFAULT_SETTINGS.recentWorkspacePaths,
-      lastOpenedFilePath: partial.lastOpenedFilePath ?? DEFAULT_SETTINGS.lastOpenedFilePath,
       restoreLastWorkspaceOnLaunch:
         partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
-      expandedFolderPaths: partial.expandedFolderPaths ?? DEFAULT_SETTINGS.expandedFolderPaths,
       messagePipeline: partial.messagePipeline,
     }
   }
