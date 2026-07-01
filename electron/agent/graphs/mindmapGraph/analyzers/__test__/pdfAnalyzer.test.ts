@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PdfInputAnalyzer, chunkPages } from '../pdfLoader.js'
+import { PdfInputAnalyzer, chunkPages } from '../pdfAnalyzer.js'
 
 describe('PdfInputAnalyzer', () => {
   it('supports pdf type', () => {

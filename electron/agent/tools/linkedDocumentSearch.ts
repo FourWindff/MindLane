@@ -4,7 +4,7 @@ import { z } from 'zod/v3'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { DocumentRef } from '../../../src/shared/lib/fileFormat.js'
 import type { CacheManager } from '../../fs/cacheManager.js'
-import { PdfInputAnalyzer } from '../graphs/mindmapGraph/loaders/pdfLoader.js'
+import { PdfInputAnalyzer } from '../graphs/mindmapGraph/analyzers/pdfAnalyzer.js'
 
 const DEFAULT_LIMIT = 5
 const MAX_LIMIT = 10

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findInputAnalyzer, TextInputAnalyzer } from '../textLoader.js'
+import { findInputAnalyzer, TextInputAnalyzer } from '../textAnalyzer.js'
 import { MindmapInputAnalyzer } from '../types.js'
 
 describe('TextInputAnalyzer', () => {

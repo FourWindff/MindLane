@@ -3,10 +3,10 @@ import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
-import { MindmapInputAnalyzer } from '../loaders/types.js'
-import type { DocumentChunk, MindmapInputSource } from '../loaders/types.js'
+import { MindmapInputAnalyzer } from '../analyzers/types.js'
+import type { DocumentChunk, MindmapInputSource } from '../analyzers/types.js'
 
-vi.mock('../loaders/pdfLoader.js', () => ({
+vi.mock('../analyzers/pdfAnalyzer.js', () => ({
   PdfInputAnalyzer: class {
     supports(source: { type: string }) {
       return source.type === 'pdf'
