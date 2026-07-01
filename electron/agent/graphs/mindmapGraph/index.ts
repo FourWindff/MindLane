@@ -25,6 +25,24 @@ const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
 
+function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
+  return {
+    response: '',
+    error: '',
+    mindmapYaml: '',
+    mindmapTitle: '',
+    documentChunks: [],
+    leafCursor: 0,
+    pendingLeafRange: null,
+    leafResults: [],
+    mergeInputs: [],
+    partialMergedTrees: [],
+    mergeResults: [],
+    pendingMergeGroups: [],
+    finalTree: null,
+  }
+}
+
 function createDefaultLoaders(): MindmapDocumentLoader[] {
   return [
     new TextDocumentLoader(),
@@ -135,9 +153,11 @@ async function loadDocumentNode(
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
   const source = state.mindmapInputSource
+  const reset = createMindmapRunReset()
 
   if (!source) {
     return {
+      ...reset,
       error: '请提供输入来源。',
       response: '请提供输入来源。',
     }
@@ -146,6 +166,7 @@ async function loadDocumentNode(
   const loader = findDocumentLoader(options.loaders ?? createDefaultLoaders(), source)
   if (!loader) {
     return {
+      ...reset,
       error: `不支持的输入类型: ${source.type}`,
       response: `不支持的输入类型: ${source.type}`,
     }
@@ -156,6 +177,7 @@ async function loadDocumentNode(
 
     if (loaded.chunks.length === 0) {
       return {
+        ...reset,
         error: '文档未能提取出任何文本内容。',
         response: '文档未能提取出任何文本内容。',
       }
@@ -170,6 +192,7 @@ async function loadDocumentNode(
     }
 
     return {
+      ...reset,
       documentChunks: loaded.chunks,
       leafCursor: 0,
       pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, loaded.chunks.length) },
@@ -178,6 +201,7 @@ async function loadDocumentNode(
   } catch (error) {
     const formatted = formatAgentError(error)
     return {
+      ...reset,
       error: formatted,
       response: `加载文档失败：${formatted.split('\n')[0]}`,
     }
@@ -221,7 +245,7 @@ async function leafExtractNode(
       : firstChunk?.id ?? `chunk-${range.start + 1}`
 
     return {
-      leafResults: [{
+      leafResults: [...state.leafResults, {
         chunkIndex: range.start,
         chunkId,
         tree,

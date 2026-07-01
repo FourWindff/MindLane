@@ -310,6 +310,59 @@ URL Root:
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
   })
 
+  it('clears stale mindmap run state before generating a new mindmap', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: `
+Fresh Root:
+  - Fresh Child
+`,
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: 'stale response',
+      error: 'stale error',
+      mindmapInputSource: { type: 'text', content: 'fresh text' },
+      mindmapInputTitle: 'Fresh Root',
+      mindmapYaml: 'Stale Root:\n  - Stale Child\n',
+      mindmapTitle: 'Stale Root',
+      documentChunks: [{
+        id: 'stale-chunk',
+        index: 0,
+        startPage: 0,
+        endPage: 0,
+        text: 'stale text',
+      }],
+      leafCursor: 99,
+      pendingLeafRange: { start: 10, end: 20 },
+      leafResults: [{ chunkIndex: 0, chunkId: 'stale-chunk', tree: { label: 'Stale Leaf' } }],
+      mergeInputs: [{ label: 'Stale Merge Input' }],
+      partialMergedTrees: [{ label: 'Stale Partial' }],
+      mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge' } }],
+      pendingMergeGroups: [{ groupIndex: 0, trees: [{ label: 'Stale Group' }] }],
+      finalTree: { label: 'Stale Final' },
+      documentRef: null,
+    })
+
+    expect(result.error).toBe('')
+    expect(result.mindmapYaml).toContain('Fresh Root')
+    expect(result.mindmapYaml).not.toContain('Stale Root')
+    expect(result.mindmapTitle).toBe('Fresh Root')
+    expect(result.leafResults).toHaveLength(0)
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+  })
+
   it('includes stack trace in state.error when generation fails', async () => {
     const mockProvider = {
       reasoningModel: {

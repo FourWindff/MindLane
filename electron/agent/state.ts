@@ -186,7 +186,7 @@ const MindmapStateAnnotations = {
     default: () => null,
   }),
   leafResults: Annotation<Array<{ chunkIndex: number; chunkId: string; tree: unknown }>>({
-    reducer: (prev, next) => [...prev, ...next],
+    reducer: replaceReducer,
     default: () => [],
   }),
   mergeInputs: Annotation<unknown[]>({
