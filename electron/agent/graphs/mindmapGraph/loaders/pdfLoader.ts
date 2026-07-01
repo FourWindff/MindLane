@@ -56,15 +56,6 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
   }
 }
 
-export class PdfDocumentLoader extends PdfInputAnalyzer {
-  async load(path: string): Promise<DocumentPage[]>
-  async load(source: MindmapInputSource): Promise<DocumentPage[]>
-  async load(input: string | MindmapInputSource): Promise<DocumentPage[]> {
-    const path = typeof input === 'string' ? input : this.resolveInput(input)
-    return super.load(path)
-  }
-}
-
 export function chunkPages(
   pages: DocumentPage[],
   chunkCharLimit: number,

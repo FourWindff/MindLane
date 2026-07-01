@@ -4,7 +4,7 @@ import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 import { MindmapInputAnalyzer } from '../loaders/types.js'
-import type { DocumentChunk, MindmapDocumentLoader, MindmapInputSource } from '../loaders/types.js'
+import type { DocumentChunk, MindmapInputSource } from '../loaders/types.js'
 
 vi.mock('../loaders/pdfLoader.js', () => ({
   PdfInputAnalyzer: class {
@@ -658,14 +658,10 @@ Merged Root:
       endPage: index + 1,
       text: `chunk ${index + 1} ${'body '.repeat(50)}`,
     }))
-    const customLoader: MindmapDocumentLoader = {
-      type: 'text',
-      supports: (source) => source.type === 'text',
-      loadDocument: vi.fn().mockResolvedValue({
-        text: chunks.map((chunk) => chunk.text).join('\n\n'),
-        chunks,
-      }),
-    }
+    const customAnalyzer = new TestInputAnalyzer('text', {
+      text: chunks.map((chunk) => chunk.text).join('\n\n'),
+      chunks,
+    })
     const events: string[] = []
     const mockProvider = {
       reasoningModel: {
@@ -694,7 +690,7 @@ Leaf ${events.length}:
 
     const graph = buildMindmapSubgraph({
       provider: mockProvider,
-      loaders: [customLoader],
+      analyzers: [customAnalyzer],
     })
     const app = graph.compile()
 

@@ -1,5 +1,5 @@
 import { MindmapInputAnalyzer } from './types.js'
-import type { LoadedDocument, MindmapDocumentLoader, MindmapInputSource } from './types.js'
+import type { LoadedDocument, MindmapInputSource } from './types.js'
 
 const TEXT_CHUNK_CHAR_LIMIT = 4000
 
@@ -27,8 +27,6 @@ export class TextInputAnalyzer extends MindmapInputAnalyzer<string, string> {
   }
 }
 
-export { TextInputAnalyzer as TextDocumentLoader }
-
 export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
   const normalizedLimit = Math.max(1000, chunkCharLimit)
   const chunks: LoadedDocument['chunks'] = []
@@ -49,15 +47,8 @@ export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT):
 }
 
 export function findInputAnalyzer(
-  analyzers: MindmapDocumentLoader[],
+  analyzers: MindmapInputAnalyzer<unknown, unknown>[],
   source: MindmapInputSource,
-): MindmapDocumentLoader | null {
+): MindmapInputAnalyzer<unknown, unknown> | null {
   return analyzers.find((analyzer) => analyzer.supports(source)) ?? null
-}
-
-export function findDocumentLoader(
-  loaders: MindmapDocumentLoader[],
-  source: MindmapInputSource,
-): MindmapDocumentLoader | null {
-  return loaders.find((loader) => loader.supports(source)) ?? null
 }

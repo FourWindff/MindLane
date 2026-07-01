@@ -6,7 +6,7 @@ import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlM
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
 import { PdfInputAnalyzer } from './loaders/pdfLoader.js'
 import { TextInputAnalyzer, findInputAnalyzer } from './loaders/textLoader.js'
-import type { MindmapDocumentLoader, MindmapInputAnalyzer } from './loaders/types.js'
+import type { MindmapInputAnalyzer } from './loaders/types.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
 
@@ -16,7 +16,6 @@ interface MindmapSubgraphOptions {
   provider: LLMProvider
   cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
   analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
-  loaders?: MindmapDocumentLoader[]
 }
 
 const LEAF_BATCH_SIZE = 5
@@ -164,7 +163,7 @@ async function loadDocumentNode(
     }
   }
 
-  const analyzer = findInputAnalyzer(options.analyzers ?? options.loaders ?? createDefaultAnalyzers(), source)
+  const analyzer = findInputAnalyzer(options.analyzers ?? createDefaultAnalyzers(), source)
   if (!analyzer) {
     return {
       ...reset,

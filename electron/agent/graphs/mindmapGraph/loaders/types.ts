@@ -36,9 +36,3 @@ export abstract class MindmapInputAnalyzer<TInput, TRaw> {
   protected abstract getText(raw: TRaw): string
   protected abstract chunk(raw: TRaw): DocumentChunk[]
 }
-
-export interface MindmapDocumentLoader {
-  type: string
-  supports(source: MindmapInputSource): boolean
-  loadDocument(source: MindmapInputSource): Promise<LoadedDocument>
-}
