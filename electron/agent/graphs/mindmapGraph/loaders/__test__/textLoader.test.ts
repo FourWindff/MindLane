@@ -1,16 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { findDocumentLoader, TextDocumentLoader } from '../textLoader.js'
+import { findInputAnalyzer, TextInputAnalyzer } from '../textLoader.js'
+import { MindmapInputAnalyzer } from '../types.js'
 
-describe('TextDocumentLoader', () => {
+describe('TextInputAnalyzer', () => {
   it('loads text input into a document chunk', async () => {
-    const loader = new TextDocumentLoader()
-    const document = await loader.loadDocument({
+    const analyzer = new TextInputAnalyzer()
+    const document = await analyzer.loadDocument({
       type: 'text',
       content: 'plain text document',
     })
 
-    expect(loader.supports({ type: 'text', content: 'plain text document' })).toBe(true)
-    expect(loader.supports({ type: 'pdf', path: '/tmp/test.pdf' })).toBe(false)
+    expect(analyzer.supports({ type: 'text', content: 'plain text document' })).toBe(true)
+    expect(analyzer.supports({ type: 'pdf', path: '/tmp/test.pdf' })).toBe(false)
+    await expect(analyzer.load('plain text document')).resolves.toBe('plain text document')
     expect(document.text).toBe('plain text document')
     expect(document.chunks).toEqual([{
       id: 'chunk-1',
@@ -22,10 +24,10 @@ describe('TextDocumentLoader', () => {
   })
 
   it('splits long text input into bounded chunks', async () => {
-    const loader = new TextDocumentLoader()
+    const analyzer = new TextInputAnalyzer()
     const text = `${'a'.repeat(3990)}\n\n${'b'.repeat(3990)}\n\n${'c'.repeat(3990)}`
 
-    const document = await loader.loadDocument({
+    const document = await analyzer.loadDocument({
       type: 'text',
       content: text,
     })
@@ -39,10 +41,10 @@ describe('TextDocumentLoader', () => {
   })
 
   it('preserves whitespace-only spans while chunking text input', async () => {
-    const loader = new TextDocumentLoader()
+    const analyzer = new TextInputAnalyzer()
     const text = `${'a'.repeat(4000)}${' '.repeat(4000)}end`
 
-    const document = await loader.loadDocument({
+    const document = await analyzer.loadDocument({
       type: 'text',
       content: text,
     })
@@ -51,15 +53,34 @@ describe('TextDocumentLoader', () => {
     expect(document.chunks.map((chunk) => chunk.text).join('')).toBe(text)
   })
 
-  it('finds a loader by source support', () => {
-    const textLoader = new TextDocumentLoader()
-    const loaders = [{
-      type: 'custom',
-      supports: () => false,
-      loadDocument: async () => ({ text: '', chunks: [] }),
-    }, textLoader]
+  it('finds an analyzer by source support', () => {
+    const textAnalyzer = new TextInputAnalyzer()
+    class UnsupportedUrlAnalyzer extends MindmapInputAnalyzer<unknown, unknown> {
+      readonly type = 'url' as const
 
-    expect(findDocumentLoader(loaders, { type: 'text', content: 'hello' })).toBe(textLoader)
-    expect(findDocumentLoader(loaders, { type: 'url', url: 'https://example.test' })).toBeNull()
+      supports(): boolean {
+        return false
+      }
+
+      protected resolveInput(): unknown {
+        return null
+      }
+
+      async load(): Promise<unknown> {
+        return ''
+      }
+
+      protected getText(): string {
+        return ''
+      }
+
+      protected chunk(): [] {
+        return []
+      }
+    }
+    const analyzers: MindmapInputAnalyzer<unknown, unknown>[] = [new UnsupportedUrlAnalyzer(), textAnalyzer]
+
+    expect(findInputAnalyzer(analyzers, { type: 'text', content: 'hello' })).toBe(textAnalyzer)
+    expect(findInputAnalyzer(analyzers, { type: 'url', url: 'https://example.test' })).toBeNull()
   })
 })

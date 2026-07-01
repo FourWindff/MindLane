@@ -1,26 +1,33 @@
+import { MindmapInputAnalyzer } from './types.js'
 import type { LoadedDocument, MindmapDocumentLoader, MindmapInputSource } from './types.js'
 
 const TEXT_CHUNK_CHAR_LIMIT = 4000
 
-export class TextDocumentLoader implements MindmapDocumentLoader {
-  readonly type = 'text'
+export class TextInputAnalyzer extends MindmapInputAnalyzer<string, string> {
+  readonly type = 'text' as const
 
-  supports(source: MindmapInputSource): boolean {
-    return source.type === this.type
+  protected resolveInput(source: MindmapInputSource): string {
+    return source.content ?? ''
   }
 
-  async loadDocument(source: MindmapInputSource): Promise<LoadedDocument> {
-    const text = source.content ?? ''
-    if (!text.trim()) {
+  async load(content: string): Promise<string> {
+    if (!content.trim()) {
       throw new Error('文本输入内容为空。')
     }
 
-    return {
-      text,
-      chunks: chunkText(text),
-    }
+    return content
+  }
+
+  protected getText(raw: string): string {
+    return raw
+  }
+
+  protected chunk(raw: string): LoadedDocument['chunks'] {
+    return chunkText(raw)
   }
 }
+
+export { TextInputAnalyzer as TextDocumentLoader }
 
 export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
   const normalizedLimit = Math.max(1000, chunkCharLimit)
@@ -39,6 +46,13 @@ export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT):
   }
 
   return chunks
+}
+
+export function findInputAnalyzer(
+  analyzers: MindmapInputAnalyzer<unknown, unknown>[],
+  source: MindmapInputSource,
+): MindmapInputAnalyzer<unknown, unknown> | null {
+  return analyzers.find((analyzer) => analyzer.supports(source)) ?? null
 }
 
 export function findDocumentLoader(
