@@ -1,5 +1,7 @@
 import type { LoadedDocument, MindmapDocumentLoader, MindmapInputSource } from './types.js'
 
+const TEXT_CHUNK_CHAR_LIMIT = 4000
+
 export class TextDocumentLoader implements MindmapDocumentLoader {
   readonly type = 'text'
 
@@ -15,15 +17,28 @@ export class TextDocumentLoader implements MindmapDocumentLoader {
 
     return {
       text,
-      chunks: [{
-        id: 'chunk-1',
-        index: 0,
-        startPage: 0,
-        endPage: 0,
-        text,
-      }],
+      chunks: chunkText(text),
     }
   }
+}
+
+export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
+  const normalizedLimit = Math.max(1000, chunkCharLimit)
+  const chunks: LoadedDocument['chunks'] = []
+
+  for (let offset = 0; offset < text.length; offset += normalizedLimit) {
+    const chunk = text.slice(offset, offset + normalizedLimit)
+
+    chunks.push({
+      id: `chunk-${chunks.length + 1}`,
+      index: chunks.length,
+      startPage: 0,
+      endPage: 0,
+      text: chunk,
+    })
+  }
+
+  return chunks
 }
 
 export function findDocumentLoader(

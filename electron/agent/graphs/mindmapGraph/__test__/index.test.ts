@@ -186,15 +186,21 @@ Short PDF:
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
   })
 
-  it('routes long text through chunk extraction instead of truncating it', async () => {
+  it('routes long text through multiple chunk extraction batches instead of truncating it', async () => {
     const importantTail = 'TAIL_MARKER'
-    const longText = `${'intro '.repeat(1400)}${importantTail}`
+    const longText = `${'intro '.repeat(4200)}${importantTail}`
     const mockProvider = {
       reasoningModel: {
         invoke: vi.fn()
           .mockResolvedValueOnce({
             content: `
-Leaf Long Text:
+Leaf Long Text 1:
+  - First Batch
+`,
+          })
+          .mockResolvedValueOnce({
+            content: `
+Leaf Long Text 2:
   - Preserved Tail
 `,
           })
@@ -237,12 +243,16 @@ Merged Long Text:
     const firstPrompt = String(
       (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]?.content ?? '',
     )
+    const secondPrompt = String(
+      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[1]?.[0]?.[1]?.content ?? '',
+    )
 
     expect(result.error).toBe('')
-    expect(result.leafResults).toHaveLength(1)
+    expect(result.leafResults).toHaveLength(2)
     expect(result.mindmapYaml).toContain('Merged Long Text')
-    expect(firstPrompt).toContain(importantTail)
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
+    expect(firstPrompt).not.toContain(importantTail)
+    expect(secondPrompt).toContain(importantTail)
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
   })
 
   it('loads documents through an injected loader registry', async () => {

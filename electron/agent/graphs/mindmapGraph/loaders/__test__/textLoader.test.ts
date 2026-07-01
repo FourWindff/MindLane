@@ -21,6 +21,36 @@ describe('TextDocumentLoader', () => {
     }])
   })
 
+  it('splits long text input into bounded chunks', async () => {
+    const loader = new TextDocumentLoader()
+    const text = `${'a'.repeat(3990)}\n\n${'b'.repeat(3990)}\n\n${'c'.repeat(3990)}`
+
+    const document = await loader.loadDocument({
+      type: 'text',
+      content: text,
+    })
+
+    expect(document.text).toBe(text)
+    expect(document.chunks.length).toBeGreaterThan(1)
+    expect(document.chunks.every((chunk) => chunk.text.length <= 4000)).toBe(true)
+    expect(document.chunks.map((chunk) => chunk.id)).toEqual(['chunk-1', 'chunk-2', 'chunk-3'])
+    expect(document.chunks.map((chunk) => chunk.index)).toEqual([0, 1, 2])
+    expect(document.chunks.map((chunk) => chunk.text).join('')).toBe(text)
+  })
+
+  it('preserves whitespace-only spans while chunking text input', async () => {
+    const loader = new TextDocumentLoader()
+    const text = `${'a'.repeat(4000)}${' '.repeat(4000)}end`
+
+    const document = await loader.loadDocument({
+      type: 'text',
+      content: text,
+    })
+
+    expect(document.chunks.length).toBeGreaterThan(1)
+    expect(document.chunks.map((chunk) => chunk.text).join('')).toBe(text)
+  })
+
   it('finds a loader by source support', () => {
     const textLoader = new TextDocumentLoader()
     const loaders = [{
@@ -33,4 +63,3 @@ describe('TextDocumentLoader', () => {
     expect(findDocumentLoader(loaders, { type: 'url', url: 'https://example.test' })).toBeNull()
   })
 })
-
