@@ -4,7 +4,7 @@ import { z } from 'zod/v3'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { DocumentRef } from '../../../src/shared/lib/fileFormat.js'
 import type { CacheManager } from '../../fs/cacheManager.js'
-import { PdfDocumentLoader } from '../graphs/mindmapGraph/loaders/pdfLoader.js'
+import { PdfInputAnalyzer } from '../graphs/mindmapGraph/loaders/pdfLoader.js'
 
 const DEFAULT_LIMIT = 5
 const MAX_LIMIT = 10
@@ -57,8 +57,8 @@ async function loadDocumentText(
   const originalPath = getOriginalPath(doc)
   if (!originalPath || !(await pathExists(originalPath))) return null
 
-  const loader = new PdfDocumentLoader()
-  const pages = await loader.load({ type: 'pdf', path: originalPath })
+  const analyzer = new PdfInputAnalyzer()
+  const pages = await analyzer.load(originalPath)
   const text = pages.map((page) => page.text).join('\n\n')
   if (!text.trim()) return null
 
