@@ -7,7 +7,13 @@ import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 vi.mock('../loaders/pdfLoader.js', () => ({
   PdfDocumentLoader: class {
     async load() {
-      return [{ pageNumber: 1, text: 'PDF text' }]
+      return [
+        { pageNumber: 1, text: 'PDF text 1' },
+        { pageNumber: 2, text: 'PDF text 2' },
+        { pageNumber: 3, text: 'PDF text 3' },
+        { pageNumber: 4, text: 'PDF text 4' },
+        { pageNumber: 5, text: 'PDF text 5' },
+      ]
     }
   },
   chunkPages: (pages: Array<{ pageNumber: number; text: string }>) => pages.map((page, index) => ({
@@ -288,6 +294,64 @@ Merged Root:
     expect(result.mindmapYaml).toContain('Merged Root')
     expect(result.pendingSubgraph).toBeNull()
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
+  })
+
+  it('stores one analysis result for a multi-chunk leaf batch', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn()
+          .mockResolvedValueOnce({
+            content: `
+Leaf Batch:
+  - Leaf A
+  - Leaf B
+`,
+          })
+          .mockResolvedValue({
+            content: `
+Merged Root:
+  - Leaf A
+  - Leaf B
+`,
+          }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'pdf', path: '/tmp/test.pdf' },
+      mindmapInputTitle: 'PDF Root',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    expect(result.error).toBe('')
+    expect(result.leafResults).toHaveLength(1)
+    expect(result.leafResults[0]).toMatchObject({
+      chunkIndex: 0,
+      chunkId: 'chunk-1..chunk-5',
+    })
+    expect(result.mergeInputs).toHaveLength(0)
+    expect(result.mindmapYaml).toContain('Merged Root')
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
   })
 
   it('retries merge before storing merge results', async () => {

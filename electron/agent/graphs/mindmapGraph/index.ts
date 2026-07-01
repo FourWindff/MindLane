@@ -231,14 +231,18 @@ async function leafExtractNode(
       `Chunk ${range.start + 1}`,
     )
 
-    const newResults = chunks.map((chunk, idx) => ({
-      chunkIndex: range.start + idx,
-      chunkId: chunk.id,
-      tree,
-    }))
+    const firstChunk = chunks[0]
+    const lastChunk = chunks[chunks.length - 1]
+    const chunkId = firstChunk && lastChunk && firstChunk.id !== lastChunk.id
+      ? `${firstChunk.id}..${lastChunk.id}`
+      : firstChunk?.id ?? `chunk-${range.start + 1}`
 
     return {
-      leafResults: newResults,
+      leafResults: [{
+        chunkIndex: range.start,
+        chunkId,
+        tree,
+      }],
       leafCursor: range.end,
     }
   } catch (error) {
