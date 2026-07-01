@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { AppSettings, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
+import { coerceLastOpenedFilePath, coerceExpandedFolderPaths } from './workspaceStateManager.js'
 
 export class SettingsManager {
   private filePath: string
@@ -71,15 +72,11 @@ export class SettingsManager {
     let hasLegacy = false
 
     if ('lastOpenedFilePath' in raw) {
-      const value = raw.lastOpenedFilePath
-      migrated.lastOpenedFilePath = typeof value === 'string' ? value : null
+      migrated.lastOpenedFilePath = coerceLastOpenedFilePath(raw.lastOpenedFilePath)
       hasLegacy = true
     }
     if ('expandedFolderPaths' in raw) {
-      const value = raw.expandedFolderPaths
-      migrated.expandedFolderPaths = Array.isArray(value)
-        ? value.filter((p): p is string => typeof p === 'string')
-        : []
+      migrated.expandedFolderPaths = coerceExpandedFolderPaths(raw.expandedFolderPaths)
       hasLegacy = true
     }
 

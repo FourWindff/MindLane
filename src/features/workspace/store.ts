@@ -96,6 +96,19 @@ function updateWorkspaceState(
   }
 }
 
+function makeFallbackSession(
+  workspacePath: string,
+  lastOpenedFilePath: string | null,
+): WorkspaceSessionState {
+  return {
+    workspacePath,
+    recentWorkspacePaths: [workspacePath],
+    lastOpenedFilePath,
+    expandedFolderPaths: [],
+    restoreLastWorkspaceOnLaunch: useWorkspaceStore.getState().restoreLastWorkspaceOnLaunch,
+  }
+}
+
 async function loadSessionFromBackend(): Promise<WorkspaceSessionState | null> {
   const api = window.mindlane?.workspace
   if (!api) return null
@@ -289,13 +302,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
-      const sessionData = session ?? {
-        workspacePath: result.data.workspacePath,
-        recentWorkspacePaths: [result.data.workspacePath],
-        lastOpenedFilePath: null,
-        expandedFolderPaths: [],
-        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-      }
+      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
       const tree = await listWorkspaceTree(sessionData.workspacePath)
       const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
@@ -327,13 +334,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
-      const sessionData = session ?? {
-        workspacePath: result.data.workspacePath,
-        recentWorkspacePaths: [result.data.workspacePath],
-        lastOpenedFilePath: null,
-        expandedFolderPaths: [],
-        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-      }
+      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
       const tree = await listWorkspaceTree(sessionData.workspacePath)
       const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
@@ -363,13 +364,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const session = await loadSessionFromBackend()
-      const sessionData = session ?? {
-        workspacePath: result.data.workspacePath,
-        recentWorkspacePaths: [result.data.workspacePath],
-        lastOpenedFilePath: null,
-        expandedFolderPaths: [],
-        restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-      }
+      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
       const tree = await listWorkspaceTree(sessionData.workspacePath)
       const emptyExpanded = new Set<string>()
       useWorkspaceStore.setState({
@@ -438,13 +433,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       const tree = await listWorkspaceTree(workspacePath)
       set({
         ...updateWorkspaceState(
-          session ?? {
-            workspacePath,
-            recentWorkspacePaths: [workspacePath],
-            lastOpenedFilePath: result.data.filePath,
-            expandedFolderPaths: [],
-            restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-          },
+          session ?? makeFallbackSession(workspacePath, result.data.filePath),
           files,
         ),
         tree,
@@ -486,13 +475,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   syncAfterFileSaved: async (filePath: string) => {
     const currentWorkspacePath = get().workspacePath
     const session = await loadSessionFromBackend()
-    const fallbackSession: WorkspaceSessionState = session ?? {
-      workspacePath: currentWorkspacePath ?? dirname(filePath),
-      recentWorkspacePaths: [currentWorkspacePath ?? dirname(filePath)],
-      lastOpenedFilePath: filePath,
-      expandedFolderPaths: [],
-      restoreLastWorkspaceOnLaunch: get().restoreLastWorkspaceOnLaunch,
-    }
+    const fallbackSession: WorkspaceSessionState =
+      session ?? makeFallbackSession(currentWorkspacePath ?? dirname(filePath), filePath)
     if (currentWorkspacePath && fallbackSession.workspacePath !== currentWorkspacePath) {
       fallbackSession.workspacePath = currentWorkspacePath
     }

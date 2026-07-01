@@ -13,7 +13,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
-import { DEFAULT_WORKSPACE_STATE } from './fs/workspaceStateManager.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './agent/service.js'
@@ -163,10 +162,7 @@ async function getWorkspaceSession() {
     }
   }
 
-  const shouldPersistCleanup =
-    JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths)
-
-  if (shouldPersistCleanup) {
+  if (JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths)) {
     await fsService.settings.update({ recentWorkspacePaths })
   }
 
@@ -195,10 +191,7 @@ function resolveWorkspaceLastOpenedFilePath(
 }
 
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
-  return (
-    state.lastOpenedFilePath === DEFAULT_WORKSPACE_STATE.lastOpenedFilePath &&
-    JSON.stringify(state.expandedFolderPaths) === JSON.stringify(DEFAULT_WORKSPACE_STATE.expandedFolderPaths)
-  )
+  return state.lastOpenedFilePath === null && state.expandedFolderPaths.length === 0
 }
 
 function setupApplicationMenu() {

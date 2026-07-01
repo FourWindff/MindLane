@@ -11,6 +11,16 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   expandedFolderPaths: [],
 }
 
+/** Coerce an untrusted value into a valid `lastOpenedFilePath` (string or null). */
+export function coerceLastOpenedFilePath(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+/** Coerce an untrusted value into a valid `expandedFolderPaths` (array of strings). */
+export function coerceExpandedFolderPaths(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((p): p is string => typeof p === 'string') : []
+}
+
 export class WorkspaceStateManager {
   private cache = new Map<string, WorkspaceState>()
   private writeQueue = new Map<string, Promise<void>>()
@@ -36,15 +46,8 @@ export class WorkspaceStateManager {
         const raw = await fs.promises.readFile(statePath, 'utf-8')
         const parsed = JSON.parse(raw) as Partial<WorkspaceState>
         const merged: WorkspaceState = {
-          lastOpenedFilePath:
-            typeof parsed.lastOpenedFilePath === 'string'
-              ? parsed.lastOpenedFilePath
-              : parsed.lastOpenedFilePath === null
-                ? null
-                : DEFAULT_WORKSPACE_STATE.lastOpenedFilePath,
-          expandedFolderPaths: Array.isArray(parsed.expandedFolderPaths)
-            ? parsed.expandedFolderPaths.filter((p): p is string => typeof p === 'string')
-            : DEFAULT_WORKSPACE_STATE.expandedFolderPaths,
+          lastOpenedFilePath: coerceLastOpenedFilePath(parsed.lastOpenedFilePath),
+          expandedFolderPaths: coerceExpandedFolderPaths(parsed.expandedFolderPaths),
         }
         this.cache.set(workspacePath, merged)
         return { ...merged }
@@ -73,9 +76,5 @@ export class WorkspaceStateManager {
         this.writeQueue.delete(workspacePath)
       }
     }
-  }
-
-  invalidateCache(workspacePath: string): void {
-    this.cache.delete(workspacePath)
   }
 }
