@@ -36,6 +36,7 @@ import {
   createInitialEdges,
   createInitialNodes,
   findParentId,
+  findRootNode,
   getChildIdsOrdered,
   newId,
   reflowChildren,
@@ -421,6 +422,25 @@ function MindMapCanvas({
     if (idx >= 0 && idx < siblings.length - 1) selectNode(siblings[idx + 1]!)
   }, [nodes, edges, selectedId, selectNode])
 
+  const centerRoot = useCallback(async () => {
+    const rootNode =
+      rf.getNode('root') ??
+      (() => {
+        const r = findRootNode(nodes, edges)
+        return r ? rf.getNode(r.id) : undefined
+      })()
+
+    if (!rootNode) return
+
+    const width = rootNode.measured?.width ?? 160
+    const height = rootNode.measured?.height ?? 40
+    const centerX = rootNode.position.x + width / 2
+    const centerY = rootNode.position.y + height / 2
+
+    await rf.setCenter(centerX, centerY, { zoom: 1, duration: 300 })
+    useMindmapStore.getState().setViewport(rf.getViewport())
+  }, [rf, nodes, edges])
+
   const canAddChild = hasSelection
 
   const canAddSibling = useMemo(() => {
@@ -457,6 +477,9 @@ function MindMapCanvas({
   )
   useShortcut(
     { id: 'mindmap.navDown', combo: 'arrowdown', description: '选中下方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateDown() } },
+  )
+  useShortcut(
+    { id: 'mindmap.centerRoot', combo: 'mod+0', description: '回到中心主题', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { centerRoot() } },
   )
 
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
@@ -703,6 +726,7 @@ function MindMapCanvas({
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
+        onCenterRoot={centerRoot}
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}

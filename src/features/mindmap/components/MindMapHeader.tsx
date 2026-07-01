@@ -6,6 +6,7 @@ import {
   Save,
   FolderInput,
   Settings,
+  Locate,
 } from 'lucide-react'
 
 type Props = {
@@ -16,6 +17,7 @@ type Props = {
   onOpenSettings?: () => void
   onSwitchWorkspace?: () => void
   onSave?: () => void
+  onCenterRoot?: () => void
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
@@ -60,6 +62,7 @@ export function MindMapHeader({
   onOpenSettings,
   onSwitchWorkspace,
   onSave,
+  onCenterRoot,
   canAddChild,
   canAddSibling,
   canRemove,
@@ -96,6 +99,14 @@ export function MindMapHeader({
           <div className="float-toolbar__divider" />
 
           <div className="float-toolbar__group float-toolbar__group--file">
+            {onCenterRoot && (
+              <ToolbarButton
+                onClick={onCenterRoot}
+                ariaLabel="回到中心主题"
+                tooltip="回到中心主题 (Ctrl+0)"
+                icon={<Locate size={22} strokeWidth={1.5} />}
+              />
+            )}
             {onSave && (
               <ToolbarButton
                 onClick={onSave}
