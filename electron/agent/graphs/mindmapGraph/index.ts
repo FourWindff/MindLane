@@ -18,6 +18,7 @@ interface MindmapSubgraphOptions {
 const LEAF_BATCH_SIZE = 5
 const MERGE_GROUP_SIZE = 8
 const CHUNK_CHAR_LIMIT = 4000
+const SINGLE_PASS_CHAR_LIMIT = 8000
 const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
@@ -401,21 +402,15 @@ async function buildOutputNode(
   }
 }
 
-// ===== Text input fast path =====
+// ===== Single-pass extraction =====
 
-async function textInputExtractNode(
+async function singleExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const source = state.mindmapInputSource
   const title = state.mindmapInputTitle || '思维导图'
-
-  if (!source || source.type !== 'text') {
-    return {}
-  }
-
-  const content = source.content ?? ''
-  if (!content.trim()) {
+  const text = state.documentChunks.map((chunk) => chunk.text).join('\n\n')
+  if (!text.trim()) {
     return {
       error: '文本输入内容为空。',
       response: '文本输入内容为空。',
@@ -423,7 +418,6 @@ async function textInputExtractNode(
   }
 
   try {
-    const text = content.slice(0, 8000)
     const rootTree = await generateValidMindmapYaml(
       options.provider,
       buildExtractStructureMessages(text),
@@ -458,7 +452,8 @@ async function textInputExtractNode(
 
 function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string {
   if (state.error) return 'build_output'
-  if (state.mindmapInputSource?.type === 'text') return 'text_extract'
+  const totalChars = state.documentChunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
+  if (totalChars <= SINGLE_PASS_CHAR_LIMIT) return 'single_extract'
   return 'dispatch_leaf'
 }
 
@@ -486,10 +481,10 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  *
  * 流程:
  * START -> load_document
- *   - text input -> text_extract -> build_output -> END
- *   - pdf input  -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
- *                  -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
- *                  -> build_output -> END
+ *   - small document -> single_extract -> build_output -> END
+ *   - large document -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
+ *                     -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
+ *                     -> build_output -> END
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
@@ -501,20 +496,20 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     .addNode('merge_trees', (state) => mergeTreesNode(state, options))
     .addNode('collect_merge', (state) => collectMergeNode(state))
     .addNode('build_output', (state) => buildOutputNode(state))
-    .addNode('text_extract', (state) => textInputExtractNode(state, options))
+    .addNode('single_extract', (state) => singleExtractNode(state, options))
 
   // START -> load_document
   graph.addEdge(START, 'load_document')
 
-  // load_document branches based on input type
+  // load_document branches based on document size
   graph.addConditionalEdges('load_document', routeAfterLoadDocument, [
-    'text_extract',
+    'single_extract',
     'dispatch_leaf',
     'build_output',
   ])
 
-  // text fast path
-  graph.addEdge('text_extract', 'build_output')
+  // Single-pass path for small documents
+  graph.addEdge('single_extract', 'build_output')
 
   // PDF/document pipeline
   graph.addConditionalEdges('dispatch_leaf', routeAfterDispatchLeaf, [

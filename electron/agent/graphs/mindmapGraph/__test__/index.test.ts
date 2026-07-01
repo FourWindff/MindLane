@@ -6,13 +6,17 @@ import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 
 vi.mock('../loaders/pdfLoader.js', () => ({
   PdfDocumentLoader: class {
-    async load() {
+    async load(source: { path?: string }) {
+      if (source.path?.includes('short')) {
+        return [{ pageNumber: 1, text: 'Short PDF text' }]
+      }
+
       return [
-        { pageNumber: 1, text: 'PDF text 1' },
-        { pageNumber: 2, text: 'PDF text 2' },
-        { pageNumber: 3, text: 'PDF text 3' },
-        { pageNumber: 4, text: 'PDF text 4' },
-        { pageNumber: 5, text: 'PDF text 5' },
+        { pageNumber: 1, text: 'PDF text 1'.repeat(900) },
+        { pageNumber: 2, text: 'PDF text 2'.repeat(900) },
+        { pageNumber: 3, text: 'PDF text 3'.repeat(900) },
+        { pageNumber: 4, text: 'PDF text 4'.repeat(900) },
+        { pageNumber: 5, text: 'PDF text 5'.repeat(900) },
       ]
     }
   },
@@ -111,6 +115,109 @@ describe('mindmapGraph', () => {
     expect(result.pendingSubgraph).toBeNull()
     expect(result.error).toBe('')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses single-pass extraction for a short PDF', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: `
+Short PDF:
+  - Summary
+  - Detail
+`,
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'pdf', path: '/tmp/short.pdf' },
+      mindmapInputTitle: 'Short PDF',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    expect(result.error).toBe('')
+    expect(result.mindmapYaml).toContain('Short PDF')
+    expect(result.leafResults).toHaveLength(0)
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('routes long text through chunk extraction instead of truncating it', async () => {
+    const importantTail = 'TAIL_MARKER'
+    const longText = `${'intro '.repeat(1400)}${importantTail}`
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn()
+          .mockResolvedValueOnce({
+            content: `
+Leaf Long Text:
+  - Preserved Tail
+`,
+          })
+          .mockResolvedValue({
+            content: `
+Merged Long Text:
+  - Preserved Tail
+`,
+          }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({ provider: mockProvider })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'text', content: longText },
+      mindmapInputTitle: 'Long Text',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    const firstPrompt = String(
+      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]?.content ?? '',
+    )
+
+    expect(result.error).toBe('')
+    expect(result.leafResults).toHaveLength(1)
+    expect(result.mindmapYaml).toContain('Merged Long Text')
+    expect(firstPrompt).toContain(importantTail)
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
   })
 
   it('includes stack trace in state.error when generation fails', async () => {
