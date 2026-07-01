@@ -1,7 +1,7 @@
 import type { Node, Edge } from '@xyflow/react'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { nodeRegistry } from '@/features/mindmap/nodes'
-import { CHILD_OFFSET_X, CHILD_GAP_Y } from '@/shared/lib/mindmapTree'
+import { CHILD_OFFSET_X, CHILD_GAP_Y, reflowChildren } from '@/shared/lib/mindmapTree'
 import type { ChatToolCall } from '@/shared/lib/fileFormat'
 
 type ToolCallResult = ChatToolCall
@@ -158,15 +158,14 @@ export function handleMindmapToolCall(
         setTimeout(() => {
           const currentNodes = useMindmapStore.getState().nodes
           const currentEdges = useMindmapStore.getState().edges
+          const nextNodes = currentNodes.filter((n) => !idsToDelete.has(n.id))
+          const nextEdges = currentEdges.filter(
+            (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)
+          )
+          const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
 
-          useMindmapStore.getState().setNodes(
-            currentNodes.filter((n) => !idsToDelete.has(n.id))
-          )
-          useMindmapStore.getState().setEdges(
-            currentEdges.filter(
-              (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)
-            )
-          )
+          useMindmapStore.getState().setNodes(laidOut)
+          useMindmapStore.getState().setEdges(nextEdges)
         }, 300)
 
         return true
