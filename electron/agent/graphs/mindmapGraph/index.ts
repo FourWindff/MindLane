@@ -4,7 +4,9 @@ import { MindmapSubgraphState, type DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
-import { PdfDocumentLoader, chunkPages } from './loaders/pdfLoader.js'
+import { PdfDocumentLoader } from './loaders/pdfLoader.js'
+import { TextDocumentLoader, findDocumentLoader } from './loaders/textLoader.js'
+import type { MindmapDocumentLoader } from './loaders/types.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
 
@@ -13,15 +15,22 @@ import { extractRootTree } from './shared/rootTree.js'
 interface MindmapSubgraphOptions {
   provider: LLMProvider
   cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
+  loaders?: MindmapDocumentLoader[]
 }
 
 const LEAF_BATCH_SIZE = 5
 const MERGE_GROUP_SIZE = 8
-const CHUNK_CHAR_LIMIT = 4000
 const SINGLE_PASS_CHAR_LIMIT = 8000
 const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
+
+function createDefaultLoaders(): MindmapDocumentLoader[] {
+  return [
+    new TextDocumentLoader(),
+    new PdfDocumentLoader(),
+  ]
+}
 
 // ===== Prompt builders =====
 
@@ -134,71 +143,44 @@ async function loadDocumentNode(
     }
   }
 
-  // Text input: create a single chunk, skip PDF loading
-  if (source.type === 'text') {
-    const content = source.content ?? ''
-    if (!content.trim()) {
-      return {
-        error: '文本输入内容为空。',
-        response: '文本输入内容为空。',
-      }
-    }
-    const chunks = [{
-      id: 'chunk-1',
-      index: 0,
-      startPage: 0,
-      endPage: 0,
-      text: content,
-    }]
+  const loader = findDocumentLoader(options.loaders ?? createDefaultLoaders(), source)
+  if (!loader) {
     return {
-      documentChunks: chunks,
+      error: `不支持的输入类型: ${source.type}`,
+      response: `不支持的输入类型: ${source.type}`,
+    }
+  }
+
+  try {
+    const loaded = await loader.loadDocument(source)
+
+    if (loaded.chunks.length === 0) {
+      return {
+        error: '文档未能提取出任何文本内容。',
+        response: '文档未能提取出任何文本内容。',
+      }
+    }
+
+    let documentRef = loaded.documentRef ?? state.documentRef
+    if (documentRef && options.cacheDocumentText) {
+      const cachedRef = await options.cacheDocumentText(documentRef, loaded.text)
+      if (cachedRef) {
+        documentRef = cachedRef
+      }
+    }
+
+    return {
+      documentChunks: loaded.chunks,
       leafCursor: 0,
-      pendingLeafRange: { start: 0, end: 1 },
+      pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, loaded.chunks.length) },
+      documentRef,
     }
-  }
-
-  // PDF input: use PdfDocumentLoader
-  if (source.type === 'pdf') {
-    try {
-      const loader = new PdfDocumentLoader()
-      const pages = await loader.load(source)
-      const fullText = pages.map((page) => page.text).join('\n\n')
-      const chunks = chunkPages(pages, CHUNK_CHAR_LIMIT)
-
-      if (chunks.length === 0) {
-        return {
-          error: 'PDF 文档未能提取出任何文本内容。',
-          response: 'PDF 文档未能提取出任何文本内容。',
-        }
-      }
-
-      let documentRef = state.documentRef
-      if (documentRef && options.cacheDocumentText) {
-        const cachedRef = await options.cacheDocumentText(documentRef, fullText)
-        if (cachedRef) {
-          documentRef = cachedRef
-        }
-      }
-
-      return {
-        documentChunks: chunks,
-        leafCursor: 0,
-        pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, chunks.length) },
-        documentRef,
-      }
-    } catch (error) {
-      const formatted = formatAgentError(error)
-      return {
-        error: formatted,
-        response: `加载 PDF 失败：${formatted.split('\n')[0]}`,
-      }
+  } catch (error) {
+    const formatted = formatAgentError(error)
+    return {
+      error: formatted,
+      response: `加载文档失败：${formatted.split('\n')[0]}`,
     }
-  }
-
-  // URL or other types not yet supported
-  return {
-    error: `不支持的输入类型: ${source.type}`,
-    response: `不支持的输入类型: ${source.type}`,
   }
 }
 

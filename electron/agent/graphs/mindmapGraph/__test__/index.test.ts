@@ -3,9 +3,14 @@ import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
+import type { MindmapDocumentLoader } from '../loaders/types.js'
 
 vi.mock('../loaders/pdfLoader.js', () => ({
   PdfDocumentLoader: class {
+    supports(source: { type: string }) {
+      return source.type === 'pdf'
+    }
+
     async load(source: { path?: string }) {
       if (source.path?.includes('short')) {
         return [{ pageNumber: 1, text: 'Short PDF text' }]
@@ -18,6 +23,22 @@ vi.mock('../loaders/pdfLoader.js', () => ({
         { pageNumber: 4, text: 'PDF text 4'.repeat(900) },
         { pageNumber: 5, text: 'PDF text 5'.repeat(900) },
       ]
+    }
+
+    async loadDocument(source: { path?: string }) {
+      const pages = await this.load(source)
+      const chunks = pages.map((page, index) => ({
+        id: `chunk-${index + 1}`,
+        index,
+        startPage: page.pageNumber,
+        endPage: page.pageNumber,
+        text: page.text,
+      }))
+
+      return {
+        text: pages.map((page) => page.text).join('\n\n'),
+        chunks,
+      }
     }
   },
   chunkPages: (pages: Array<{ pageNumber: number; text: string }>) => pages.map((page, index) => ({
@@ -218,6 +239,70 @@ Merged Long Text:
     expect(result.mindmapYaml).toContain('Merged Long Text')
     expect(firstPrompt).toContain(importantTail)
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
+  })
+
+  it('loads documents through an injected loader registry', async () => {
+    const customLoader: MindmapDocumentLoader = {
+      type: 'url',
+      supports: (source) => source.type === 'url',
+      loadDocument: vi.fn().mockResolvedValue({
+        text: 'Loaded URL text',
+        chunks: [{
+          id: 'url-chunk-1',
+          index: 0,
+          startPage: 0,
+          endPage: 0,
+          text: 'Loaded URL text',
+        }],
+      }),
+    }
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: `
+URL Root:
+  - Loaded URL text
+`,
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({
+      provider: mockProvider,
+      loaders: [customLoader],
+    })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'url', url: 'https://example.test/doc' },
+      mindmapInputTitle: 'URL Root',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    })
+
+    expect(customLoader.loadDocument).toHaveBeenCalledWith({
+      type: 'url',
+      url: 'https://example.test/doc',
+    })
+    expect(result.error).toBe('')
+    expect(result.mindmapYaml).toContain('URL Root')
+    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
   })
 
   it('includes stack trace in state.error when generation fails', async () => {

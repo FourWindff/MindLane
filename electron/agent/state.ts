@@ -47,7 +47,7 @@ export type MemoryPalaceStation = {
   linkedNodeId?: string
 }
 
-interface MindmapInputSource {
+export interface MindmapInputSource {
   type: 'pdf' | 'url' | 'text'
   path?: string
   url?: string
@@ -65,7 +65,7 @@ export interface DocumentRef {
   metadata?: Record<string, unknown>
 }
 
-type DocumentChunk = {
+export type DocumentChunk = {
   id: string
   index: number
   startPage: number

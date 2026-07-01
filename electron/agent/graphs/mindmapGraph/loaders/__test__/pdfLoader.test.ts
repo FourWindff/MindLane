@@ -4,8 +4,8 @@ import { PdfDocumentLoader, chunkPages } from '../pdfLoader.js'
 describe('PdfDocumentLoader', () => {
   it('supports pdf type', () => {
     const loader = new PdfDocumentLoader()
-    expect(loader.supports('pdf')).toBe(true)
-    expect(loader.supports('url')).toBe(false)
+    expect(loader.supports({ type: 'pdf' })).toBe(true)
+    expect(loader.supports({ type: 'url' })).toBe(false)
   })
 
   it('throws when path is missing', async () => {

@@ -1,25 +1,20 @@
 import fs from 'node:fs/promises'
+import type { LoadedDocument, MindmapDocumentLoader, MindmapInputSource } from './types.js'
 
 interface DocumentPage {
   text: string
   index: number
 }
 
-interface MindmapInputSource {
-  type: 'pdf' | 'url' | 'text'
-  path?: string
-  url?: string
-  content?: string
-}
-
-interface DocumentLoader {
+interface PageDocumentLoader {
   load(source: MindmapInputSource): Promise<DocumentPage[]>
-  supports(type: string): boolean
 }
 
-export class PdfDocumentLoader implements DocumentLoader {
-  supports(type: string): boolean {
-    return type === 'pdf'
+export class PdfDocumentLoader implements PageDocumentLoader, MindmapDocumentLoader {
+  readonly type = 'pdf'
+
+  supports(source: MindmapInputSource): boolean {
+    return source.type === this.type
   }
 
   async load(source: MindmapInputSource): Promise<DocumentPage[]> {
@@ -51,6 +46,15 @@ export class PdfDocumentLoader implements DocumentLoader {
         .filter(page => page.text.length > 0)
     } finally {
       await parser.destroy()
+    }
+  }
+
+  async loadDocument(source: MindmapInputSource): Promise<LoadedDocument> {
+    const pages = await this.load(source)
+    const text = pages.map((page) => page.text).join('\n\n')
+    return {
+      text,
+      chunks: chunkPages(pages, 4000),
     }
   }
 }
