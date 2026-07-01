@@ -127,20 +127,21 @@ async function rememberWorkspace(
   }
 }
 
-async function getWorkspaceSession() {
-  const settings = await fsService.settings.load()
+export async function getWorkspaceSessionForService(service: FileSystemService) {
+  const settings = await service.settings.load()
   const recentWorkspacePaths = dedupeWorkspacePaths(settings.recentWorkspacePaths, settings.recentFilesMax)
+  const persistedLastWorkspacePathExists = directoryExists(settings.lastWorkspacePath)
   const persistedWorkspacePath =
     settings.restoreLastWorkspaceOnLaunch &&
     settings.lastWorkspacePath &&
-    directoryExists(settings.lastWorkspacePath)
+    persistedLastWorkspacePathExists
       ? path.resolve(settings.lastWorkspacePath)
       : null
 
   let lastOpenedFilePath: string | null = null
   let expandedFolderPaths: string[] = []
   if (persistedWorkspacePath) {
-    const workspaceState = await fsService.workspaceState.load(persistedWorkspacePath)
+    const workspaceState = await service.workspaceState.load(persistedWorkspacePath)
     expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
       workspaceState.lastOpenedFilePath,
@@ -150,9 +151,9 @@ async function getWorkspaceSession() {
     // One-time migration of legacy workspace-scoped keys from global settings.json.
     // Only seed workspace-local state if it is still all-defaults, then remove the legacy keys.
     if (isDefaultWorkspaceState(workspaceState)) {
-      const legacy = await fsService.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
+      const legacy = await service.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
       if (legacy) {
-        await fsService.workspaceState.save(persistedWorkspacePath, legacy)
+        await service.workspaceState.save(persistedWorkspacePath, legacy)
         lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
           legacy.lastOpenedFilePath ?? null,
           persistedWorkspacePath,
@@ -162,8 +163,15 @@ async function getWorkspaceSession() {
     }
   }
 
+  const settingsUpdate: Partial<AppSettings> = {}
+  if (settings.lastWorkspacePath && !persistedLastWorkspacePathExists) {
+    settingsUpdate.lastWorkspacePath = null
+  }
   if (JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths)) {
-    await fsService.settings.update({ recentWorkspacePaths })
+    settingsUpdate.recentWorkspacePaths = recentWorkspacePaths
+  }
+  if (Object.keys(settingsUpdate).length > 0) {
+    await service.settings.update(settingsUpdate)
   }
 
   return {
@@ -173,6 +181,10 @@ async function getWorkspaceSession() {
     expandedFolderPaths,
     restoreLastWorkspaceOnLaunch: settings.restoreLastWorkspaceOnLaunch,
   }
+}
+
+async function getWorkspaceSession() {
+  return getWorkspaceSessionForService(fsService)
 }
 
 function resolveWorkspaceLastOpenedFilePath(
