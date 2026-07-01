@@ -5,6 +5,7 @@ import { SettingsManager } from './settingsManager.js'
 import { RecentFilesManager } from './recentFilesManager.js'
 import { WorkspaceManager } from './workspaceManager.js'
 import { ThumbnailManager } from './thumbnailManager.js'
+import { WorkspaceStateManager } from './workspaceStateManager.js'
 
 export class FileSystemService {
   readonly project: ProjectFileManager
@@ -13,6 +14,7 @@ export class FileSystemService {
   readonly recentFiles: RecentFilesManager
   readonly workspace: WorkspaceManager
   readonly thumbnails: ThumbnailManager
+  readonly workspaceState: WorkspaceStateManager
 
   constructor(userDataPath: string) {
     this.project = new ProjectFileManager(userDataPath)
@@ -21,6 +23,7 @@ export class FileSystemService {
     this.recentFiles = new RecentFilesManager(userDataPath)
     this.workspace = new WorkspaceManager()
     this.thumbnails = new ThumbnailManager(userDataPath)
+    this.workspaceState = new WorkspaceStateManager()
   }
 
   async initialize(): Promise<void> {

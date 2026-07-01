@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import type { AppSettings } from './fs/types.js'
+import type { AppSettings, WorkspaceState } from './fs/types.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './agent/service.js'
@@ -98,9 +98,9 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
   )
   await fsService.settings.update({
     lastWorkspacePath: workspacePath,
-    lastOpenedFilePath: filePath,
     recentWorkspacePaths,
   })
+  await fsService.workspaceState.save(workspacePath, { lastOpenedFilePath: filePath })
   await fsService.recentFiles
     .touch({
       filePath,
@@ -118,58 +118,92 @@ async function rememberWorkspace(
     [workspacePath, ...settings.recentWorkspacePaths],
     settings.recentFilesMax,
   )
-  const nextLastOpenedFilePath = options?.clearLastOpenedFile
-    ? null
-    : settings.lastOpenedFilePath &&
-        fsService.workspace.isWithinWorkspace(settings.lastOpenedFilePath, workspacePath)
-      ? settings.lastOpenedFilePath
-      : null
-
   await fsService.settings.update({
     lastWorkspacePath: workspacePath,
     recentWorkspacePaths,
-    lastOpenedFilePath: nextLastOpenedFilePath,
   })
+  if (options?.clearLastOpenedFile) {
+    await fsService.workspaceState.save(workspacePath, { lastOpenedFilePath: null })
+  }
 }
 
-async function getWorkspaceSession() {
-  const settings = await fsService.settings.load()
-  const recentWorkspacePaths = dedupeWorkspacePaths(
-    settings.recentWorkspacePaths,
-    settings.recentFilesMax,
-  )
+export async function getWorkspaceSessionForService(service: FileSystemService) {
+  const settings = await service.settings.load()
+  const recentWorkspacePaths = dedupeWorkspacePaths(settings.recentWorkspacePaths, settings.recentFilesMax)
+  const persistedLastWorkspacePathExists = directoryExists(settings.lastWorkspacePath)
   const persistedWorkspacePath =
-    settings.lastWorkspacePath && directoryExists(settings.lastWorkspacePath)
+    settings.restoreLastWorkspaceOnLaunch &&
+    settings.lastWorkspacePath &&
+    persistedLastWorkspacePathExists
       ? path.resolve(settings.lastWorkspacePath)
       : null
-  const persistedLastOpenedFilePath =
-    persistedWorkspacePath &&
-    settings.lastOpenedFilePath &&
-    pathExists(settings.lastOpenedFilePath) &&
-    fsService.workspace.isSupportedFile(settings.lastOpenedFilePath) &&
-    fsService.workspace.isWithinWorkspace(settings.lastOpenedFilePath, persistedWorkspacePath)
-      ? path.resolve(settings.lastOpenedFilePath)
-      : null
 
-  const shouldPersistCleanup =
-    JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths) ||
-    settings.lastWorkspacePath !== persistedWorkspacePath ||
-    settings.lastOpenedFilePath !== persistedLastOpenedFilePath
+  let lastOpenedFilePath: string | null = null
+  let expandedFolderPaths: string[] = []
+  if (persistedWorkspacePath) {
+    const workspaceState = await service.workspaceState.load(persistedWorkspacePath)
+    expandedFolderPaths = workspaceState.expandedFolderPaths
+    lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
+      workspaceState.lastOpenedFilePath,
+      persistedWorkspacePath,
+    )
 
-  if (shouldPersistCleanup) {
-    await fsService.settings.update({
-      lastWorkspacePath: persistedWorkspacePath,
-      recentWorkspacePaths,
-      lastOpenedFilePath: persistedLastOpenedFilePath,
-    })
+    // One-time migration of legacy workspace-scoped keys from global settings.json.
+    // Only seed workspace-local state if it is still all-defaults, then remove the legacy keys.
+    if (isDefaultWorkspaceState(workspaceState)) {
+      const legacy = await service.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
+      if (legacy) {
+        await service.workspaceState.save(persistedWorkspacePath, legacy)
+        lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
+          legacy.lastOpenedFilePath ?? null,
+          persistedWorkspacePath,
+        )
+        expandedFolderPaths = legacy.expandedFolderPaths ?? []
+      }
+    }
+  }
+
+  const settingsUpdate: Partial<AppSettings> = {}
+  if (settings.lastWorkspacePath && !persistedLastWorkspacePathExists) {
+    settingsUpdate.lastWorkspacePath = null
+  }
+  if (JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths)) {
+    settingsUpdate.recentWorkspacePaths = recentWorkspacePaths
+  }
+  if (Object.keys(settingsUpdate).length > 0) {
+    await service.settings.update(settingsUpdate)
   }
 
   return {
-    workspacePath: settings.restoreLastWorkspaceOnLaunch ? persistedWorkspacePath : null,
+    workspacePath: persistedWorkspacePath,
     recentWorkspacePaths,
-    lastOpenedFilePath: settings.restoreLastWorkspaceOnLaunch ? persistedLastOpenedFilePath : null,
+    lastOpenedFilePath,
+    expandedFolderPaths,
     restoreLastWorkspaceOnLaunch: settings.restoreLastWorkspaceOnLaunch,
   }
+}
+
+async function getWorkspaceSession() {
+  return getWorkspaceSessionForService(fsService)
+}
+
+function resolveWorkspaceLastOpenedFilePath(
+  candidate: string | null,
+  workspacePath: string,
+): string | null {
+  if (
+    candidate &&
+    pathExists(candidate) &&
+    fsService.workspace.isSupportedFile(candidate) &&
+    fsService.workspace.isWithinWorkspace(candidate, workspacePath)
+  ) {
+    return path.resolve(candidate)
+  }
+  return null
+}
+
+function isDefaultWorkspaceState(state: WorkspaceState): boolean {
+  return state.lastOpenedFilePath === null && state.expandedFolderPaths.length === 0
 }
 
 function setupApplicationMenu() {
@@ -638,6 +672,25 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle('workspace:get-session', async () => {
     return getWorkspaceSession()
   })
+
+  ipcMain.handle(
+    'workspace:update-state',
+    async (_e, payload: { workspacePath: string } & Partial<WorkspaceState>) => {
+      try {
+        const partial: Partial<WorkspaceState> = {}
+        if (payload.expandedFolderPaths !== undefined) {
+          partial.expandedFolderPaths = payload.expandedFolderPaths
+        }
+        if (payload.lastOpenedFilePath !== undefined) {
+          partial.lastOpenedFilePath = payload.lastOpenedFilePath
+        }
+        await fsService.workspaceState.save(payload.workspacePath, partial)
+        return { ok: true }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
 
   ipcMain.handle('workspace:switch', async (_e, payload: { workspacePath: string }) => {
     try {

@@ -7,6 +7,7 @@ declare namespace NodeJS {
   }
 }
 
+type _WorkspaceState = import('./fs/types').WorkspaceState
 type _WorkspaceTreeEntry = {
   name: string
   path: string
@@ -208,8 +209,10 @@ interface Window {
         workspacePath: string | null
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
+        expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>
+      updateState: (payload: { workspacePath: string } & Partial<_WorkspaceState>) => Promise<{ ok: true } | { ok: false; error: string }>
       switchDirectory: (payload: { workspacePath: string }) => Promise<
         | {
             ok: true
@@ -283,9 +286,7 @@ interface Window {
         recentFilesMax: number
         lastWorkspacePath: string | null
         recentWorkspacePaths: string[]
-        lastOpenedFilePath: string | null
         restoreLastWorkspaceOnLaunch: boolean
-        expandedFolderPaths: string[]
       }>
       update: (partial: Record<string, unknown>) => Promise<void>
     }
