@@ -46,6 +46,7 @@ function createInitialState() {
     pendingLeafRange: null,
     leafResults: [],
     mergeInputs: [],
+    partialMergedTrees: [],
     mergeResults: [],
     pendingMergeGroups: [],
     finalTree: null,

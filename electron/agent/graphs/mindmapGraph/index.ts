@@ -240,22 +240,23 @@ async function leafExtractNode(
 async function collectLeafNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  // If there are more chunks to process, continue to dispatch_leaf
-  if (state.leafCursor < state.documentChunks.length) {
+  const latestResult = state.leafResults[state.leafResults.length - 1]
+  if (!latestResult) {
     return {}
   }
 
-  // All chunks processed — prepare merge inputs from leaf results
-  const inputs = state.leafResults.map((r) => r.tree)
   return {
-    mergeInputs: inputs,
+    mergeInputs: [...state.mergeInputs, latestResult.tree],
   }
 }
 
 async function dispatchMergeNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const inputs = state.mergeInputs
+  const leafDone = state.leafCursor >= state.documentChunks.length
+  const inputs = leafDone
+    ? [...state.partialMergedTrees, ...state.mergeInputs]
+    : state.mergeInputs.slice(0, MERGE_GROUP_SIZE)
   const groups: Array<{ groupIndex: number; trees: unknown[] }> = []
 
   for (let i = 0; i < inputs.length; i += MERGE_GROUP_SIZE) {
@@ -267,6 +268,7 @@ async function dispatchMergeNode(
 
   return {
     pendingMergeGroups: groups,
+    mergeResults: [],
   }
 }
 
@@ -318,21 +320,40 @@ async function mergeTreesNode(
 async function collectMergeNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  if (state.finalTree) {
+    return {}
+  }
+
   const results = state.mergeResults
+  const trees = results.map((r) => r.tree)
+  const leafDone = state.leafCursor >= state.documentChunks.length
+
+  if (!leafDone) {
+    return {
+      partialMergedTrees: [...state.partialMergedTrees, ...trees],
+      mergeInputs: state.mergeInputs.slice(MERGE_GROUP_SIZE),
+      pendingMergeGroups: [],
+      mergeResults: [],
+    }
+  }
 
   // If only one result, it's the final tree
   if (results.length === 1) {
     return {
       finalTree: results[0]!.tree,
       mergeInputs: [],
+      partialMergedTrees: [],
       pendingMergeGroups: [],
+      mergeResults: [],
     }
   }
 
   // Multiple results — need another merge round
-  const newInputs = results.map((r) => r.tree)
   return {
-    mergeInputs: newInputs,
+    mergeInputs: trees,
+    partialMergedTrees: [],
+    pendingMergeGroups: [],
+    mergeResults: [],
   }
 }
 
@@ -445,14 +466,17 @@ function routeAfterDispatchLeaf(state: typeof MindmapSubgraphState.State): strin
 }
 
 function routeAfterCollectLeaf(state: typeof MindmapSubgraphState.State): string {
+  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
   if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
-  if (state.mergeInputs.length > 0) return 'dispatch_merge'
+  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
 
 function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): string {
   if (state.finalTree) return 'build_output'
-  if (state.mergeInputs.length > 1) return 'dispatch_merge'
+  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
+  if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
+  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
 
@@ -510,6 +534,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   graph.addEdge('merge_trees', 'collect_merge')
   graph.addConditionalEdges('collect_merge', routeAfterCollectMerge, [
     'dispatch_merge',
+    'dispatch_leaf',
     'build_output',
   ])
 

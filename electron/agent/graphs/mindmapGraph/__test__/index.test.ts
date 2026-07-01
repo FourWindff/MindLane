@@ -78,6 +78,7 @@ describe('mindmapGraph', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -125,6 +126,7 @@ describe('mindmapGraph', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -171,6 +173,7 @@ Short PDF:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -224,6 +227,7 @@ Merged Long Text:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -290,6 +294,7 @@ URL Root:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -332,6 +337,7 @@ URL Root:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -377,6 +383,7 @@ URL Root:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -416,6 +423,7 @@ URL Root:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -475,6 +483,7 @@ Merged Root:
       pendingLeafRange: { start: 0, end: 1 },
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -529,6 +538,7 @@ Merged Root:
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -544,6 +554,95 @@ Merged Root:
     expect(result.mergeInputs).toHaveLength(0)
     expect(result.mindmapYaml).toContain('Merged Root')
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
+  })
+
+  it('merges a full analysis queue before dispatching remaining leaf batches', async () => {
+    const chunks = Array.from({ length: 45 }, (_, index) => ({
+      id: `chunk-${index + 1}`,
+      index,
+      startPage: index + 1,
+      endPage: index + 1,
+      text: `chunk ${index + 1} ${'body '.repeat(50)}`,
+    }))
+    const customLoader: MindmapDocumentLoader = {
+      type: 'text',
+      supports: (source) => source.type === 'text',
+      loadDocument: vi.fn().mockResolvedValue({
+        text: chunks.map((chunk) => chunk.text).join('\n\n'),
+        chunks,
+      }),
+    }
+    const events: string[] = []
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockImplementation(async (messages: Array<{ content: string }>) => {
+          const systemPrompt = messages[0]?.content ?? ''
+          if (systemPrompt.includes('merging assistant')) {
+            events.push('merge')
+            return {
+              content: `
+Merged ${events.length}:
+  - Combined
+`,
+            }
+          }
+
+          events.push('leaf')
+          return {
+            content: `
+Leaf ${events.length}:
+  - Extracted
+`,
+          }
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const graph = buildMindmapSubgraph({
+      provider: mockProvider,
+      loaders: [customLoader],
+    })
+    const app = graph.compile()
+
+    const result = await app.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: { type: 'text', content: 'large document' },
+      mindmapInputTitle: 'Large Document',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentChunks: [],
+      leafCursor: 0,
+      pendingLeafRange: null,
+      leafResults: [],
+      mergeInputs: [],
+      partialMergedTrees: [],
+      mergeResults: [],
+      pendingMergeGroups: [],
+      finalTree: null,
+      documentRef: null,
+    }, {
+      recursionLimit: 100,
+    })
+
+    expect(result.error).toBe('')
+    expect(events.slice(0, 10)).toEqual([
+      'leaf',
+      'leaf',
+      'leaf',
+      'leaf',
+      'leaf',
+      'leaf',
+      'leaf',
+      'leaf',
+      'merge',
+      'leaf',
+    ])
   })
 
   it('retries merge before storing merge results', async () => {
@@ -596,6 +695,7 @@ Merged Root:
         page_range: '',
         children: [{ label: 'Child B', page_range: '', children: [] }],
       }],
+      partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
       finalTree: null,
@@ -603,7 +703,7 @@ Merged Root:
     })
 
     expect(result.error).toBe('')
-    expect(result.mergeResults).toHaveLength(1)
+    expect(result.finalTree).toBeTruthy()
     expect(result.mindmapYaml).toContain('Merged Root')
     expect(result.pendingSubgraph).toBeNull()
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)

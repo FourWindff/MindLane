@@ -97,6 +97,7 @@ function createState(messages: Array<InstanceType<typeof HumanMessage | typeof A
     pendingLeafRange: null,
     leafResults: [],
     mergeInputs: [],
+    partialMergedTrees: [],
     mergeResults: [],
     pendingMergeGroups: [],
     finalTree: null,

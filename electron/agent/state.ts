@@ -193,6 +193,10 @@ const MindmapStateAnnotations = {
     reducer: replaceReducer,
     default: () => [],
   }),
+  partialMergedTrees: Annotation<unknown[]>({
+    reducer: replaceReducer,
+    default: () => [],
+  }),
   mergeResults: Annotation<Array<{ groupIndex: number; tree: unknown }>>({
     reducer: replaceReducer,
     default: () => [],

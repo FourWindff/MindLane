@@ -31,6 +31,7 @@ describe('MindmapSubgraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
@@ -63,6 +64,7 @@ describe('MindmapSubgraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: { id: 'doc-1', type: 'pdf', source: '/test.pdf', filename: 'test.pdf', importedAt: new Date().toISOString() },
     })
@@ -95,6 +97,7 @@ describe('MindmapSubgraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
@@ -126,6 +129,7 @@ describe('MindmapSubgraphState', () => {
       pendingLeafRange: null,
       leafResults: [{ chunkIndex: 0, chunkId: 'c1', tree: { root: 'a' } }],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
@@ -161,6 +165,7 @@ describe('MindmapSubgraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [{ groupIndex: 0, tree: { root: 'a' } }],
       documentRef: null,
     })
@@ -200,6 +205,7 @@ describe('MainGraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
       palaceInputText: ' palace text',
@@ -236,6 +242,7 @@ describe('MainGraphState', () => {
       pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
+      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
       palaceInputText: '',
