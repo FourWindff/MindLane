@@ -3,16 +3,17 @@ import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
-import type { MindmapDocumentLoader } from '../loaders/types.js'
+import { MindmapInputAnalyzer } from '../loaders/types.js'
+import type { DocumentChunk, MindmapDocumentLoader, MindmapInputSource } from '../loaders/types.js'
 
 vi.mock('../loaders/pdfLoader.js', () => ({
-  PdfDocumentLoader: class {
+  PdfInputAnalyzer: class {
     supports(source: { type: string }) {
       return source.type === 'pdf'
     }
 
-    async load(source: { path?: string }) {
-      if (source.path?.includes('short')) {
+    async load(path: string) {
+      if (path.includes('short')) {
         return [{ pageNumber: 1, text: 'Short PDF text' }]
       }
 
@@ -26,7 +27,11 @@ vi.mock('../loaders/pdfLoader.js', () => ({
     }
 
     async loadDocument(source: { path?: string }) {
-      const pages = await this.load(source)
+      if (!source.path) {
+        throw new Error('PDF source requires a path')
+      }
+
+      const pages = await this.load(source.path)
       const chunks = pages.map((page, index) => ({
         id: `chunk-${index + 1}`,
         index,
@@ -49,6 +54,36 @@ vi.mock('../loaders/pdfLoader.js', () => ({
     text: page.text,
   })),
 }))
+
+class TestInputAnalyzer extends MindmapInputAnalyzer<null, { text: string; chunks: DocumentChunk[] }> {
+  readonly type: MindmapInputSource['type']
+  readonly loadDocument = vi.fn()
+
+  constructor(
+    type: MindmapInputSource['type'],
+    private readonly loaded: { text: string; chunks: DocumentChunk[] },
+  ) {
+    super()
+    this.type = type
+    this.loadDocument.mockResolvedValue(loaded)
+  }
+
+  protected resolveInput(): null {
+    return null
+  }
+
+  async load(): Promise<{ text: string; chunks: DocumentChunk[] }> {
+    return this.loaded
+  }
+
+  protected getText(raw: { text: string }): string {
+    return raw.text
+  }
+
+  protected chunk(raw: { chunks: DocumentChunk[] }): DocumentChunk[] {
+    return raw.chunks
+  }
+}
 
 describe('mindmapGraph', () => {
   it('returns error when no input source is provided', async () => {
@@ -255,21 +290,17 @@ Merged Long Text:
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
   })
 
-  it('loads documents through an injected loader registry', async () => {
-    const customLoader: MindmapDocumentLoader = {
-      type: 'url',
-      supports: (source) => source.type === 'url',
-      loadDocument: vi.fn().mockResolvedValue({
+  it('loads documents through an injected analyzer registry', async () => {
+    const customAnalyzer = new TestInputAnalyzer('url', {
+      text: 'Loaded URL text',
+      chunks: [{
+        id: 'url-chunk-1',
+        index: 0,
+        startPage: 0,
+        endPage: 0,
         text: 'Loaded URL text',
-        chunks: [{
-          id: 'url-chunk-1',
-          index: 0,
-          startPage: 0,
-          endPage: 0,
-          text: 'Loaded URL text',
-        }],
-      }),
-    }
+      }],
+    })
     const mockProvider = {
       reasoningModel: {
         invoke: vi.fn().mockResolvedValue({
@@ -283,7 +314,7 @@ URL Root:
 
     const graph = buildMindmapSubgraph({
       provider: mockProvider,
-      loaders: [customLoader],
+      analyzers: [customAnalyzer],
     })
     const app = graph.compile()
 
@@ -311,7 +342,7 @@ URL Root:
       documentRef: null,
     })
 
-    expect(customLoader.loadDocument).toHaveBeenCalledWith({
+    expect(customAnalyzer.loadDocument).toHaveBeenCalledWith({
       type: 'url',
       url: 'https://example.test/doc',
     })

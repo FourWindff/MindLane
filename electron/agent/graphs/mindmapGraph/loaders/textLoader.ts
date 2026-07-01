@@ -49,9 +49,9 @@ export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT):
 }
 
 export function findInputAnalyzer(
-  analyzers: MindmapInputAnalyzer<unknown, unknown>[],
+  analyzers: MindmapDocumentLoader[],
   source: MindmapInputSource,
-): MindmapInputAnalyzer<unknown, unknown> | null {
+): MindmapDocumentLoader | null {
   return analyzers.find((analyzer) => analyzer.supports(source)) ?? null
 }
 

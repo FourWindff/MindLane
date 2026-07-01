@@ -4,9 +4,9 @@ import { MindmapSubgraphState, type DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
-import { PdfDocumentLoader } from './loaders/pdfLoader.js'
-import { TextDocumentLoader, findDocumentLoader } from './loaders/textLoader.js'
-import type { MindmapDocumentLoader } from './loaders/types.js'
+import { PdfInputAnalyzer } from './loaders/pdfLoader.js'
+import { TextInputAnalyzer, findInputAnalyzer } from './loaders/textLoader.js'
+import type { MindmapDocumentLoader, MindmapInputAnalyzer } from './loaders/types.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
 
@@ -15,6 +15,7 @@ import { extractRootTree } from './shared/rootTree.js'
 interface MindmapSubgraphOptions {
   provider: LLMProvider
   cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
+  analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
   loaders?: MindmapDocumentLoader[]
 }
 
@@ -43,10 +44,10 @@ function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
   }
 }
 
-function createDefaultLoaders(): MindmapDocumentLoader[] {
+function createDefaultAnalyzers(): MindmapInputAnalyzer<unknown, unknown>[] {
   return [
-    new TextDocumentLoader(),
-    new PdfDocumentLoader(),
+    new TextInputAnalyzer(),
+    new PdfInputAnalyzer(),
   ]
 }
 
@@ -163,8 +164,8 @@ async function loadDocumentNode(
     }
   }
 
-  const loader = findDocumentLoader(options.loaders ?? createDefaultLoaders(), source)
-  if (!loader) {
+  const analyzer = findInputAnalyzer(options.analyzers ?? options.loaders ?? createDefaultAnalyzers(), source)
+  if (!analyzer) {
     return {
       ...reset,
       error: `不支持的输入类型: ${source.type}`,
@@ -173,7 +174,7 @@ async function loadDocumentNode(
   }
 
   try {
-    const loaded = await loader.loadDocument(source)
+    const loaded = await analyzer.loadDocument(source)
 
     if (loaded.chunks.length === 0) {
       return {
