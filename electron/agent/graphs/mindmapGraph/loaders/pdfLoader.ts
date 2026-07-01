@@ -1,27 +1,25 @@
 import fs from 'node:fs/promises'
-import type { LoadedDocument, MindmapDocumentLoader, MindmapInputSource } from './types.js'
+import { MindmapInputAnalyzer } from './types.js'
+import type { DocumentChunk, MindmapInputSource } from './types.js'
 
 interface DocumentPage {
   text: string
   index: number
 }
 
-interface PageDocumentLoader {
-  load(source: MindmapInputSource): Promise<DocumentPage[]>
-}
+export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[]> {
+  readonly type = 'pdf' as const
 
-export class PdfDocumentLoader implements PageDocumentLoader, MindmapDocumentLoader {
-  readonly type = 'pdf'
-
-  supports(source: MindmapInputSource): boolean {
-    return source.type === this.type
-  }
-
-  async load(source: MindmapInputSource): Promise<DocumentPage[]> {
+  protected resolveInput(source: MindmapInputSource): string {
     if (!source.path) {
       throw new Error('PDF source requires a path')
     }
-    const data = await fs.readFile(source.path)
+
+    return source.path
+  }
+
+  async load(path: string): Promise<DocumentPage[]> {
+    const data = await fs.readFile(path)
     const pdfParse = await import('pdf-parse')
     const PDFParseClass = (pdfParse as unknown as {
       PDFParse?: new (options: { data: Buffer }) => {
@@ -49,22 +47,30 @@ export class PdfDocumentLoader implements PageDocumentLoader, MindmapDocumentLoa
     }
   }
 
-  async loadDocument(source: MindmapInputSource): Promise<LoadedDocument> {
-    const pages = await this.load(source)
-    const text = pages.map((page) => page.text).join('\n\n')
-    return {
-      text,
-      chunks: chunkPages(pages, 4000),
-    }
+  protected getText(raw: DocumentPage[]): string {
+    return raw.map((page) => page.text).join('\n\n')
+  }
+
+  protected chunk(raw: DocumentPage[]): DocumentChunk[] {
+    return chunkPages(raw, 4000)
+  }
+}
+
+export class PdfDocumentLoader extends PdfInputAnalyzer {
+  async load(path: string): Promise<DocumentPage[]>
+  async load(source: MindmapInputSource): Promise<DocumentPage[]>
+  async load(input: string | MindmapInputSource): Promise<DocumentPage[]> {
+    const path = typeof input === 'string' ? input : this.resolveInput(input)
+    return super.load(path)
   }
 }
 
 export function chunkPages(
   pages: DocumentPage[],
   chunkCharLimit: number,
-): Array<{ id: string; index: number; startPage: number; endPage: number; text: string }> {
+): DocumentChunk[] {
   const normalizedLimit = Math.max(1000, chunkCharLimit)
-  const chunks: Array<{ id: string; index: number; startPage: number; endPage: number; text: string }> = []
+  const chunks: DocumentChunk[] = []
 
   let currentTexts: string[] = []
   let startPage = 0

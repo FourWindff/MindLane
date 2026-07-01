@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { PdfDocumentLoader, chunkPages } from '../pdfLoader.js'
+import { PdfInputAnalyzer, chunkPages } from '../pdfLoader.js'
 
-describe('PdfDocumentLoader', () => {
+describe('PdfInputAnalyzer', () => {
   it('supports pdf type', () => {
-    const loader = new PdfDocumentLoader()
-    expect(loader.supports({ type: 'pdf' })).toBe(true)
-    expect(loader.supports({ type: 'url' })).toBe(false)
+    const analyzer = new PdfInputAnalyzer()
+    expect(analyzer.supports({ type: 'pdf' })).toBe(true)
+    expect(analyzer.supports({ type: 'url' })).toBe(false)
   })
 
   it('throws when path is missing', async () => {
-    const loader = new PdfDocumentLoader()
-    await expect(loader.load({ type: 'pdf' })).rejects.toThrow('PDF source requires a path')
+    const analyzer = new PdfInputAnalyzer()
+    await expect(analyzer.loadDocument({ type: 'pdf' })).rejects.toThrow('PDF source requires a path')
   })
 })
 
