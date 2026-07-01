@@ -101,11 +101,15 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
     recentWorkspacePaths,
   })
   await fsService.workspaceState.save(workspacePath, { lastOpenedFilePath: filePath })
-  await fsService.recentFiles
-    .touch({
-      filePath,
-      title: data?.metadata.title || path.basename(filePath, path.extname(filePath)),
-    })
+  await fsService.workspaceState
+    .touchRecentFile(
+      workspacePath,
+      {
+        filePath,
+        title: data?.metadata.title || path.basename(filePath, path.extname(filePath)),
+      },
+      settings.recentFilesMax,
+    )
     .catch(() => {})
 }
 
@@ -203,7 +207,7 @@ function resolveWorkspaceLastOpenedFilePath(
 }
 
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
-  return state.lastOpenedFilePath === null && state.expandedFolderPaths.length === 0
+  return state.lastOpenedFilePath === null && state.expandedFolderPaths.length === 0 && state.recentFiles.length === 0
 }
 
 function setupApplicationMenu() {
@@ -544,7 +548,10 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   ipcMain.handle('file:recent-list', async () => {
-    return fsService.recentFiles.list()
+    const settings = await fsService.settings.load()
+    if (!settings.lastWorkspacePath || !directoryExists(settings.lastWorkspacePath)) return []
+    await fsService.workspaceState.pruneRecentFiles(settings.lastWorkspacePath)
+    return fsService.workspaceState.listRecentFiles(settings.lastWorkspacePath)
   })
 
   ipcMain.handle('file:save-thumbnail', async (_e, payload: { filePath: string; imageData: string }) => {

@@ -25,6 +25,7 @@ describe('WorkspaceStateManager', () => {
 
     expect(result.lastOpenedFilePath).toBeNull()
     expect(result.expandedFolderPaths).toEqual([])
+    expect(result.recentFiles).toEqual([])
   })
 
   it('creates .mindlane directory and persists state', async () => {
@@ -85,5 +86,49 @@ describe('WorkspaceStateManager', () => {
 
     expect(result.lastOpenedFilePath).toBeNull()
     expect(result.expandedFolderPaths).toEqual([])
+    expect(result.recentFiles).toEqual([])
+  })
+
+  it('persists recent files inside the workspace state file', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const filePath = path.join(workspacePath, 'note.mindlane')
+    fs.writeFileSync(filePath, '{}')
+
+    await manager.touchRecentFile(workspacePath, { filePath, title: 'Note' }, 10)
+
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    const state = JSON.parse(fs.readFileSync(statePath, 'utf-8')) as { recentFiles?: unknown }
+    expect(state.recentFiles).toMatchObject([{ filePath, title: 'Note' }])
+    expect(fs.existsSync(path.join(workspacePath, '.mindlane', 'recent-files.json'))).toBe(false)
+    expect(await manager.listRecentFiles(workspacePath)).toMatchObject([{ filePath, title: 'Note' }])
+  })
+
+  it('keeps recent files isolated by workspace', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    const otherWorkspacePath = path.join(tmpDir, 'other-workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    fs.mkdirSync(otherWorkspacePath, { recursive: true })
+    const filePath = path.join(workspacePath, 'note.mindlane')
+    const otherFilePath = path.join(otherWorkspacePath, 'other.mindlane')
+
+    await manager.touchRecentFile(workspacePath, { filePath, title: 'Note' }, 10)
+    await manager.touchRecentFile(otherWorkspacePath, { filePath: otherFilePath, title: 'Other' }, 10)
+
+    expect(await manager.listRecentFiles(workspacePath)).toMatchObject([{ filePath, title: 'Note' }])
+    expect(await manager.listRecentFiles(otherWorkspacePath)).toMatchObject([
+      { filePath: otherFilePath, title: 'Other' },
+    ])
+  })
+
+  it('prunes missing files from the workspace recent file list', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const filePath = path.join(workspacePath, 'note.mindlane')
+
+    await manager.touchRecentFile(workspacePath, { filePath, title: 'Note' }, 10)
+    await manager.pruneRecentFiles(workspacePath)
+
+    expect(await manager.listRecentFiles(workspacePath)).toEqual([])
   })
 })

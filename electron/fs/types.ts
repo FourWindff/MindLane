@@ -49,6 +49,7 @@ export interface AppSettings {
 export interface WorkspaceState {
   lastOpenedFilePath: string | null
   expandedFolderPaths: string[]
+  recentFiles: RecentFileEntry[]
 }
 
 export interface ProviderConfig {

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
-import type { WorkspaceState } from './types.js'
+import type { RecentFileEntry, WorkspaceState } from './types.js'
 
 const STATE_FILE = 'state.json'
 const MINDLANE_DIR = '.mindlane'
@@ -9,6 +9,7 @@ const MINDLANE_DIR = '.mindlane'
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   lastOpenedFilePath: null,
   expandedFolderPaths: [],
+  recentFiles: [],
 }
 
 /** Coerce an untrusted value into a valid `lastOpenedFilePath` (string or null). */
@@ -19,6 +20,19 @@ export function coerceLastOpenedFilePath(value: unknown): string | null {
 /** Coerce an untrusted value into a valid `expandedFolderPaths` (array of strings). */
 export function coerceExpandedFolderPaths(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((p): p is string => typeof p === 'string') : []
+}
+
+/** Coerce an untrusted value into valid recent file entries. */
+export function coerceRecentFiles(value: unknown): RecentFileEntry[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(
+    (entry): entry is RecentFileEntry =>
+      entry != null &&
+      typeof entry === 'object' &&
+      typeof (entry as Record<string, unknown>).filePath === 'string' &&
+      typeof (entry as Record<string, unknown>).title === 'string' &&
+      typeof (entry as Record<string, unknown>).lastOpenedAt === 'string',
+  )
 }
 
 export class WorkspaceStateManager {
@@ -48,6 +62,7 @@ export class WorkspaceStateManager {
         const merged: WorkspaceState = {
           lastOpenedFilePath: coerceLastOpenedFilePath(parsed.lastOpenedFilePath),
           expandedFolderPaths: coerceExpandedFolderPaths(parsed.expandedFolderPaths),
+          recentFiles: coerceRecentFiles(parsed.recentFiles),
         }
         this.cache.set(workspacePath, merged)
         return { ...merged }
@@ -75,6 +90,39 @@ export class WorkspaceStateManager {
       if (this.writeQueue.get(workspacePath) === operation) {
         this.writeQueue.delete(workspacePath)
       }
+    }
+  }
+
+  async touchRecentFile(
+    workspacePath: string,
+    entry: Omit<RecentFileEntry, 'lastOpenedAt'>,
+    maxEntries: number,
+  ): Promise<void> {
+    const state = await this.load(workspacePath)
+    const filtered = state.recentFiles.filter((recentFile) => recentFile.filePath !== entry.filePath)
+    filtered.unshift({
+      ...entry,
+      lastOpenedAt: new Date().toISOString(),
+    })
+    await this.save(workspacePath, { recentFiles: filtered.slice(0, maxEntries) })
+  }
+
+  async listRecentFiles(workspacePath: string): Promise<RecentFileEntry[]> {
+    const state = await this.load(workspacePath)
+    return state.recentFiles
+  }
+
+  async pruneRecentFiles(workspacePath: string): Promise<void> {
+    const state = await this.load(workspacePath)
+    const valid = state.recentFiles.filter((entry) => {
+      try {
+        return fs.existsSync(entry.filePath)
+      } catch {
+        return false
+      }
+    })
+    if (valid.length !== state.recentFiles.length) {
+      await this.save(workspacePath, { recentFiles: valid })
     }
   }
 }
