@@ -28,17 +28,11 @@ release
 *.sln
 *.sw?
 
-_bmad
-_bmad-output
 .claude
 .codex
-.gitnexus
-.codegraph
 .agents
 skills-lock.json
-
-electron/lab/output
 tsconfig.node.tsbuildinfo
-.playwright-mcp
+
 # LangGraph API
 .langgraph_api
