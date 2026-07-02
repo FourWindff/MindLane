@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
+import { DEFAULT_SETTINGS } from './fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
@@ -71,21 +72,8 @@ function directoryExists(targetPath: string | null | undefined): boolean {
   }
 }
 
-function dedupeWorkspacePaths(paths: string[], maxEntries: number): string[] {
-  const unique = new Set<string>()
-  const result: string[] = []
-  for (const targetPath of paths) {
-    const resolvedPath = path.resolve(targetPath)
-    if (unique.has(resolvedPath) || !directoryExists(resolvedPath)) continue
-    unique.add(resolvedPath)
-    result.push(resolvedPath)
-    if (result.length >= maxEntries) break
-  }
-  return result
-}
-
 async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Promise<void> {
-  const settings = await fsService.settings.load()
+  const settings = await fsService.appState.load()
 
   const currentWorkspace = settings.lastWorkspacePath ? path.resolve(settings.lastWorkspacePath) : null
   const fileIsInCurrentWorkspace =
@@ -93,51 +81,39 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
 
   const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
 
-  const recentWorkspacePaths = dedupeWorkspacePaths(
-    [workspacePath, ...settings.recentWorkspacePaths],
-    settings.recentFilesMax,
-  )
-  await fsService.settings.update({
-    lastWorkspacePath: workspacePath,
-    recentWorkspacePaths,
-  })
+  await fsService.appState.switchWorkspace(workspacePath).catch(() => {})
   const title = data?.metadata.title || path.basename(filePath, path.extname(filePath))
-  await fsService.workspace.openFile(workspacePath, filePath, title, settings.recentFilesMax).catch(() => {})
+  const recentFilesMax = await fsService.appState.getRecentFilesMax()
+  await fsService.workspace.openFile(workspacePath, filePath, title, recentFilesMax).catch(() => {})
 }
 
 async function rememberWorkspace(
   workspacePath: string,
   options?: { clearLastOpenedFile?: boolean },
 ): Promise<void> {
-  const settings = await fsService.settings.load()
-  const recentWorkspacePaths = dedupeWorkspacePaths(
-    [workspacePath, ...settings.recentWorkspacePaths],
-    settings.recentFilesMax,
-  )
-  await fsService.settings.update({
-    lastWorkspacePath: workspacePath,
-    recentWorkspacePaths,
-  })
+  await fsService.appState.switchWorkspace(workspacePath).catch(() => {})
   if (options?.clearLastOpenedFile) {
-    await fsService.workspace.clearLastOpenedFile(workspacePath)
+    await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
   }
 }
 
 export async function getWorkspaceSessionForService(service: FileSystemService) {
-  const settings = await service.settings.load()
-  const recentWorkspacePaths = dedupeWorkspacePaths(settings.recentWorkspacePaths, settings.recentFilesMax)
-  const persistedLastWorkspacePathExists = directoryExists(settings.lastWorkspacePath)
-  const persistedWorkspacePath =
-    settings.restoreLastWorkspaceOnLaunch &&
-    settings.lastWorkspacePath &&
-    persistedLastWorkspacePathExists
-      ? path.resolve(settings.lastWorkspacePath)
-      : null
+  const launchResult = await service.appState.getLaunchSession()
+  if (!launchResult.ok) {
+    return {
+      workspacePath: null as string | null,
+      recentWorkspacePaths: [] as string[],
+      lastOpenedFilePath: null as string | null,
+      expandedFolderPaths: [] as string[],
+      restoreLastWorkspaceOnLaunch: DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
+    }
+  }
+  const { workspacePath, recentWorkspacePaths, restoreLastWorkspaceOnLaunch } = launchResult.data
 
   let lastOpenedFilePath: string | null = null
   let expandedFolderPaths: string[] = []
-  if (persistedWorkspacePath) {
-    const workspaceResult = await service.workspace.load(persistedWorkspacePath)
+  if (workspacePath) {
+    const workspaceResult = await service.workspace.load(workspacePath)
     const workspaceState = workspaceResult.ok ? workspaceResult.data : { ...DEFAULT_WORKSPACE_STATE }
     expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
@@ -145,10 +121,10 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     // One-time migration of legacy workspace-scoped keys from global settings.json.
     // Only seed workspace-local state if it is still all-defaults, then remove the legacy keys.
     if (isDefaultWorkspaceState(workspaceState)) {
-      const legacy = await service.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
-      if (legacy) {
-        await service.workspace.migrateLegacyState(persistedWorkspacePath, legacy)
-        const reloaded = await service.workspace.load(persistedWorkspacePath)
+      const legacyResult = await service.appState.migrateLegacyWorkspaceState(workspacePath)
+      if (legacyResult.ok && legacyResult.data) {
+        await service.workspace.migrateLegacyState(workspacePath, legacyResult.data)
+        const reloaded = await service.workspace.load(workspacePath)
         if (reloaded.ok) {
           expandedFolderPaths = reloaded.data.expandedFolderPaths
           lastOpenedFilePath = reloaded.data.lastOpenedFilePath
@@ -157,23 +133,12 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     }
   }
 
-  const settingsUpdate: Partial<AppSettings> = {}
-  if (settings.lastWorkspacePath && !persistedLastWorkspacePathExists) {
-    settingsUpdate.lastWorkspacePath = null
-  }
-  if (JSON.stringify(recentWorkspacePaths) !== JSON.stringify(settings.recentWorkspacePaths)) {
-    settingsUpdate.recentWorkspacePaths = recentWorkspacePaths
-  }
-  if (Object.keys(settingsUpdate).length > 0) {
-    await service.settings.update(settingsUpdate)
-  }
-
   return {
-    workspacePath: persistedWorkspacePath,
+    workspacePath,
     recentWorkspacePaths,
     lastOpenedFilePath,
     expandedFolderPaths,
-    restoreLastWorkspaceOnLaunch: settings.restoreLastWorkspaceOnLaunch,
+    restoreLastWorkspaceOnLaunch,
   }
 }
 
@@ -249,7 +214,7 @@ function createWindow() {
 
 function registerIpcHandlers(userDataPath: string) {
   const createProviderForRequest = async (apiKey: string, model: string) => {
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerConfig = settings.providerConfigs[providerId]
     const providerMeta = getProviderMeta(providerId)
@@ -266,7 +231,7 @@ function registerIpcHandlers(userDataPath: string) {
   }
 
   const resolveMessagePipelineConfig = async () => {
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerOverride = settings.providerConfigs[providerId]?.messagePipeline
     return mergeMessagePipelineConfig({
@@ -308,7 +273,7 @@ function registerIpcHandlers(userDataPath: string) {
       }
 
       try {
-        const settings = await fsService.settings.load()
+        const settings = await fsService.appState.load()
         const providerId = settings.activeProviders.chat || 'dashscope'
         const providerConfig = settings.providerConfigs[providerId]
         const apiKey = providerConfig?.apiKey || settings.apiKey || ''
@@ -470,7 +435,7 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle('ai:get-capabilities', async () => {
     try {
-      const settings = await fsService.settings.load()
+      const settings = await fsService.appState.load()
       const providerId = settings.activeProviders.chat || 'dashscope'
       const providerMeta = getProviderMeta(providerId)
       if (!providerMeta) {
@@ -489,7 +454,7 @@ function registerIpcHandlers(userDataPath: string) {
   // -- File operations --
   ipcMain.handle('file:open', async () => {
     if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const result = await fsService.project.open(win, {
       defaultPath: settings.lastWorkspacePath ?? undefined,
     })
@@ -511,7 +476,7 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle('file:save-as', async (_e, payload: { data: unknown }) => {
     if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const data = payload.data as MindLaneFile
     const result = await fsService.project.saveAs(data, win, {
       defaultDirectory: settings.lastWorkspacePath,
@@ -523,7 +488,7 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   ipcMain.handle('file:recent-list', async () => {
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     if (!settings.lastWorkspacePath || !directoryExists(settings.lastWorkspacePath)) return []
     await fsService.workspace.pruneRecentFiles(settings.lastWorkspacePath)
     const recentResult = await fsService.workspace.getRecentFiles(settings.lastWorkspacePath)
@@ -576,7 +541,7 @@ function registerIpcHandlers(userDataPath: string) {
   // -- Workspace operations --
   ipcMain.handle('workspace:open-directory', async () => {
     if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const result = await dialog.showOpenDialog(win, {
       title: '打开本地仓库',
       defaultPath: settings.lastWorkspacePath ?? undefined,
@@ -593,7 +558,7 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle('workspace:create-directory', async (_e, payload: { name: string }) => {
     if (!win) return { ok: false, error: 'No window' }
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const parentResult = await dialog.showOpenDialog(win, {
       title: '选择仓库父目录',
       defaultPath: settings.lastWorkspacePath ?? undefined,
@@ -842,11 +807,11 @@ function registerIpcHandlers(userDataPath: string) {
 
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {
-    return fsService.settings.load()
+    return fsService.appState.load()
   })
 
   ipcMain.handle('file:settings-update', async (_e, partial: Record<string, unknown>) => {
-    await fsService.settings.update(partial as Partial<AppSettings>)
+    await fsService.appState.update(partial as Partial<AppSettings>)
   })
 
   ipcMain.handle('window:minimize', () => {
@@ -897,7 +862,7 @@ app.whenReady().then(async () => {
 
   aiService = new AiService()
   try {
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerConfig = settings.providerConfigs[providerId]
     const apiKey = providerConfig?.apiKey || settings.apiKey || ''

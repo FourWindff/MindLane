@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { ProjectFileManager } from './projectFileManager.js'
 import { CacheManager } from './cacheManager.js'
-import { SettingsManager } from './settingsManager.js'
+import { AppState } from './appState.js'
 import { WorkspaceManager } from './workspaceManager.js'
 import { ThumbnailManager } from './thumbnailManager.js'
 import { Workspace } from './workspace.js'
@@ -9,7 +9,7 @@ import { Workspace } from './workspace.js'
 export class FileSystemService {
   readonly project: ProjectFileManager
   readonly cache: CacheManager
-  readonly settings: SettingsManager
+  readonly appState: AppState
   readonly workspace: Workspace
   readonly workspaceTree: WorkspaceManager
   readonly thumbnails: ThumbnailManager
@@ -17,7 +17,7 @@ export class FileSystemService {
   constructor(userDataPath: string) {
     this.project = new ProjectFileManager(userDataPath)
     this.cache = new CacheManager(path.join(userDataPath, 'cache'))
-    this.settings = new SettingsManager(userDataPath)
+    this.appState = new AppState(userDataPath)
     this.workspace = new Workspace()
     this.workspaceTree = new WorkspaceManager()
     this.thumbnails = new ThumbnailManager(userDataPath)
@@ -27,7 +27,7 @@ export class FileSystemService {
     await this.project.initialize()
     await this.cache.initialize()
     await this.thumbnails.initialize()
-    const settings = await this.settings.load()
+    const settings = await this.appState.load()
     if (settings.editor.cachePruneDays > 0) {
       await this.cache.pruneOldCache(settings.editor.cachePruneDays).catch(() => {})
     }
