@@ -71,19 +71,11 @@ describe('MindLaneAgent.invoke()', () => {
             name: GENERATE_MINDMAP_FRAGMENT_TOOL,
             input: '',
           },
-          {
-            index: 1,
-            type: 'input_json_delta',
-            input: '{"source":{"type":"pdf","path":"/test.pdf"}}',
-          },
         ],
         tool_calls: [
           {
             name: GENERATE_MINDMAP_FRAGMENT_TOOL,
-            args: {
-              source: { type: 'pdf', path: '/test.pdf' },
-              title: 'PDF 导图',
-            },
+            args: {},
             id: 'call-1',
             type: 'tool_call',
           },
@@ -98,8 +90,8 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.pendingSubgraph).toBe('mindmap')
     expect(result.pendingSubgraphToolCallId).toBe('call-1')
     expect(result.pendingSubgraphToolName).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
-    expect(result.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
-    expect(result.mindmapInputTitle).toBe('PDF 导图')
+    expect(result.mindmapInputSource).toBeUndefined()
+    expect(result.mindmapInputTitle).toBeUndefined()
     expect(result.messages).toHaveLength(1)
     const savedMessage = result.messages?.[0] as AIMessage
     expect(savedMessage.content).toBe('我来从 PDF 生成思维导图')
@@ -113,10 +105,7 @@ describe('MindLaneAgent.invoke()', () => {
         tool_calls: [
           {
             name: GENERATE_PALACE_TOOL,
-            args: {
-              inputText: '记忆材料',
-              inputNodes: [{ id: 'n1', label: '节点1' }],
-            },
+            args: {},
             id: 'call-2',
             type: 'tool_call',
           },
@@ -130,8 +119,8 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.pendingSubgraph).toBe('palace')
     expect(result.pendingSubgraphToolCallId).toBe('call-2')
     expect(result.pendingSubgraphToolName).toBe(GENERATE_PALACE_TOOL)
-    expect(result.palaceInputText).toBe('记忆材料')
-    expect(result.palaceInputNodes).toEqual([{ id: 'n1', label: '节点1' }])
+    expect(result.palaceInputText).toBeUndefined()
+    expect(result.palaceInputNodes).toBeUndefined()
   })
 
   it('returns ordinary tool calls for ToolNode execution', async () => {
@@ -169,7 +158,7 @@ describe('MindLaneAgent.invoke()', () => {
           },
           {
             name: GENERATE_MINDMAP_FRAGMENT_TOOL,
-            args: { source: { type: 'text', content: 'AI 基础知识' } },
+            args: {},
             id: 'call-2',
             type: 'tool_call',
           },

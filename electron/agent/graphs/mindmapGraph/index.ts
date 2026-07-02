@@ -9,6 +9,7 @@ import { TextInputAnalyzer, findInputAnalyzer } from './analyzers/textAnalyzer.j
 import type { MindmapInputAnalyzer } from './analyzers/types.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
+import { MindmapInputResolver } from './inputResolver.js'
 
 // ===== 配置选项 =====
 
@@ -147,6 +148,27 @@ function buildYamlRepairPrompt(
 }
 
 // ===== Node implementations =====
+
+async function resolveInputNode(
+  state: typeof MindmapSubgraphState.State,
+): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  const reset = createMindmapRunReset()
+  const resolution = new MindmapInputResolver().resolve(state)
+
+  if (!resolution) {
+    return {
+      ...reset,
+      error: '请提供要生成思维导图的文档或文本。',
+      response: '请提供要生成思维导图的文档或文本。',
+    }
+  }
+
+  return {
+    ...reset,
+    mindmapInputSource: resolution.source,
+    mindmapInputTitle: resolution.title,
+  }
+}
 
 async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
@@ -477,6 +499,11 @@ async function singleExtractNode(
 
 // ===== Edge routing functions =====
 
+function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): string {
+  if (state.error) return 'build_output'
+  return 'load_document'
+}
+
 function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string {
   if (state.error) return 'build_output'
   const totalChars = state.documentChunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
@@ -510,7 +537,7 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  * 构建 Mindmap Subgraph
  *
  * 流程:
- * START -> load_document
+ * START -> resolve_input -> load_document
  *   - small document -> single_extract -> build_output -> END
  *   - large document -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
  *                     -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
@@ -518,6 +545,7 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
+    .addNode('resolve_input', (state) => resolveInputNode(state))
     .addNode('load_document', (state) => loadDocumentNode(state, options))
     .addNode('dispatch_leaf', (state) => dispatchLeafNode(state))
     .addNode('leaf_extract', (state) => leafExtractNode(state, options))
@@ -528,8 +556,12 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     .addNode('build_output', (state) => buildOutputNode(state))
     .addNode('single_extract', (state) => singleExtractNode(state, options))
 
-  // START -> load_document
-  graph.addEdge(START, 'load_document')
+  // START -> resolve_input -> load_document
+  graph.addEdge(START, 'resolve_input')
+  graph.addConditionalEdges('resolve_input', routeAfterResolveInput, [
+    'load_document',
+    'build_output',
+  ])
 
   // load_document branches based on document size
   graph.addConditionalEdges('load_document', routeAfterLoadDocument, [

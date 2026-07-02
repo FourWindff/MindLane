@@ -11,12 +11,8 @@ import { logger } from "../../../shared/logger.js";
 import {
   createGenerateMindmapFragmentTool,
   createGeneratePalaceTool,
-  GENERATE_MINDMAP_FRAGMENT_TOOL,
-  GENERATE_PALACE_TOOL,
-  isVirtualSubgraphTool,
-  type GenerateMindmapFragmentArgs,
-  type GeneratePalaceArgs,
 } from "../../tools/subgraphRoutingTools.js";
+import { route as routeSubgraph } from "../../subgraphRouter.js";
 import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
 import { isPromptTooLongError } from "../../memory/contextCompact.js";
 import { AGENT_LIMITS } from "../../config.js";
@@ -128,24 +124,21 @@ export class MindLaneAgent extends BaseAgent {
   }
 
   route(state: MainGraphStateType): string {
-    const lastMessage = state.messages[state.messages.length - 1];
-
-    if (lastMessage && lastMessage.type === "ai") {
-      const msg = lastMessage as AIMessage;
-      const actionToolCalls =
-        msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? [];
-      if (actionToolCalls.length > 0) {
-        return "tools";
-      }
-    }
-
     switch (state.pendingSubgraph) {
       case "palace":
         return this.capabilityFlags.hasPalace ? "palaceSubgraph" : "__end__";
       case "mindmap":
         return "mindmapSubgraph";
-      default:
+      default: {
+        const lastMessage = state.messages[state.messages.length - 1];
+        if (lastMessage && lastMessage.type === "ai") {
+          const msg = lastMessage as AIMessage;
+          if ((msg.tool_calls?.length ?? 0) > 0) {
+            return "tools";
+          }
+        }
         return "__end__";
+      }
     }
   }
 
@@ -197,11 +190,11 @@ export class MindLaneAgent extends BaseAgent {
     const content = extractTextContent(response.content)
     const toolCalls = response.tool_calls ?? []
 
-    const virtualToolCalls = toolCalls.filter((tc) =>
-      isVirtualSubgraphTool(tc.name),
-    )
-    const actionToolCalls = toolCalls.filter((tc) =>
-      !isVirtualSubgraphTool(tc.name),
+    const routeResults = toolCalls
+      .map((tc) => routeSubgraph(tc, state.context, state.messages))
+      .filter((r) => r !== null)
+    const hasActionToolCall = toolCalls.some(
+      (tc) => routeSubgraph(tc, state.context, state.messages) === null,
     )
 
     logger.info('[MindLaneAgent] 模型输出:', {
@@ -211,11 +204,8 @@ export class MindLaneAgent extends BaseAgent {
         name: tc.name,
         args: tc.args,
       })),
-      actionToolCalls: actionToolCalls.map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        args: tc.args,
-      })),
+      routedSubgraphs: routeResults.map((r) => r.subgraph),
+      hasActionToolCall,
     })
 
     let resultMessages: BaseMessage[]
@@ -230,17 +220,23 @@ export class MindLaneAgent extends BaseAgent {
       resultMessages = [response]
     }
 
-    if (actionToolCalls.length > 0) {
+    if (hasActionToolCall) {
       return { messages: resultMessages }
     }
 
-    const virtualToolCall = virtualToolCalls[0]
-    if (virtualToolCall) {
-      const routeResult = this.executeVirtualToolRoute(response, virtualToolCall, content)
-      if (didReactiveCompact) {
-        return { ...routeResult, messages: resultMessages }
+    const virtualRoute = routeResults[0]
+    if (virtualRoute) {
+      const routeState = {
+        messages: [createToolCallMessage(response, content)],
+        pendingSubgraph: virtualRoute.subgraph,
+        pendingSubgraphToolCallId: virtualRoute.toolCallId,
+        pendingSubgraphToolName: virtualRoute.toolName,
+        response: content,
       }
-      return routeResult
+      if (didReactiveCompact) {
+        return { ...routeState, messages: resultMessages }
+      }
+      return routeState
     }
 
     return {
@@ -273,51 +269,6 @@ export class MindLaneAgent extends BaseAgent {
     }
   }
 
-  private executeVirtualToolRoute(
-    response: AIMessage,
-    toolCall: NonNullable<AIMessage["tool_calls"]>[number],
-    content: string,
-  ): Partial<MainGraphStateType> {
-    if (toolCall.name === GENERATE_MINDMAP_FRAGMENT_TOOL) {
-      const args = toolCall.args as GenerateMindmapFragmentArgs;
-      const source = args.source;
-      if (!source) {
-        return {
-          messages: [new AIMessage({ content: '请提供要生成思维导图的文档或文本。' })],
-          pendingSubgraph: null,
-          response: '请提供要生成思维导图的文档或文本。',
-        };
-      }
-      return {
-        messages: [createToolCallMessage(response, content)],
-        pendingSubgraph: "mindmap",
-        pendingSubgraphToolCallId: toolCall.id ?? '',
-        pendingSubgraphToolName: toolCall.name,
-        mindmapInputSource: source,
-        mindmapInputTitle: args.title || '',
-        response: content,
-      };
-    }
-
-    if (toolCall.name === GENERATE_PALACE_TOOL) {
-      const args = toolCall.args as GeneratePalaceArgs;
-      return {
-        messages: [createToolCallMessage(response, content)],
-        pendingSubgraph: "palace",
-        pendingSubgraphToolCallId: toolCall.id ?? '',
-        pendingSubgraphToolName: toolCall.name,
-        palaceInputText: args.inputText || content,
-        palaceInputNodes: args.inputNodes || [],
-        response: content,
-      };
-    }
-
-    return {
-      messages: [response],
-      pendingSubgraph: null,
-      response: content,
-    };
-  }
 }
 
 function summarizeMessageContent(content: unknown): unknown {

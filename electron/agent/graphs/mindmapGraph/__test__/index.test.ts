@@ -120,7 +120,7 @@ describe('mindmapGraph', () => {
       documentRef: null,
     })
 
-    expect(result.error).toContain('请提供输入来源')
+    expect(result.error).toContain('请提供要生成思维导图的文档或文本')
     expect(mockProvider.reasoningModel.invoke).not.toHaveBeenCalled()
   })
 
