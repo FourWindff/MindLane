@@ -4,22 +4,22 @@ import { CacheManager } from './cacheManager.js'
 import { SettingsManager } from './settingsManager.js'
 import { WorkspaceManager } from './workspaceManager.js'
 import { ThumbnailManager } from './thumbnailManager.js'
-import { WorkspaceStateManager } from './workspaceStateManager.js'
+import { Workspace } from './workspace.js'
 
 export class FileSystemService {
   readonly project: ProjectFileManager
   readonly cache: CacheManager
   readonly settings: SettingsManager
-  readonly workspace: WorkspaceManager
+  readonly workspace: Workspace
+  readonly workspaceTree: WorkspaceManager
   readonly thumbnails: ThumbnailManager
-  readonly workspaceState: WorkspaceStateManager
 
   constructor(userDataPath: string) {
     this.project = new ProjectFileManager(userDataPath)
     this.cache = new CacheManager(path.join(userDataPath, 'cache'))
     this.settings = new SettingsManager(userDataPath)
-    this.workspaceState = new WorkspaceStateManager()
-    this.workspace = new WorkspaceManager()
+    this.workspace = new Workspace()
+    this.workspaceTree = new WorkspaceManager()
     this.thumbnails = new ThumbnailManager(userDataPath)
   }
 

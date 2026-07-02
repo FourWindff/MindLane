@@ -88,7 +88,7 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
 
   const currentWorkspace = settings.lastWorkspacePath ? path.resolve(settings.lastWorkspacePath) : null
   const fileIsInCurrentWorkspace =
-    currentWorkspace && fsService.workspace.isWithinWorkspace(filePath, currentWorkspace)
+    currentWorkspace && fsService.workspaceTree.isWithinWorkspace(filePath, currentWorkspace)
 
   const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
 
@@ -100,17 +100,8 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
     lastWorkspacePath: workspacePath,
     recentWorkspacePaths,
   })
-  await fsService.workspaceState.save(workspacePath, { lastOpenedFilePath: filePath })
-  await fsService.workspaceState
-    .touchRecentFile(
-      workspacePath,
-      {
-        filePath,
-        title: data?.metadata.title || path.basename(filePath, path.extname(filePath)),
-      },
-      settings.recentFilesMax,
-    )
-    .catch(() => {})
+  const title = data?.metadata.title || path.basename(filePath, path.extname(filePath))
+  await fsService.workspace.openFile(workspacePath, filePath, title, settings.recentFilesMax).catch(() => {})
 }
 
 async function rememberWorkspace(
@@ -127,7 +118,7 @@ async function rememberWorkspace(
     recentWorkspacePaths,
   })
   if (options?.clearLastOpenedFile) {
-    await fsService.workspaceState.save(workspacePath, { lastOpenedFilePath: null })
+    await fsService.workspace.clearLastOpenedFile(workspacePath)
   }
 }
 
@@ -145,7 +136,10 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   let lastOpenedFilePath: string | null = null
   let expandedFolderPaths: string[] = []
   if (persistedWorkspacePath) {
-    const workspaceState = await service.workspaceState.load(persistedWorkspacePath)
+    const workspaceResult = await service.workspace.load(persistedWorkspacePath)
+    const workspaceState = workspaceResult.ok
+      ? workspaceResult.data
+      : { lastOpenedFilePath: null as string | null, expandedFolderPaths: [] as string[], recentFiles: [] }
     expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
       workspaceState.lastOpenedFilePath,
@@ -157,7 +151,7 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     if (isDefaultWorkspaceState(workspaceState)) {
       const legacy = await service.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
       if (legacy) {
-        await service.workspaceState.save(persistedWorkspacePath, legacy)
+        await service.workspace.saveRaw(persistedWorkspacePath, legacy)
         lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
           legacy.lastOpenedFilePath ?? null,
           persistedWorkspacePath,
@@ -198,8 +192,8 @@ function resolveWorkspaceLastOpenedFilePath(
   if (
     candidate &&
     pathExists(candidate) &&
-    fsService.workspace.isSupportedFile(candidate) &&
-    fsService.workspace.isWithinWorkspace(candidate, workspacePath)
+    fsService.workspaceTree.isSupportedFile(candidate) &&
+    fsService.workspaceTree.isWithinWorkspace(candidate, workspacePath)
   ) {
     return path.resolve(candidate)
   }
@@ -550,8 +544,9 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle('file:recent-list', async () => {
     const settings = await fsService.settings.load()
     if (!settings.lastWorkspacePath || !directoryExists(settings.lastWorkspacePath)) return []
-    await fsService.workspaceState.pruneRecentFiles(settings.lastWorkspacePath)
-    return fsService.workspaceState.listRecentFiles(settings.lastWorkspacePath)
+    await fsService.workspace.pruneRecentFiles(settings.lastWorkspacePath)
+    const recentResult = await fsService.workspace.getRecentFiles(settings.lastWorkspacePath)
+    return recentResult.ok ? recentResult.data : []
   })
 
   ipcMain.handle('file:save-thumbnail', async (_e, payload: { filePath: string; imageData: string }) => {
@@ -611,7 +606,7 @@ function registerIpcHandlers(userDataPath: string) {
     }
     const workspacePath = path.resolve(result.filePaths[0]!)
     await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
-    const files = await fsService.workspace.listFiles(workspacePath)
+    const files = await fsService.workspaceTree.listFiles(workspacePath)
     return { ok: true, data: { workspacePath, files } }
   })
 
@@ -627,7 +622,7 @@ function registerIpcHandlers(userDataPath: string) {
       return { ok: false, error: '已取消' }
     }
     try {
-      const workspacePath = await fsService.workspace.createDirectory(
+      const workspacePath = await fsService.workspaceTree.createDirectory(
         parentResult.filePaths[0]!,
         payload.name,
       )
@@ -661,7 +656,7 @@ function registerIpcHandlers(userDataPath: string) {
     try {
       return {
         ok: true,
-        data: await fsService.workspace.listFiles(payload.workspacePath),
+        data: await fsService.workspaceTree.listFiles(payload.workspacePath),
       }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -683,26 +678,28 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle(
     'workspace:update-state',
     async (_e, payload: { workspacePath: string } & Partial<WorkspaceState>) => {
-      try {
-        const partial: Partial<WorkspaceState> = {}
-        if (payload.expandedFolderPaths !== undefined) {
-          partial.expandedFolderPaths = payload.expandedFolderPaths
-        }
-        if (payload.lastOpenedFilePath !== undefined) {
-          partial.lastOpenedFilePath = payload.lastOpenedFilePath
-        }
-        await fsService.workspaceState.save(payload.workspacePath, partial)
-        return { ok: true }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      if (payload.expandedFolderPaths !== undefined) {
+        const result = await fsService.workspace.updateExpandedFolders(
+          payload.workspacePath,
+          payload.expandedFolderPaths,
+        )
+        if (!result.ok) return result
       }
+      if (payload.lastOpenedFilePath !== undefined) {
+        const result =
+          payload.lastOpenedFilePath === null
+            ? await fsService.workspace.clearLastOpenedFile(payload.workspacePath)
+            : { ok: false, error: '不支持直接设置 lastOpenedFilePath' }
+        if (!result.ok) return result
+      }
+      return { ok: true }
     },
   )
 
   ipcMain.handle('workspace:switch', async (_e, payload: { workspacePath: string }) => {
     try {
       const workspacePath = path.resolve(payload.workspacePath)
-      const files = await fsService.workspace.listFiles(workspacePath)
+      const files = await fsService.workspaceTree.listFiles(workspacePath)
       await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
       return { ok: true, data: { workspacePath, files } }
     } catch (error) {
@@ -714,7 +711,7 @@ function registerIpcHandlers(userDataPath: string) {
     try {
       return {
         ok: true,
-        data: await fsService.workspace.listTree(payload.workspacePath),
+        data: await fsService.workspaceTree.listTree(payload.workspacePath),
       }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
@@ -725,7 +722,7 @@ function registerIpcHandlers(userDataPath: string) {
     'workspace:create-subfolder',
     async (_e, payload: { parentPath: string; name: string; workspacePath: string }) => {
       try {
-        const createdPath = await fsService.workspace.createSubdirectory(
+        const createdPath = await fsService.workspaceTree.createSubdirectory(
           payload.parentPath,
           payload.name,
           payload.workspacePath,
@@ -741,7 +738,7 @@ function registerIpcHandlers(userDataPath: string) {
     'workspace:delete-item',
     async (_e, payload: { targetPath: string; workspacePath: string }) => {
       try {
-        await fsService.workspace.deleteItem(payload.targetPath, payload.workspacePath)
+        await fsService.workspaceTree.deleteItem(payload.targetPath, payload.workspacePath)
         // 清理缩略图
         await fsService.thumbnails.delete(payload.targetPath)
         return { ok: true }
@@ -755,7 +752,7 @@ function registerIpcHandlers(userDataPath: string) {
     'workspace:rename-item',
     async (_e, payload: { oldPath: string; newName: string; workspacePath: string }) => {
       try {
-        const newPath = await fsService.workspace.rename(
+        const newPath = await fsService.workspaceTree.rename(
           payload.oldPath,
           payload.newName,
           payload.workspacePath,
@@ -771,7 +768,7 @@ function registerIpcHandlers(userDataPath: string) {
     'workspace:move-item',
     async (_e, payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) => {
       try {
-        const newPath = await fsService.workspace.move(
+        const newPath = await fsService.workspaceTree.move(
           payload.sourcePath,
           payload.targetDirPath,
           payload.workspacePath,
@@ -915,7 +912,7 @@ app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData')
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
-  fsService.workspace.setThumbnailManager(fsService.thumbnails)
+  fsService.workspaceTree.setThumbnailManager(fsService.thumbnails)
 
   aiService = new AiService()
   try {

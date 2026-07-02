@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { AppSettings, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
-import { coerceLastOpenedFilePath, coerceExpandedFolderPaths } from './workspaceStateManager.js'
+import { coerceLastOpenedFilePath, coerceExpandedFolderPaths } from './workspace.js'
 
 export class SettingsManager {
   private filePath: string
