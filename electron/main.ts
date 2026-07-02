@@ -552,8 +552,9 @@ function registerIpcHandlers(userDataPath: string) {
     }
     const workspacePath = path.resolve(result.filePaths[0]!)
     await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
-    const files = await fsService.workspaceTree.listFiles(workspacePath)
-    return { ok: true, data: { workspacePath, files } }
+    const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
+    if (!filesResult.ok) return filesResult
+    return { ok: true, data: { workspacePath, files: filesResult.data } }
   })
 
   ipcMain.handle('workspace:create-directory', async (_e, payload: { name: string }) => {
@@ -567,16 +568,13 @@ function registerIpcHandlers(userDataPath: string) {
     if (parentResult.canceled || parentResult.filePaths.length === 0) {
       return { ok: false, error: '已取消' }
     }
-    try {
-      const workspacePath = await fsService.workspaceTree.createDirectory(
-        parentResult.filePaths[0]!,
-        payload.name,
-      )
-      await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
-      return { ok: true, data: { workspacePath, files: [] } }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
+    const createResult = await fsService.workspaceTree.createDirectory(
+      parentResult.filePaths[0]!,
+      payload.name,
+    )
+    if (!createResult.ok) return createResult
+    await rememberWorkspace(createResult.data, { clearLastOpenedFile: true })
+    return { ok: true, data: { workspacePath: createResult.data, files: [] } }
   })
 
   ipcMain.handle(
@@ -599,14 +597,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle('workspace:list-files', async (_e, payload: { workspacePath: string }) => {
-    try {
-      return {
-        ok: true,
-        data: await fsService.workspaceTree.listFiles(payload.workspacePath),
-      }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
+    return fsService.workspaceTree.listFiles(payload.workspacePath)
   })
 
   ipcMain.handle('workspace:open-file-path', async (_e, payload: { filePath: string }) => {
@@ -643,86 +634,64 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle('workspace:switch', async (_e, payload: { workspacePath: string }) => {
-    try {
-      const workspacePath = path.resolve(payload.workspacePath)
-      const files = await fsService.workspaceTree.listFiles(workspacePath)
-      await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
-      return { ok: true, data: { workspacePath, files } }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
+    const workspacePath = path.resolve(payload.workspacePath)
+    const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
+    if (!filesResult.ok) return filesResult
+    await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
+    return { ok: true, data: { workspacePath, files: filesResult.data } }
   })
 
   ipcMain.handle('workspace:list-tree', async (_e, payload: { workspacePath: string }) => {
-    try {
-      return {
-        ok: true,
-        data: await fsService.workspaceTree.listTree(payload.workspacePath),
-      }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
+    return fsService.workspaceTree.listTree(payload.workspacePath)
   })
 
   ipcMain.handle(
     'workspace:create-subfolder',
     async (_e, payload: { parentPath: string; name: string; workspacePath: string }) => {
-      try {
-        const createdPath = await fsService.workspaceTree.createSubdirectory(
-          payload.parentPath,
-          payload.name,
-          payload.workspacePath,
-        )
-        return { ok: true, data: { path: createdPath } }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      const result = await fsService.workspaceTree.createSubdirectory(
+        payload.parentPath,
+        payload.name,
+        payload.workspacePath,
+      )
+      if (!result.ok) return result
+      return { ok: true, data: { path: result.data } }
     },
   )
 
   ipcMain.handle(
     'workspace:delete-item',
     async (_e, payload: { targetPath: string; workspacePath: string }) => {
-      try {
-        await fsService.workspaceTree.deleteItem(payload.targetPath, payload.workspacePath)
-        // 清理缩略图
-        await fsService.thumbnails.delete(payload.targetPath)
-        return { ok: true }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      const result = await fsService.workspaceTree.deleteItem(payload.targetPath, payload.workspacePath)
+      if (!result.ok) return result
+      // 清理缩略图
+      await fsService.thumbnails.delete(payload.targetPath).catch(() => {})
+      return { ok: true }
     },
   )
 
   ipcMain.handle(
     'workspace:rename-item',
     async (_e, payload: { oldPath: string; newName: string; workspacePath: string }) => {
-      try {
-        const newPath = await fsService.workspaceTree.rename(
-          payload.oldPath,
-          payload.newName,
-          payload.workspacePath,
-        )
-        return { ok: true, data: { newPath } }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      const result = await fsService.workspaceTree.rename(
+        payload.oldPath,
+        payload.newName,
+        payload.workspacePath,
+      )
+      if (!result.ok) return result
+      return { ok: true, data: { newPath: result.data } }
     },
   )
 
   ipcMain.handle(
     'workspace:move-item',
     async (_e, payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) => {
-      try {
-        const newPath = await fsService.workspaceTree.move(
-          payload.sourcePath,
-          payload.targetDirPath,
-          payload.workspacePath,
-        )
-        return { ok: true, data: { newPath } }
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
+      const result = await fsService.workspaceTree.move(
+        payload.sourcePath,
+        payload.targetDirPath,
+        payload.workspacePath,
+      )
+      if (!result.ok) return result
+      return { ok: true, data: { newPath: result.data } }
     },
   )
 

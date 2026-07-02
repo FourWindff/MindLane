@@ -2,7 +2,7 @@ import path from 'node:path'
 import { ProjectFileManager } from './projectFileManager.js'
 import { CacheManager } from './cacheManager.js'
 import { AppState } from './appState.js'
-import { WorkspaceManager } from './workspaceManager.js'
+import { WorkspaceTree } from './workspaceTree.js'
 import { ThumbnailManager } from './thumbnailManager.js'
 import { Workspace } from './workspace.js'
 
@@ -11,7 +11,7 @@ export class FileSystemService {
   readonly cache: CacheManager
   readonly appState: AppState
   readonly workspace: Workspace
-  readonly workspaceTree: WorkspaceManager
+  readonly workspaceTree: WorkspaceTree
   readonly thumbnails: ThumbnailManager
 
   constructor(userDataPath: string) {
@@ -19,7 +19,7 @@ export class FileSystemService {
     this.cache = new CacheManager(path.join(userDataPath, 'cache'))
     this.appState = new AppState(userDataPath)
     this.workspace = new Workspace()
-    this.workspaceTree = new WorkspaceManager()
+    this.workspaceTree = new WorkspaceTree()
     this.thumbnails = new ThumbnailManager(userDataPath)
   }
 
