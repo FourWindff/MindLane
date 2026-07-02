@@ -13,6 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
+import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 
 import { AiService } from './agent/service.js'
@@ -137,26 +138,21 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   let expandedFolderPaths: string[] = []
   if (persistedWorkspacePath) {
     const workspaceResult = await service.workspace.load(persistedWorkspacePath)
-    const workspaceState = workspaceResult.ok
-      ? workspaceResult.data
-      : { lastOpenedFilePath: null as string | null, expandedFolderPaths: [] as string[], recentFiles: [] }
+    const workspaceState = workspaceResult.ok ? workspaceResult.data : { ...DEFAULT_WORKSPACE_STATE }
     expandedFolderPaths = workspaceState.expandedFolderPaths
-    lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
-      workspaceState.lastOpenedFilePath,
-      persistedWorkspacePath,
-    )
+    lastOpenedFilePath = workspaceState.lastOpenedFilePath
 
     // One-time migration of legacy workspace-scoped keys from global settings.json.
     // Only seed workspace-local state if it is still all-defaults, then remove the legacy keys.
     if (isDefaultWorkspaceState(workspaceState)) {
       const legacy = await service.settings.migrateLegacyWorkspaceState(persistedWorkspacePath)
       if (legacy) {
-        await service.workspace.saveRaw(persistedWorkspacePath, legacy)
-        lastOpenedFilePath = resolveWorkspaceLastOpenedFilePath(
-          legacy.lastOpenedFilePath ?? null,
-          persistedWorkspacePath,
-        )
-        expandedFolderPaths = legacy.expandedFolderPaths ?? []
+        await service.workspace.migrateLegacyState(persistedWorkspacePath, legacy)
+        const reloaded = await service.workspace.load(persistedWorkspacePath)
+        if (reloaded.ok) {
+          expandedFolderPaths = reloaded.data.expandedFolderPaths
+          lastOpenedFilePath = reloaded.data.lastOpenedFilePath
+        }
       }
     }
   }
@@ -183,21 +179,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
 
 async function getWorkspaceSession() {
   return getWorkspaceSessionForService(fsService)
-}
-
-function resolveWorkspaceLastOpenedFilePath(
-  candidate: string | null,
-  workspacePath: string,
-): string | null {
-  if (
-    candidate &&
-    pathExists(candidate) &&
-    fsService.workspaceTree.isSupportedFile(candidate) &&
-    fsService.workspaceTree.isWithinWorkspace(candidate, workspacePath)
-  ) {
-    return path.resolve(candidate)
-  }
-  return null
 }
 
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {

@@ -47,9 +47,6 @@ export class Workspace {
     const pending = this.writeQueue.get(workspacePath)
     if (pending) await pending
 
-    const cached = this.cache.get(workspacePath)
-    if (cached) return { ok: true, data: { ...cached } }
-
     return this.loadFromDisk(workspacePath)
   }
 
@@ -87,8 +84,15 @@ export class Workspace {
     }))
   }
 
-  /** Internal escape hatch for legacy migration: write arbitrary partial state. */
-  async saveRaw(workspacePath: string, partial: Partial<WorkspaceState>): Promise<FsResult<void>> {
+  /**
+   * One-time migration helper: write legacy workspace-scoped keys that were
+   * previously stored in global settings.json. The written state is still
+   * subject to the normal validation rules on the next load.
+   */
+  async migrateLegacyState(
+    workspacePath: string,
+    partial: Partial<WorkspaceState>,
+  ): Promise<FsResult<void>> {
     return this.saveState(workspacePath, async () => partial)
   }
 

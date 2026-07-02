@@ -98,6 +98,74 @@ describe('Workspace', () => {
     expect(typeof loaded.data.recentFiles[0]?.lastOpenedAt).toBe('string')
   })
 
+  it('falls back to defaults when state file is corrupt', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    fs.mkdirSync(path.dirname(statePath), { recursive: true })
+    fs.writeFileSync(statePath, 'not valid json')
+
+    const result = await workspace.load(workspacePath)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.lastOpenedFilePath).toBeNull()
+    expect(result.data.expandedFolderPaths).toEqual([])
+    expect(result.data.recentFiles).toEqual([])
+  })
+
+  it('re-validates lastOpenedFilePath on every load', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    const docPath = path.join(workspacePath, 'doc.mindlane')
+    fs.mkdirSync(path.dirname(statePath), { recursive: true })
+    fs.writeFileSync(docPath, '{}')
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        lastOpenedFilePath: docPath,
+        expandedFolderPaths: [],
+        recentFiles: [],
+      }),
+    )
+
+    const first = await workspace.load(workspacePath)
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.data.lastOpenedFilePath).toBe(docPath)
+
+    fs.unlinkSync(docPath)
+
+    const second = await workspace.load(workspacePath)
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(second.data.lastOpenedFilePath).toBeNull()
+  })
+
+  it('migrateLegacyState writes legacy keys and subsequent load validates them', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const existingFile = path.join(workspacePath, 'legacy.mindlane')
+    const missingFile = path.join(workspacePath, 'gone.mindlane')
+    fs.writeFileSync(existingFile, '{}')
+
+    const migrateResult = await workspace.migrateLegacyState(workspacePath, {
+      lastOpenedFilePath: existingFile,
+      expandedFolderPaths: ['a', 'b'],
+      recentFiles: [
+        { filePath: existingFile, title: 'Legacy', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
+        { filePath: missingFile, title: 'Missing', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
+      ],
+    })
+    expect(migrateResult.ok).toBe(true)
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.lastOpenedFilePath).toBe(existingFile)
+    expect(loaded.data.expandedFolderPaths).toEqual(['a', 'b'])
+    expect(loaded.data.recentFiles).toHaveLength(2)
+  })
+
   it('openFile respects maxEntries and moves existing entries to the top', async () => {
     const workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
