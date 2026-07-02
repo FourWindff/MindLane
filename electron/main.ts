@@ -87,16 +87,6 @@ async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Pro
   await fsService.workspace.openFile(workspacePath, filePath, title, recentFilesMax).catch(() => {})
 }
 
-async function rememberWorkspace(
-  workspacePath: string,
-  options?: { clearLastOpenedFile?: boolean },
-): Promise<void> {
-  await fsService.appState.switchWorkspace(workspacePath).catch(() => {})
-  if (options?.clearLastOpenedFile) {
-    await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
-  }
-}
-
 export async function getWorkspaceSessionForService(service: FileSystemService) {
   const launchResult = await service.appState.getLaunchSession()
   if (!launchResult.ok) {
@@ -551,7 +541,9 @@ function registerIpcHandlers(userDataPath: string) {
       return { ok: false, error: '已取消' }
     }
     const workspacePath = path.resolve(result.filePaths[0]!)
-    await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
+    const switchResult = await fsService.appState.switchWorkspace(workspacePath)
+    if (!switchResult.ok) return switchResult
+    await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
     const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
     if (!filesResult.ok) return filesResult
     return { ok: true, data: { workspacePath, files: filesResult.data } }
@@ -573,7 +565,9 @@ function registerIpcHandlers(userDataPath: string) {
       payload.name,
     )
     if (!createResult.ok) return createResult
-    await rememberWorkspace(createResult.data, { clearLastOpenedFile: true })
+    const switchResult = await fsService.appState.switchWorkspace(createResult.data)
+    if (!switchResult.ok) return switchResult
+    await fsService.workspace.clearLastOpenedFile(createResult.data).catch(() => {})
     return { ok: true, data: { workspacePath: createResult.data, files: [] } }
   })
 
@@ -637,7 +631,9 @@ function registerIpcHandlers(userDataPath: string) {
     const workspacePath = path.resolve(payload.workspacePath)
     const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
     if (!filesResult.ok) return filesResult
-    await rememberWorkspace(workspacePath, { clearLastOpenedFile: true })
+    const switchResult = await fsService.appState.switchWorkspace(workspacePath)
+    if (!switchResult.ok) return switchResult
+    await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
     return { ok: true, data: { workspacePath, files: filesResult.data } }
   })
 
