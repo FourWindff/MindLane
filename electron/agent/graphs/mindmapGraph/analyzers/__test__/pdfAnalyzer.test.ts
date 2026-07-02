@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { PdfInputAnalyzer, chunkPages } from '../pdfAnalyzer.js'
+import { PdfInputAnalyzer } from '../pdfAnalyzer.js'
+import type { DocumentChunk } from '../types.js'
+
+type PdfAnalyzerWithChunking = PdfInputAnalyzer & {
+  chunkPages: (pages: Array<{ text: string; index: number }>, limit: number) => DocumentChunk[]
+}
 
 describe('PdfInputAnalyzer', () => {
   it('supports pdf type', () => {
@@ -14,14 +19,15 @@ describe('PdfInputAnalyzer', () => {
   })
 })
 
-describe('chunkPages', () => {
+describe('PdfInputAnalyzer chunking', () => {
   it('splits pages into chunks respecting char limit', () => {
+    const analyzer = new PdfInputAnalyzer()
     const pages = [
       { text: 'a'.repeat(500), index: 1 },
       { text: 'b'.repeat(500), index: 2 },
       { text: 'c'.repeat(500), index: 3 },
     ]
-    const chunks = chunkPages(pages, 800)
+    const chunks = (analyzer as PdfAnalyzerWithChunking).chunkPages(pages, 800)
     expect(chunks.length).toBe(2)
     expect(chunks[0]!.startPage).toBe(1)
     expect(chunks[0]!.endPage).toBe(2)

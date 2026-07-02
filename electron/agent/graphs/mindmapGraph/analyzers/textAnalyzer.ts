@@ -23,27 +23,27 @@ export class TextInputAnalyzer extends MindmapInputAnalyzer<string, string> {
   }
 
   protected chunk(raw: string): LoadedDocument['chunks'] {
-    return chunkText(raw)
-  }
-}
-
-export function chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
-  const normalizedLimit = Math.max(1000, chunkCharLimit)
-  const chunks: LoadedDocument['chunks'] = []
-
-  for (let offset = 0; offset < text.length; offset += normalizedLimit) {
-    const chunk = text.slice(offset, offset + normalizedLimit)
-
-    chunks.push({
-      id: `chunk-${chunks.length + 1}`,
-      index: chunks.length,
-      startPage: 0,
-      endPage: 0,
-      text: chunk,
-    })
+    return this.chunkText(raw)
   }
 
-  return chunks
+  private chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
+    const normalizedLimit = Math.max(1000, chunkCharLimit)
+    const chunks: LoadedDocument['chunks'] = []
+
+    for (let offset = 0; offset < text.length; offset += normalizedLimit) {
+      const chunk = text.slice(offset, offset + normalizedLimit)
+
+      chunks.push({
+        id: `chunk-${chunks.length + 1}`,
+        index: chunks.length,
+        startPage: 0,
+        endPage: 0,
+        text: chunk,
+      })
+    }
+
+    return chunks
+  }
 }
 
 export function findInputAnalyzer(

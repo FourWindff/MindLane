@@ -52,63 +52,63 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
   }
 
   protected chunk(raw: DocumentPage[]): DocumentChunk[] {
-    return chunkPages(raw, 4000)
-  }
-}
-
-export function chunkPages(
-  pages: DocumentPage[],
-  chunkCharLimit: number,
-): DocumentChunk[] {
-  const normalizedLimit = Math.max(1000, chunkCharLimit)
-  const chunks: DocumentChunk[] = []
-
-  let currentTexts: string[] = []
-  let startPage = 0
-  let endPage = 0
-  let currentChars = 0
-
-  const pushChunk = () => {
-    if (currentTexts.length === 0) return
-    chunks.push({
-      id: `chunk-${chunks.length + 1}`,
-      index: chunks.length,
-      startPage,
-      endPage,
-      text: currentTexts.join('\n\n'),
-    })
-    currentTexts = []
-    startPage = 0
-    endPage = 0
-    currentChars = 0
+    return this.chunkPages(raw, 4000)
   }
 
-  for (const page of pages) {
-    const text = page.text.trim()
-    if (!text) continue
+  private chunkPages(
+    pages: DocumentPage[],
+    chunkCharLimit: number,
+  ): DocumentChunk[] {
+    const normalizedLimit = Math.max(1000, chunkCharLimit)
+    const chunks: DocumentChunk[] = []
 
-    if (currentTexts.length === 0) {
-      startPage = page.index
-      endPage = page.index
-      currentTexts.push(text)
-      currentChars = text.length
-      continue
+    let currentTexts: string[] = []
+    let startPage = 0
+    let endPage = 0
+    let currentChars = 0
+
+    const pushChunk = () => {
+      if (currentTexts.length === 0) return
+      chunks.push({
+        id: `chunk-${chunks.length + 1}`,
+        index: chunks.length,
+        startPage,
+        endPage,
+        text: currentTexts.join('\n\n'),
+      })
+      currentTexts = []
+      startPage = 0
+      endPage = 0
+      currentChars = 0
     }
 
-    if (currentChars + text.length > normalizedLimit) {
-      pushChunk()
-      startPage = page.index
-      endPage = page.index
+    for (const page of pages) {
+      const text = page.text.trim()
+      if (!text) continue
+
+      if (currentTexts.length === 0) {
+        startPage = page.index
+        endPage = page.index
+        currentTexts.push(text)
+        currentChars = text.length
+        continue
+      }
+
+      if (currentChars + text.length > normalizedLimit) {
+        pushChunk()
+        startPage = page.index
+        endPage = page.index
+        currentTexts.push(text)
+        currentChars = text.length
+        continue
+      }
+
       currentTexts.push(text)
-      currentChars = text.length
-      continue
+      endPage = page.index
+      currentChars += text.length
     }
 
-    currentTexts.push(text)
-    endPage = page.index
-    currentChars += text.length
+    pushChunk()
+    return chunks
   }
-
-  pushChunk()
-  return chunks
 }
