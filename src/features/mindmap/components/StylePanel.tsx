@@ -2,12 +2,19 @@ import { useState } from 'react'
 import { Palette, Brush } from 'lucide-react'
 import { useStyleStore } from '@/features/mindmap/style/styleStore'
 import { MAP_STYLES, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
+import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
 import type { MapStyleId, ColorSchemeId } from '@/features/mindmap/style/types'
 
 type Tab = 'style' | 'color'
 
-export function StylePanel({ onClose }: { onClose?: () => void }) {
-  const [activeTab, setActiveTab] = useState<Tab>('style')
+export function StylePanel({
+  onClose,
+  initialTab = 'style',
+}: {
+  onClose?: () => void
+  initialTab?: Tab
+}) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
   const mapStyle    = useStyleStore((s) => s.mapStyle)
   const colorScheme = useStyleStore((s) => s.colorScheme)
@@ -97,21 +104,35 @@ export function StylePanel({ onClose }: { onClose?: () => void }) {
           {COLOR_SCHEMES.map((cs) => (
             <button
               key={cs.id}
-              className={`style-panel__swatch ${colorScheme === cs.id ? 'style-panel__swatch--active' : ''}`}
+              className={`style-panel__color-option ${colorScheme === cs.id ? 'style-panel__color-option--active' : ''}`}
               onClick={() => setColorScheme(cs.id as ColorSchemeId)}
               aria-label={cs.label}
               title={cs.label}
             >
-              <span
-                className="style-panel__swatch-color"
-                style={{ background: cs.swatch }}
-              />
-              <span className="style-panel__swatch-label">{cs.label}</span>
+              <ColorSwatch schemeId={cs.id as ColorSchemeId} />
+              <span className="style-panel__color-label">{cs.label}</span>
             </button>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function ColorSwatch({ schemeId }: { schemeId: ColorSchemeId }) {
+  const palette = SCHEME_PALETTES[schemeId]
+  const branchCount = palette.branches.length
+
+  return (
+    <span className="style-panel__swatch">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <span
+          key={i}
+          className="style-panel__swatch-bar"
+          style={{ background: palette.branches[i % branchCount]!.depth1.nodeBg }}
+        />
+      ))}
+    </span>
   )
 }
 
