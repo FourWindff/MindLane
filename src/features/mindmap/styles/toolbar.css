@@ -89,6 +89,15 @@
   transform: scale(0.94);
 }
 
+.float-toolbar__btn--active {
+  background: var(--ml-accent-soft);
+  color: var(--ml-accent);
+}
+
+.float-toolbar__btn--active:hover:not(:disabled) {
+  background: var(--ml-accent-soft);
+}
+
 .float-toolbar__btn--danger {
   color: var(--ml-danger);
 }

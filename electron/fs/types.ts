@@ -26,6 +26,11 @@ export interface WorkspaceTreeEntry {
 }
 
 
+export interface MindmapStyleSettings {
+  mapStyle:    'logic-card' | 'logic-outline' | 'logic-minimal' | 'mindmap-card' | 'mindmap-outline' | 'mindmap-minimal'
+  colorScheme: 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
+}
+
 export interface AppSettings {
   apiKey: string
   chatModel: string
@@ -44,6 +49,7 @@ export interface AppSettings {
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
   messagePipeline?: MessagePipelineConfig
+  mindmapStyle?: Partial<MindmapStyleSettings>
 }
 
 export interface WorkspaceState {

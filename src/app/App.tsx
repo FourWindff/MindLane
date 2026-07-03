@@ -3,6 +3,7 @@ import { MindMapView } from '@/features/mindmap/components/MindMapView'
 import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { loadMindmapStyleFromBackend } from '@/features/mindmap/style/styleStore'
 import { ChatPanel } from '@/features/chat/components/ChatPanel'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { FileManager } from '@/features/workspace/components/FileManager'
@@ -68,6 +69,7 @@ function AppContent() {
 
   useEffect(() => {
     void loadSettingsFromBackend()
+    void loadMindmapStyleFromBackend()
   }, [])
 
   useEffect(() => {

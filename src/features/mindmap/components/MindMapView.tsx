@@ -51,6 +51,9 @@ import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
 import { SelectionActionBar } from './SelectionActionBar'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
+import { StyleProvider } from '@/features/mindmap/style/StyleContext'
+import { useStyleStore } from '@/features/mindmap/style/styleStore'
+import { StylePanel } from './StylePanel'
 
 const NODE_EXIT_MS = 300
 
@@ -67,6 +70,12 @@ function MindMapCanvas({
   const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const rfStore = useStoreApi()
   const rf = useReactFlow()
+
+  const structureType = useStyleStore((s) => s.mapStyle).startsWith("mindmap") ? "mindmap" as const : "logic" as const
+  // ref 始终指向最新的 structureType，避免 useCallback 闭包读到过期值
+  const structureTypeRef = useRef(structureType)
+  useEffect(() => { structureTypeRef.current = structureType }, [structureType])
+  const [stylePanelOpen, setStylePanelOpen] = useState(false)
 
   const nodes = useMindmapStore((s) => s.nodes)
   const edges = useMindmapStore((s) => s.edges)
@@ -160,7 +169,7 @@ function MindMapCanvas({
 
         let result = latestNodes
         for (const root of roots) {
-          result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
+          result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureTypeRef.current)
         }
 
         setNodes(result)
@@ -307,21 +316,21 @@ function MindMapCanvas({
     if (aiBusy) return
     const parentId = selectedId ?? 'root'
     const { nodes: nextNodes, edges: nextEdges } = withNewChild(
-      nodes, edges, parentId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y,
+      nodes, edges, parentId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y, structureType,
     )
     setNodes(nextNodes)
     setEdges(nextEdges)
-  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes])
+  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes, structureType])
 
   const addSibling = useCallback(() => {
     if (aiBusy || !selectedId) return
     const { nodes: nextNodes, edges: nextEdges } = withNewSibling(
-      nodes, edges, selectedId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y,
+      nodes, edges, selectedId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y, structureType,
     )
     if (nextNodes === nodes && nextEdges === edges) return
     setNodes(nextNodes)
     setEdges(nextEdges)
-  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes])
+  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes, structureType])
 
   const selectNode = useCallback(
     (targetId: string) => {
@@ -378,7 +387,7 @@ function MindMapCanvas({
       const { nodes: n, edges: e } = graphRef.current
       const nextNodes = n.filter((node) => !allIds.has(node.id))
       const nextEdges = e.filter((edge) => !allIds.has(edge.source) && !allIds.has(edge.target))
-      const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
+      const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureTypeRef.current)
       setNodes(laidOut)
       setEdges(nextEdges)
     }, NODE_EXIT_MS)
@@ -653,7 +662,7 @@ function MindMapCanvas({
     )
     const nextEdges = [...cleanedEdges, treeEdge, ...childEdges]
 
-    const laidOut = reflowChildren(palaceId, nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
+    const laidOut = reflowChildren(palaceId, nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
     setNodes(laidOut)
     setEdges(nextEdges)
 
@@ -714,7 +723,24 @@ function MindMapCanvas({
         `生成异常：${e instanceof Error ? e.message : String(e)}`,
       )
     }
-  }, [aiBusy, apiKey, chatModel, selectedId, nodes, edges, setNodes, setEdges])
+  }, [aiBusy, apiKey, chatModel, selectedId, nodes, edges, setNodes, setEdges, structureType])
+
+  // 布局类型切换时重新排布整棵树
+  const prevStructureTypeRef = useRef(structureType)
+  useEffect(() => {
+    if (prevStructureTypeRef.current === structureType) return
+    prevStructureTypeRef.current = structureType
+
+    const { nodes: latestNodes, edges: curEdges } = useMindmapStore.getState()
+    const targetIds = new Set(curEdges.map((e) => e.target))
+    const roots = latestNodes.filter((n) => !targetIds.has(n.id))
+    let result = latestNodes
+    for (const root of roots) {
+      result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
+    }
+    setNodes(result)
+    setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 50)
+  }, [structureType, setNodes, rf])
 
   return (
     <div className="mindmap-shell">
@@ -727,9 +753,11 @@ function MindMapCanvas({
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
         onCenterRoot={centerRoot}
+        onToggleStylePanel={() => setStylePanelOpen((v) => !v)}
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
+        stylePanelOpen={stylePanelOpen}
       />
       <div className="mindmap-canvas-wrap">
         <ReactFlow
@@ -787,6 +815,9 @@ function MindMapCanvas({
         {palaceModal && (
           <PalaceModal data={palaceModal} onClose={() => setPalaceModal(null)} />
         )}
+        {stylePanelOpen && (
+          <StylePanel onClose={() => setStylePanelOpen(false)} />
+        )}
       </div>
       <div
         ref={hiddenFlowRef}
@@ -824,11 +855,13 @@ export function MindMapView({
   onOpenSettings?: () => void
 }) {
   return (
-    <ReactFlowProvider>
-      <MindMapCanvas
-        onSwitchWorkspace={onSwitchWorkspace}
-        onOpenSettings={onOpenSettings}
-      />
-    </ReactFlowProvider>
+    <StyleProvider>
+      <ReactFlowProvider>
+        <MindMapCanvas
+          onSwitchWorkspace={onSwitchWorkspace}
+          onOpenSettings={onOpenSettings}
+        />
+      </ReactFlowProvider>
+    </StyleProvider>
   )
 }

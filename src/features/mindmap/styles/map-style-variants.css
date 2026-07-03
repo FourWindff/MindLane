@@ -1,0 +1,99 @@
+/* ══════════════════════════════════════════════════════
+   导图风格变体 — 通过 data-map-style 属性切换视觉样式
+   节点背景/边框/文字颜色由 JS inline style（--node-bg 等变量）按分支深度注入，
+   此文件只负责形状、边框半径、阴影和边线粗细。
+   ══════════════════════════════════════════════════════ */
+
+/* ── 通用：节点读取 inline style 注入的颜色变量 ── */
+.text-node {
+  background:    var(--node-bg,     var(--ml-bg-elevated));
+  border-color:  var(--node-border, var(--ml-border-strong));
+  color:         var(--node-text,   var(--ml-text));
+}
+
+/* ── 卡片式（card，默认） ── */
+[data-map-style="card"] .text-node {
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  padding: 0.55rem 0.75rem;
+}
+
+[data-map-style="card"] .text-node--selected {
+  box-shadow:
+    0 0 0 2px rgba(0,0,0,0.08),
+    0 4px 20px rgba(0,0,0,0.08);
+}
+
+/* ── 线框式（outline） ── */
+[data-map-style="outline"] .text-node {
+  background: transparent;
+  border-radius: 6px;
+  border-width: 1.5px;
+  border-style: solid;
+  box-shadow: none;
+  padding: 0.45rem 0.7rem;
+}
+
+[data-map-style="outline"] .text-node--selected {
+  box-shadow: 0 0 0 3px var(--node-border, var(--ml-accent-soft));
+}
+
+/* ── 极简式（minimal） ── */
+[data-map-style="minimal"] .text-node {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid var(--node-border, var(--ml-text-muted));
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0.25rem 0.15rem;
+  min-width: 60px;
+  color: var(--node-text, var(--ml-text));
+}
+
+[data-map-style="minimal"] .text-node--selected {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── 边线粗细随风格调整 ── */
+[data-map-style="outline"] .react-flow__edge-path {
+  stroke-width: 1.5 !important;
+}
+
+[data-map-style="minimal"] .react-flow__edge-path {
+  stroke-width: 1 !important;
+}
+
+/* ══════════════════════════════════════════════════════
+   配色方案 — 通过 data-color-scheme 属性切换
+   只修改画布背景和点阵颜色；节点/边颜色由 JS 按分支计算后通过 inline style 注入。
+   不覆盖任何 --ml-* 全局 UI 变量，避免影响 header / toolbar / 记忆宫殿按钮等。
+   ══════════════════════════════════════════════════════ */
+
+/* 各配色方案定义画布专属变量 */
+[data-color-scheme="warm"] {
+  --canvas-bg:  #f5f4f2;
+  --canvas-dot: rgba(0, 0, 0, 0.07);
+}
+
+[data-color-scheme="ocean"] {
+  --canvas-bg:  #eef6fb;
+  --canvas-dot: rgba(13, 45, 69, 0.07);
+}
+
+[data-color-scheme="forest"] {
+  --canvas-bg:  #edf5ec;
+  --canvas-dot: rgba(26, 51, 32, 0.07);
+}
+
+[data-color-scheme="sunset"] {
+  --canvas-bg:  #fdf3ea;
+  --canvas-dot: rgba(61, 31, 10, 0.07);
+}
+
+[data-color-scheme="night"] {
+  --canvas-bg:  #1a1b2e;
+  --canvas-dot: rgba(255, 255, 255, 0.04);
+}
