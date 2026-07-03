@@ -150,20 +150,20 @@
   color: var(--ml-accent);
 }
 
-/* ── 配色方案网格 ── */
+/* ── 配色方案列表 ── */
 .style-panel__section--colors {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px;
 }
 
 .style-panel__color-option {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 6px 4px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
   border: 1.5px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -182,8 +182,8 @@
 
 .style-panel__swatch {
   display: flex;
-  width: 32px;
-  height: 20px;
+  width: 96px;
+  height: 18px;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -195,8 +195,8 @@
 }
 
 .style-panel__color-label {
-  font-size: 0.68rem;
-  color: var(--ml-text-muted);
+  font-size: 0.74rem;
+  color: var(--ml-text);
   line-height: 1;
 }
 

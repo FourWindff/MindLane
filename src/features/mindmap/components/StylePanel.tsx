@@ -109,8 +109,8 @@ export function StylePanel({
               aria-label={cs.label}
               title={cs.label}
             >
-              <ColorSwatch schemeId={cs.id as ColorSchemeId} />
               <span className="style-panel__color-label">{cs.label}</span>
+              <ColorSwatch schemeId={cs.id as ColorSchemeId} />
             </button>
           ))}
         </div>
@@ -121,15 +121,14 @@ export function StylePanel({
 
 function ColorSwatch({ schemeId }: { schemeId: ColorSchemeId }) {
   const palette = SCHEME_PALETTES[schemeId]
-  const branchCount = palette.branches.length
 
   return (
     <span className="style-panel__swatch">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {palette.branches.map((branch, i) => (
         <span
           key={i}
           className="style-panel__swatch-bar"
-          style={{ background: palette.branches[i % branchCount]!.depth1.nodeBg }}
+          style={{ background: branch.depth1.nodeBg }}
         />
       ))}
     </span>
