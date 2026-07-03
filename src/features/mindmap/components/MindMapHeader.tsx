@@ -24,6 +24,8 @@ type Props = {
   canAddSibling: boolean
   canRemove: boolean
   stylePanelOpen?: boolean
+  /** 样式面板内容，打开时渲染在工具栏下方。 */
+  stylePanel?: React.ReactNode
 }
 
 function ToolbarButton({
@@ -78,6 +80,7 @@ export function MindMapHeader({
   canAddSibling,
   canRemove,
   stylePanelOpen,
+  stylePanel,
 }: Props) {
   return (
     <header className="mindmap-header">
@@ -165,6 +168,7 @@ export function MindMapHeader({
             />
           </div>
         </nav>
+        {stylePanel}
       </div>
     </header>
   )

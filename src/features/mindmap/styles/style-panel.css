@@ -4,8 +4,8 @@
 
 .style-panel {
   position: absolute;
-  top: 56px;
-  right: 12px;
+  top: calc(100% + 8px);
+  right: 5px;
   z-index: 40;
   width: 220px;
   background: var(--ml-bg-elevated);

@@ -12,6 +12,7 @@
 }
 
 .mindmap-header__panel {
+  position: relative;
   display: inline-flex;
   padding: 4px 5px;
   border-radius: 12px;

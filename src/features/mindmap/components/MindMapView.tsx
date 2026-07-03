@@ -758,6 +758,9 @@ function MindMapCanvas({
         canAddSibling={canAddSibling}
         canRemove={canRemove}
         stylePanelOpen={stylePanelOpen}
+        stylePanel={stylePanelOpen ? (
+          <StylePanel onClose={() => setStylePanelOpen(false)} />
+        ) : null}
       />
       <div className="mindmap-canvas-wrap">
         <ReactFlow
@@ -814,9 +817,6 @@ function MindMapCanvas({
         ) : null}
         {palaceModal && (
           <PalaceModal data={palaceModal} onClose={() => setPalaceModal(null)} />
-        )}
-        {stylePanelOpen && (
-          <StylePanel onClose={() => setStylePanelOpen(false)} />
         )}
       </div>
       <div
