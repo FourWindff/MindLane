@@ -8,7 +8,7 @@ import {
 import { useMemo } from 'react'
 import { computeSiblingCurvature } from './siblingOffset'
 import { resolveMindmapEdgeGeometry } from './edgeGeometry'
-import { useMapStyle } from '@/features/mindmap/style/StyleContext'
+import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getEdgeColor } from '@/features/mindmap/style/colorPalettes'
 
 export function MindmapEdge(props: EdgeProps) {

@@ -1,31 +1,8 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useStyleStore } from './styleStore'
-import type { ColorSchemeId, MapStyleId } from './types'
 import { MAP_STYLES } from './presets'
 import { getStructureType, getVisualVariant } from './types'
-
-interface StyleContextValue {
-  mapStyle: MapStyleId
-  colorScheme: ColorSchemeId
-  /** 'logic' | 'mindmap' — 决定布局算法 */
-  structureType: 'logic' | 'mindmap'
-  /** 'card' | 'outline' | 'minimal' — 决定节点/边视觉 */
-  visualVariant: 'card' | 'outline' | 'minimal'
-  /** 边路径算法（bezier / smooth-step / step） */
-  edgeVariant: 'bezier' | 'smooth-step' | 'step'
-}
-
-const StyleContext = createContext<StyleContextValue>({
-  mapStyle: 'logic-card',
-  colorScheme: 'warm',
-  structureType: 'logic',
-  visualVariant: 'card',
-  edgeVariant: 'bezier',
-})
-
-export function useMapStyle(): StyleContextValue {
-  return useContext(StyleContext)
-}
+import { StyleContext, type StyleContextValue } from './useMapStyle'
 
 /**
  * StyleProvider — 包裹整个 mindmap 画布区域。

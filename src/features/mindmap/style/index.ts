@@ -1,5 +1,6 @@
 export * from './types'
 export * from './presets'
 export { useStyleStore, loadMindmapStyleFromBackend } from './styleStore'
-export { useMapStyle, StyleProvider } from './StyleContext'
+export { useMapStyle } from './useMapStyle'
+export { StyleProvider } from './StyleContext'
 export { getNodeColor, getEdgeColor, SCHEME_PALETTES } from './colorPalettes'

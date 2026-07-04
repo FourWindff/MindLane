@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { useMapStyle } from '@/features/mindmap/style/StyleContext'
+import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
 import type { TextNodeData } from './types'
 

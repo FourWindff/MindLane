@@ -74,7 +74,7 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLane** (4795 symbols, 9376 relationships, 281 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLane** (4806 symbols, 9405 relationships, 285 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

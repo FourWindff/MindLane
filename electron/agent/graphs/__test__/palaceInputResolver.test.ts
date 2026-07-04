@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { HumanMessage } from '@langchain/core/messages'
 import { PalaceInputResolver } from '../palaceGraph/inputResolver.js'
-import type { PalaceSubgraphStateType } from '../../../state.js'
-import type { DocumentRef } from '../../../state.js'
+import type { PalaceSubgraphStateType } from '../../state.js'
+import type { DocumentRef } from '../../state.js'
 import { CacheManager } from '../../../fs/cacheManager.js'
 import path from 'node:path'
 import os from 'node:os'
@@ -51,8 +51,8 @@ describe('PalaceInputResolver', () => {
       createState({
         context: {
           selectedNodes: [
-            { id: 'n1', label: 'Node 1' },
-            { id: 'n2', label: 'Node 2' },
+            { id: 'n1', type: 'text', label: 'Node 1' },
+            { id: 'n2', type: 'text', label: 'Node 2' },
           ],
         },
         messages: [new HumanMessage('some text')],
