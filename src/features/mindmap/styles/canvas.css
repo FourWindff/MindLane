@@ -5,8 +5,14 @@
 }
 
 .mindmap-canvas-wrap .react-flow {
-  background: var(--ml-bg);
-  background-image: radial-gradient(circle, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  /* --canvas-bg / --canvas-dot 由 data-color-scheme 选择器注入，
+     回退到全局 --ml-bg 保证默认外观不变 */
+  background: var(--canvas-bg, var(--ml-bg));
+  background-image: radial-gradient(
+    circle,
+    var(--canvas-dot, rgba(0, 0, 0, 0.07)) 1px,
+    transparent 1px
+  );
   background-size: 24px 24px;
   cursor: default;
 }

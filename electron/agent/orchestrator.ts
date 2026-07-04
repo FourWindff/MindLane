@@ -27,11 +27,11 @@ import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import type { MindmapContextData } from "./tools/mindmapContext.js";
 import { logger } from "../shared/logger.js";
 import { createMindmapActionTools } from "./tools/mindmapActions.js";
-import { createSearchLinkedDocumentTool } from "./tools/linkedDocumentSearch.js";
+import { createReadLinkedDocumentTool } from "./tools/readLinkedDocument.js";
+import { isVirtualSubgraphTool } from "./subgraphRouter.js";
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
-  isVirtualSubgraphTool,
 } from "./tools/subgraphRoutingTools.js";
 import { _normalize_tool_result } from "./tools/toolResultNormalizer.js";
 import { AGENT_LIMITS } from "./config.js";
@@ -176,6 +176,7 @@ export class AgentOrchestrator {
     if (!this.compiledPalaceSubgraph) {
       this.compiledPalaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
+        cacheManager: this.options.cacheManager,
       }).compile();
     }
     return this.compiledPalaceSubgraph;
@@ -429,7 +430,7 @@ export class AgentOrchestrator {
     }
     if (this.options.cacheManager) {
       tools.push(
-        createSearchLinkedDocumentTool({
+        createReadLinkedDocumentTool({
           documents: () => this.activeContext?.linkedDocuments ?? [],
           cacheManager: this.options.cacheManager,
         }),

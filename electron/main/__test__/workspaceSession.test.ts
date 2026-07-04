@@ -40,17 +40,18 @@ describe('getWorkspaceSessionForService', () => {
     const existingWorkspacePath = path.join(tmpDir, 'existing-workspace')
     fs.mkdirSync(existingWorkspacePath, { recursive: true })
 
-    await fsService.settings.update({
+    const update = await fsService.appState.update({
       lastWorkspacePath: missingWorkspacePath,
       recentWorkspacePaths: [missingWorkspacePath, existingWorkspacePath],
     })
+    expect(update.ok).toBe(true)
 
     const session = await getWorkspaceSessionForService(fsService)
 
     expect(session.workspacePath).toBeNull()
     expect(session.recentWorkspacePaths).toEqual([existingWorkspacePath])
 
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     expect(settings.lastWorkspacePath).toBeNull()
     expect(settings.recentWorkspacePaths).toEqual([existingWorkspacePath])
   })
@@ -59,17 +60,18 @@ describe('getWorkspaceSessionForService', () => {
     const workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
 
-    await fsService.settings.update({
+    const update = await fsService.appState.update({
       lastWorkspacePath: workspacePath,
       recentWorkspacePaths: [workspacePath],
       restoreLastWorkspaceOnLaunch: false,
     })
+    expect(update.ok).toBe(true)
 
     const session = await getWorkspaceSessionForService(fsService)
 
     expect(session.workspacePath).toBeNull()
 
-    const settings = await fsService.settings.load()
+    const settings = await fsService.appState.load()
     expect(settings.lastWorkspacePath).toBe(workspacePath)
     expect(settings.recentWorkspacePaths).toEqual([workspacePath])
   })

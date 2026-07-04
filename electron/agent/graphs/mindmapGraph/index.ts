@@ -4,23 +4,52 @@ import { MindmapSubgraphState, type DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
-import { PdfDocumentLoader, chunkPages } from './loaders/pdfLoader.js'
+import { PdfInputAnalyzer } from './analyzers/pdfAnalyzer.js'
+import { TextInputAnalyzer, findInputAnalyzer } from './analyzers/textAnalyzer.js'
+import type { MindmapInputAnalyzer } from './analyzers/types.js'
 import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
 import { extractRootTree } from './shared/rootTree.js'
+import { MindmapInputResolver } from './inputResolver.js'
 
 // ===== 配置选项 =====
 
 interface MindmapSubgraphOptions {
   provider: LLMProvider
   cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
+  analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
 }
 
 const LEAF_BATCH_SIZE = 5
 const MERGE_GROUP_SIZE = 8
-const CHUNK_CHAR_LIMIT = 4000
+const SINGLE_PASS_CHAR_LIMIT = 8000
 const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
+
+function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
+  return {
+    response: '',
+    error: '',
+    mindmapYaml: '',
+    mindmapTitle: '',
+    documentChunks: [],
+    leafCursor: 0,
+    pendingLeafRange: null,
+    leafResults: [],
+    mergeInputs: [],
+    partialMergedTrees: [],
+    mergeResults: [],
+    pendingMergeGroups: [],
+    finalTree: null,
+  }
+}
+
+function createDefaultAnalyzers(): MindmapInputAnalyzer<unknown, unknown>[] {
+  return [
+    new TextInputAnalyzer(),
+    new PdfInputAnalyzer(),
+  ]
+}
 
 // ===== Prompt builders =====
 
@@ -120,84 +149,84 @@ function buildYamlRepairPrompt(
 
 // ===== Node implementations =====
 
+async function resolveInputNode(
+  state: typeof MindmapSubgraphState.State,
+): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  const reset = createMindmapRunReset()
+  const resolution = new MindmapInputResolver().resolve(state)
+
+  if (!resolution) {
+    return {
+      ...reset,
+      error: '请提供要生成思维导图的文档或文本。',
+      response: '请提供要生成思维导图的文档或文本。',
+    }
+  }
+
+  return {
+    ...reset,
+    mindmapInputSource: resolution.source,
+    mindmapInputTitle: resolution.title,
+  }
+}
+
 async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
   const source = state.mindmapInputSource
+  const reset = createMindmapRunReset()
 
   if (!source) {
     return {
+      ...reset,
       error: '请提供输入来源。',
       response: '请提供输入来源。',
     }
   }
 
-  // Text input: create a single chunk, skip PDF loading
-  if (source.type === 'text') {
-    const content = source.content ?? ''
-    if (!content.trim()) {
-      return {
-        error: '文本输入内容为空。',
-        response: '文本输入内容为空。',
-      }
-    }
-    const chunks = [{
-      id: 'chunk-1',
-      index: 0,
-      startPage: 0,
-      endPage: 0,
-      text: content,
-    }]
+  const analyzer = findInputAnalyzer(options.analyzers ?? createDefaultAnalyzers(), source)
+  if (!analyzer) {
     return {
-      documentChunks: chunks,
+      ...reset,
+      error: `不支持的输入类型: ${source.type}`,
+      response: `不支持的输入类型: ${source.type}`,
+    }
+  }
+
+  try {
+    const loaded = await analyzer.loadDocument(source)
+
+    if (loaded.chunks.length === 0) {
+      return {
+        ...reset,
+        error: '文档未能提取出任何文本内容。',
+        response: '文档未能提取出任何文本内容。',
+      }
+    }
+
+    let documentRef = loaded.documentRef ?? state.documentRef
+    if (documentRef && options.cacheDocumentText) {
+      const cachedRef = await options.cacheDocumentText(documentRef, loaded.text)
+      if (cachedRef) {
+        documentRef = cachedRef
+      }
+    }
+
+    return {
+      ...reset,
+      documentChunks: loaded.chunks,
       leafCursor: 0,
-      pendingLeafRange: { start: 0, end: 1 },
+      pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, loaded.chunks.length) },
+      documentRef,
     }
-  }
-
-  // PDF input: use PdfDocumentLoader
-  if (source.type === 'pdf') {
-    try {
-      const loader = new PdfDocumentLoader()
-      const pages = await loader.load(source)
-      const fullText = pages.map((page) => page.text).join('\n\n')
-      const chunks = chunkPages(pages, CHUNK_CHAR_LIMIT)
-
-      if (chunks.length === 0) {
-        return {
-          error: 'PDF 文档未能提取出任何文本内容。',
-          response: 'PDF 文档未能提取出任何文本内容。',
-        }
-      }
-
-      let documentRef = state.documentRef
-      if (documentRef && options.cacheDocumentText) {
-        const cachedRef = await options.cacheDocumentText(documentRef, fullText)
-        if (cachedRef) {
-          documentRef = cachedRef
-        }
-      }
-
-      return {
-        documentChunks: chunks,
-        leafCursor: 0,
-        pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, chunks.length) },
-        documentRef,
-      }
-    } catch (error) {
-      const formatted = formatAgentError(error)
-      return {
-        error: formatted,
-        response: `加载 PDF 失败：${formatted.split('\n')[0]}`,
-      }
+  } catch (error) {
+    const formatted = formatAgentError(error)
+    return {
+      ...reset,
+      error: formatted,
+      response: `加载文档失败：${formatted.split('\n')[0]}`,
     }
-  }
-
-  // URL or other types not yet supported
-  return {
-    error: `不支持的输入类型: ${source.type}`,
-    response: `不支持的输入类型: ${source.type}`,
   }
 }
 
@@ -231,14 +260,18 @@ async function leafExtractNode(
       `Chunk ${range.start + 1}`,
     )
 
-    const newResults = chunks.map((chunk, idx) => ({
-      chunkIndex: range.start + idx,
-      chunkId: chunk.id,
-      tree,
-    }))
+    const firstChunk = chunks[0]
+    const lastChunk = chunks[chunks.length - 1]
+    const chunkId = firstChunk && lastChunk && firstChunk.id !== lastChunk.id
+      ? `${firstChunk.id}..${lastChunk.id}`
+      : firstChunk?.id ?? `chunk-${range.start + 1}`
 
     return {
-      leafResults: newResults,
+      leafResults: [...state.leafResults, {
+        chunkIndex: range.start,
+        chunkId,
+        tree,
+      }],
       leafCursor: range.end,
     }
   } catch (error) {
@@ -253,22 +286,23 @@ async function leafExtractNode(
 async function collectLeafNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  // If there are more chunks to process, continue to dispatch_leaf
-  if (state.leafCursor < state.documentChunks.length) {
+  const latestResult = state.leafResults[state.leafResults.length - 1]
+  if (!latestResult) {
     return {}
   }
 
-  // All chunks processed — prepare merge inputs from leaf results
-  const inputs = state.leafResults.map((r) => r.tree)
   return {
-    mergeInputs: inputs,
+    mergeInputs: [...state.mergeInputs, latestResult.tree],
   }
 }
 
 async function dispatchMergeNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const inputs = state.mergeInputs
+  const leafDone = state.leafCursor >= state.documentChunks.length
+  const inputs = leafDone
+    ? [...state.partialMergedTrees, ...state.mergeInputs]
+    : state.mergeInputs.slice(0, MERGE_GROUP_SIZE)
   const groups: Array<{ groupIndex: number; trees: unknown[] }> = []
 
   for (let i = 0; i < inputs.length; i += MERGE_GROUP_SIZE) {
@@ -280,6 +314,7 @@ async function dispatchMergeNode(
 
   return {
     pendingMergeGroups: groups,
+    mergeResults: [],
   }
 }
 
@@ -331,21 +366,40 @@ async function mergeTreesNode(
 async function collectMergeNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  if (state.finalTree) {
+    return {}
+  }
+
   const results = state.mergeResults
+  const trees = results.map((r) => r.tree)
+  const leafDone = state.leafCursor >= state.documentChunks.length
+
+  if (!leafDone) {
+    return {
+      partialMergedTrees: [...state.partialMergedTrees, ...trees],
+      mergeInputs: state.mergeInputs.slice(MERGE_GROUP_SIZE),
+      pendingMergeGroups: [],
+      mergeResults: [],
+    }
+  }
 
   // If only one result, it's the final tree
   if (results.length === 1) {
     return {
       finalTree: results[0]!.tree,
       mergeInputs: [],
+      partialMergedTrees: [],
       pendingMergeGroups: [],
+      mergeResults: [],
     }
   }
 
   // Multiple results — need another merge round
-  const newInputs = results.map((r) => r.tree)
   return {
-    mergeInputs: newInputs,
+    mergeInputs: trees,
+    partialMergedTrees: [],
+    pendingMergeGroups: [],
+    mergeResults: [],
   }
 }
 
@@ -397,21 +451,15 @@ async function buildOutputNode(
   }
 }
 
-// ===== Text input fast path =====
+// ===== Single-pass extraction =====
 
-async function textInputExtractNode(
+async function singleExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const source = state.mindmapInputSource
   const title = state.mindmapInputTitle || '思维导图'
-
-  if (!source || source.type !== 'text') {
-    return {}
-  }
-
-  const content = source.content ?? ''
-  if (!content.trim()) {
+  const text = state.documentChunks.map((chunk) => chunk.text).join('\n\n')
+  if (!text.trim()) {
     return {
       error: '文本输入内容为空。',
       response: '文本输入内容为空。',
@@ -419,7 +467,6 @@ async function textInputExtractNode(
   }
 
   try {
-    const text = content.slice(0, 8000)
     const rootTree = await generateValidMindmapYaml(
       options.provider,
       buildExtractStructureMessages(text),
@@ -452,9 +499,15 @@ async function textInputExtractNode(
 
 // ===== Edge routing functions =====
 
+function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): string {
+  if (state.error) return 'build_output'
+  return 'load_document'
+}
+
 function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string {
   if (state.error) return 'build_output'
-  if (state.mindmapInputSource?.type === 'text') return 'text_extract'
+  const totalChars = state.documentChunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
+  if (totalChars <= SINGLE_PASS_CHAR_LIMIT) return 'single_extract'
   return 'dispatch_leaf'
 }
 
@@ -464,14 +517,17 @@ function routeAfterDispatchLeaf(state: typeof MindmapSubgraphState.State): strin
 }
 
 function routeAfterCollectLeaf(state: typeof MindmapSubgraphState.State): string {
+  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
   if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
-  if (state.mergeInputs.length > 0) return 'dispatch_merge'
+  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
 
 function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): string {
   if (state.finalTree) return 'build_output'
-  if (state.mergeInputs.length > 1) return 'dispatch_merge'
+  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
+  if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
+  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
 
@@ -481,14 +537,15 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  * 构建 Mindmap Subgraph
  *
  * 流程:
- * START -> load_document
- *   - text input -> text_extract -> build_output -> END
- *   - pdf input  -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
- *                  -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
- *                  -> build_output -> END
+ * START -> resolve_input -> load_document
+ *   - small document -> single_extract -> build_output -> END
+ *   - large document -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
+ *                     -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
+ *                     -> build_output -> END
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
+    .addNode('resolve_input', (state) => resolveInputNode(state))
     .addNode('load_document', (state) => loadDocumentNode(state, options))
     .addNode('dispatch_leaf', (state) => dispatchLeafNode(state))
     .addNode('leaf_extract', (state) => leafExtractNode(state, options))
@@ -497,20 +554,24 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     .addNode('merge_trees', (state) => mergeTreesNode(state, options))
     .addNode('collect_merge', (state) => collectMergeNode(state))
     .addNode('build_output', (state) => buildOutputNode(state))
-    .addNode('text_extract', (state) => textInputExtractNode(state, options))
+    .addNode('single_extract', (state) => singleExtractNode(state, options))
 
-  // START -> load_document
-  graph.addEdge(START, 'load_document')
+  // START -> resolve_input -> load_document
+  graph.addEdge(START, 'resolve_input')
+  graph.addConditionalEdges('resolve_input', routeAfterResolveInput, [
+    'load_document',
+    'build_output',
+  ])
 
-  // load_document branches based on input type
+  // load_document branches based on document size
   graph.addConditionalEdges('load_document', routeAfterLoadDocument, [
-    'text_extract',
+    'single_extract',
     'dispatch_leaf',
     'build_output',
   ])
 
-  // text fast path
-  graph.addEdge('text_extract', 'build_output')
+  // Single-pass path for small documents
+  graph.addEdge('single_extract', 'build_output')
 
   // PDF/document pipeline
   graph.addConditionalEdges('dispatch_leaf', routeAfterDispatchLeaf, [
@@ -529,6 +590,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   graph.addEdge('merge_trees', 'collect_merge')
   graph.addConditionalEdges('collect_merge', routeAfterCollectMerge, [
     'dispatch_merge',
+    'dispatch_leaf',
     'build_output',
   ])
 

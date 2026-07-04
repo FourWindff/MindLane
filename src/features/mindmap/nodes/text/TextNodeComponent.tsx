@@ -1,6 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
+import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
+import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
 import type { TextNodeData } from './types'
 
 function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
@@ -9,6 +11,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore((s) => s.busy)
+  const { visualVariant, colorScheme } = useMapStyle()
 
   const editing = !!data.editing
 
@@ -67,8 +70,20 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
     [id, setNodes],
   )
 
+  // 按深度/分支计算节点颜色
+  const depth       = data.depth       ?? 0
+  const branchIndex = data.branchIndex ?? 0
+  const nodeColors  = getNodeColor(colorScheme, depth, branchIndex)
+
+  const colorStyle: React.CSSProperties = {
+    '--node-bg':     nodeColors.nodeBg,
+    '--node-border': nodeColors.nodeBorder,
+    '--node-text':   nodeColors.nodeText,
+  } as React.CSSProperties
+
   const className = [
     'text-node',
+    `text-node--style-${visualVariant}`,
     selected && 'text-node--selected',
     data.justAdded && 'text-node--enter',
     data.exiting && 'text-node--exiting',
@@ -79,8 +94,17 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
     .join(' ')
 
   return (
-    <div className={className} onAnimationEnd={onAnimationEnd}>
-      <Handle type="target" position={Position.Left} />
+    <div className={className} style={colorStyle} onAnimationEnd={onAnimationEnd}>
+      {/* 所有方向 handle 均渲染，CSS 隐藏；xyflow 根据 sourcePosition/targetPosition 路由 */}
+      <Handle type="target" position={Position.Left}   />
+      <Handle type="target" position={Position.Top}    />
+      <Handle type="target" position={Position.Right}  />
+      <Handle type="target" position={Position.Bottom} />
+      <Handle type="source" position={Position.Right}  />
+      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Left}   />
+      <Handle type="source" position={Position.Top}    />
+
       {editing && !aiBusy ? (
         <textarea
           ref={textareaRef}
@@ -104,7 +128,6 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       ) : (
         <span className="text-node__label">{label}</span>
       )}
-      <Handle type="source" position={Position.Right} />
     </div>
   )
 }

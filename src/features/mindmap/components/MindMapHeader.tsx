@@ -7,6 +7,7 @@ import {
   FolderInput,
   Settings,
   Locate,
+  Palette,
 } from 'lucide-react'
 
 type Props = {
@@ -18,9 +19,13 @@ type Props = {
   onSwitchWorkspace?: () => void
   onSave?: () => void
   onCenterRoot?: () => void
+  onToggleStylePanel?: () => void
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
+  stylePanelOpen?: boolean
+  /** 样式面板内容，打开时渲染在工具栏下方。 */
+  stylePanel?: React.ReactNode
 }
 
 function ToolbarButton({
@@ -30,6 +35,7 @@ function ToolbarButton({
   tooltip,
   icon,
   variant = 'default',
+  active,
 }: {
   onClick: () => void
   disabled?: boolean
@@ -37,15 +43,21 @@ function ToolbarButton({
   tooltip: string
   icon: React.ReactNode
   variant?: 'default' | 'danger'
+  active?: boolean
 }) {
   return (
     <div className="float-toolbar__btn-wrap">
       <button
         type="button"
-        className={`float-toolbar__btn${variant === 'danger' ? ' float-toolbar__btn--danger' : ''}`}
+        className={[
+          'float-toolbar__btn',
+          variant === 'danger' ? 'float-toolbar__btn--danger' : '',
+          active ? 'float-toolbar__btn--active' : '',
+        ].filter(Boolean).join(' ')}
         onClick={onClick}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-pressed={active}
       >
         {icon}
       </button>
@@ -63,9 +75,12 @@ export function MindMapHeader({
   onSwitchWorkspace,
   onSave,
   onCenterRoot,
+  onToggleStylePanel,
   canAddChild,
   canAddSibling,
   canRemove,
+  stylePanelOpen,
+  stylePanel,
 }: Props) {
   return (
     <header className="mindmap-header">
@@ -128,6 +143,15 @@ export function MindMapHeader({
           <div className="float-toolbar__divider" />
 
           <div className="float-toolbar__group float-toolbar__group--system">
+            {onToggleStylePanel && (
+              <ToolbarButton
+                onClick={onToggleStylePanel}
+                ariaLabel="导图样式"
+                tooltip="导图样式"
+                active={stylePanelOpen}
+                icon={<Palette size={22} strokeWidth={1.5} />}
+              />
+            )}
             {onOpenSettings && (
               <ToolbarButton
                 onClick={onOpenSettings}
@@ -144,6 +168,7 @@ export function MindMapHeader({
             />
           </div>
         </nav>
+        {stylePanel}
       </div>
     </header>
   )

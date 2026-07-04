@@ -47,7 +47,7 @@ export type MemoryPalaceStation = {
   linkedNodeId?: string
 }
 
-interface MindmapInputSource {
+export interface MindmapInputSource {
   type: 'pdf' | 'url' | 'text'
   path?: string
   url?: string
@@ -65,7 +65,7 @@ export interface DocumentRef {
   metadata?: Record<string, unknown>
 }
 
-type DocumentChunk = {
+export type DocumentChunk = {
   id: string
   index: number
   startPage: number
@@ -186,10 +186,14 @@ const MindmapStateAnnotations = {
     default: () => null,
   }),
   leafResults: Annotation<Array<{ chunkIndex: number; chunkId: string; tree: unknown }>>({
-    reducer: (prev, next) => [...prev, ...next],
+    reducer: replaceReducer,
     default: () => [],
   }),
   mergeInputs: Annotation<unknown[]>({
+    reducer: replaceReducer,
+    default: () => [],
+  }),
+  partialMergedTrees: Annotation<unknown[]>({
     reducer: replaceReducer,
     default: () => [],
   }),

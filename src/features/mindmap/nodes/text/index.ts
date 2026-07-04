@@ -13,6 +13,8 @@ class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
       ...(data.palaceId != null && { palaceId: data.palaceId }),
       ...(data.pageRange != null && { pageRange: data.pageRange }),
       ...(data.summary != null && { summary: data.summary }),
+      ...(data.side != null && { side: data.side }),
+      ...(data.branchIndex != null && { branchIndex: data.branchIndex }),
     }
   }
 

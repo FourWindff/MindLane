@@ -7,8 +7,9 @@ function resetMindmapStore(nodes: Node[], edges: Edge[]) {
   useMindmapStore.setState({
     nodes,
     edges,
-    currentFile: null,
-    hasUnsavedChanges: false,
+    dirty: false,
+    filePath: null,
+    hasDocumentOpen: false,
   })
 }
 
@@ -35,9 +36,8 @@ describe('handleMindmapToolCall', () => {
 
     const handled = handleMindmapToolCall(
       {
-        id: 'tool-call-1',
         name: 'deleteMindmapNode',
-        input: '{}',
+        args: {},
         result: JSON.stringify({
           ok: true,
           action: 'deleteNode',

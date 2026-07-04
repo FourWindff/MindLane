@@ -1,0 +1,265 @@
+/* ══════════════════════════════════════════════════════
+   StylePanel — 样式面板
+   ══════════════════════════════════════════════════════ */
+
+.style-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 5px;
+  z-index: 40;
+  width: 220px;
+  background: var(--ml-bg-elevated);
+  border: 1px solid var(--ml-border-strong);
+  border-radius: 12px;
+  box-shadow: var(--ml-shadow-strong);
+  overflow: hidden;
+  animation: style-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes style-panel-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* ── 头部 ── */
+.style-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--ml-border);
+}
+
+.style-panel__title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ml-text);
+  letter-spacing: 0.02em;
+}
+
+.style-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--ml-text-muted);
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.style-panel__close:hover {
+  background: var(--ml-fill-medium);
+  color: var(--ml-text);
+}
+
+/* ── 标签栏 ── */
+.style-panel__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ml-border);
+}
+
+.style-panel__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 6px;
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: var(--ml-text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.style-panel__tab:hover {
+  color: var(--ml-text);
+  background: var(--ml-fill-soft);
+}
+
+.style-panel__tab--active {
+  color: var(--ml-accent);
+  border-bottom-color: var(--ml-accent);
+}
+
+/* ── 内容区 ── */
+.style-panel__section {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ── 选项按钮 ── */
+.style-panel__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s, border-color 0.14s;
+}
+
+.style-panel__option:hover {
+  background: var(--ml-fill-soft);
+}
+
+.style-panel__option--active {
+  background: var(--ml-accent-soft);
+  border-color: var(--ml-accent);
+}
+
+.style-panel__option-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ml-text);
+  line-height: 1.2;
+}
+
+.style-panel__option-desc {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--ml-text-muted);
+  margin-top: 1px;
+  line-height: 1.2;
+}
+
+/* 预览 SVG */
+.style-panel__preview {
+  flex-shrink: 0;
+  width: 40px;
+  height: 24px;
+  color: var(--ml-text-muted);
+}
+
+.style-panel__option--active .style-panel__preview {
+  color: var(--ml-accent);
+}
+
+/* ── 配色方案列表 ── */
+.style-panel__section--colors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+}
+
+.style-panel__color-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+
+.style-panel__color-option:hover {
+  background: var(--ml-fill-soft);
+}
+
+.style-panel__color-option--active {
+  border-color: var(--ml-accent);
+  background: var(--ml-accent-soft);
+}
+
+.style-panel__swatch {
+  display: flex;
+  width: 96px;
+  height: 18px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.style-panel__swatch-bar {
+  flex: 1;
+}
+
+.style-panel__color-label {
+  font-size: 0.74rem;
+  color: var(--ml-text);
+  line-height: 1;
+}
+
+.style-panel__color-option--active .style-panel__color-label {
+  color: var(--ml-accent);
+  font-weight: 600;
+}
+
+/* ── 风格网格 — 3列，每格一个 SVG 预览 + 文字标签 ── */
+.style-panel__style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.style-panel__style-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s;
+}
+
+.style-panel__style-option:hover {
+  background: var(--ml-fill-soft);
+}
+
+.style-panel__style-option--active {
+  border-color: var(--ml-accent);
+  background: var(--ml-accent-soft);
+}
+
+.style-panel__style-label {
+  font-size: 0.67rem;
+  color: var(--ml-text-muted);
+  line-height: 1;
+  text-align: center;
+}
+
+.style-panel__style-option--active .style-panel__style-label {
+  color: var(--ml-accent);
+  font-weight: 600;
+}
+
+/* 风格预览 SVG：比配色 swatch 更宽 */
+.style-panel__preview {
+  flex-shrink: 0;
+  width: 54px;
+  height: 36px;
+}
+
+/* ── 分组标签 ── */
+.style-panel__group-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ml-text-muted);
+  letter-spacing: 0.04em;
+  padding: 2px 2px 0;
+  text-transform: uppercase;
+}
