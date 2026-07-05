@@ -1,8 +1,6 @@
 import type { MessagePipelineConfig } from '../agent/context/pipelineTypes.js'
 
-export type FsResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string }
+export type FsResult<T> = { ok: true; data: T } | { ok: false; error: string }
 
 export interface RecentFileEntry {
   filePath: string
@@ -25,9 +23,14 @@ export interface WorkspaceTreeEntry {
   previewUrl?: string
 }
 
-
 export interface MindmapStyleSettings {
-  mapStyle:    'logic-card' | 'logic-outline' | 'logic-minimal' | 'mindmap-card' | 'mindmap-outline' | 'mindmap-minimal'
+  mapStyle:
+    | 'logic-card'
+    | 'logic-outline'
+    | 'logic-minimal'
+    | 'mindmap-card'
+    | 'mindmap-outline'
+    | 'mindmap-minimal'
   colorScheme: 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 }
 

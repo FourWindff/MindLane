@@ -33,9 +33,7 @@ describe('microcompact', () => {
 
   it('不压缩未命中名单的工具', () => {
     const original = 'x'.repeat(200)
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'otherTool', content: original }),
-    ]
+    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'otherTool', content: original })]
 
     const result = microcompact(messages, makeConfig())
 
@@ -72,9 +70,7 @@ describe('microcompact', () => {
 
   it('不压缩未超过阈值的内容', () => {
     const original = 'short'
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'bigTool', content: original }),
-    ]
+    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'bigTool', content: original })]
 
     const result = microcompact(messages, makeConfig())
 
@@ -95,22 +91,26 @@ describe('applyToolResultBudget', () => {
 
   it('不压缩在预算内的 tool_result', async () => {
     const original = 'small result'
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original }),
-    ]
+    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
-    const result = await applyToolResultBudget(messages, makeConfig({ toolResultMaxBytes: 1000 }), tmpDir)
+    const result = await applyToolResultBudget(
+      messages,
+      makeConfig({ toolResultMaxBytes: 1000 }),
+      tmpDir,
+    )
 
     expect((result[0] as ToolMessage).content).toBe(original)
   })
 
   it('超限内容写入磁盘并用引用替换', async () => {
     const original = 'x'.repeat(20_000)
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original }),
-    ]
+    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
-    const result = await applyToolResultBudget(messages, makeConfig({ toolResultMaxBytes: 1000 }), tmpDir)
+    const result = await applyToolResultBudget(
+      messages,
+      makeConfig({ toolResultMaxBytes: 1000 }),
+      tmpDir,
+    )
 
     const toolMsg = result[0] as ToolMessage
     expect(toolMsg.content).toContain('exceeded')
@@ -125,9 +125,7 @@ describe('applyToolResultBudget', () => {
 
   it('没有 userDataPath 时回退到截断', async () => {
     const original = 'x'.repeat(20_000)
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original }),
-    ]
+    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
     const result = await applyToolResultBudget(messages, makeConfig({ toolResultMaxBytes: 1000 }))
 
@@ -136,4 +134,3 @@ describe('applyToolResultBudget', () => {
     expect(toolMsg.content).toContain('Offload to disk failed')
   })
 })
-

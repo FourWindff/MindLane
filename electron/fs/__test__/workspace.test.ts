@@ -41,7 +41,9 @@ describe('Workspace', () => {
       JSON.stringify({
         lastOpenedFilePath: docPath,
         expandedFolderPaths: ['a', 'b'],
-        recentFiles: [{ filePath: docPath, title: 'Doc', lastOpenedAt: '2024-01-01T00:00:00.000Z' }],
+        recentFiles: [
+          { filePath: docPath, title: 'Doc', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
+        ],
       }),
     )
 

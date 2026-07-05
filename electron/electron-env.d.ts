@@ -96,18 +96,22 @@ interface Window {
       stopStream: () => Promise<void>
       onStreamToken: (callback: (token: string) => void) => () => void
       onStreamMessageStart: (callback: () => void) => () => void
-      onStreamToolStart: (callback: (data: { name: string; input: Record<string, unknown> }) => void) => () => void
+      onStreamToolStart: (
+        callback: (data: { name: string; input: Record<string, unknown> }) => void,
+      ) => () => void
       onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => () => void
-      onStreamEnd: (callback: (response: {
-        content: string
-        messages?: Array<{ role: 'assistant'; content: string; toolCalls?: _ChatToolCall[] }>
-        toolCalls?: _ChatToolCall[]
-        mindmapData?: {
-          nodes: _MindLaneNode[]
-          edges: _MindLaneEdge[]
-          title: string
-        }
-      }) => void) => () => void
+      onStreamEnd: (
+        callback: (response: {
+          content: string
+          messages?: Array<{ role: 'assistant'; content: string; toolCalls?: _ChatToolCall[] }>
+          toolCalls?: _ChatToolCall[]
+          mindmapData?: {
+            nodes: _MindLaneNode[]
+            edges: _MindLaneEdge[]
+            title: string
+          }
+        }) => void,
+      ) => () => void
       onStreamError: (callback: (error: string) => void) => () => void
       nodesToPalace: (payload: {
         apiKey: string
@@ -132,25 +136,38 @@ interface Window {
         | { ok: false; error: string }
       >
       listProviders: () => Promise<{
-        chat: { id: string; displayName: string; models: { id: string; displayName: string }[]; capabilities: string[] }[]
+        chat: {
+          id: string
+          displayName: string
+          models: { id: string; displayName: string }[]
+          capabilities: string[]
+        }[]
         image: { id: string; displayName: string }[]
       }>
-      getProviders: () => Promise<{
-        ok: true
-        providers: { id: string; displayName: string; capabilities: string[]; models: { id: string; displayName: string }[] }[]
-      } | { ok: false; error: string }>
-      getCapabilities: () => Promise<{
-        ok: true
-        capabilities: string[]
-      } | { ok: false; error: string }>
-      urlToDataUrl: (payload: { url: string }) => Promise<
-        _FsResult<{ dataUrl: string }>
+      getProviders: () => Promise<
+        | {
+            ok: true
+            providers: {
+              id: string
+              displayName: string
+              capabilities: string[]
+              models: { id: string; displayName: string }[]
+            }[]
+          }
+        | { ok: false; error: string }
       >
+      getCapabilities: () => Promise<
+        | {
+            ok: true
+            capabilities: string[]
+          }
+        | { ok: false; error: string }
+      >
+      urlToDataUrl: (payload: { url: string }) => Promise<_FsResult<{ dataUrl: string }>>
     }
     file: {
       open: () => Promise<
-        | { ok: true; data: { filePath: string; data: unknown } }
-        | { ok: false; error: string }
+        { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
       >
       save: (payload: {
         filePath: string | null
@@ -163,12 +180,12 @@ interface Window {
       saveThumbnail: (payload: {
         filePath: string
         imageData: string
-      }) => Promise<
-        | { ok: true; data: { previewUrl: string } }
-        | { ok: false; error: string }
-      >
+      }) => Promise<{ ok: true; data: { previewUrl: string } } | { ok: false; error: string }>
       selectDocument: () => Promise<
-        | { ok: true; data: { path: string; name: string; size: number; mtimeMs: number; sha256: string } }
+        | {
+            ok: true
+            data: { path: string; name: string; size: number; mtimeMs: number; sha256: string }
+          }
         | { ok: false; error: string }
       >
     }
@@ -193,17 +210,23 @@ interface Window {
           }
         | { ok: false; error: string }
       >
-      createFile: (payload: { workspacePath: string; name: string; data: unknown }) => Promise<
-        | { ok: true; data: { filePath: string; data: unknown } }
-        | { ok: false; error: string }
+      createFile: (payload: {
+        workspacePath: string
+        name: string
+        data: unknown
+      }) => Promise<
+        { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
       >
-      listFiles: (payload: { workspacePath: string }) => Promise<
+      listFiles: (payload: {
+        workspacePath: string
+      }) => Promise<
         | { ok: true; data: { filePath: string; name: string; lastModifiedAt: string }[] }
         | { ok: false; error: string }
       >
-      openFilePath: (payload: { filePath: string }) => Promise<
-        | { ok: true; data: { filePath: string; data: unknown } }
-        | { ok: false; error: string }
+      openFilePath: (payload: {
+        filePath: string
+      }) => Promise<
+        { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
       >
       getSession: () => Promise<{
         workspacePath: string | null
@@ -212,7 +235,9 @@ interface Window {
         expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>
-      updateState: (payload: { workspacePath: string } & Partial<_WorkspaceState>) => Promise<{ ok: true } | { ok: false; error: string }>
+      updateState: (
+        payload: { workspacePath: string } & Partial<_WorkspaceState>,
+      ) => Promise<{ ok: true } | { ok: false; error: string }>
       switchDirectory: (payload: { workspacePath: string }) => Promise<
         | {
             ok: true
@@ -229,10 +254,7 @@ interface Window {
         name: string
         workspacePath: string
       }) => Promise<_FsResult<{ path: string }>>
-      deleteItem: (payload: {
-        targetPath: string
-        workspacePath: string
-      }) => Promise<_FsResult>
+      deleteItem: (payload: { targetPath: string; workspacePath: string }) => Promise<_FsResult>
       renameItem: (payload: {
         oldPath: string
         newName: string
@@ -245,13 +267,36 @@ interface Window {
       }) => Promise<_FsResult<{ newPath: string }>>
     }
     chat: {
-      listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) => Promise<
-        | { ok: true; data: { sessions: Array<{ id: string; title: string; createdAt: string; updatedAt: string; messageCount: number }> } }
+      listSessions: (payload: {
+        workspacePath: string
+        limit?: number
+        offset?: number
+      }) => Promise<
+        | {
+            ok: true
+            data: {
+              sessions: Array<{
+                id: string
+                title: string
+                createdAt: string
+                updatedAt: string
+                messageCount: number
+              }>
+            }
+          }
         | { ok: false; error: string }
       >
-      loadSession: (payload: { workspacePath: string; sessionId: string }) => Promise<_ChatLoadSessionResult>
-      saveSession: (payload: _ChatSaveSessionPayload) => Promise<{ ok: true } | { ok: false; error: string }>
-      deleteSession: (payload: { workspacePath: string; sessionId: string }) => Promise<{ ok: true } | { ok: false; error: string }>
+      loadSession: (payload: {
+        workspacePath: string
+        sessionId: string
+      }) => Promise<_ChatLoadSessionResult>
+      saveSession: (
+        payload: _ChatSaveSessionPayload,
+      ) => Promise<{ ok: true } | { ok: false; error: string }>
+      deleteSession: (payload: {
+        workspacePath: string
+        sessionId: string
+      }) => Promise<{ ok: true } | { ok: false; error: string }>
     }
     kb: {
       uploadDocuments: () => Promise<_FsResult<{ indexed: _IndexedDocMeta[] }>>
@@ -272,9 +317,7 @@ interface Window {
           }
         | { ok: false; error: string; canceled?: boolean; phase?: string }
       >
-      onGenerationProgress: (
-        callback: (progress: _MindmapGenerationProgress) => void,
-      ) => () => void
+      onGenerationProgress: (callback: (progress: _MindmapGenerationProgress) => void) => () => void
     }
     settings: {
       load: () => Promise<{

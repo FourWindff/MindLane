@@ -12,7 +12,7 @@ import { StyleContext, type StyleContextValue } from './useMapStyle'
  * 供 CSS 选择器实现无 JS 的视觉风格覆写（仅作用于画布内部）。
  */
 export function StyleProvider({ children }: { children: ReactNode }) {
-  const mapStyle    = useStyleStore((s) => s.mapStyle)
+  const mapStyle = useStyleStore((s) => s.mapStyle)
   const colorScheme = useStyleStore((s) => s.colorScheme)
 
   const structureType = useMemo(() => getStructureType(mapStyle), [mapStyle])

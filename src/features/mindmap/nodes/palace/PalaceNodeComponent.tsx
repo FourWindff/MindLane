@@ -3,7 +3,6 @@ import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
 import { Image, Landmark, Minimize2 } from 'lucide-react'
 import type { PalaceNodeData } from './types'
 
-
 type TransitionPhase = 'collapsed' | 'expanding' | 'expanded' | 'collapsing'
 
 function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
@@ -33,9 +32,7 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
     (e: React.MouseEvent) => {
       e.stopPropagation()
       setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, expanded: false } } : n,
-        ),
+        nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, expanded: false } } : n)),
       )
     },
     [id, setNodes],
@@ -54,7 +51,9 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const showExpanded = phase === 'expanding' || phase === 'expanded' || phase === 'collapsing'
 
   return (
-    <div className={`palace-node-shell palace-node-shell--${phase}${selected ? ' palace-node-shell--selected' : ''}`}>
+    <div
+      className={`palace-node-shell palace-node-shell--${phase}${selected ? ' palace-node-shell--selected' : ''}`}
+    >
       <Handle type="target" position={Position.Left} />
 
       {!showExpanded && (

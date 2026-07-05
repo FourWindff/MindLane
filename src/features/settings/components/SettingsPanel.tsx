@@ -35,7 +35,9 @@ export function SettingsPanel() {
   const setActiveChatProvider = useSettingsStore((s) => s.setActiveChatProvider)
   const currentFilePath = useMindmapStore((s) => s.filePath)
   const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
-  const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.setRestoreLastWorkspaceOnLaunch)
+  const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
+    (s) => s.setRestoreLastWorkspaceOnLaunch,
+  )
   const openWorkspaceDirectory = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
@@ -84,7 +86,9 @@ export function SettingsPanel() {
             <div className="settings-card__row">
               <div>
                 <div className="settings-card__label">工作区状态</div>
-                <div className="settings-card__value">{workspacePath ? '已打开工作区' : '未打开工作区'}</div>
+                <div className="settings-card__value">
+                  {workspacePath ? '已打开工作区' : '未打开工作区'}
+                </div>
                 <div className="settings-card__hint">{workspacePath ?? '尚未选择本地仓库'}</div>
               </div>
             </div>
@@ -130,10 +134,9 @@ export function SettingsPanel() {
                 onClick={async () => {
                   const result = await window.mindlane?.file.open()
                   if (result?.ok) {
-                    useMindmapStore.getState().loadFile(
-                      result.data.filePath,
-                      result.data.data as MindLaneFile,
-                    )
+                    useMindmapStore
+                      .getState()
+                      .loadFile(result.data.filePath, result.data.data as MindLaneFile)
                     await syncAfterFileSaved(result.data.filePath)
                   }
                 }}
@@ -272,9 +275,7 @@ export function SettingsPanel() {
             <div className="settings-card__row">
               <div>
                 <div className="settings-card__label">快捷键说明</div>
-                <div className="settings-card__hint">
-                  所有导图与应用级快捷键直接展示在这里。
-                </div>
+                <div className="settings-card__hint">所有导图与应用级快捷键直接展示在这里。</div>
               </div>
             </div>
             <div className="shortcuts-inline">

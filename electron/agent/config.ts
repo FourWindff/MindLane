@@ -49,7 +49,7 @@ export const AGENT_LIMITS = {
   toolResultOffloadChars: 8_000,
   toolResultMaxChars: 32_000,
   toolResultSummaryChars: 1_000,
-  toolResultOffloadDirName: "tool-results",
+  toolResultOffloadDirName: 'tool-results',
 } as const
 
 /**

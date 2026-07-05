@@ -40,7 +40,13 @@ describe('MindmapSubgraphState', () => {
   it('has documentRef field', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('test', async (state) => {
-        expect(state.documentRef).toEqual({ id: 'doc-1', type: 'pdf', source: '/test.pdf', filename: 'test.pdf', importedAt: expect.any(String) })
+        expect(state.documentRef).toEqual({
+          id: 'doc-1',
+          type: 'pdf',
+          source: '/test.pdf',
+          filename: 'test.pdf',
+          importedAt: expect.any(String),
+        })
         return {}
       })
       .addEdge('__start__', 'test')
@@ -66,7 +72,13 @@ describe('MindmapSubgraphState', () => {
       mergeInputs: [],
       partialMergedTrees: [],
       mergeResults: [],
-      documentRef: { id: 'doc-1', type: 'pdf', source: '/test.pdf', filename: 'test.pdf', importedAt: new Date().toISOString() },
+      documentRef: {
+        id: 'doc-1',
+        type: 'pdf',
+        source: '/test.pdf',
+        filename: 'test.pdf',
+        importedAt: new Date().toISOString(),
+      },
     })
   })
 

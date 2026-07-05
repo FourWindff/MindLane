@@ -28,10 +28,7 @@ function findLatestUserMessageText(messages: BaseMessage[]): string | null {
 
 function resolveCacheKey(documentRef: DocumentRef): string {
   const metadataTextCacheKey = documentRef.metadata?.textCacheKey
-  if (
-    typeof metadataTextCacheKey === 'string' &&
-    /^[A-Za-z0-9_-]+$/.test(metadataTextCacheKey)
-  ) {
+  if (typeof metadataTextCacheKey === 'string' && /^[A-Za-z0-9_-]+$/.test(metadataTextCacheKey)) {
     return metadataTextCacheKey
   }
   return documentRef.id

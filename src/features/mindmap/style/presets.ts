@@ -54,9 +54,9 @@ export const MAP_STYLES: MapStyleDef[] = [
 ]
 
 export const COLOR_SCHEMES: ColorSchemeDef[] = [
-  { id: 'warm',   label: '暖石',  swatch: '#f5f4f2' },
-  { id: 'ocean',  label: '海蓝',  swatch: '#e8f4fd' },
-  { id: 'forest', label: '森绿',  swatch: '#edf5ed' },
-  { id: 'sunset', label: '暮橙',  swatch: '#fdf3ea' },
-  { id: 'night',  label: '暗夜',  swatch: '#1e1e2e' },
+  { id: 'warm', label: '暖石', swatch: '#f5f4f2' },
+  { id: 'ocean', label: '海蓝', swatch: '#e8f4fd' },
+  { id: 'forest', label: '森绿', swatch: '#edf5ed' },
+  { id: 'sunset', label: '暮橙', swatch: '#fdf3ea' },
+  { id: 'night', label: '暗夜', swatch: '#1e1e2e' },
 ]

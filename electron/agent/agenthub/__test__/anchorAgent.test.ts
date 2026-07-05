@@ -38,8 +38,10 @@ describe('AnchorAgent error logging', () => {
     const result = await agent.invoke(state)
 
     expect(consoleLogSpy).toHaveBeenCalled()
-    const warnCall = consoleLogSpy.mock.calls.find(
-      (call: unknown[]) => call.some((arg: unknown) => String(arg).includes('locateAnchors') || String(arg).includes('降级')),
+    const warnCall = consoleLogSpy.mock.calls.find((call: unknown[]) =>
+      call.some(
+        (arg: unknown) => String(arg).includes('locateAnchors') || String(arg).includes('降级'),
+      ),
     )
     expect(warnCall).toBeDefined()
     expect(result.memoryRoute).toBeDefined()

@@ -11,14 +11,18 @@ describe('StylePanel color tab', () => {
     const html = renderToString(<StylePanel initialTab="color" />)
 
     for (const cs of COLOR_SCHEMES) {
-      const buttonMatch = html.match(new RegExp(`<button[^>]*aria-label="${cs.label}"[^>]*>([\\s\\S]*?)</button>`))
+      const buttonMatch = html.match(
+        new RegExp(`<button[^>]*aria-label="${cs.label}"[^>]*>([\\s\\S]*?)</button>`),
+      )
       expect(buttonMatch, `expected button for ${cs.label}`).toBeTruthy()
       const buttonHtml = buttonMatch![1]
 
       const bars = [...buttonHtml.matchAll(/class="style-panel__swatch-bar"/g)]
       expect(bars.length).toBe(SCHEME_PALETTES[cs.id].branches.length)
 
-      const renderedColors = [...buttonHtml.matchAll(/class="style-panel__swatch-bar" style="background:\s*([^;"]+)"/g)]
+      const renderedColors = [
+        ...buttonHtml.matchAll(/class="style-panel__swatch-bar" style="background:\s*([^;"]+)"/g),
+      ]
       SCHEME_PALETTES[cs.id].branches.forEach((branch, i) => {
         expect(renderedColors[i][1]).toBe(branch.depth1.nodeBg)
       })

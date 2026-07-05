@@ -80,12 +80,7 @@ export function FileContextMenu({ x, y, entry, onAction, onClose }: FileContextM
   }, [x, y])
 
   return (
-    <div
-      ref={menuRef}
-      className="context-menu"
-      style={{ left: x, top: y }}
-      role="menu"
-    >
+    <div ref={menuRef} className="context-menu" style={{ left: x, top: y }} role="menu">
       {items.map((item) => (
         <button
           key={item.key}

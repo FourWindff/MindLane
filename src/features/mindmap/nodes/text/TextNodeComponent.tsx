@@ -17,9 +17,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
 
   const clearEditing = useCallback(() => {
     setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, editing: undefined } } : n,
-      ),
+      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, editing: undefined } } : n)),
     )
   }, [id, setNodes])
 
@@ -28,9 +26,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
     setLabel(next)
     setNodes((nds) =>
       nds.map((n) =>
-        n.id === id
-          ? { ...n, data: { ...n.data, label: next, editing: undefined } }
-          : n,
+        n.id === id ? { ...n, data: { ...n.data, label: next, editing: undefined } } : n,
       ),
     )
   }, [id, label, setNodes])
@@ -61,9 +57,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       if (!e.animationName.includes('text-node-enter')) return
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === id && n.data.justAdded
-            ? { ...n, data: { ...n.data, justAdded: undefined } }
-            : n,
+          n.id === id && n.data.justAdded ? { ...n, data: { ...n.data, justAdded: undefined } } : n,
         ),
       )
     },
@@ -71,14 +65,14 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   )
 
   // 按深度/分支计算节点颜色
-  const depth       = data.depth       ?? 0
+  const depth = data.depth ?? 0
   const branchIndex = data.branchIndex ?? 0
-  const nodeColors  = getNodeColor(colorScheme, depth, branchIndex)
+  const nodeColors = getNodeColor(colorScheme, depth, branchIndex)
 
   const colorStyle: React.CSSProperties = {
-    '--node-bg':     nodeColors.nodeBg,
+    '--node-bg': nodeColors.nodeBg,
     '--node-border': nodeColors.nodeBorder,
-    '--node-text':   nodeColors.nodeText,
+    '--node-text': nodeColors.nodeText,
   } as React.CSSProperties
 
   const className = [
@@ -96,14 +90,14 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   return (
     <div className={className} style={colorStyle} onAnimationEnd={onAnimationEnd}>
       {/* 所有方向 handle 均渲染，CSS 隐藏；xyflow 根据 sourcePosition/targetPosition 路由 */}
-      <Handle type="target" position={Position.Left}   />
-      <Handle type="target" position={Position.Top}    />
-      <Handle type="target" position={Position.Right}  />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Right} />
       <Handle type="target" position={Position.Bottom} />
-      <Handle type="source" position={Position.Right}  />
+      <Handle type="source" position={Position.Right} />
       <Handle type="source" position={Position.Bottom} />
-      <Handle type="source" position={Position.Left}   />
-      <Handle type="source" position={Position.Top}    />
+      <Handle type="source" position={Position.Left} />
+      <Handle type="source" position={Position.Top} />
 
       {editing && !aiBusy ? (
         <textarea

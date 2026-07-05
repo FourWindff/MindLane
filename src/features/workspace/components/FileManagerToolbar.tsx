@@ -1,10 +1,4 @@
-import {
-  X,
-  FolderInput,
-  FilePlus,
-  FolderPlus,
-  RefreshCw,
-} from 'lucide-react'
+import { X, FolderInput, FilePlus, FolderPlus, RefreshCw } from 'lucide-react'
 
 export function FileManagerToolbar({
   busy,

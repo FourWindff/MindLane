@@ -48,7 +48,10 @@ function enforceMinDistance(points: MemoryPalaceStation[]): MemoryPalaceStation[
 
 type RouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
 
-function applyCanonicalLayout(stations: StationDesign[], routeStyle?: string): MemoryPalaceStation[] {
+function applyCanonicalLayout(
+  stations: StationDesign[],
+  routeStyle?: string,
+): MemoryPalaceStation[] {
   const sorted = [...stations].sort((a, b) => a.order - b.order)
   const n = sorted.length
   if (n === 0) return []
@@ -72,7 +75,7 @@ function applyCanonicalLayout(stations: StationDesign[], routeStyle?: string): M
       case 'loop': {
         const angle = Math.PI * 0.85 + t * Math.PI * 1.7
         x = 0.5 + Math.cos(angle) * 0.38
-        y = 0.5 + Math.sin(angle) * 0.30
+        y = 0.5 + Math.sin(angle) * 0.3
         break
       }
       case 'stairs':
@@ -277,10 +280,7 @@ export class AnchorAgent extends PalaceAgent {
           memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
         }
       } catch (err) {
-        logger.warn(
-          '[AnchorAgent] locateAnchors 失败，降级到标准布局:\n',
-          formatAgentError(err),
-        )
+        logger.warn('[AnchorAgent] locateAnchors 失败，降级到标准布局:\n', formatAgentError(err))
         memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
       }
     } else {
@@ -304,10 +304,7 @@ export class AnchorAgent extends PalaceAgent {
         summary = buildFallbackSummary(memoryRoute, hasImage)
       }
     } catch (err) {
-      logger.warn(
-        '[AnchorAgent] 总结生成失败，使用 fallback 摘要:\n',
-        formatAgentError(err),
-      )
+      logger.warn('[AnchorAgent] 总结生成失败，使用 fallback 摘要:\n', formatAgentError(err))
       summary = buildFallbackSummary(memoryRoute, hasImage)
     }
 

@@ -1,28 +1,34 @@
-import { AIMessage, SystemMessage, RemoveMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
-import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { LLMProvider } from "../../providers/index.js";
-import type { MainGraphStateType } from "../../state.js";
-import { BaseAgent } from "../base.js";
-import { ContextBuilder } from "./context.js";
-import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from "../../utils.js";
-import { MemoryManager } from "../../memory/memoryManager.js";
-import { logger } from "../../../shared/logger.js";
+import {
+  AIMessage,
+  SystemMessage,
+  RemoveMessage,
+  HumanMessage,
+  type BaseMessage,
+} from '@langchain/core/messages'
+import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import type { LLMProvider } from '../../providers/index.js'
+import type { MainGraphStateType } from '../../state.js'
+import { BaseAgent } from '../base.js'
+import { ContextBuilder } from './context.js'
+import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '../../utils.js'
+import { MemoryManager } from '../../memory/memoryManager.js'
+import { logger } from '../../../shared/logger.js'
 import {
   createGenerateMindmapFragmentTool,
   createGeneratePalaceTool,
-} from "../../tools/subgraphRoutingTools.js";
-import { route as routeSubgraph } from "../../subgraphRouter.js";
-import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
-import { isPromptTooLongError } from "../../memory/contextCompact.js";
-import { AGENT_LIMITS } from "../../config.js";
+} from '../../tools/subgraphRoutingTools.js'
+import { route as routeSubgraph } from '../../subgraphRouter.js'
+import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
+import { isPromptTooLongError } from '../../memory/contextCompact.js'
+import { AGENT_LIMITS } from '../../config.js'
 import {
   preprocessMessages,
   mergeMessagePipelineConfig,
   type MessagePipelineConfig,
-} from "../../context/pipeline.js";
+} from '../../context/pipeline.js'
 
-type AIMessageContent = AIMessage['content'];
+type AIMessageContent = AIMessage['content']
 
 /**
  * MindLaneAgent - 中央智能体，负责路由决策和上下文管理
@@ -38,22 +44,22 @@ type AIMessageContent = AIMessage['content'];
  * - 通过 state.context 访问工作区、思维导图、选中节点等上下文
  */
 export interface CapabilityFlags {
-  hasEmbeddings: boolean;
-  hasPalace: boolean;
+  hasEmbeddings: boolean
+  hasPalace: boolean
 }
 
 interface MindLaneAgentOptions {
-  userDataPath?: string;
-  messagePipeline?: MessagePipelineConfig;
+  userDataPath?: string
+  messagePipeline?: MessagePipelineConfig
 }
 
 export class MindLaneAgent extends BaseAgent {
-  private tools: StructuredToolInterface[];
-  private capabilityFlags: CapabilityFlags;
-  private modelWithTools: ReturnType<NonNullable<BaseChatModel["bindTools"]>>;
-  private memoryManager?: MemoryManager;
-  private userDataPath?: string;
-  private messagePipelineConfig: MessagePipelineConfig;
+  private tools: StructuredToolInterface[]
+  private capabilityFlags: CapabilityFlags
+  private modelWithTools: ReturnType<NonNullable<BaseChatModel['bindTools']>>
+  private memoryManager?: MemoryManager
+  private userDataPath?: string
+  private messagePipelineConfig: MessagePipelineConfig
 
   constructor(
     provider: LLMProvider,
@@ -62,24 +68,20 @@ export class MindLaneAgent extends BaseAgent {
     memoryManager?: MemoryManager,
     options?: MindLaneAgentOptions,
   ) {
-    super(provider);
-    const routingTools: StructuredToolInterface[] = [
-      createGenerateMindmapFragmentTool(),
-    ];
+    super(provider)
+    const routingTools: StructuredToolInterface[] = [createGenerateMindmapFragmentTool()]
     if (capabilityFlags?.hasPalace ?? true) {
-      routingTools.push(createGeneratePalaceTool());
+      routingTools.push(createGeneratePalaceTool())
     }
-    this.tools = [...tools, ...routingTools];
-    this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true };
-    this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools);
-    this.memoryManager = memoryManager;
-    this.userDataPath = options?.userDataPath;
-    this.messagePipelineConfig = mergeMessagePipelineConfig(options?.messagePipeline);
+    this.tools = [...tools, ...routingTools]
+    this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true }
+    this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools)
+    this.memoryManager = memoryManager
+    this.userDataPath = options?.userDataPath
+    this.messagePipelineConfig = mergeMessagePipelineConfig(options?.messagePipeline)
   }
 
-  async invoke(
-    state: MainGraphStateType,
-  ): Promise<Partial<MainGraphStateType>> {
+  async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {
     logger.info('[MindLaneAgent] invoke called with %d messages', state.messages.length)
     // Surface subgraph errors
     if (state.error) {
@@ -88,7 +90,7 @@ export class MindLaneAgent extends BaseAgent {
         pendingSubgraph: null,
         response: state.response || state.error,
         error: '',
-      };
+      }
     }
 
     try {
@@ -105,39 +107,37 @@ export class MindLaneAgent extends BaseAgent {
         .withMemory(this.memoryManager)
 
       await builder.buildMemoryContext()
-      builder.buildSystemPrompt()
-        .buildEnvironmentPrompt()
-        .buildMindmapContext()
+      builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext()
 
-      const systemPrompt = builder.build();
+      const systemPrompt = builder.build()
 
       return await this.invokeModel(state, systemPrompt, preprocessedMessages, 0)
     } catch (err) {
-      const formatted = formatAgentError(err);
-      logger.error('[MindLaneAgent] invoke 失败:\n', formatted);
+      const formatted = formatAgentError(err)
+      logger.error('[MindLaneAgent] invoke 失败:\n', formatted)
       return {
         messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
         response: '处理请求时出错，请稍后重试。',
-      };
+      }
     }
   }
 
   route(state: MainGraphStateType): string {
     switch (state.pendingSubgraph) {
-      case "palace":
-        return this.capabilityFlags.hasPalace ? "palaceSubgraph" : "__end__";
-      case "mindmap":
-        return "mindmapSubgraph";
+      case 'palace':
+        return this.capabilityFlags.hasPalace ? 'palaceSubgraph' : '__end__'
+      case 'mindmap':
+        return 'mindmapSubgraph'
       default: {
-        const lastMessage = state.messages[state.messages.length - 1];
-        if (lastMessage && lastMessage.type === "ai") {
-          const msg = lastMessage as AIMessage;
+        const lastMessage = state.messages[state.messages.length - 1]
+        if (lastMessage && lastMessage.type === 'ai') {
+          const msg = lastMessage as AIMessage
           if ((msg.tool_calls?.length ?? 0) > 0) {
-            return "tools";
+            return 'tools'
           }
         }
-        return "__end__";
+        return '__end__'
       }
     }
   }
@@ -149,12 +149,12 @@ export class MindLaneAgent extends BaseAgent {
     retryCount: number,
   ): Promise<Partial<MainGraphStateType>> {
     logger.info('[MindLaneAgent] invokeModel called with %d messages', state.messages.length)
-    const messagesWithSystem = [
-      new SystemMessage(systemPrompt),
-      ...preprocessedMessages,
-    ];
+    const messagesWithSystem = [new SystemMessage(systemPrompt), ...preprocessedMessages]
 
-    logger.info('[MindLaneAgent] messages before invoke:', JSON.stringify(messagesWithSystem.map(summarizeMessageForLog)))
+    logger.info(
+      '[MindLaneAgent] messages before invoke:',
+      JSON.stringify(messagesWithSystem.map(summarizeMessageForLog)),
+    )
 
     let response: AIMessage
     let didReactiveCompact = false
@@ -164,7 +164,10 @@ export class MindLaneAgent extends BaseAgent {
       response.content = sanitizeAIMessageContent(response.content) as AIMessageContent
     } catch (err) {
       logger.error('[MindLaneAgent] invoke error:', err)
-      logger.error('[MindLaneAgent] invoke error messages:', JSON.stringify(messagesWithSystem.map(summarizeMessageForLog), null, 2))
+      logger.error(
+        '[MindLaneAgent] invoke error messages:',
+        JSON.stringify(messagesWithSystem.map(summarizeMessageForLog), null, 2),
+      )
       if (!isPromptTooLongError(err) || retryCount >= AGENT_LIMITS.reactiveCompactMaxRetries) {
         throw err
       }
@@ -178,10 +181,7 @@ export class MindLaneAgent extends BaseAgent {
       const compactedMessages = await this.performReactiveCompact(preprocessedMessages)
       didReactiveCompact = true
 
-      const compactedWithSystem = [
-        new SystemMessage(systemPrompt),
-        ...compactedMessages,
-      ]
+      const compactedWithSystem = [new SystemMessage(systemPrompt), ...compactedMessages]
 
       response = (await this.modelWithTools.invoke(compactedWithSystem)) as AIMessage
       response.content = sanitizeAIMessageContent(response.content) as AIMessageContent
@@ -268,22 +268,21 @@ export class MindLaneAgent extends BaseAgent {
       return messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
     }
   }
-
 }
 
 function summarizeMessageContent(content: unknown): unknown {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return content;
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return content
 
   return content.map((block) => {
-    if (!block || typeof block !== 'object') return block;
+    if (!block || typeof block !== 'object') return block
 
-    const record = block as Record<string, unknown>;
+    const record = block as Record<string, unknown>
     if (record.type === 'text') {
       return {
         type: record.type,
         text: record.text,
-      };
+      }
     }
 
     if (record.type === 'tool_use') {
@@ -292,11 +291,11 @@ function summarizeMessageContent(content: unknown): unknown {
         id: record.id,
         name: record.name,
         input: record.input,
-      };
+      }
     }
 
-    return record;
-  });
+    return record
+  })
 }
 
 function summarizeForLog(content: unknown): unknown {
@@ -329,5 +328,5 @@ function createToolCallMessage(response: AIMessage, content: string): AIMessage 
   return new AIMessage({
     content,
     tool_calls: response.tool_calls ?? [],
-  });
+  })
 }

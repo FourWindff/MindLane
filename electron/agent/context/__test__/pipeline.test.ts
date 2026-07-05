@@ -44,9 +44,15 @@ describe('preprocessMessages', () => {
       new ToolMessage({ tool_call_id: 'orphan', content: 'orphan-result' }),
     ]
 
-    const result = await preprocessMessages(messages, makeConfig({ microcompactKeepRecent: 0 }), tmpDir)
+    const result = await preprocessMessages(
+      messages,
+      makeConfig({ microcompactKeepRecent: 0 }),
+      tmpDir,
+    )
 
-    expect(result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan')).toBe(false)
+    expect(
+      result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan'),
+    ).toBe(false)
 
     const bigToolResults = result.filter(
       (m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-1',
@@ -74,17 +80,15 @@ describe('preprocessMessages', () => {
 
     const result = await preprocessMessages(messages, makeConfig(), tmpDir)
 
-    const backfill = result.find((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-1')
+    const backfill = result.find(
+      (m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-1',
+    )
     expect(backfill).toBeDefined()
     expect((backfill as ToolMessage).content).toContain('unavailable')
   })
 
   it('drops invalid message-like objects before sending to the model', async () => {
-    const messages = [
-      new HumanMessage('hello'),
-      {} as BaseMessage,
-      new AIMessage('hi'),
-    ]
+    const messages = [new HumanMessage('hello'), {} as BaseMessage, new AIMessage('hi')]
 
     const result = await preprocessMessages(messages, makeConfig(), tmpDir)
 

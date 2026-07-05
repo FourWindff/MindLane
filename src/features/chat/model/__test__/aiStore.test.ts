@@ -79,7 +79,11 @@ describe('aiStore session chat API', () => {
       sessionId: 'thread-1',
       messages: [{ role: 'user', content: 'hello' }],
     })
-    expect(api.listSessions).toHaveBeenCalledWith({ workspacePath: '/workspace', limit: 20, offset: 0 })
+    expect(api.listSessions).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      limit: 20,
+      offset: 0,
+    })
     expect(useAiStore.getState().sessions).toEqual(sessions)
   })
 
@@ -88,8 +92,15 @@ describe('aiStore session chat API', () => {
 
     await loadWorkspaceChat('/workspace')
 
-    expect(api.listSessions).toHaveBeenCalledWith({ workspacePath: '/workspace', limit: 20, offset: 0 })
-    expect(api.loadSession).toHaveBeenCalledWith({ workspacePath: '/workspace', sessionId: 'session-latest' })
+    expect(api.listSessions).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      limit: 20,
+      offset: 0,
+    })
+    expect(api.loadSession).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      sessionId: 'session-latest',
+    })
     expect(useAiStore.getState()).toMatchObject({
       workspacePath: '/workspace',
       threadId: 'session-latest',

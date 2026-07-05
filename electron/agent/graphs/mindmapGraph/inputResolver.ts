@@ -1,9 +1,6 @@
 import type { BaseMessage } from '@langchain/core/messages'
 import { extractTextContent } from '../../utils.js'
-import type {
-  MindmapInputSource,
-  MindmapSubgraphStateType,
-} from '../../state.js'
+import type { MindmapInputSource, MindmapSubgraphStateType } from '../../state.js'
 import type { DocumentRef } from '../../state.js'
 
 export interface MindmapInputResolution {
@@ -27,10 +24,7 @@ function resolveAttachedDocument(documentRef: DocumentRef): MindmapInputSource {
   }
 }
 
-function resolveTitle(
-  documentRef: DocumentRef | undefined,
-  fileTitle: string | undefined,
-): string {
+function resolveTitle(documentRef: DocumentRef | undefined, fileTitle: string | undefined): string {
   return documentRef?.title || documentRef?.filename || fileTitle || ''
 }
 

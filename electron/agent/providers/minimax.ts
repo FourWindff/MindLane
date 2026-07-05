@@ -9,15 +9,7 @@ const MINIMAX_IMAGE_URL = 'https://api.minimaxi.com/v1/image_generation'
 const DEFAULT_CHAT_MODEL = 'MiniMax-M2.7'
 const DEFAULT_IMAGE_MODEL = 'image-01'
 
-const SUPPORTED_ASPECT_RATIOS = [
-  '1:1',
-  '4:3',
-  '3:4',
-  '3:2',
-  '2:3',
-  '16:9',
-  '9:16',
-] as const
+const SUPPORTED_ASPECT_RATIOS = ['1:1', '4:3', '3:4', '3:2', '2:3', '16:9', '9:16'] as const
 
 type MiniMaxImageResponse = {
   base_resp?: {
@@ -41,7 +33,8 @@ function errMsg(body: unknown, fallback: string): string {
       return payload.base_resp?.status_msg || fallback
     }
     if (typeof payload.message === 'string' && payload.message) return payload.message
-    if (typeof payload.error?.message === 'string' && payload.error.message) return payload.error.message
+    if (typeof payload.error?.message === 'string' && payload.error.message)
+      return payload.error.message
   }
   return fallback
 }
@@ -103,11 +96,7 @@ export class MiniMaxProvider extends LLMProvider {
     return MiniMaxProvider.defaultChatModels
   }
 
-  constructor(config: {
-    apiKey: string
-    chatModel: string
-    baseUrl?: string
-  }) {
+  constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()
     if (!key) throw new Error('未填写 API Key')
 
@@ -137,32 +126,29 @@ export class MiniMaxProvider extends LLMProvider {
     }
 
     const payload = await withRetry(() =>
-      withTimeout(
-        async (signal) => {
-          const response = await fetch(MINIMAX_IMAGE_URL, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${this.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: DEFAULT_IMAGE_MODEL,
-              prompt,
-              aspect_ratio: mapSizeToAspectRatio(input.size),
-              response_format: 'url',
-              n: Math.min(4, Math.max(1, input.n ?? 1)),
-            }),
-            signal,
-          })
+      withTimeout(async (signal) => {
+        const response = await fetch(MINIMAX_IMAGE_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: DEFAULT_IMAGE_MODEL,
+            prompt,
+            aspect_ratio: mapSizeToAspectRatio(input.size),
+            response_format: 'url',
+            n: Math.min(4, Math.max(1, input.n ?? 1)),
+          }),
+          signal,
+        })
 
-          const body = (await response.json().catch(() => null)) as MiniMaxImageResponse | null
-          if (!response.ok) {
-            throw new Error(errMsg(body, `创建图片失败：HTTP ${response.status}`))
-          }
-          return body
-        },
-        HTTP_TIMEOUT_MS,
-      ),
+        const body = (await response.json().catch(() => null)) as MiniMaxImageResponse | null
+        if (!response.ok) {
+          throw new Error(errMsg(body, `创建图片失败：HTTP ${response.status}`))
+        }
+        return body
+      }, HTTP_TIMEOUT_MS),
     )
 
     const urls = extractImageUrls(payload)

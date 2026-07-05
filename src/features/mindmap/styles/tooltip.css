@@ -16,7 +16,9 @@
   pointer-events: none;
   opacity: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
   z-index: 101;
 }
 

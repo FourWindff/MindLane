@@ -105,7 +105,11 @@ describe('SessionMessageStore', () => {
       messageCount: 2,
     }
     const goodLine = JSON.stringify({ type: 'human', data: { content: 'ok' } })
-    fs.writeFileSync(sessionPath, `${JSON.stringify(meta)}\n${goodLine}\n{not valid json}\n`, 'utf-8')
+    fs.writeFileSync(
+      sessionPath,
+      `${JSON.stringify(meta)}\n${goodLine}\n{not valid json}\n`,
+      'utf-8',
+    )
 
     const messages = await store.loadMessages('corrupt')
     expect(messages).toHaveLength(1)

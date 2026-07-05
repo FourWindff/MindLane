@@ -75,10 +75,12 @@ function collectAllFolderPaths(entries: WorkspaceTreeEntry[]): string[] {
 function saveExpandedFolders(folders: Set<string>) {
   const workspacePath = useWorkspaceStore.getState().workspacePath
   if (!workspacePath) return
-  window.mindlane?.workspace.updateState?.({
-    workspacePath,
-    expandedFolderPaths: [...folders],
-  }).catch(() => {})
+  window.mindlane?.workspace
+    .updateState?.({
+      workspacePath,
+      expandedFolderPaths: [...folders],
+    })
+    .catch(() => {})
 }
 
 function updateWorkspaceState(
@@ -594,7 +596,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const currentFilePath = useMindmapStore.getState().filePath
-      if (currentFilePath === targetPath || (currentFilePath && currentFilePath.startsWith(targetPath + '/'))) {
+      if (
+        currentFilePath === targetPath ||
+        (currentFilePath && currentFilePath.startsWith(targetPath + '/'))
+      ) {
         clearMindLaneFile()
       }
 

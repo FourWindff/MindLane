@@ -14,13 +14,15 @@ describe('TextInputAnalyzer', () => {
     expect(analyzer.supports({ type: 'pdf', path: '/tmp/test.pdf' })).toBe(false)
     await expect(analyzer.load('plain text document')).resolves.toBe('plain text document')
     expect(document.text).toBe('plain text document')
-    expect(document.chunks).toEqual([{
-      id: 'chunk-1',
-      index: 0,
-      startPage: 0,
-      endPage: 0,
-      text: 'plain text document',
-    }])
+    expect(document.chunks).toEqual([
+      {
+        id: 'chunk-1',
+        index: 0,
+        startPage: 0,
+        endPage: 0,
+        text: 'plain text document',
+      },
+    ])
   })
 
   it('splits long text input into bounded chunks', async () => {
@@ -78,7 +80,10 @@ describe('TextInputAnalyzer', () => {
         return []
       }
     }
-    const analyzers: MindmapInputAnalyzer<unknown, unknown>[] = [new UnsupportedUrlAnalyzer(), textAnalyzer]
+    const analyzers: MindmapInputAnalyzer<unknown, unknown>[] = [
+      new UnsupportedUrlAnalyzer(),
+      textAnalyzer,
+    ]
 
     expect(findInputAnalyzer(analyzers, { type: 'text', content: 'hello' })).toBe(textAnalyzer)
     expect(findInputAnalyzer(analyzers, { type: 'url', url: 'https://example.test' })).toBeNull()

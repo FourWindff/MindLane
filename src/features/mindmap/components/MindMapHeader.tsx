@@ -53,7 +53,9 @@ function ToolbarButton({
           'float-toolbar__btn',
           variant === 'danger' ? 'float-toolbar__btn--danger' : '',
           active ? 'float-toolbar__btn--active' : '',
-        ].filter(Boolean).join(' ')}
+        ]
+          .filter(Boolean)
+          .join(' ')}
         onClick={onClick}
         disabled={disabled}
         aria-label={ariaLabel}

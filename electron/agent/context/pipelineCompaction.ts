@@ -15,7 +15,10 @@ function isTargetForMicrocompact(toolName: string, config: MessagePipelineConfig
   return config.microcompactToolNames.includes(toolName)
 }
 
-function compactStringContent(content: ToolMessage['content'], threshold: number): ToolMessage['content'] {
+function compactStringContent(
+  content: ToolMessage['content'],
+  threshold: number,
+): ToolMessage['content'] {
   if (typeof content === 'string' && content.length > threshold) {
     return MICROCOMPACT_SUMMARY
   }
@@ -62,8 +65,7 @@ export function microcompact(
 
   if (targetIndices.length === 0) return messages
 
-  const keepSet =
-    keepRecent > 0 ? new Set(targetIndices.slice(-keepRecent)) : new Set<number>()
+  const keepSet = keepRecent > 0 ? new Set(targetIndices.slice(-keepRecent)) : new Set<number>()
 
   return messages.map((msg, idx) => {
     if (msg.type !== 'tool') return msg
@@ -160,4 +162,3 @@ async function createOffloadReference(
 
   return `[Tool result exceeded ${budget} bytes budget (${totalBytes} bytes total).]\n${refLine}\n\nFirst ${headChars} characters:\n${head}`
 }
-

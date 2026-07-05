@@ -9,14 +9,13 @@ type Props = {
 
 function extractFileName(filePath: string | undefined): string | null {
   if (!filePath) return null
-  return filePath.split(/[/\\]/).pop()!.replace(/\.mindlane$/, '')
+  return filePath
+    .split(/[/\\]/)
+    .pop()!
+    .replace(/\.mindlane$/, '')
 }
 
-export function AppToolbar({
-  onOpenFileManager,
-  fileManagerOpen,
-  filePath,
-}: Props) {
+export function AppToolbar({ onOpenFileManager, fileManagerOpen, filePath }: Props) {
   const fileName = extractFileName(filePath)
 
   return (

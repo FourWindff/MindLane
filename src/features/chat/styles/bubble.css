@@ -138,10 +138,22 @@
   animation: chat-float-thinking-bounce 1.2s ease-in-out infinite;
 }
 
-.chat-float-thinking__dot:nth-child(2) { animation-delay: 0.15s; }
-.chat-float-thinking__dot:nth-child(3) { animation-delay: 0.3s; }
+.chat-float-thinking__dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.chat-float-thinking__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
 
 @keyframes chat-float-thinking-bounce {
-  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-4px); opacity: 1; }
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
 }

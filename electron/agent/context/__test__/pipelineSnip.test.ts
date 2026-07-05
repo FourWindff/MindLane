@@ -19,11 +19,7 @@ function makeConfig(partial: Partial<MessagePipelineConfig> = {}): MessagePipeli
 
 describe('snipHistory', () => {
   it('未超预算时保留所有消息', () => {
-    const messages = [
-      new SystemMessage('system'),
-      new HumanMessage('hello'),
-      new AIMessage('hi'),
-    ]
+    const messages = [new SystemMessage('system'), new HumanMessage('hello'), new AIMessage('hi')]
 
     const result = snipHistory(messages, makeConfig({ maxContextTokens: 10_000 }))
 
@@ -75,16 +71,18 @@ describe('snipHistory', () => {
 
     const result = snipHistory(messages, makeConfig({ maxContextTokens: 10 }))
 
-    expect(result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2')).toBe(false)
+    expect(
+      result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2'),
+    ).toBe(false)
   })
 
   it('允许关闭 system 保留', () => {
-    const messages = [
-      new SystemMessage('system'),
-      new HumanMessage('current'),
-    ]
+    const messages = [new SystemMessage('system'), new HumanMessage('current')]
 
-    const result = snipHistory(messages, makeConfig({ maxContextTokens: 5, snipPreserveSystem: false }))
+    const result = snipHistory(
+      messages,
+      makeConfig({ maxContextTokens: 5, snipPreserveSystem: false }),
+    )
 
     expect(result.some((m) => m.type === 'system')).toBe(false)
   })

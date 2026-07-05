@@ -110,18 +110,23 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
         <div className="palace-modal__body">
           <div className="palace-modal__image-wrap">
             {data.imageUrl ? (
-              <img src={data.imageUrl} alt={data.label} className="palace-modal__image" draggable={false} />
+              <img
+                src={data.imageUrl}
+                alt={data.label}
+                className="palace-modal__image"
+                draggable={false}
+              />
             ) : (
               <div className="palace-modal__no-image">暂无图片</div>
             )}
 
             {stations.length >= 2 && (
-              <svg className="palace-modal__trail-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path
-                  ref={pathRef}
-                  d={pathD}
-                  className="palace-modal__trail-path"
-                />
+              <svg
+                className="palace-modal__trail-svg"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <path ref={pathRef} d={pathD} className="palace-modal__trail-path" />
               </svg>
             )}
 

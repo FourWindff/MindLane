@@ -16,12 +16,12 @@ export function StylePanel({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
-  const mapStyle    = useStyleStore((s) => s.mapStyle)
+  const mapStyle = useStyleStore((s) => s.mapStyle)
   const colorScheme = useStyleStore((s) => s.colorScheme)
-  const setMapStyle    = useStyleStore((s) => s.setMapStyle)
+  const setMapStyle = useStyleStore((s) => s.setMapStyle)
   const setColorScheme = useStyleStore((s) => s.setColorScheme)
 
-  const logicStyles   = MAP_STYLES.filter((s) => s.structureType === 'logic')
+  const logicStyles = MAP_STYLES.filter((s) => s.structureType === 'logic')
   const mindmapStyles = MAP_STYLES.filter((s) => s.structureType === 'mindmap')
 
   return (
@@ -29,11 +29,7 @@ export function StylePanel({
       <div className="style-panel__header">
         <span className="style-panel__title">导图样式</span>
         {onClose && (
-          <button
-            className="style-panel__close"
-            onClick={onClose}
-            aria-label="关闭样式面板"
-          >
+          <button className="style-panel__close" onClick={onClose} aria-label="关闭样式面板">
             ✕
           </button>
         )}
@@ -81,7 +77,9 @@ export function StylePanel({
           </div>
 
           {/* 思维导图分组 */}
-          <div className="style-panel__group-label" style={{ marginTop: 12 }}>思维导图</div>
+          <div className="style-panel__group-label" style={{ marginTop: 12 }}>
+            思维导图
+          </div>
           <div className="style-panel__style-grid">
             {mindmapStyles.map((ms) => (
               <button
@@ -145,49 +143,85 @@ function LogicPreview({
   active: boolean
 }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
-  const fill  = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
+  const fill = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
 
   if (variant === 'card') {
     return (
       <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
         {/* 根节点 */}
-        <rect x="2"  y="13" width="16" height="10" rx="2.5" fill={fill} stroke={color} strokeWidth="1.3" />
+        <rect
+          x="2"
+          y="13"
+          width="16"
+          height="10"
+          rx="2.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1.3"
+        />
         {/* 子节点 */}
-        <rect x="28" y="4"  width="22" height="8"  rx="2" fill={fill} stroke={color} strokeWidth="1" />
-        <rect x="28" y="14" width="22" height="8"  rx="2" fill={fill} stroke={color} strokeWidth="1" />
-        <rect x="28" y="24" width="22" height="8"  rx="2" fill={fill} stroke={color} strokeWidth="1" />
+        <rect
+          x="28"
+          y="4"
+          width="22"
+          height="8"
+          rx="2"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <rect
+          x="28"
+          y="14"
+          width="22"
+          height="8"
+          rx="2"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <rect
+          x="28"
+          y="24"
+          width="22"
+          height="8"
+          rx="2"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
         {/* 贝塞尔边 */}
-        <path d="M18 18 C22 18 24 8 28 8"   stroke={color} strokeWidth="1" fill="none" />
-        <path d="M18 18 C22 18 24 18 28 18"  stroke={color} strokeWidth="1" fill="none" />
-        <path d="M18 18 C22 18 24 28 28 28"  stroke={color} strokeWidth="1" fill="none" />
+        <path d="M18 18 C22 18 24 8 28 8" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M18 18 C22 18 24 18 28 18" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M18 18 C22 18 24 28 28 28" stroke={color} strokeWidth="1" fill="none" />
       </svg>
     )
   }
   if (variant === 'outline') {
     return (
       <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
-        <rect x="2"  y="13" width="16" height="10" rx="1.5" stroke={color} strokeWidth="1.3" />
-        <rect x="28" y="4"  width="22" height="8"  rx="1" stroke={color} strokeWidth="1" />
-        <rect x="28" y="14" width="22" height="8"  rx="1" stroke={color} strokeWidth="1" />
-        <rect x="28" y="24" width="22" height="8"  rx="1" stroke={color} strokeWidth="1" />
+        <rect x="2" y="13" width="16" height="10" rx="1.5" stroke={color} strokeWidth="1.3" />
+        <rect x="28" y="4" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
+        <rect x="28" y="14" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
+        <rect x="28" y="24" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
         {/* smooth-step 折线 */}
-        <path d="M18 18 L22 18 L22 8  L28 8"  stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L28 18"               stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L22 28 L28 28"        stroke={color} strokeWidth="1" fill="none" />
+        <path d="M18 18 L22 18 L22 8  L28 8" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M22 18 L28 18" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M22 18 L22 28 L28 28" stroke={color} strokeWidth="1" fill="none" />
       </svg>
     )
   }
   // minimal
   return (
     <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
-      <line x1="2"  y1="19.5" x2="18" y2="19.5" stroke={color} strokeWidth="1.5" />
-      <line x1="28" y1="8.5"  x2="50" y2="8.5"  stroke={color} strokeWidth="1.2" />
+      <line x1="2" y1="19.5" x2="18" y2="19.5" stroke={color} strokeWidth="1.5" />
+      <line x1="28" y1="8.5" x2="50" y2="8.5" stroke={color} strokeWidth="1.2" />
       <line x1="28" y1="18.5" x2="50" y2="18.5" stroke={color} strokeWidth="1.2" />
       <line x1="28" y1="28.5" x2="50" y2="28.5" stroke={color} strokeWidth="1.2" />
       {/* 直角折线 */}
-      <path d="M18 18 L22 18 L22 8  L28 8"  stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L28 18"               stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L22 28 L28 28"        stroke={color} strokeWidth="1" fill="none" />
+      <path d="M18 18 L22 18 L22 8  L28 8" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M22 18 L28 18" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M22 18 L22 28 L28 28" stroke={color} strokeWidth="1" fill="none" />
     </svg>
   )
 }
@@ -202,23 +236,68 @@ function MindmapPreview({
   active: boolean
 }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
-  const fill  = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
+  const fill = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
 
   if (variant === 'card') {
     return (
       <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
         {/* 中心根节点 */}
-        <rect x="22" y="13" width="20" height="10" rx="2.5" fill={fill} stroke={color} strokeWidth="1.3" />
+        <rect
+          x="22"
+          y="13"
+          width="20"
+          height="10"
+          rx="2.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1.3"
+        />
         {/* 右侧子节点 */}
-        <rect x="47" y="4"  width="15" height="7" rx="1.5" fill={fill} stroke={color} strokeWidth="1" />
-        <rect x="47" y="25" width="15" height="7" rx="1.5" fill={fill} stroke={color} strokeWidth="1" />
+        <rect
+          x="47"
+          y="4"
+          width="15"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <rect
+          x="47"
+          y="25"
+          width="15"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
         {/* 左侧子节点 */}
-        <rect x="2"  y="4"  width="15" height="7" rx="1.5" fill={fill} stroke={color} strokeWidth="1" />
-        <rect x="2"  y="25" width="15" height="7" rx="1.5" fill={fill} stroke={color} strokeWidth="1" />
+        <rect
+          x="2"
+          y="4"
+          width="15"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <rect
+          x="2"
+          y="25"
+          width="15"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
         {/* 边 */}
-        <path d="M42 18 C44 18 45 7.5 47 7.5"  stroke={color} strokeWidth="1" fill="none" />
+        <path d="M42 18 C44 18 45 7.5 47 7.5" stroke={color} strokeWidth="1" fill="none" />
         <path d="M42 18 C44 18 45 28.5 47 28.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 C20 18 19 7.5 17 7.5"  stroke={color} strokeWidth="1" fill="none" />
+        <path d="M22 18 C20 18 19 7.5 17 7.5" stroke={color} strokeWidth="1" fill="none" />
         <path d="M22 18 C20 18 19 28.5 17 28.5" stroke={color} strokeWidth="1" fill="none" />
       </svg>
     )
@@ -227,14 +306,14 @@ function MindmapPreview({
     return (
       <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
         <rect x="22" y="13" width="20" height="10" rx="1.5" stroke={color} strokeWidth="1.3" />
-        <rect x="47" y="4"  width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
+        <rect x="47" y="4" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
         <rect x="47" y="25" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="2"  y="4"  width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="2"  y="25" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <path d="M42 18 L44 18 L44 7.5  L47 7.5"  stroke={color} strokeWidth="1" fill="none" />
-        <path d="M44 18 L44 28.5 L47 28.5"        stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L20 18 L20 7.5  L17 7.5"  stroke={color} strokeWidth="1" fill="none" />
-        <path d="M20 18 L20 28.5 L17 28.5"        stroke={color} strokeWidth="1" fill="none" />
+        <rect x="2" y="4" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
+        <rect x="2" y="25" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
+        <path d="M42 18 L44 18 L44 7.5  L47 7.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M44 18 L44 28.5 L47 28.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M22 18 L20 18 L20 7.5  L17 7.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M20 18 L20 28.5 L17 28.5" stroke={color} strokeWidth="1" fill="none" />
       </svg>
     )
   }
@@ -242,14 +321,14 @@ function MindmapPreview({
   return (
     <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
       <line x1="22" y1="19.5" x2="42" y2="19.5" stroke={color} strokeWidth="1.5" />
-      <line x1="47" y1="8.5"  x2="62" y2="8.5"  stroke={color} strokeWidth="1.2" />
+      <line x1="47" y1="8.5" x2="62" y2="8.5" stroke={color} strokeWidth="1.2" />
       <line x1="47" y1="28.5" x2="62" y2="28.5" stroke={color} strokeWidth="1.2" />
-      <line x1="2"  y1="8.5"  x2="17" y2="8.5"  stroke={color} strokeWidth="1.2" />
-      <line x1="2"  y1="28.5" x2="17" y2="28.5" stroke={color} strokeWidth="1.2" />
-      <path d="M42 18 L44 18 L44 8.5  L47 8.5"  stroke={color} strokeWidth="1" fill="none" />
-      <path d="M44 18 L44 28.5 L47 28.5"        stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L20 18 L20 8.5  L17 8.5"  stroke={color} strokeWidth="1" fill="none" />
-      <path d="M20 18 L20 28.5 L17 28.5"        stroke={color} strokeWidth="1" fill="none" />
+      <line x1="2" y1="8.5" x2="17" y2="8.5" stroke={color} strokeWidth="1.2" />
+      <line x1="2" y1="28.5" x2="17" y2="28.5" stroke={color} strokeWidth="1.2" />
+      <path d="M42 18 L44 18 L44 8.5  L47 8.5" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M44 18 L44 28.5 L47 28.5" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M22 18 L20 18 L20 8.5  L17 8.5" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M20 18 L20 28.5 L17 28.5" stroke={color} strokeWidth="1" fill="none" />
     </svg>
   )
 }

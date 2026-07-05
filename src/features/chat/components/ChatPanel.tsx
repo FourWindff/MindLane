@@ -35,14 +35,8 @@ export function ChatPanel() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [inputRows, setInputRows] = useState(1)
 
-  const {
-    apiKey,
-    selectedNodes,
-    buildContext,
-    clearNodeSelection,
-    emptyHint,
-    quickActions,
-  } = useChatContext()
+  const { apiKey, selectedNodes, buildContext, clearNodeSelection, emptyHint, quickActions } =
+    useChatContext()
 
   const { streamingText, activeTools } = useChatStream()
 
@@ -109,7 +103,11 @@ export function ChatPanel() {
 
     const context = buildContext()
     setAttachedDocument(null) // clear after context captures the doc
-    await api.chatStream({ threadId, message: text || `请根据「${doc?.filename}」生成思维导图`, context })
+    await api.chatStream({
+      threadId,
+      message: text || `请根据「${doc?.filename}」生成思维导图`,
+      context,
+    })
   }, [apiKey, busy, threadId, addMessage, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {
@@ -146,14 +144,20 @@ export function ChatPanel() {
     setShowSessionList(!showSessionList)
   }, [showSessionList, setShowSessionList])
 
-  const handleLoadSession = useCallback((sessionId: string) => {
-    void loadSession(sessionId)
-  }, [loadSession])
+  const handleLoadSession = useCallback(
+    (sessionId: string) => {
+      void loadSession(sessionId)
+    },
+    [loadSession],
+  )
 
-  const handleDeleteSession = useCallback((sessionId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    void deleteSession(sessionId)
-  }, [deleteSession])
+  const handleDeleteSession = useCallback(
+    (sessionId: string, e: React.MouseEvent) => {
+      e.stopPropagation()
+      void deleteSession(sessionId)
+    },
+    [deleteSession],
+  )
 
   const handleQuickAction = useCallback((prompt: string) => {
     if (inputRef.current) {
@@ -207,7 +211,11 @@ export function ChatPanel() {
         busy={busy}
         inputRows={inputRows}
         selectedNodes={selectedNodes}
-        attachment={attachedDocument ? { name: attachedDocument.filename, path: attachedDocument.source, size: 0 } : undefined}
+        attachment={
+          attachedDocument
+            ? { name: attachedDocument.filename, path: attachedDocument.source, size: 0 }
+            : undefined
+        }
         onSend={send}
         onStop={stop}
         onKeyDown={handleKeyDown}

@@ -122,15 +122,20 @@ export class Workspace {
     updater: () => Promise<Partial<WorkspaceState>>,
   ): Promise<FsResult<void>> {
     const previous = this.writeQueue.get(workspacePath) ?? Promise.resolve()
-    const operation = previous.catch(() => {}).then(async () => {
-      const partial = await updater()
-      const current = await this.loadFromDisk(workspacePath)
-      const next: WorkspaceState = { ...(current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }), ...partial }
-      const statePath = this.statePath(workspacePath)
-      await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
-      await atomicWrite(statePath, JSON.stringify(next, null, 2))
-      this.cache.set(workspacePath, next)
-    })
+    const operation = previous
+      .catch(() => {})
+      .then(async () => {
+        const partial = await updater()
+        const current = await this.loadFromDisk(workspacePath)
+        const next: WorkspaceState = {
+          ...(current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }),
+          ...partial,
+        }
+        const statePath = this.statePath(workspacePath)
+        await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
+        await atomicWrite(statePath, JSON.stringify(next, null, 2))
+        this.cache.set(workspacePath, next)
+      })
     this.writeQueue.set(workspacePath, operation)
     try {
       await operation
@@ -151,7 +156,10 @@ export class Workspace {
         const raw = await fs.promises.readFile(statePath, 'utf-8')
         const parsed = JSON.parse(raw) as Partial<WorkspaceState>
         const rawLastOpenedFilePath = coerceLastOpenedFilePath(parsed.lastOpenedFilePath)
-        const lastOpenedFilePath = this.resolveLastOpenedFilePath(rawLastOpenedFilePath, workspacePath)
+        const lastOpenedFilePath = this.resolveLastOpenedFilePath(
+          rawLastOpenedFilePath,
+          workspacePath,
+        )
         const corrected = lastOpenedFilePath !== rawLastOpenedFilePath
         const merged: WorkspaceState = {
           lastOpenedFilePath,
@@ -170,7 +178,10 @@ export class Workspace {
     return { ok: true, data: { ...DEFAULT_WORKSPACE_STATE } }
   }
 
-  private resolveLastOpenedFilePath(candidate: string | null, workspacePath: string): string | null {
+  private resolveLastOpenedFilePath(
+    candidate: string | null,
+    workspacePath: string,
+  ): string | null {
     if (
       candidate &&
       this.pathExists(candidate) &&

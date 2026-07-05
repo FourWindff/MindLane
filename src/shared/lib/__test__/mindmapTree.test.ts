@@ -15,7 +15,13 @@ type Tree = { nodes: Node[]; edges: Edge[] }
 
 function addChild(tree: Tree, parentId: string, label: string): Tree & { newNodeId: string } {
   return withNewChild(
-    tree.nodes, tree.edges, parentId, { label }, CHILD_OFFSET_X, CHILD_GAP_Y, 'mindmap',
+    tree.nodes,
+    tree.edges,
+    parentId,
+    { label },
+    CHILD_OFFSET_X,
+    CHILD_GAP_Y,
+    'mindmap',
   )
 }
 
@@ -100,7 +106,13 @@ describe('mindmap 布局左右分侧', () => {
     const ids: string[] = []
     for (let i = 0; i < 3; i++) {
       const r = withNewChild(
-        tree.nodes, tree.edges, 'root', { label: `n${i}` }, CHILD_OFFSET_X, CHILD_GAP_Y, 'logic',
+        tree.nodes,
+        tree.edges,
+        'root',
+        { label: `n${i}` },
+        CHILD_OFFSET_X,
+        CHILD_GAP_Y,
+        'logic',
       )
       tree = r
       ids.push(r.newNodeId)
@@ -108,7 +120,13 @@ describe('mindmap 布局左右分侧', () => {
 
     const before = ids.map((id) => tree.nodes.find((n) => n.id === id)!.data.branchIndex)
     const r = withNewChild(
-      tree.nodes, tree.edges, 'root', { label: 'n3' }, CHILD_OFFSET_X, CHILD_GAP_Y, 'logic',
+      tree.nodes,
+      tree.edges,
+      'root',
+      { label: 'n3' },
+      CHILD_OFFSET_X,
+      CHILD_GAP_Y,
+      'logic',
     )
     const after = ids.map((id) => r.nodes.find((n) => n.id === id)!.data.branchIndex)
 
@@ -119,7 +137,13 @@ describe('mindmap 布局左右分侧', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     for (let i = 0; i < 4; i++) {
       const r = withNewChild(
-        tree.nodes, tree.edges, 'root', { label: `n${i}` }, CHILD_OFFSET_X, CHILD_GAP_Y, 'logic',
+        tree.nodes,
+        tree.edges,
+        'root',
+        { label: `n${i}` },
+        CHILD_OFFSET_X,
+        CHILD_GAP_Y,
+        'logic',
       )
       tree = r
     }

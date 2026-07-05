@@ -44,11 +44,7 @@ export function collectSubtreeIds(edges: Edge[], rootId: string): Set<string> {
   return ids
 }
 
-export function getChildIdsOrdered(
-  nodes: Node[],
-  edges: Edge[],
-  parentId: string,
-): string[] {
+export function getChildIdsOrdered(nodes: Node[], edges: Edge[], parentId: string): string[] {
   const ids = getChildIds(edges, parentId)
   const y = new Map(nodes.map((n) => [n.id, n.position.y]))
   return [...ids].sort((a, b) => (y.get(a) ?? 0) - (y.get(b) ?? 0))
@@ -80,12 +76,7 @@ function nodeWidth(nodeId: string, nodes: Node[]): number {
   return DEFAULT_NODE_WIDTH
 }
 
-function subtreeHeight(
-  nodeId: string,
-  edges: Edge[],
-  nodes: Node[],
-  gapY: number,
-): number {
+function subtreeHeight(nodeId: string, edges: Edge[], nodes: Node[], gapY: number): number {
   const selfH = nodeHeight(nodeId, nodes)
   const childIds = getChildIds(edges, nodeId)
   if (childIds.length === 0) return selfH
@@ -108,10 +99,7 @@ interface MindmapNodeMeta {
  * 已有 data.branchIndex 的节点保持不变；新节点取当前最大值 +1。
  * 这样新增/删除节点不会让其余分支的颜色移位。
  */
-function assignStableBranchIndexes(
-  childIds: string[],
-  nodes: Node[],
-): Map<string, number> {
+function assignStableBranchIndexes(childIds: string[], nodes: Node[]): Map<string, number> {
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const result = new Map<string, number>()
   const used = new Set<number>()
@@ -212,16 +200,15 @@ function layoutMindmapSide(
   positions.set(nodeId, { x, y })
   handleMap.set(nodeId, {
     source: direction === 'right' ? Position.Right : Position.Left,
-    target: direction === 'right' ? Position.Left  : Position.Right,
+    target: direction === 'right' ? Position.Left : Position.Right,
   })
   metaMap.set(nodeId, { depth, branchIndex, side: direction })
 
   const childIds = getChildIdsOrdered(nodes, edges, nodeId)
   if (childIds.length === 0) return
 
-  const childX = direction === 'right'
-    ? x + selfW + gapX
-    : x - gapX - nodeWidth(childIds[0]!, nodes)
+  const childX =
+    direction === 'right' ? x + selfW + gapX : x - gapX - nodeWidth(childIds[0]!, nodes)
 
   const childHeights = childIds.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
   const totalH = childHeights.reduce((s, h) => s + h, 0) + (childIds.length - 1) * gapY
@@ -231,9 +218,7 @@ function layoutMindmapSide(
   childIds.forEach((cid, i) => {
     const childH = childHeights[i]!
     const childSelfH = nodeHeight(cid, nodes)
-    const childActualX = direction === 'right'
-      ? childX
-      : x - gapX - nodeWidth(cid, nodes)
+    const childActualX = direction === 'right' ? childX : x - gapX - nodeWidth(cid, nodes)
 
     layoutMindmapSide(
       cid,
@@ -285,7 +270,7 @@ function layoutMindmap(
     if (side === 'left' || side === 'right') sideOf.set(cid, side)
   }
   let rightCount = children.filter((cid) => sideOf.get(cid) === 'right').length
-  let leftCount  = children.filter((cid) => sideOf.get(cid) === 'left').length
+  let leftCount = children.filter((cid) => sideOf.get(cid) === 'left').length
   for (const cid of children) {
     if (sideOf.has(cid)) continue
     const side = rightCount <= leftCount ? 'right' : 'left'
@@ -295,7 +280,7 @@ function layoutMindmap(
   }
 
   const rightChildren = children.filter((cid) => sideOf.get(cid) === 'right')
-  const leftChildren  = children.filter((cid) => sideOf.get(cid) === 'left')
+  const leftChildren = children.filter((cid) => sideOf.get(cid) === 'left')
   const branchIndexOf = assignStableBranchIndexes(children, nodes)
 
   // 右侧展开
@@ -370,7 +355,7 @@ export function reflowChildren(
 
   const positions = new Map<string, { x: number; y: number }>()
   const handleMap = new Map<string, { source: Position; target: Position }>()
-  const metaMap   = new Map<string, MindmapNodeMeta>()
+  const metaMap = new Map<string, MindmapNodeMeta>()
 
   const gapX = offsetX - DEFAULT_NODE_WIDTH
 
@@ -394,9 +379,9 @@ export function reflowChildren(
   }
 
   return nodes.map((node) => {
-    const pos     = positions.get(node.id)
+    const pos = positions.get(node.id)
     const handles = handleMap.get(node.id)
-    const meta    = metaMap.get(node.id)
+    const meta = metaMap.get(node.id)
     if (!pos && !handles && !meta) return node
     return {
       ...node,
@@ -406,7 +391,7 @@ export function reflowChildren(
         ? {
             data: {
               ...node.data,
-              depth:       meta.depth,
+              depth: meta.depth,
               branchIndex: meta.branchIndex,
               // logic 布局的 meta 不带 side，保留节点原有分侧，切回 mindmap 时仍稳定
               ...(meta.side ? { side: meta.side } : {}),
@@ -472,14 +457,18 @@ export function withNewSibling(
   const parentId = findParentId(edges, selectedId)
   if (!parentId) return { nodes, edges }
   const { nodes: n2, edges: e2 } = withNewChild(
-    nodes, edges, parentId, data, offsetX, gapY, structureType,
+    nodes,
+    edges,
+    parentId,
+    data,
+    offsetX,
+    gapY,
+    structureType,
   )
   return { nodes: n2, edges: e2 }
 }
 
 export function deserializeNode(node: Node): Node {
   const descriptor = nodeRegistry.get(node.type!)
-  return descriptor
-    ? { ...node, data: descriptor.deserialize(node.data) }
-    : node
+  return descriptor ? { ...node, data: descriptor.deserialize(node.data) } : node
 }

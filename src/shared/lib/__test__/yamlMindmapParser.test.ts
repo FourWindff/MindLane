@@ -48,7 +48,9 @@ describe('yamlMindmapParser', () => {
       const labelOf = (id: string) =>
         (result.nodes.find((n) => n.id === id)!.data as { label: string }).label
 
-      const level4Node = result.nodes.find((n) => (n.data as { label: string }).label === 'Level 4')!
+      const level4Node = result.nodes.find(
+        (n) => (n.data as { label: string }).label === 'Level 4',
+      )!
       const level3Id = parentMap.get(level4Node.id)!
       const level2Id = parentMap.get(level3Id)!
       const level1Id = parentMap.get(level2Id)!
@@ -169,7 +171,9 @@ mindmap:
       // 虚拟根→A, 虚拟根→B, B→B1 = 3 边
       expect(result.edges).toHaveLength(3)
       // 多根时创建一个虚拟根节点，用 Symbol 标记
-      expect(result.nodes.some(n => (n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL])).toBe(true)
+      expect(
+        result.nodes.some((n) => (n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL]),
+      ).toBe(true)
       // rootIds 应包含两个真实根节点
       expect(result.rootIds).toHaveLength(2)
     })
@@ -188,10 +192,18 @@ mindmap:
       const result = parseYamlFragment(yaml)
 
       expect(result.rootIds).toHaveLength(4)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '模块: 导入器')).toBe(true)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '优先级: 高')).toBe(true)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '状态: 待开发')).toBe(true)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '验收标准')).toBe(true)
+      expect(result.nodes.some((n) => (n.data as { label: string }).label === '模块: 导入器')).toBe(
+        true,
+      )
+      expect(result.nodes.some((n) => (n.data as { label: string }).label === '优先级: 高')).toBe(
+        true,
+      )
+      expect(result.nodes.some((n) => (n.data as { label: string }).label === '状态: 待开发')).toBe(
+        true,
+      )
+      expect(result.nodes.some((n) => (n.data as { label: string }).label === '验收标准')).toBe(
+        true,
+      )
       expect(result.nodes).toHaveLength(9)
     })
 
@@ -217,8 +229,14 @@ mindmap:
       expect(result.nodes).toHaveLength(6)
       // 虚拟根→父1, 虚拟根→父2, 父1→子1, 父1→子2, 父2→子3 = 5 边
       expect(result.edges).toHaveLength(5)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '学习率的作用与选择')).toBe(true)
-      expect(result.nodes.some(n => (n.data as { label: string }).label === '学习率过大：损失震荡不收敛')).toBe(true)
+      expect(
+        result.nodes.some((n) => (n.data as { label: string }).label === '学习率的作用与选择'),
+      ).toBe(true)
+      expect(
+        result.nodes.some(
+          (n) => (n.data as { label: string }).label === '学习率过大：损失震荡不收敛',
+        ),
+      ).toBe(true)
     })
   })
 })

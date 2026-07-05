@@ -31,11 +31,7 @@ export function SessionList({
         >
           <div className="chat-float-session-list__header">
             <span>历史对话</span>
-            <button
-              type="button"
-              className="chat-float-session-list__close"
-              onClick={onClose}
-            >
+            <button type="button" className="chat-float-session-list__close" onClick={onClose}>
               <X size={14} strokeWidth={2} />
             </button>
           </div>

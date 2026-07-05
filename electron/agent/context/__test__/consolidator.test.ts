@@ -26,11 +26,7 @@ class FakeProvider extends LLMProvider {
 function makeMessages(count: number): BaseMessage[] {
   const messages: BaseMessage[] = []
   for (let i = 0; i < count; i++) {
-    messages.push(
-      i % 2 === 0
-        ? new HumanMessage(`message ${i}`)
-        : new AIMessage(`reply ${i}`),
-    )
+    messages.push(i % 2 === 0 ? new HumanMessage(`message ${i}`) : new AIMessage(`reply ${i}`))
   }
   return messages
 }
@@ -135,7 +131,7 @@ describe('Consolidator', () => {
     expect(changed).toBe(true)
 
     const meta = manager.getSessionMeta(sessionId)
-    expect((meta?.lastConsolidated ?? 0)).toBeGreaterThan(0)
+    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
 
     const historyPath = manager.resolveHistoryPath(sessionId)
     expect(fs.existsSync(historyPath)).toBe(true)
@@ -176,7 +172,7 @@ describe('Consolidator', () => {
     expect(historyContent).toContain('[RAW]')
 
     const meta = manager.getSessionMeta(sessionId)
-    expect((meta?.lastConsolidated ?? 0)).toBeGreaterThan(0)
+    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
   })
 
   it('getMessagesForContext 限制条数与 token 预算', async () => {
@@ -251,9 +247,7 @@ describe('Consolidator', () => {
     const messages = makeMessages(30)
     await manager.saveMessages(sessionId, messages)
 
-    const provider = new FakeProvider(
-      new FakeListChatModel({ responses: ['one', 'two'] }),
-    )
+    const provider = new FakeProvider(new FakeListChatModel({ responses: ['one', 'two'] }))
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
@@ -278,6 +272,6 @@ describe('Consolidator', () => {
     expect(lines.length).toBeGreaterThanOrEqual(2)
 
     const meta = manager.getSessionMeta(sessionId)
-    expect((meta?.lastConsolidated ?? 0)).toBeGreaterThan(0)
+    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
   })
 })

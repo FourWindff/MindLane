@@ -38,24 +38,33 @@ describe('MemoryExtractor', () => {
 
   it('persist writes patterns to memory files and updates index', async () => {
     const extractor = new MemoryExtractor(manager)
-    await extractor.persist([{
-      discipline: 'engineering',
-      subTag: 'modular',
-      description: '用户偏好模块化',
-      observation: '倾向组件化设计',
-    }])
+    await extractor.persist([
+      {
+        discipline: 'engineering',
+        subTag: 'modular',
+        description: '用户偏好模块化',
+        observation: '倾向组件化设计',
+      },
+    ])
 
     const index = await manager.loadIndex()
     expect(index).toContain('engineering-modular')
 
-    const content = await fs.promises.readFile(path.join(tempDir, 'mindlanememory', 'engineering-modular.md'), 'utf-8')
+    const content = await fs.promises.readFile(
+      path.join(tempDir, 'mindlanememory', 'engineering-modular.md'),
+      'utf-8',
+    )
     expect(content).toContain('倾向组件化设计')
   })
 
   it('extractAndPersist calls LLM, persists patterns, and updates .mindlane tags', async () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
-      metadata: { title: 'Test', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      metadata: {
+        title: 'Test',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
       mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       documents: [],
     }
@@ -63,15 +72,19 @@ describe('MemoryExtractor', () => {
     await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
 
     const mockResponse = JSON.stringify({
-      disciplines: [{
-        name: 'engineering',
-        patterns: [{
-          subTag: 'modular',
-          description: '用户偏好模块化',
-          observation: '倾向组件化设计',
-          evidence: ['我们把这个拆成几个模块'],
-        }],
-      }],
+      disciplines: [
+        {
+          name: 'engineering',
+          patterns: [
+            {
+              subTag: 'modular',
+              description: '用户偏好模块化',
+              observation: '倾向组件化设计',
+              evidence: ['我们把这个拆成几个模块'],
+            },
+          ],
+        },
+      ],
     })
     const mockProvider = createMockProvider(mockResponse)
 
@@ -99,7 +112,11 @@ describe('MemoryExtractor', () => {
   it('extractAndPersist handles empty LLM response gracefully', async () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
-      metadata: { title: 'Test', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+      metadata: {
+        title: 'Test',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      },
       mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       documents: [],
     }
@@ -124,7 +141,12 @@ describe('MemoryExtractor', () => {
   it('extractAndPersist merges new discipline tags with existing ones', async () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
-      metadata: { title: 'Test', createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z', tags: ['humanities'] },
+      metadata: {
+        title: 'Test',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        tags: ['humanities'],
+      },
       mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
       documents: [],
     }
@@ -132,14 +154,18 @@ describe('MemoryExtractor', () => {
     await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
 
     const mockResponse = JSON.stringify({
-      disciplines: [{
-        name: 'engineering',
-        patterns: [{
-          subTag: 'modular',
-          description: '用户偏好模块化',
-          observation: '倾向组件化设计',
-        }],
-      }],
+      disciplines: [
+        {
+          name: 'engineering',
+          patterns: [
+            {
+              subTag: 'modular',
+              description: '用户偏好模块化',
+              observation: '倾向组件化设计',
+            },
+          ],
+        },
+      ],
     })
     const mockProvider = createMockProvider(mockResponse)
 
@@ -160,7 +186,9 @@ describe('MemoryExtractor', () => {
   it('parseExtractionResponse handles markdown code blocks', async () => {
     const extractor = new MemoryExtractor(manager)
 
-    const mockProvider = createMockProvider('```json\n{"disciplines": [{"name": "engineering", "patterns": [{"subTag": "mvp", "description": "先跑MVP", "observation": "用户偏好快速验证"}]}]}\n```')
+    const mockProvider = createMockProvider(
+      '```json\n{"disciplines": [{"name": "engineering", "patterns": [{"subTag": "mvp", "description": "先跑MVP", "observation": "用户偏好快速验证"}]}]}\n```',
+    )
 
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,

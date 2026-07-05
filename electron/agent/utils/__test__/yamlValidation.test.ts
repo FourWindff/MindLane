@@ -12,10 +12,13 @@ describe('validateMindmapYaml', () => {
   })
 
   it('returns yaml parser error reason for duplicate keys', () => {
-    const result = validateMindmapYaml(`Root:
+    const result = validateMindmapYaml(
+      `Root:
   Same: []
   Same: []
-`, { mode: 'tree' })
+`,
+      { mode: 'tree' },
+    )
 
     expect(result).toMatchObject({
       ok: false,
@@ -24,10 +27,13 @@ describe('validateMindmapYaml', () => {
   })
 
   it('accepts valid outline tree', () => {
-    const result = validateMindmapYaml(`Root:
+    const result = validateMindmapYaml(
+      `Root:
   - Child A
   - Child B
-`, { mode: 'tree' })
+`,
+      { mode: 'tree' },
+    )
 
     expect(result.ok).toBe(true)
     if (result.ok) {
@@ -37,7 +43,8 @@ describe('validateMindmapYaml', () => {
   })
 
   it('accepts project outline tree with key-value leaves', () => {
-    const result = validateMindmapYaml(`项目计划:
+    const result = validateMindmapYaml(
+      `项目计划:
   - 基本信息:
     - 项目名称: 智能笔记助手
     - 版本: 1.0
@@ -55,16 +62,25 @@ describe('validateMindmapYaml', () => {
       - 生成大纲
       - 批量添加节点
       - 导出结果
-`, { mode: 'tree' })
+`,
+      { mode: 'tree' },
+    )
 
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.tree.label).toBe('项目计划')
       expect(result.tree.children?.map((node) => node.label)).toEqual(['基本信息', '里程碑'])
-      expect(result.tree.children?.[0]?.children?.map((node) => node.label)).toContain('项目名称: 智能笔记助手')
-      expect(result.tree.children?.[0]?.children?.find((node) => node.label === '联系方式')?.children?.map((node) => node.label))
-        .toEqual(['邮箱: team@example.com', '群组: alpha-review'])
-      expect(result.tree.children?.[1]?.children?.find((node) => node.label === '验收')?.children).toHaveLength(4)
+      expect(result.tree.children?.[0]?.children?.map((node) => node.label)).toContain(
+        '项目名称: 智能笔记助手',
+      )
+      expect(
+        result.tree.children?.[0]?.children
+          ?.find((node) => node.label === '联系方式')
+          ?.children?.map((node) => node.label),
+      ).toEqual(['邮箱: team@example.com', '群组: alpha-review'])
+      expect(
+        result.tree.children?.[1]?.children?.find((node) => node.label === '验收')?.children,
+      ).toHaveLength(4)
     }
   })
 
@@ -97,7 +113,8 @@ describe('validateMindmapYaml', () => {
   })
 
   it('accepts task outline fragment with multiple key-value roots', () => {
-    const result = validateMindmapYaml(`- 模块: 导入器
+    const result = validateMindmapYaml(
+      `- 模块: 导入器
 - 优先级: 高
 - 状态: 待开发
 - 验收标准:
@@ -105,7 +122,9 @@ describe('validateMindmapYaml', () => {
   - 支持 PDF
   - 保留层级
   - 返回错误提示
-`, { mode: 'fragment' })
+`,
+      { mode: 'fragment' },
+    )
 
     expect(result.ok).toBe(true)
     if (result.ok) {
@@ -121,10 +140,13 @@ describe('validateMindmapYaml', () => {
   })
 
   it('rejects structured fragment because the frontend consumes outline fragments', () => {
-    const result = validateMindmapYaml(`label: Topic
+    const result = validateMindmapYaml(
+      `label: Topic
 children:
   - label: Child
-`, { mode: 'fragment' })
+`,
+      { mode: 'fragment' },
+    )
 
     expect(result).toMatchObject({
       ok: false,

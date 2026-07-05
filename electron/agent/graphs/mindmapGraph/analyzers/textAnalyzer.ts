@@ -26,7 +26,10 @@ export class TextInputAnalyzer extends MindmapInputAnalyzer<string, string> {
     return this.chunkText(raw)
   }
 
-  private chunkText(text: string, chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT): LoadedDocument['chunks'] {
+  private chunkText(
+    text: string,
+    chunkCharLimit = TEXT_CHUNK_CHAR_LIMIT,
+  ): LoadedDocument['chunks'] {
     const normalizedLimit = Math.max(1000, chunkCharLimit)
     const chunks: LoadedDocument['chunks'] = []
 

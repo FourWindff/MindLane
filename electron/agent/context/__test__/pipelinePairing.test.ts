@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { AIMessage, ToolMessage, HumanMessage } from '@langchain/core/messages'
-import {
-  dropOrphanToolResults,
-  backfillMissingToolResults,
-} from '../pipelinePairing.js'
+import { dropOrphanToolResults, backfillMissingToolResults } from '../pipelinePairing.js'
 
 describe('dropOrphanToolResults', () => {
   it('删除没有对应 tool_use 的孤儿 tool_result', () => {
@@ -20,7 +17,9 @@ describe('dropOrphanToolResults', () => {
     const result = dropOrphanToolResults(messages)
 
     expect(result).toHaveLength(3)
-    expect(result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan')).toBe(false)
+    expect(
+      result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan'),
+    ).toBe(false)
   })
 
   it('保留所有配对完整的 tool_result', () => {
@@ -89,11 +88,9 @@ describe('backfillMissingToolResults', () => {
 
     const result = backfillMissingToolResults(messages)
 
-    expect(result.map((m) => (m.type === 'tool' ? (m as ToolMessage).tool_call_id : m.type))).toEqual([
-      'ai',
-      'call-1',
-      'call-2',
-    ])
+    expect(
+      result.map((m) => (m.type === 'tool' ? (m as ToolMessage).tool_call_id : m.type)),
+    ).toEqual(['ai', 'call-1', 'call-2'])
   })
 
   it('处理混合场景', () => {
@@ -112,7 +109,11 @@ describe('backfillMissingToolResults', () => {
     const dropped = dropOrphanToolResults(messages)
     const result = backfillMissingToolResults(dropped)
 
-    expect(result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan')).toBe(false)
-    expect(result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2')).toBe(true)
+    expect(
+      result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'orphan'),
+    ).toBe(false)
+    expect(
+      result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2'),
+    ).toBe(true)
   })
 })

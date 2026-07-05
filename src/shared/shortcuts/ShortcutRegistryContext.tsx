@@ -10,8 +10,6 @@ export function ShortcutRegistryProvider({ children }: { children: ReactNode }) 
   const value = useMemo(() => ({ registry }), [registry])
 
   return (
-    <ShortcutRegistryContext.Provider value={value}>
-      {children}
-    </ShortcutRegistryContext.Provider>
+    <ShortcutRegistryContext.Provider value={value}>{children}</ShortcutRegistryContext.Provider>
   )
 }

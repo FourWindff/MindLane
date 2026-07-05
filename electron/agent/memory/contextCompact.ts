@@ -40,7 +40,8 @@ export function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): num
   let total = 0
   for (const tool of tools) {
     const toolAny = tool as unknown as Record<string, unknown>
-    const schema = toolAny.schema || (tool as unknown as { lc_kwargs?: { schema?: unknown } }).lc_kwargs?.schema
+    const schema =
+      toolAny.schema || (tool as unknown as { lc_kwargs?: { schema?: unknown } }).lc_kwargs?.schema
     if (schema) {
       total += estimateTokenCount(JSON.stringify(schema))
     }
@@ -63,10 +64,7 @@ async function estimateSystemPromptTokens(
     .withMemory(memoryManager)
 
   await builder.buildMemoryContext()
-  builder.buildSystemPrompt()
-    .buildEnvironmentPrompt()
-    .buildMindmapContext()
-    .buildHistory()
+  builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext().buildHistory()
 
   return estimateTokenCount(builder.build())
 }
@@ -91,10 +89,7 @@ async function estimateFullInputTokens(
 /**
  * 裁剪到最近消息窗口，保留 system 消息和当前用户消息
  */
-export function trimToRecentWindow(
-  messages: BaseMessage[],
-  recentCount: number,
-): BaseMessage[] {
+export function trimToRecentWindow(messages: BaseMessage[], recentCount: number): BaseMessage[] {
   const systemMsgs = messages.filter((m) => m.type === 'system')
   const nonSystem = messages.filter((m) => m.type !== 'system')
 
@@ -112,10 +107,7 @@ export function trimToRecentWindow(
 /**
  * 使用 LLM 生成对话摘要
  */
-async function generateSummary(
-  messages: BaseMessage[],
-  model: BaseChatModel,
-): Promise<string> {
+async function generateSummary(messages: BaseMessage[], model: BaseChatModel): Promise<string> {
   const summaryPrompt = new SystemMessage(
     '请用中文简要总结以下对话的关键信息。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续执行的任务，4）重要文件、节点或工具结果的高层结论。保持简短具体。',
   )
@@ -169,10 +161,7 @@ export async function compactContext(
   )
 
   // Step 1: 轻量裁剪 — 保留最近窗口
-  let compacted = trimToRecentWindow(
-    state.messages,
-    AGENT_LIMITS.contextCompactRecentMessages,
-  )
+  let compacted = trimToRecentWindow(state.messages, AGENT_LIMITS.contextCompactRecentMessages)
 
   const compactedEstimate = await estimateFullInputTokens(
     { ...state, messages: compacted },
@@ -189,10 +178,7 @@ export async function compactContext(
       compactedEstimate,
     )
     return {
-      messages: [
-        new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
-        ...compacted,
-      ],
+      messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...compacted],
     }
   }
 
@@ -225,10 +211,7 @@ export async function compactContext(
     )
 
     return {
-      messages: [
-        new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
-        ...compacted,
-      ],
+      messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...compacted],
     }
   } catch (err) {
     logger.warn('[contextCompact] LLM summary failed, falling back to smaller trim:', err)
@@ -240,10 +223,7 @@ export async function compactContext(
     )
 
     return {
-      messages: [
-        new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
-        ...compacted,
-      ],
+      messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...compacted],
     }
   }
 }

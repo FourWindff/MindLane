@@ -95,17 +95,13 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
           if (entry?.type === 'file') void openWorkspaceFile(entry.path)
           break
         case 'new-file': {
-          const parentPath = entry?.type === 'directory'
-            ? entry.path
-            : currentDirectoryPath
+          const parentPath = entry?.type === 'directory' ? entry.path : currentDirectoryPath
           if (!parentPath) return
           setDialog({ type: 'new-file', parentPath })
           break
         }
         case 'new-folder': {
-          const parentPath = entry?.type === 'directory'
-            ? entry.path
-            : currentDirectoryPath
+          const parentPath = entry?.type === 'directory' ? entry.path : currentDirectoryPath
           if (!parentPath) return
           setDialog({ type: 'new-folder', parentPath })
           break
@@ -147,14 +143,17 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
     if (ok) closeDialog()
   }
 
-  const handleNavigateInto = useCallback((entry: WorkspaceTreeEntry) => {
-    if (entry.type === 'directory') {
-      setNavigationPath((prev) => [...prev, entry.name])
-    } else {
-      void openWorkspaceFile(entry.path)
-      onClose()
-    }
-  }, [openWorkspaceFile, onClose])
+  const handleNavigateInto = useCallback(
+    (entry: WorkspaceTreeEntry) => {
+      if (entry.type === 'directory') {
+        setNavigationPath((prev) => [...prev, entry.name])
+      } else {
+        void openWorkspaceFile(entry.path)
+        onClose()
+      }
+    },
+    [openWorkspaceFile, onClose],
+  )
 
   const handleBreadcrumbClick = useCallback((idx: number) => {
     setNavigationPath((prev) => prev.slice(0, idx + 1))
@@ -262,9 +261,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
           <ConfirmDialog
             title={dialog.entry.type === 'file' ? '删除文件' : '删除文件夹'}
             message={`确定要将「${dialog.entry.name}」移到回收站吗？${
-              dialog.entry.type === 'directory'
-                ? '该文件夹内的所有内容都将被移到回收站。'
-                : ''
+              dialog.entry.type === 'directory' ? '该文件夹内的所有内容都将被移到回收站。' : ''
             }`}
             confirmLabel="移到回收站"
             danger

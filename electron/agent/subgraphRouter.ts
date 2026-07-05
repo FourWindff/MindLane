@@ -47,8 +47,7 @@ export function route(
     return null
   }
 
-  const subgraph: SubgraphName =
-    toolCall.name === GENERATE_PALACE_TOOL ? 'palace' : 'mindmap'
+  const subgraph: SubgraphName = toolCall.name === GENERATE_PALACE_TOOL ? 'palace' : 'mindmap'
 
   return {
     subgraph,

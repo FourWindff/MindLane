@@ -1,5 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { urlToDataUrl, createProvider, getProviderMeta, getRegisteredProviders } from './agent/providers/index.js'
+import {
+  urlToDataUrl,
+  createProvider,
+  getProviderMeta,
+  getRegisteredProviders,
+} from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
   loadWindowBounds,
@@ -75,7 +80,9 @@ function directoryExists(targetPath: string | null | undefined): boolean {
 async function syncWorkspaceFromFile(filePath: string, data?: MindLaneFile): Promise<void> {
   const settings = await fsService.appState.load()
 
-  const currentWorkspace = settings.lastWorkspacePath ? path.resolve(settings.lastWorkspacePath) : null
+  const currentWorkspace = settings.lastWorkspacePath
+    ? path.resolve(settings.lastWorkspacePath)
+    : null
   const fileIsInCurrentWorkspace =
     currentWorkspace && fsService.workspaceTree.isWithinWorkspace(filePath, currentWorkspace)
 
@@ -104,7 +111,9 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   let expandedFolderPaths: string[] = []
   if (workspacePath) {
     const workspaceResult = await service.workspace.load(workspacePath)
-    const workspaceState = workspaceResult.ok ? workspaceResult.data : { ...DEFAULT_WORKSPACE_STATE }
+    const workspaceState = workspaceResult.ok
+      ? workspaceResult.data
+      : { ...DEFAULT_WORKSPACE_STATE }
     expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
 
@@ -137,7 +146,11 @@ async function getWorkspaceSession() {
 }
 
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
-  return state.lastOpenedFilePath === null && state.expandedFolderPaths.length === 0 && state.recentFiles.length === 0
+  return (
+    state.lastOpenedFilePath === null &&
+    state.expandedFolderPaths.length === 0 &&
+    state.recentFiles.length === 0
+  )
 }
 
 function setupApplicationMenu() {
@@ -209,10 +222,9 @@ function registerIpcHandlers(userDataPath: string) {
     const providerConfig = settings.providerConfigs[providerId]
     const providerMeta = getProviderMeta(providerId)
     const requestedModel = model.trim() || settings.chatModel || ''
-    const normalizedModel =
-      providerMeta?.defaultModels.some((item) => item.id === requestedModel)
-        ? requestedModel
-        : providerMeta?.defaultModels[0]?.id || requestedModel || 'qwen-turbo'
+    const normalizedModel = providerMeta?.defaultModels.some((item) => item.id === requestedModel)
+      ? requestedModel
+      : providerMeta?.defaultModels[0]?.id || requestedModel || 'qwen-turbo'
     return createProvider(providerId, {
       apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
       chatModel: normalizedModel,
@@ -242,7 +254,12 @@ function registerIpcHandlers(userDataPath: string) {
         message: string
         context?: {
           mindmapSummary?: string
-          selectedNodes?: { id: string; type: string; label: string; extra?: Record<string, unknown> }[]
+          selectedNodes?: {
+            id: string
+            type: string
+            label: string
+            extra?: Record<string, unknown>
+          }[]
           filePath?: string
           fileTitle?: string
           hasDocumentOpen?: boolean
@@ -291,7 +308,9 @@ function registerIpcHandlers(userDataPath: string) {
             const raw = await fs.promises.readFile(payload.context.filePath, 'utf-8')
             const data = JSON.parse(raw) as MindLaneFile
             fileTags = data.metadata.tags
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
 
         const request: ChatRequest = {
@@ -301,8 +320,14 @@ function registerIpcHandlers(userDataPath: string) {
             ? {
                 ...payload.context,
                 selectedNodes: payload.context.selectedNodes?.filter(
-                  (n): n is { id: string; type: 'text' | 'palace'; label: string; extra?: Record<string, unknown> } =>
-                    n.type === 'text' || n.type === 'palace',
+                  (
+                    n,
+                  ): n is {
+                    id: string
+                    type: 'text' | 'palace'
+                    label: string
+                    extra?: Record<string, unknown>
+                  } => n.type === 'text' || n.type === 'palace',
                 ),
                 fileTags,
               }
@@ -485,14 +510,17 @@ function registerIpcHandlers(userDataPath: string) {
     return recentResult.ok ? recentResult.data : []
   })
 
-  ipcMain.handle('file:save-thumbnail', async (_e, payload: { filePath: string; imageData: string }) => {
-    try {
-      const url = await fsService.thumbnails.save(payload.filePath, payload.imageData)
-      return { ok: true, data: { previewUrl: url } }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
-  })
+  ipcMain.handle(
+    'file:save-thumbnail',
+    async (_e, payload: { filePath: string; imageData: string }) => {
+      try {
+        const url = await fsService.thumbnails.save(payload.filePath, payload.imageData)
+        return { ok: true, data: { previewUrl: url } }
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      }
+    },
+  )
 
   ipcMain.handle('file:select-document', async () => {
     if (!win) return { ok: false, error: 'No window' }
@@ -524,7 +552,10 @@ function registerIpcHandlers(userDataPath: string) {
         },
       }
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : 'Failed to read file info' }
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : 'Failed to read file info',
+      }
     }
   })
 
@@ -575,7 +606,11 @@ function registerIpcHandlers(userDataPath: string) {
     'workspace:create-file',
     async (_e, payload: { workspacePath: string; name: string; data: unknown }) => {
       const data = payload.data as MindLaneFile
-      const result = await fsService.project.createInDirectory(payload.workspacePath, payload.name, data)
+      const result = await fsService.project.createInDirectory(
+        payload.workspacePath,
+        payload.name,
+        data,
+      )
       if (result.ok) {
         await syncWorkspaceFromFile(result.data.filePath, data)
         return {
@@ -657,7 +692,10 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle(
     'workspace:delete-item',
     async (_e, payload: { targetPath: string; workspacePath: string }) => {
-      const result = await fsService.workspaceTree.deleteItem(payload.targetPath, payload.workspacePath)
+      const result = await fsService.workspaceTree.deleteItem(
+        payload.targetPath,
+        payload.workspacePath,
+      )
       if (!result.ok) return result
       // 清理缩略图
       await fsService.thumbnails.delete(payload.targetPath).catch(() => {})
@@ -693,47 +731,53 @@ function registerIpcHandlers(userDataPath: string) {
 
   // -- Chat History (Multi-session support) --
 
-  ipcMain.handle('chat:list-sessions', async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
-    if (!aiServiceReady) return aiNotReadyResponse()
-    try {
-      aiService.sessionManager.setWorkspace(payload.workspacePath)
-      const sessions = await aiService.sessionManager.listSessions(payload.limit, payload.offset)
-      return { ok: true, data: { sessions } }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
-    }
-  })
+  ipcMain.handle(
+    'chat:list-sessions',
+    async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
+      if (!aiServiceReady) return aiNotReadyResponse()
+      try {
+        aiService.sessionManager.setWorkspace(payload.workspacePath)
+        const sessions = await aiService.sessionManager.listSessions(payload.limit, payload.offset)
+        return { ok: true, data: { sessions } }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
-  ipcMain.handle('chat:load-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
-    if (!aiServiceReady) {
-      return {
-        ok: true,
-        data: {
-          sessionId: payload.sessionId,
-          messages: [],
-        },
+  ipcMain.handle(
+    'chat:load-session',
+    async (_e, payload: { workspacePath: string; sessionId: string }) => {
+      if (!aiServiceReady) {
+        return {
+          ok: true,
+          data: {
+            sessionId: payload.sessionId,
+            messages: [],
+          },
+        }
       }
-    }
-    try {
-      aiService.sessionManager.setWorkspace(payload.workspacePath)
-      const messages = await aiService.sessionManager.loadSessionMessages(payload.sessionId)
-      return {
-        ok: true,
-        data: {
-          sessionId: payload.sessionId,
-          messages,
-        },
+      try {
+        aiService.sessionManager.setWorkspace(payload.workspacePath)
+        const messages = await aiService.sessionManager.loadSessionMessages(payload.sessionId)
+        return {
+          ok: true,
+          data: {
+            sessionId: payload.sessionId,
+            messages,
+          },
+        }
+      } catch (err) {
+        return {
+          ok: true,
+          data: {
+            sessionId: payload.sessionId,
+            messages: [],
+          },
+        }
       }
-    } catch (err) {
-      return {
-        ok: true,
-        data: {
-          sessionId: payload.sessionId,
-          messages: [],
-        },
-      }
-    }
-  })
+    },
+  )
 
   ipcMain.handle(
     'chat:save-session',
@@ -748,10 +792,7 @@ function registerIpcHandlers(userDataPath: string) {
       if (!aiServiceReady) return aiNotReadyResponse()
       try {
         aiService.sessionManager.setWorkspace(payload.workspacePath)
-        await aiService.sessionManager.saveSession(
-          payload.sessionId,
-          payload.messages,
-        )
+        await aiService.sessionManager.saveSession(payload.sessionId, payload.messages)
         return { ok: true }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -759,16 +800,19 @@ function registerIpcHandlers(userDataPath: string) {
     },
   )
 
-  ipcMain.handle('chat:delete-session', async (_e, payload: { workspacePath: string; sessionId: string }) => {
-    if (!aiServiceReady) return aiNotReadyResponse()
-    try {
-      aiService.sessionManager.setWorkspace(payload.workspacePath)
-      await aiService.sessionManager.deleteSession(payload.sessionId)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
-    }
-  })
+  ipcMain.handle(
+    'chat:delete-session',
+    async (_e, payload: { workspacePath: string; sessionId: string }) => {
+      if (!aiServiceReady) return aiNotReadyResponse()
+      try {
+        aiService.sessionManager.setWorkspace(payload.workspacePath)
+        await aiService.sessionManager.deleteSession(payload.sessionId)
+        return { ok: true }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
   // -- Settings --
   ipcMain.handle('file:settings-load', async () => {
@@ -803,7 +847,6 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle('window:open-devtools', () => {
     win?.webContents.openDevTools()
   })
-
 }
 
 app.on('window-all-closed', () => {

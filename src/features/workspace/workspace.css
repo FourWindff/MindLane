@@ -283,7 +283,9 @@
   color: var(--ml-text);
   background: var(--ml-bg);
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .workspace-home__modal-input:focus,
@@ -409,7 +411,9 @@
   flex-direction: column;
   gap: 0.2rem;
   cursor: pointer;
-  transition: background-color 100ms ease, border-color 100ms ease;
+  transition:
+    background-color 100ms ease,
+    border-color 100ms ease;
   contain: layout paint style;
 }
 

@@ -19,11 +19,7 @@ export function FileManagerBreadcrumb({
     <>
       <div className="file-manager__header-left">
         <div className="file-manager__breadcrumb">
-          <button
-            type="button"
-            className="file-manager__breadcrumb-root"
-            onClick={onNavigateRoot}
-          >
+          <button type="button" className="file-manager__breadcrumb-root" onClick={onNavigateRoot}>
             思想聚落
           </button>
           {navigationPath.map((name, idx) => (
@@ -40,9 +36,7 @@ export function FileManagerBreadcrumb({
           ))}
         </div>
         <p className="file-manager__subtitle">
-          {currentFolder
-            ? `当前位置：${currentFolder}`
-            : '浏览工作区中的文件和文件夹'}
+          {currentFolder ? `当前位置：${currentFolder}` : '浏览工作区中的文件和文件夹'}
         </p>
       </div>
 

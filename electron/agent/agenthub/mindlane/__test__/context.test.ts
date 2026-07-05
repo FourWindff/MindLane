@@ -15,7 +15,12 @@ describe('ContextBuilder memory', () => {
 
     const builder = new ContextBuilder()
     builder.withMemory(mm)
-    builder.withContext({ fileTags: ['eng'], hasDocumentOpen: true, filePath: '/t.mindlane', fileTitle: 't' })
+    builder.withContext({
+      fileTags: ['eng'],
+      hasDocumentOpen: true,
+      filePath: '/t.mindlane',
+      fileTitle: 't',
+    })
     builder.buildSystemPrompt()
     await builder.buildMemoryContext()
     builder.buildEnvironmentPrompt()

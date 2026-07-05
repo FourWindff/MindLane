@@ -14,9 +14,7 @@ type EdgeTypes = NonNullable<React.ComponentProps<typeof ReactFlow>['edgeTypes']
 function serializeNodes(nodes: Node[]): Node[] {
   return nodes.map((n) => {
     const descriptor = nodeRegistry.get(n.type ?? '')
-    return descriptor
-      ? { ...n, data: descriptor.serialize(n.data) as Record<string, unknown> }
-      : n
+    return descriptor ? { ...n, data: descriptor.serialize(n.data) as Record<string, unknown> } : n
   })
 }
 
@@ -37,7 +35,9 @@ export function HiddenThumbnailFlow({
 
   useEffect(() => {
     onInit.current = rf
-    return () => { onInit.current = null }
+    return () => {
+      onInit.current = null
+    }
   }, [rf, onInit])
 
   return (

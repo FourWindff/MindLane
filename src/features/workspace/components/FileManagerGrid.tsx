@@ -35,9 +35,7 @@ export function FileManagerGrid({
           const isFolder = entry.type === 'directory'
           const displayName = isFolder ? entry.name : entry.name.replace(/\.mindlane$/, '')
           const childCount = isFolder ? (entry.children?.length ?? 0) : 0
-          const dateLabel = isFolder
-            ? `${childCount} 项内容`
-            : formatDate(entry.lastModifiedAt)
+          const dateLabel = isFolder ? `${childCount} 项内容` : formatDate(entry.lastModifiedAt)
 
           return (
             <button

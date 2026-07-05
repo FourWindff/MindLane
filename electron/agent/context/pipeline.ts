@@ -29,32 +29,34 @@ export async function preprocessMessages(
 ): Promise<BaseMessage[]> {
   if (!config.enabled) return messages
 
-  const validMessages = messages.filter((m, i): m is BaseMessage => {
-    const isValid = Boolean(
-      m &&
+  const validMessages = messages
+    .filter((m, i): m is BaseMessage => {
+      const isValid = Boolean(
+        m &&
         typeof m === 'object' &&
         'type' in m &&
         typeof (m as { getType?: unknown }).getType === 'function',
-    )
-    if (!isValid) {
-      logger.warn('[preprocessMessages] dropping invalid input message at %d: %o', i, m)
-    }
-    return isValid
-  }).map((m) => {
-    if (m.type !== 'ai') return m
-    const aiMsg = m as AIMessage
-    const sanitizedContent = sanitizeAIMessageContent(aiMsg.content)
-    if (sanitizedContent === aiMsg.content) return m
-    return new AIMessage({
-      id: aiMsg.id,
-      content: sanitizedContent as AIMessage['content'],
-      tool_calls: aiMsg.tool_calls,
-      invalid_tool_calls: aiMsg.invalid_tool_calls,
-      additional_kwargs: aiMsg.additional_kwargs,
-      response_metadata: aiMsg.response_metadata,
-      usage_metadata: aiMsg.usage_metadata,
+      )
+      if (!isValid) {
+        logger.warn('[preprocessMessages] dropping invalid input message at %d: %o', i, m)
+      }
+      return isValid
     })
-  })
+    .map((m) => {
+      if (m.type !== 'ai') return m
+      const aiMsg = m as AIMessage
+      const sanitizedContent = sanitizeAIMessageContent(aiMsg.content)
+      if (sanitizedContent === aiMsg.content) return m
+      return new AIMessage({
+        id: aiMsg.id,
+        content: sanitizedContent as AIMessage['content'],
+        tool_calls: aiMsg.tool_calls,
+        invalid_tool_calls: aiMsg.invalid_tool_calls,
+        additional_kwargs: aiMsg.additional_kwargs,
+        response_metadata: aiMsg.response_metadata,
+        usage_metadata: aiMsg.usage_metadata,
+      })
+    })
 
   let result = dropOrphanToolResults(validMessages)
   result = backfillMissingToolResults(result)

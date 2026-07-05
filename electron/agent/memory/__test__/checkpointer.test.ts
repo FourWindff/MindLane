@@ -26,10 +26,7 @@ describe('CheckpointerManager', () => {
       if (!manager.get()) return
 
       const threadId = 'thread-1'
-      const messages: BaseMessage[] = [
-        new HumanMessage('Hello'),
-        new AIMessage('Hi there!'),
-      ]
+      const messages: BaseMessage[] = [new HumanMessage('Hello'), new AIMessage('Hi there!')]
 
       const saver = manager.get()!
       await saver.put(
@@ -59,9 +56,7 @@ describe('CheckpointerManager', () => {
         new HumanMessage('What is the weather?'),
         new AIMessage({
           content: '',
-          tool_calls: [
-            { id: 'call-1', name: 'getWeather', args: { city: 'Beijing' } },
-          ],
+          tool_calls: [{ id: 'call-1', name: 'getWeather', args: { city: 'Beijing' } }],
         }),
         new ToolMessage({
           content: 'Sunny, 25C',
@@ -90,9 +85,7 @@ describe('CheckpointerManager', () => {
       expect(result[1]).toEqual({
         role: 'assistant',
         content: 'The weather in Beijing is sunny, 25C.',
-        toolCalls: [
-          { name: 'getWeather', args: { city: 'Beijing' }, result: 'Sunny, 25C' },
-        ],
+        toolCalls: [{ name: 'getWeather', args: { city: 'Beijing' }, result: 'Sunny, 25C' }],
       })
     })
   })
@@ -181,9 +174,7 @@ describe('checkpointMessagesToSessionMessages', () => {
     const messages: BaseMessage[] = [
       new AIMessage({
         content: '',
-        tool_calls: [
-          { id: 'tc1', name: 'foo', args: { bar: 1 } },
-        ],
+        tool_calls: [{ id: 'tc1', name: 'foo', args: { bar: 1 } }],
       }),
       new ToolMessage({ content: 'result-foo', tool_call_id: 'tc1' }),
       new AIMessage('Done.'),
@@ -201,9 +192,7 @@ describe('checkpointMessagesToSessionMessages', () => {
     const messages: BaseMessage[] = [
       new AIMessage({
         content: '',
-        tool_calls: [
-          { id: 'tc1', name: 'foo', args: { bar: 1 } },
-        ],
+        tool_calls: [{ id: 'tc1', name: 'foo', args: { bar: 1 } }],
       }),
       new ToolMessage({ content: 'result-foo', tool_call_id: 'tc1' }),
     ]
@@ -276,9 +265,20 @@ describe('checkpointMessagesToSessionMessages', () => {
       new AIMessage({
         content: [
           { type: 'text', text: '我将为您扩展思维导图。' },
-          { type: 'tool_use', id: 'tool_abc', name: 'generateMindmapFragment', input: { source: { type: 'text', content: '内容' } } },
+          {
+            type: 'tool_use',
+            id: 'tool_abc',
+            name: 'generateMindmapFragment',
+            input: { source: { type: 'text', content: '内容' } },
+          },
         ],
-        tool_calls: [{ id: 'tool_abc', name: 'generateMindmapFragment', args: { source: { type: 'text', content: '内容' } } }],
+        tool_calls: [
+          {
+            id: 'tool_abc',
+            name: 'generateMindmapFragment',
+            args: { source: { type: 'text', content: '内容' } },
+          },
+        ],
       }),
     ]
     const result = checkpointMessagesToSessionMessages(messages)
@@ -286,7 +286,13 @@ describe('checkpointMessagesToSessionMessages', () => {
     expect(result[0]).toEqual({
       role: 'assistant',
       content: '我将为您扩展思维导图。',
-      toolCalls: [{ name: 'generateMindmapFragment', args: { source: { type: 'text', content: '内容' } }, result: '' }],
+      toolCalls: [
+        {
+          name: 'generateMindmapFragment',
+          args: { source: { type: 'text', content: '内容' } },
+          result: '',
+        },
+      ],
     })
   })
 })

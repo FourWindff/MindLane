@@ -1,10 +1,4 @@
-import {
-  BaseEdge,
-  getBezierPath,
-  getSmoothStepPath,
-  useStore,
-  type EdgeProps,
-} from '@xyflow/react'
+import { BaseEdge, getBezierPath, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
 import { useMemo } from 'react'
 import { computeSiblingCurvature } from './siblingOffset'
 import { resolveMindmapEdgeGeometry } from './edgeGeometry'
@@ -50,7 +44,7 @@ export function MindmapEdge(props: EdgeProps) {
     const sourceNode = nodes.find((n) => n.id === source)
     const targetNode = nodes.find((n) => n.id === target)
 
-    const depth       = (sourceNode?.data?.depth       as number | undefined) ?? 0
+    const depth = (sourceNode?.data?.depth as number | undefined) ?? 0
     const branchIndex = (sourceNode?.data?.branchIndex as number | undefined) ?? 0
     const stroke = getEdgeColor(colorScheme, depth, branchIndex)
 
@@ -62,24 +56,30 @@ export function MindmapEdge(props: EdgeProps) {
 
     let path: string
     if (edgeVariant === 'bezier') {
-      const curvature = computeSiblingCurvature(
-        siblingIndex >= 0 ? siblingIndex : 0,
-        siblingCount,
-      )
+      const curvature = computeSiblingCurvature(siblingIndex >= 0 ? siblingIndex : 0, siblingCount)
       ;[path] = getBezierPath({ ...geometry, curvature })
     } else if (edgeVariant === 'smooth-step') {
-      [path] = getSmoothStepPath({ ...geometry, borderRadius: 8 })
+      ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 8 })
     } else {
       // step / 直角折线
-      [path] = getSmoothStepPath({ ...geometry, borderRadius: 0 })
+      ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 0 })
     }
 
     return { edgePath: path, edgeStroke: stroke }
   }, [
-    edges, nodes, source, target, id,
-    sourceX, sourceY, targetX, targetY,
-    sourcePosition, targetPosition,
-    edgeVariant, colorScheme,
+    edges,
+    nodes,
+    source,
+    target,
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    edgeVariant,
+    colorScheme,
   ])
 
   return (

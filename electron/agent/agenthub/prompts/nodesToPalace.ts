@@ -24,7 +24,9 @@ type PalaceImagePromptInput = {
 export function buildAnalyzeAndPlanMessages(
   selectedNodes: SelectedNodePromptInput[],
 ): WorkflowPromptMessage[] {
-  const nodeList = selectedNodes.map((node, index) => `${index + 1}. [${node.id}] ${node.label}`).join('\n')
+  const nodeList = selectedNodes
+    .map((node, index) => `${index + 1}. [${node.id}] ${node.label}`)
+    .join('\n')
 
   return [
     {

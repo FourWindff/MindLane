@@ -22,7 +22,9 @@ export function ChatFab({ onExpand }: ChatFabProps) {
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
     >
       <Bot size={36} strokeWidth={1.5} className="chat-float-fab__icon" />
-      <span className={`chat-float-fab__status chat-float-fab__status--${busy ? 'busy' : 'idle'}`} />
+      <span
+        className={`chat-float-fab__status chat-float-fab__status--${busy ? 'busy' : 'idle'}`}
+      />
       <span className="chat-float-fab__tooltip">Neural Assistant</span>
     </motion.button>
   )

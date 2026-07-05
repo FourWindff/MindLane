@@ -23,10 +23,7 @@ export function ShortcutsList() {
     () => registry.getSnapshot(),
   )
 
-  const visible = useMemo(
-    () => entries.filter((e) => e.showInHelp !== false),
-    [entries],
-  )
+  const visible = useMemo(() => entries.filter((e) => e.showInHelp !== false), [entries])
 
   const grouped = useMemo(() => {
     const map = new Map<string, ShortcutRegistration[]>()
@@ -58,9 +55,7 @@ export function ShortcutsList() {
           <ul className="shortcuts-panel__list">
             {block.items.map((item) => (
               <li key={item.id} className="shortcuts-panel__row">
-                <kbd className="shortcuts-panel__kbd">
-                  {formatComboLabel(item.combo)}
-                </kbd>
+                <kbd className="shortcuts-panel__kbd">{formatComboLabel(item.combo)}</kbd>
                 <span className="shortcuts-panel__desc">{item.description}</span>
               </li>
             ))}

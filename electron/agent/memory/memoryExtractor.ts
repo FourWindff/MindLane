@@ -15,7 +15,7 @@ const DISCIPLINES = [
   'creative-arts',
 ] as const
 
-type Discipline = typeof DISCIPLINES[number]
+type Discipline = (typeof DISCIPLINES)[number]
 
 interface ExtractedPattern {
   discipline: Discipline
@@ -58,12 +58,12 @@ export class MemoryExtractor {
       logger.info('[MemoryExtractor] No patterns extracted, skipping persist')
       return
     }
-    logger.info(`[MemoryExtractor] Extracted ${patterns.length} pattern(s):`, patterns.map(p => `${p.discipline}-${p.subTag}`))
+    logger.info(
+      `[MemoryExtractor] Extracted ${patterns.length} pattern(s):`,
+      patterns.map((p) => `${p.discipline}-${p.subTag}`),
+    )
 
-    await Promise.all([
-      this.persist(patterns),
-      this.updateMindlaneTags(filePath, patterns),
-    ])
+    await Promise.all([this.persist(patterns), this.updateMindlaneTags(filePath, patterns)])
     logger.info('[MemoryExtractor] Persist and tag update completed')
   }
 
@@ -108,7 +108,12 @@ export class MemoryExtractor {
       data.metadata.tags = Array.from(existing)
       data.metadata.updatedAt = new Date().toISOString()
       await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      logger.info('[MemoryExtractor] Updated .mindlane tags:', Array.from(existing), 'file:', filePath)
+      logger.info(
+        '[MemoryExtractor] Updated .mindlane tags:',
+        Array.from(existing),
+        'file:',
+        filePath,
+      )
     } catch (e) {
       logger.warn('[MemoryExtractor] Failed to update .mindlane tags:', e, 'file:', filePath)
     }
@@ -118,8 +123,8 @@ export class MemoryExtractor {
     // Limit to last 20 exchanges to avoid unbounded prompt size
     const recentMessages = messages.slice(-40)
     const conversation = recentMessages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
-      .map(m => {
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
+      .map((m) => {
         const role = m.role === 'user' ? '用户' : 'AI'
         return `${role}: ${m.content}`
       })

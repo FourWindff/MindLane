@@ -37,7 +37,10 @@ function getSettingsPath(): string {
       p = path.join(home, 'Library/Application Support/MindLane/settings.json')
       break
     case 'win32':
-      p = path.join(process.env.APPDATA || path.join(home, 'AppData/Roaming'), 'MindLane/settings.json')
+      p = path.join(
+        process.env.APPDATA || path.join(home, 'AppData/Roaming'),
+        'MindLane/settings.json',
+      )
       break
     default:
       p = path.join(home, '.config/mindlane/settings.json')
@@ -85,15 +88,15 @@ function createProviderFromSettings(): LLMProvider {
   if (!apiKey) {
     throw new Error(
       `缺少 API Key。\n` +
-      `方式一：在 MindLane 应用中配置 provider，或通过 MINDLANE_SETTINGS_PATH 指定配置路径。\n` +
-      `方式二：设置环境变量启动 LangGraph Studio，例如：\n` +
-      `  MINDLANE_API_KEY=your_key npx @langchain/langgraph-cli dev\n\n` +
-      `可选环境变量：\n` +
-      `  MINDLANE_PROVIDER  - provider ID（默认 dashscope）\n` +
-      `  MINDLANE_API_KEY   - API Key\n` +
-      `  MINDLANE_CHAT_MODEL - 模型名称（默认取 provider 的第一个默认模型）\n` +
-      `  MINDLANE_BASE_URL  - 自定义 API 地址\n` +
-      `  MINDLANE_SETTINGS_PATH - MindLane settings.json 路径`
+        `方式一：在 MindLane 应用中配置 provider，或通过 MINDLANE_SETTINGS_PATH 指定配置路径。\n` +
+        `方式二：设置环境变量启动 LangGraph Studio，例如：\n` +
+        `  MINDLANE_API_KEY=your_key npx @langchain/langgraph-cli dev\n\n` +
+        `可选环境变量：\n` +
+        `  MINDLANE_PROVIDER  - provider ID（默认 dashscope）\n` +
+        `  MINDLANE_API_KEY   - API Key\n` +
+        `  MINDLANE_CHAT_MODEL - 模型名称（默认取 provider 的第一个默认模型）\n` +
+        `  MINDLANE_BASE_URL  - 自定义 API 地址\n` +
+        `  MINDLANE_SETTINGS_PATH - MindLane settings.json 路径`,
     )
   }
 

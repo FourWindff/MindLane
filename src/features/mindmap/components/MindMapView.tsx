@@ -71,10 +71,14 @@ function MindMapCanvas({
   const rfStore = useStoreApi()
   const rf = useReactFlow()
 
-  const structureType = useStyleStore((s) => s.mapStyle).startsWith("mindmap") ? "mindmap" as const : "logic" as const
+  const structureType = useStyleStore((s) => s.mapStyle).startsWith('mindmap')
+    ? ('mindmap' as const)
+    : ('logic' as const)
   // ref 始终指向最新的 structureType，避免 useCallback 闭包读到过期值
   const structureTypeRef = useRef(structureType)
-  useEffect(() => { structureTypeRef.current = structureType }, [structureType])
+  useEffect(() => {
+    structureTypeRef.current = structureType
+  }, [structureType])
   const [stylePanelOpen, setStylePanelOpen] = useState(false)
 
   const nodes = useMindmapStore((s) => s.nodes)
@@ -153,9 +157,7 @@ function MindMapCanvas({
 
       if (isLayoutingRef.current) return
 
-      const hasDimensionChange = changes.some(
-        (c) => c.type === 'dimensions' && c.dimensions,
-      )
+      const hasDimensionChange = changes.some((c) => c.type === 'dimensions' && c.dimensions)
       if (!hasDimensionChange) return
 
       if (layoutTimerRef.current) window.clearTimeout(layoutTimerRef.current)
@@ -169,11 +171,20 @@ function MindMapCanvas({
 
         let result = latestNodes
         for (const root of roots) {
-          result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureTypeRef.current)
+          result = reflowChildren(
+            root.id,
+            result,
+            curEdges,
+            CHILD_OFFSET_X,
+            CHILD_GAP_Y,
+            structureTypeRef.current,
+          )
         }
 
         setNodes(result)
-        requestAnimationFrame(() => { isLayoutingRef.current = false })
+        requestAnimationFrame(() => {
+          isLayoutingRef.current = false
+        })
       }, 80)
     },
     [onNodesChange, setNodes],
@@ -206,11 +217,7 @@ function MindMapCanvas({
           setPalaceModal(pd)
         } else {
           setNodes((nds) =>
-            nds.map((n) =>
-              n.id === node.id
-                ? { ...n, data: { ...n.data, expanded: true } }
-                : n,
-            ),
+            nds.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, expanded: true } } : n)),
           )
         }
         return
@@ -267,10 +274,13 @@ function MindMapCanvas({
     setContextMenu(next)
   }, [])
 
-  const onPaneContextMenu = useCallback((event: FlowContextEvent) => {
-    event.preventDefault()
-    openContextMenu({ clientX: event.clientX, clientY: event.clientY, scope: 'pane' })
-  }, [openContextMenu])
+  const onPaneContextMenu = useCallback(
+    (event: FlowContextEvent) => {
+      event.preventDefault()
+      openContextMenu({ clientX: event.clientX, clientY: event.clientY, scope: 'pane' })
+    },
+    [openContextMenu],
+  )
 
   const onNodeContextMenu = useCallback(
     (event: ReactMouseEvent, node: Node) => {
@@ -279,7 +289,12 @@ function MindMapCanvas({
       if (!node.selected) {
         setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })))
       }
-      openContextMenu({ clientX: event.clientX, clientY: event.clientY, scope: 'node', nodeId: node.id })
+      openContextMenu({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        scope: 'node',
+        nodeId: node.id,
+      })
     },
     [openContextMenu, setNodes],
   )
@@ -290,7 +305,12 @@ function MindMapCanvas({
       if (selectedNodes.length === 0) return
       const prime = selectedNodes[0]!
       setSelectedId(prime.id)
-      openContextMenu({ clientX: event.clientX, clientY: event.clientY, scope: 'node', nodeId: prime.id })
+      openContextMenu({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        scope: 'node',
+        nodeId: prime.id,
+      })
     },
     [openContextMenu],
   )
@@ -301,14 +321,11 @@ function MindMapCanvas({
 
   const mindmapShortcutsEnabled = useCallback(() => !aiBusy, [aiBusy])
 
-  const handleSelectionChange = useCallback(
-    ({ nodes: sel }: { nodes: Node[] }) => {
-      setSelectedId(sel[0]?.id ?? null)
-      setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
-      setHasSelection(sel.length > 0)
-    },
-    [],
-  )
+  const handleSelectionChange = useCallback(({ nodes: sel }: { nodes: Node[] }) => {
+    setSelectedId(sel[0]?.id ?? null)
+    setSelectedTopicIds(sel.filter((n) => n.type === 'text').map((n) => n.id))
+    setHasSelection(sel.length > 0)
+  }, [])
 
   useOnSelectionChange({ onChange: handleSelectionChange })
 
@@ -316,7 +333,13 @@ function MindMapCanvas({
     if (aiBusy) return
     const parentId = selectedId ?? 'root'
     const { nodes: nextNodes, edges: nextEdges } = withNewChild(
-      nodes, edges, parentId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y, structureType,
+      nodes,
+      edges,
+      parentId,
+      { label: '新主题' },
+      CHILD_OFFSET_X,
+      CHILD_GAP_Y,
+      structureType,
     )
     setNodes(nextNodes)
     setEdges(nextEdges)
@@ -325,7 +348,13 @@ function MindMapCanvas({
   const addSibling = useCallback(() => {
     if (aiBusy || !selectedId) return
     const { nodes: nextNodes, edges: nextEdges } = withNewSibling(
-      nodes, edges, selectedId, { label: '新主题' }, CHILD_OFFSET_X, CHILD_GAP_Y, structureType,
+      nodes,
+      edges,
+      selectedId,
+      { label: '新主题' },
+      CHILD_OFFSET_X,
+      CHILD_GAP_Y,
+      structureType,
     )
     if (nextNodes === nodes && nextEdges === edges) return
     setNodes(nextNodes)
@@ -344,9 +373,7 @@ function MindMapCanvas({
   const removeSelected = useCallback(() => {
     if (aiBusy) return
 
-    const targets = nodes.filter(
-      (n) => n.selected && n.id !== 'root' && !n.data?.exiting,
-    )
+    const targets = nodes.filter((n) => n.selected && n.id !== 'root' && !n.data?.exiting)
     if (targets.length === 0) return
 
     const allIds = new Set<string>()
@@ -355,16 +382,17 @@ function MindMapCanvas({
     }
 
     setNodes((nds) =>
-      nds.map((n) =>
-        allIds.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n,
-      ),
+      nds.map((n) => (allIds.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n)),
     )
     setEdges((eds) =>
       eds.map((e) => {
         const touch = allIds.has(e.source) || allIds.has(e.target)
         if (!touch) return e
         const parts = new Set(
-          [e.className, 'mindmap-edge', 'mindmap-edge--exiting'].join(' ').split(/\s+/).filter(Boolean),
+          [e.className, 'mindmap-edge', 'mindmap-edge--exiting']
+            .join(' ')
+            .split(/\s+/)
+            .filter(Boolean),
         )
         return { ...e, className: [...parts].join(' ') }
       }),
@@ -387,7 +415,14 @@ function MindMapCanvas({
       const { nodes: n, edges: e } = graphRef.current
       const nextNodes = n.filter((node) => !allIds.has(node.id))
       const nextEdges = e.filter((edge) => !allIds.has(edge.source) && !allIds.has(edge.target))
-      const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureTypeRef.current)
+      const laidOut = reflowChildren(
+        'root',
+        nextNodes,
+        nextEdges,
+        CHILD_OFFSET_X,
+        CHILD_GAP_Y,
+        structureTypeRef.current,
+      )
       setNodes(laidOut)
       setEdges(nextEdges)
     }, NODE_EXIT_MS)
@@ -457,39 +492,127 @@ function MindMapCanvas({
     return findParentId(edges, selectedId) != null
   }, [edges, selectedId])
 
-  useShortcut(
-    { id: 'mindmap.addChild', combo: 'mod+enter', description: '添加子主题', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { addChild() } },
-  )
-  useShortcut(
-    { id: 'mindmap.addSibling', combo: 'mod+shift+enter', description: '添加同级主题', group: 'mindmap', preventWhenTyping: true, enabled: () => mindmapShortcutsEnabled() && canAddSibling, handler: () => { addSibling() } },
-  )
-  useShortcut(
-    { id: 'mindmap.delete', combo: 'delete', description: '删除选中节点（含子树）', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { removeSelected() } },
-  )
-  useShortcut(
-    { id: 'mindmap.backspace', combo: 'backspace', description: '删除选中节点（含子树）', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { removeSelected() } },
-  )
-  useShortcut(
-    { id: 'mindmap.edit', combo: 'f2', description: '编辑选中节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { if (selectedId) startEditing(selectedId) } },
-  )
-  useShortcut(
-    { id: 'mindmap.reset', combo: 'mod+shift+r', description: '重置为示例导图', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { reset() } },
-  )
-  useShortcut(
-    { id: 'mindmap.navLeft', combo: 'arrowleft', description: '选中父节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateLeft() } },
-  )
-  useShortcut(
-    { id: 'mindmap.navRight', combo: 'arrowright', description: '选中第一个子节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateRight() } },
-  )
-  useShortcut(
-    { id: 'mindmap.navUp', combo: 'arrowup', description: '选中上方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateUp() } },
-  )
-  useShortcut(
-    { id: 'mindmap.navDown', combo: 'arrowdown', description: '选中下方兄弟节点', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { navigateDown() } },
-  )
-  useShortcut(
-    { id: 'mindmap.centerRoot', combo: 'mod+0', description: '回到中心主题', group: 'mindmap', preventWhenTyping: true, enabled: mindmapShortcutsEnabled, handler: () => { centerRoot() } },
-  )
+  useShortcut({
+    id: 'mindmap.addChild',
+    combo: 'mod+enter',
+    description: '添加子主题',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      addChild()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.addSibling',
+    combo: 'mod+shift+enter',
+    description: '添加同级主题',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: () => mindmapShortcutsEnabled() && canAddSibling,
+    handler: () => {
+      addSibling()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.delete',
+    combo: 'delete',
+    description: '删除选中节点（含子树）',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      removeSelected()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.backspace',
+    combo: 'backspace',
+    description: '删除选中节点（含子树）',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      removeSelected()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.edit',
+    combo: 'f2',
+    description: '编辑选中节点',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      if (selectedId) startEditing(selectedId)
+    },
+  })
+  useShortcut({
+    id: 'mindmap.reset',
+    combo: 'mod+shift+r',
+    description: '重置为示例导图',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      reset()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.navLeft',
+    combo: 'arrowleft',
+    description: '选中父节点',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      navigateLeft()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.navRight',
+    combo: 'arrowright',
+    description: '选中第一个子节点',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      navigateRight()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.navUp',
+    combo: 'arrowup',
+    description: '选中上方兄弟节点',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      navigateUp()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.navDown',
+    combo: 'arrowdown',
+    description: '选中下方兄弟节点',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      navigateDown()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.centerRoot',
+    combo: 'mod+0',
+    description: '回到中心主题',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      centerRoot()
+    },
+  })
 
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
   const hiddenRfInstanceRef = useRef<ReactFlowInstance | null>(null)
@@ -558,9 +681,17 @@ function MindMapCanvas({
 
   void aiBusy
 
-  useShortcut(
-    { id: 'mindmap.save', combo: 'mod+s', description: '保存文件', group: 'mindmap', preventWhenTyping: false, enabled: mindmapShortcutsEnabled, handler: () => { doSave() } },
-  )
+  useShortcut({
+    id: 'mindmap.save',
+    combo: 'mod+s',
+    description: '保存文件',
+    group: 'mindmap',
+    preventWhenTyping: false,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      doSave()
+    },
+  })
 
   useEffect(() => {
     if (!hasDocumentOpen || !dirty || !filePath || aiBusy) return
@@ -589,7 +720,8 @@ function MindMapCanvas({
 
     const backendSettings = await mindlane.settings.load()
     const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
-    const currentModel = backendSettings?.chatModel || chatModel || settings.chatModel || 'qwen-turbo'
+    const currentModel =
+      backendSettings?.chatModel || chatModel || settings.chatModel || 'qwen-turbo'
 
     if (!currentKey) {
       ai.setError('请先在右侧「设置」面板中填写 API Key')
@@ -623,8 +755,8 @@ function MindMapCanvas({
       id: palaceId,
       type: 'palace',
       position: {
-        x: (firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X),
-        y: (firstSelected?.position.y ?? parentNode?.position.y ?? 0),
+        x: firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X,
+        y: firstSelected?.position.y ?? parentNode?.position.y ?? 0,
       },
       data: {
         label: '生成中…',
@@ -662,7 +794,14 @@ function MindMapCanvas({
     )
     const nextEdges = [...cleanedEdges, treeEdge, ...childEdges]
 
-    const laidOut = reflowChildren(palaceId, nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
+    const laidOut = reflowChildren(
+      palaceId,
+      nextNodes,
+      nextEdges,
+      CHILD_OFFSET_X,
+      CHILD_GAP_Y,
+      structureType,
+    )
     setNodes(laidOut)
     setEdges(nextEdges)
 
@@ -719,9 +858,7 @@ function MindMapCanvas({
     } catch (e) {
       setNodes(rollbackNodes)
       setEdges(rollbackEdges)
-      ai.setError(
-        `生成异常：${e instanceof Error ? e.message : String(e)}`,
-      )
+      ai.setError(`生成异常：${e instanceof Error ? e.message : String(e)}`)
     }
   }, [aiBusy, apiKey, chatModel, selectedId, nodes, edges, setNodes, setEdges, structureType])
 
@@ -758,9 +895,7 @@ function MindMapCanvas({
         canAddSibling={canAddSibling}
         canRemove={canRemove}
         stylePanelOpen={stylePanelOpen}
-        stylePanel={stylePanelOpen ? (
-          <StylePanel onClose={() => setStylePanelOpen(false)} />
-        ) : null}
+        stylePanel={stylePanelOpen ? <StylePanel onClose={() => setStylePanelOpen(false)} /> : null}
       />
       <div className="mindmap-canvas-wrap">
         <ReactFlow
@@ -815,9 +950,7 @@ function MindMapCanvas({
             palaceEnabled={palaceEnabled}
           />
         ) : null}
-        {palaceModal && (
-          <PalaceModal data={palaceModal} onClose={() => setPalaceModal(null)} />
-        )}
+        {palaceModal && <PalaceModal data={palaceModal} onClose={() => setPalaceModal(null)} />}
       </div>
       <div
         ref={hiddenFlowRef}
@@ -857,10 +990,7 @@ export function MindMapView({
   return (
     <StyleProvider>
       <ReactFlowProvider>
-        <MindMapCanvas
-          onSwitchWorkspace={onSwitchWorkspace}
-          onOpenSettings={onOpenSettings}
-        />
+        <MindMapCanvas onSwitchWorkspace={onSwitchWorkspace} onOpenSettings={onOpenSettings} />
       </ReactFlowProvider>
     </StyleProvider>
   )

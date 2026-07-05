@@ -14,8 +14,11 @@ export class MemoryManager {
   }
 
   async loadIndex(): Promise<string> {
-    try { return await fs.promises.readFile(this.indexPath, 'utf-8') }
-    catch { return '' }
+    try {
+      return await fs.promises.readFile(this.indexPath, 'utf-8')
+    } catch {
+      return ''
+    }
   }
 
   async loadMemoriesForTags(tags: string[]): Promise<string[]> {
@@ -24,7 +27,7 @@ export class MemoryManager {
     for (const file of files) {
       const content = await fs.promises.readFile(path.join(this.dir, file), 'utf-8')
       const { tag } = this.parseFrontmatter(content)
-      if (tag && tags.some(t => tag.startsWith(t))) {
+      if (tag && tags.some((t) => tag.startsWith(t))) {
         const body = this.extractBody(content)
         results.push(`--- ${tag} ---\n${body}`)
       }
@@ -32,12 +35,20 @@ export class MemoryManager {
     return results
   }
 
-  async writeMemory(tag: string, description: string, content: string, options?: { skipIndexRebuild?: boolean }): Promise<void> {
+  async writeMemory(
+    tag: string,
+    description: string,
+    content: string,
+    options?: { skipIndexRebuild?: boolean },
+  ): Promise<void> {
     await fs.promises.mkdir(this.dir, { recursive: true })
     const fp = path.join(this.dir, `${tag}.md`)
     let body = ''
-    try { body = this.extractBody(await fs.promises.readFile(fp, 'utf-8')) }
-    catch { /* new file */ }
+    try {
+      body = this.extractBody(await fs.promises.readFile(fp, 'utf-8'))
+    } catch {
+      /* new file */
+    }
     const newBody = body ? `${body}\n\n${content}` : content
     await atomicWrite(fp, `---\ntag: ${tag}\ndescription: ${description}\n---\n\n${newBody}`)
     if (!options?.skipIndexRebuild) {
@@ -60,7 +71,9 @@ export class MemoryManager {
     if (files.length > THRESHOLDS.maxFiles) return true
     for (const f of files) {
       const content = await fs.promises.readFile(path.join(this.dir, f), 'utf-8')
-      const paragraphCount = this.extractBody(content).split(/\n\n+/).filter(p => p.trim()).length
+      const paragraphCount = this.extractBody(content)
+        .split(/\n\n+/)
+        .filter((p) => p.trim()).length
       if (paragraphCount > THRESHOLDS.maxParagraphs) return true
     }
     try {
@@ -77,8 +90,13 @@ export class MemoryManager {
   }
 
   private async listFiles(): Promise<string[]> {
-    try { return (await fs.promises.readdir(this.dir)).filter(e => e.endsWith('.md') && e !== 'MEMORY.md') }
-    catch { return [] }
+    try {
+      return (await fs.promises.readdir(this.dir)).filter(
+        (e) => e.endsWith('.md') && e !== 'MEMORY.md',
+      )
+    } catch {
+      return []
+    }
   }
 
   private parseFrontmatter(content: string): { tag?: string; description?: string } {

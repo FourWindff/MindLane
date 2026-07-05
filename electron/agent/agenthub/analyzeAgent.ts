@@ -5,10 +5,7 @@ import type { LLMProvider } from '../providers/index.js'
 import { PalaceAgent } from './base.js'
 import { logger } from '../../shared/logger.js'
 import { formatAgentError } from '../utils.js'
-import {
-  buildAnalyzeInputMessages,
-  buildDesignMnemonicsMessages,
-} from './prompts/textToPalace.js'
+import { buildAnalyzeInputMessages, buildDesignMnemonicsMessages } from './prompts/textToPalace.js'
 import { buildAnalyzeAndPlanMessages } from './prompts/nodesToPalace.js'
 
 const analyzeSchema = z.object({
@@ -72,12 +69,10 @@ function buildPlannedStations(
       const sourceNode = selectedById.get(linkedNodeId)
       const content = sourceNode?.label.trim() || (row.content ?? '').trim() || `节点 ${index + 1}`
       const anchorVisual =
-        (row.anchor_visual ?? row.anchorVisual ?? '').trim() || `与「${content.slice(0, 60)}」强相关的大型具象物体`
+        (row.anchor_visual ?? row.anchorVisual ?? '').trim() ||
+        `与「${content.slice(0, 60)}」强相关的大型具象物体`
       const association =
-        row.association?.trim() ||
-        row.visual_bridge?.trim() ||
-        row.visualBridge?.trim() ||
-        ''
+        row.association?.trim() || row.visual_bridge?.trim() || row.visualBridge?.trim() || ''
 
       return {
         order: row.order ?? index + 1,
@@ -108,7 +103,13 @@ function buildPlannedStations(
 }
 
 function normalizeRouteStyle(value: string | undefined, stationCount: number): string {
-  if (value === 'arc' || value === 's_curve' || value === 'zigzag' || value === 'loop' || value === 'stairs') {
+  if (
+    value === 'arc' ||
+    value === 's_curve' ||
+    value === 'zigzag' ||
+    value === 'loop' ||
+    value === 'stairs'
+  ) {
     return value
   }
   if (stationCount <= 3) return 'arc'
@@ -167,7 +168,10 @@ export class AnalyzeAgent extends PalaceAgent {
     messages: Array<{ role: string; content: string }>,
   ): Promise<Partial<PalaceSubgraphStateType>> {
     const conversation = messages
-      .map((m) => `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`)
+      .map(
+        (m) =>
+          `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`,
+      )
       .join('\n')
     const inputText = conversation || text
 

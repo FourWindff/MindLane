@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  RemoveMessage,
-  HumanMessage,
-  AIMessage,
-  SystemMessage,
-} from '@langchain/core/messages'
+import { RemoveMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 import { REMOVE_ALL_MESSAGES, messagesStateReducer } from '@langchain/langgraph'
 import { AGENT_LIMITS } from '../../config.js'
 import { compactContext, isPromptTooLongError, trimToRecentWindow } from '../contextCompact.js'
@@ -79,7 +74,9 @@ function createMockTool(name: string): StructuredToolInterface {
   } as unknown as StructuredToolInterface
 }
 
-function createState(messages: Array<InstanceType<typeof HumanMessage | typeof AIMessage>>): MainGraphStateType {
+function createState(
+  messages: Array<InstanceType<typeof HumanMessage | typeof AIMessage>>,
+): MainGraphStateType {
   return {
     messages,
     context: null,
@@ -144,7 +141,7 @@ describe('trimToRecentWindow', () => {
     ]
     const result = trimToRecentWindow(messages, 2)
 
-    expect(result.some(m => m.type === 'system')).toBe(true)
+    expect(result.some((m) => m.type === 'system')).toBe(true)
     expect(result[result.length - 1].content).toBe('current')
   })
 
@@ -170,9 +167,7 @@ describe('trimToRecentWindow', () => {
 describe('compactContext', () => {
   it('returns empty update when under budget', async () => {
     const provider = createMockProvider()
-    const state = createState([
-      new HumanMessage('hello'),
-    ])
+    const state = createState([new HumanMessage('hello')])
 
     const result = await compactContext(state, [], provider)
 
@@ -187,9 +182,7 @@ describe('compactContext', () => {
       messages.push(new AIMessage(`回复 ${i} ${longText}`))
     }
 
-    const mockInvoke = vi.fn().mockResolvedValue(
-      new AIMessage('对话摘要内容。'),
-    )
+    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage('对话摘要内容。'))
     const provider = createMockProvider(mockInvoke)
     const state = createState(messages)
 

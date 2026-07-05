@@ -38,7 +38,9 @@ export class ProjectFileManager {
     return this.loadFromPath(filePath)
   }
 
-  async loadFromPath(filePath: string): Promise<FsResult<{ filePath: string; data: MindLaneFile }>> {
+  async loadFromPath(
+    filePath: string,
+  ): Promise<FsResult<{ filePath: string; data: MindLaneFile }>> {
     try {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
       const data = JSON.parse(raw) as MindLaneFile
@@ -151,5 +153,4 @@ export class ProjectFileManager {
       /* best-effort */
     }
   }
-
 }

@@ -1,10 +1,7 @@
 import { eventComboFromCode, isTypingTarget } from './matchKeydown'
 import type { ShortcutRegistration } from './types'
 
-type DocumentLike = Pick<
-  Document,
-  'addEventListener' | 'removeEventListener'
->
+type DocumentLike = Pick<Document, 'addEventListener' | 'removeEventListener'>
 
 /**
  * 与 React 无关的快捷键注册表：可独立测试，也可在非 React 环境使用。
@@ -55,9 +52,7 @@ export class ShortcutRegistry {
     if (e.repeat) return false
     const typing = isTypingTarget(e.target)
     const combo = eventComboFromCode(e)
-    const sorted = [...this.entries].sort(
-      (a, b) => (b.priority ?? 0) - (a.priority ?? 0),
-    )
+    const sorted = [...this.entries].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
     for (const entry of sorted) {
       if (entry.combo !== combo) continue
       if (entry.preventWhenTyping && typing) continue

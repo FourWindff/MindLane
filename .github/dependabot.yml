@@ -5,73 +5,72 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "daily"
+      interval: 'daily'
     open-pull-requests-limit: 5
     versioning-strategy: increase-if-necessary
     labels:
-      - "dependencies"
-      - "npm"
+      - 'dependencies'
+      - 'npm'
     commit-message:
-      prefix: "deps"
-      include: "scope"
+      prefix: 'deps'
+      include: 'scope'
     allow:
       # Keep automated version updates limited to dependencies that are not
       # part of the Electron startup, packaging, native-module, or agent-runtime
       # stack. Review the excluded set manually.
-      - dependency-name: "dagre"
-      - dependency-name: "html-to-image"
-      - dependency-name: "js-tiktoken"
-      - dependency-name: "lucide-react"
-      - dependency-name: "motion"
-      - dependency-name: "react-markdown"
-      - dependency-name: "remark-gfm"
-      - dependency-name: "yaml"
-      - dependency-name: "zod"
-      - dependency-name: "zustand"
-      - dependency-name: "@types/dagre"
-      - dependency-name: "@typescript-eslint/eslint-plugin"
-      - dependency-name: "@typescript-eslint/parser"
-      - dependency-name: "eslint"
-      - dependency-name: "eslint-plugin-react-hooks"
-      - dependency-name: "eslint-plugin-react-refresh"
-      - dependency-name: "typescript"
-      - dependency-name: "vitest"
+      - dependency-name: 'dagre'
+      - dependency-name: 'html-to-image'
+      - dependency-name: 'js-tiktoken'
+      - dependency-name: 'lucide-react'
+      - dependency-name: 'motion'
+      - dependency-name: 'react-markdown'
+      - dependency-name: 'remark-gfm'
+      - dependency-name: 'yaml'
+      - dependency-name: 'zod'
+      - dependency-name: 'zustand'
+      - dependency-name: '@types/dagre'
+      - dependency-name: '@typescript-eslint/eslint-plugin'
+      - dependency-name: '@typescript-eslint/parser'
+      - dependency-name: 'eslint'
+      - dependency-name: 'eslint-plugin-react-hooks'
+      - dependency-name: 'eslint-plugin-react-refresh'
+      - dependency-name: 'typescript'
+      - dependency-name: 'vitest'
     ignore:
       # Group update-types only controls what enters a group. This keeps major
       # updates out of Dependabot version-update PRs entirely.
-      - dependency-name: "*"
+      - dependency-name: '*'
         update-types:
-          - "version-update:semver-major"
+          - 'version-update:semver-major'
     groups:
       low-risk-runtime:
-        dependency-type: "production"
+        dependency-type: 'production'
         update-types:
-          - "patch"
-          - "minor"
+          - 'patch'
+          - 'minor'
         patterns:
-          - "dagre"
-          - "html-to-image"
-          - "js-tiktoken"
-          - "lucide-react"
-          - "motion"
-          - "react-markdown"
-          - "remark-gfm"
-          - "yaml"
-          - "zod"
-          - "zustand"
+          - 'dagre'
+          - 'html-to-image'
+          - 'js-tiktoken'
+          - 'lucide-react'
+          - 'motion'
+          - 'react-markdown'
+          - 'remark-gfm'
+          - 'yaml'
+          - 'zod'
+          - 'zustand'
       low-risk-dev:
-        dependency-type: "development"
+        dependency-type: 'development'
         update-types:
-          - "patch"
-          - "minor"
+          - 'patch'
+          - 'minor'
         patterns:
-          - "@types/*"
-          - "@typescript-eslint/*"
-          - "eslint"
-          - "eslint-plugin-*"
-          - "typescript"
-          - "vitest"
-
+          - '@types/*'
+          - '@typescript-eslint/*'
+          - 'eslint'
+          - 'eslint-plugin-*'
+          - 'typescript'
+          - 'vitest'

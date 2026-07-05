@@ -36,7 +36,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max))
 }
 
-function readLineRange(text: string, start?: number, end?: number): {
+function readLineRange(
+  text: string,
+  start?: number,
+  end?: number,
+): {
   text: string
   startLine: number
   endLine: number
@@ -84,11 +88,7 @@ export function createReadLinkedDocumentTool(
         }
       }
 
-      const { text, startLine, endLine, totalLines } = readLineRange(
-        cachedText,
-        start,
-        end,
-      )
+      const { text, startLine, endLine, totalLines } = readLineRange(cachedText, start, end)
 
       return {
         ok: true,
@@ -105,8 +105,18 @@ export function createReadLinkedDocumentTool(
         '按行号范围读取已关联文档的缓存文本。用户要求根据原文件、原文、文档或章节修改思维导图时，先用此工具读取相关文本，再调用思维导图操作工具修改节点。',
       schema: z.object({
         documentRefId: z.string().describe('要读取的关联文档 ID'),
-        start: z.number().int().min(1).optional().describe('起始行号（1-based，闭区间；省略则从开头开始）'),
-        end: z.number().int().min(1).optional().describe('结束行号（1-based，闭区间；省略则读到末尾）'),
+        start: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe('起始行号（1-based，闭区间；省略则从开头开始）'),
+        end: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe('结束行号（1-based，闭区间；省略则读到末尾）'),
       }),
     },
   )

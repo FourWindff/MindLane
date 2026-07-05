@@ -24,7 +24,11 @@ function errMsg(body: unknown, fallback: string): string {
     const o = body as Record<string, unknown>
     if (typeof o.message === 'string') return o.message
     const err = o.error
-    if (err && typeof err === 'object' && typeof (err as { message?: string }).message === 'string') {
+    if (
+      err &&
+      typeof err === 'object' &&
+      typeof (err as { message?: string }).message === 'string'
+    ) {
       return (err as { message: string }).message
     }
     if (typeof o.code === 'string' && typeof o.message === 'string') {
@@ -119,42 +123,41 @@ export class DashScopeProvider extends LLMProvider {
     // 用总超时给整个流程兜底，轮询 sleep / fetch 都可被该 signal 中断。
     return withTimeout(
       async (totalSignal) => {
-        const createData = await withRetry(
-          () =>
-            withTimeout(
-              async (signal) => {
-                const linked = linkSignals([totalSignal, signal])
-                try {
-                  const res = await fetch(IMAGE_SYNTH_URL, {
-                    method: 'POST',
-                    headers: {
-                      Authorization: `Bearer ${this.apiKey}`,
-                      'Content-Type': 'application/json',
-                      'X-DashScope-Async': 'enable',
+        const createData = await withRetry(() =>
+          withTimeout(
+            async (signal) => {
+              const linked = linkSignals([totalSignal, signal])
+              try {
+                const res = await fetch(IMAGE_SYNTH_URL, {
+                  method: 'POST',
+                  headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                    'X-DashScope-Async': 'enable',
+                  },
+                  body: JSON.stringify({
+                    model: 'wanx-v1',
+                    input: { prompt },
+                    parameters: {
+                      style: '<auto>',
+                      size: input.size ?? '1024*1024',
+                      n: Math.min(4, Math.max(1, input.n ?? 1)),
                     },
-                    body: JSON.stringify({
-                      model: 'wanx-v1',
-                      input: { prompt },
-                      parameters: {
-                        style: '<auto>',
-                        size: input.size ?? '1024*1024',
-                        n: Math.min(4, Math.max(1, input.n ?? 1)),
-                      },
-                    }),
-                    signal: linked.signal,
-                  })
-                  const data = (await res.json().catch(() => null)) as TaskBody | null
-                  if (!res.ok) {
-                    throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
-                  }
-                  return data
-                } finally {
-                  linked.cleanup()
+                  }),
+                  signal: linked.signal,
+                })
+                const data = (await res.json().catch(() => null)) as TaskBody | null
+                if (!res.ok) {
+                  throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
                 }
-              },
-              HTTP_TIMEOUT_MS,
-              { signal: totalSignal },
-            ),
+                return data
+              } finally {
+                linked.cleanup()
+              }
+            },
+            HTTP_TIMEOUT_MS,
+            { signal: totalSignal },
+          ),
         )
 
         const taskId = createData?.output?.task_id
@@ -167,28 +170,27 @@ export class DashScopeProvider extends LLMProvider {
           // 可被中断的 sleep（替代裸 setTimeout，避免轮询卡死无法取消）
           await sleepWithAbort(POLL_INTERVAL_MS, totalSignal)
 
-          const pollData = await withRetry(
-            () =>
-              withTimeout(
-                async (signal) => {
-                  const linked = linkSignals([totalSignal, signal])
-                  try {
-                    const res = await fetch(taskUrl, {
-                      headers: { Authorization: `Bearer ${this.apiKey}` },
-                      signal: linked.signal,
-                    })
-                    const data = (await res.json().catch(() => null)) as TaskBody | null
-                    if (!res.ok) {
-                      throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
-                    }
-                    return data
-                  } finally {
-                    linked.cleanup()
+          const pollData = await withRetry(() =>
+            withTimeout(
+              async (signal) => {
+                const linked = linkSignals([totalSignal, signal])
+                try {
+                  const res = await fetch(taskUrl, {
+                    headers: { Authorization: `Bearer ${this.apiKey}` },
+                    signal: linked.signal,
+                  })
+                  const data = (await res.json().catch(() => null)) as TaskBody | null
+                  if (!res.ok) {
+                    throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
                   }
-                },
-                HTTP_TIMEOUT_MS,
-                { signal: totalSignal },
-              ),
+                  return data
+                } finally {
+                  linked.cleanup()
+                }
+              },
+              HTTP_TIMEOUT_MS,
+              { signal: totalSignal },
+            ),
           )
 
           const status = pollData?.output?.task_status

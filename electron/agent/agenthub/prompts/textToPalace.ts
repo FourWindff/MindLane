@@ -32,7 +32,9 @@ export function buildAnalyzeInputMessages(conversation: string): WorkflowPromptM
   ]
 }
 
-export function buildDesignMnemonicsMessages(items: MemoryItemPromptInput[]): WorkflowPromptMessage[] {
+export function buildDesignMnemonicsMessages(
+  items: MemoryItemPromptInput[],
+): WorkflowPromptMessage[] {
   const itemsText = items.map((item) => `${item.order}. ${item.content}`).join('\n')
   return [
     {

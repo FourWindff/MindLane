@@ -112,10 +112,7 @@ describe('AppState', () => {
   })
 
   it('getRecentFilesMax returns the configured limit', async () => {
-    fs.writeFileSync(
-      path.join(tmpDir, 'settings.json'),
-      JSON.stringify({ recentFilesMax: 7 }),
-    )
+    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ recentFilesMax: 7 }))
 
     const max = await appState.getRecentFilesMax()
 
@@ -148,10 +145,7 @@ describe('AppState', () => {
       fs.mkdirSync(workspacePath, { recursive: true })
     }
 
-    fs.writeFileSync(
-      path.join(tmpDir, 'settings.json'),
-      JSON.stringify({ recentFilesMax: 2 }),
-    )
+    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ recentFilesMax: 2 }))
 
     for (const workspacePath of workspaces) {
       const result = await appState.switchWorkspace(workspacePath)

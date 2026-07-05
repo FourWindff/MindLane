@@ -39,7 +39,12 @@ function parseSaved(raw: string): SavedBounds | null {
     if (width < MIN_WIDTH || height < MIN_HEIGHT || width > 4096 || height > 4096) {
       return null
     }
-    return { width: Math.floor(width), height: Math.floor(height), x: Math.floor(x), y: Math.floor(y) }
+    return {
+      width: Math.floor(width),
+      height: Math.floor(height),
+      x: Math.floor(x),
+      y: Math.floor(y),
+    }
   } catch {
     return null
   }

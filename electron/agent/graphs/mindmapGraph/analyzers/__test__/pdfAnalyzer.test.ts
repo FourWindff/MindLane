@@ -20,7 +20,9 @@ describe('PdfInputAnalyzer', () => {
 
   it('throws when path is missing', async () => {
     const analyzer = new PdfInputAnalyzer()
-    await expect(analyzer.loadDocument({ type: 'pdf' })).rejects.toThrow('PDF source requires a path')
+    await expect(analyzer.loadDocument({ type: 'pdf' })).rejects.toThrow(
+      'PDF source requires a path',
+    )
   })
 })
 

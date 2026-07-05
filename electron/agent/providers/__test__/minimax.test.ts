@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MiniMaxProvider, ProviderCapability, createProvider, getRegisteredProviders } from '../index.js'
+import {
+  MiniMaxProvider,
+  ProviderCapability,
+  createProvider,
+  getRegisteredProviders,
+} from '../index.js'
 
 describe('MiniMaxProvider', () => {
   afterEach(() => {
@@ -25,10 +30,7 @@ describe('MiniMaxProvider', () => {
     const minimax = providers.find((provider) => provider.id === 'minimax')
 
     expect(minimax).toBeDefined()
-    expect(minimax?.capabilities).toEqual([
-      ProviderCapability.Chat,
-      ProviderCapability.ImageGen,
-    ])
+    expect(minimax?.capabilities).toEqual([ProviderCapability.Chat, ProviderCapability.ImageGen])
 
     const provider = createProvider('minimax', {
       apiKey: 'test-key',
@@ -61,10 +63,7 @@ describe('MiniMaxProvider', () => {
       n: 2,
     })
 
-    expect(result.urls).toEqual([
-      'https://img.example/1.png',
-      'https://img.example/2.png',
-    ])
+    expect(result.urls).toEqual(['https://img.example/1.png', 'https://img.example/2.png'])
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit]

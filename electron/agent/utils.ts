@@ -4,21 +4,21 @@
  * OpenAI 格式返回 content 是字符串
  */
 export function extractTextContent(content: unknown): string {
-  if (typeof content === "string") return content;
+  if (typeof content === 'string') return content
   if (Array.isArray(content)) {
     return content
       .filter(
         (block): block is { type: string; text: string } =>
-          typeof block === "object" &&
+          typeof block === 'object' &&
           block !== null &&
-          "type" in block &&
-          block.type === "text" &&
-          "text" in block,
+          'type' in block &&
+          block.type === 'text' &&
+          'text' in block,
       )
       .map((block) => block.text)
-      .join("");
+      .join('')
   }
-  return "";
+  return ''
 }
 
 /**
@@ -33,19 +33,19 @@ export function extractTextContent(content: unknown): string {
  * 文本放在没有 `type:"text"` 标记的对象中）。
  */
 export function messageContentToString(content: unknown): string {
-  if (typeof content === "string") return content;
+  if (typeof content === 'string') return content
   if (Array.isArray(content)) {
     return content
       .map((block) => {
-        if (typeof block === "string") return block;
-        if (block && typeof block === "object" && "text" in block) {
-          return String((block as { text?: unknown }).text ?? "");
+        if (typeof block === 'string') return block
+        if (block && typeof block === 'object' && 'text' in block) {
+          return String((block as { text?: unknown }).text ?? '')
         }
-        return "";
+        return ''
       })
-      .join("");
+      .join('')
   }
-  return "";
+  return ''
 }
 
 /**
@@ -115,7 +115,7 @@ export function formatAgentError(error: unknown): string {
   if (error && typeof error === 'object' && 'message' in error) {
     const name = 'name' in error ? `${String((error as Record<string, unknown>).name)}: ` : ''
     const stack = 'stack' in error ? String((error as Record<string, unknown>).stack) : ''
-    return stack || (name + String((error as Record<string, unknown>).message))
+    return stack || name + String((error as Record<string, unknown>).message)
   }
   if (error === undefined) return 'Unknown error'
   if (error === null) return 'null'

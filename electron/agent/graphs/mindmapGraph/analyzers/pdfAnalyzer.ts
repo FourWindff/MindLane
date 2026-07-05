@@ -21,12 +21,14 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
   async load(path: string): Promise<DocumentPage[]> {
     const data = await fs.readFile(path)
     const pdfParse = await import('pdf-parse')
-    const PDFParseClass = (pdfParse as unknown as {
-      PDFParse?: new (options: { data: Buffer }) => {
-        getText: () => Promise<{ pages?: Array<{ text?: string; num?: number }> }>
-        destroy: () => Promise<void>
+    const PDFParseClass = (
+      pdfParse as unknown as {
+        PDFParse?: new (options: { data: Buffer }) => {
+          getText: () => Promise<{ pages?: Array<{ text?: string; num?: number }> }>
+          destroy: () => Promise<void>
+        }
       }
-    }).PDFParse
+    ).PDFParse
 
     if (!PDFParseClass) {
       throw new Error('Unable to find pdf-parse PDFParse API')
@@ -41,7 +43,7 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
           text: String(page.text ?? '').trim(),
           index: Number(page.num ?? idx + 1),
         }))
-        .filter(page => page.text.length > 0)
+        .filter((page) => page.text.length > 0)
     } finally {
       await parser.destroy()
     }
@@ -55,10 +57,7 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
     return this.chunkPages(raw, 4000)
   }
 
-  private chunkPages(
-    pages: DocumentPage[],
-    chunkCharLimit: number,
-  ): DocumentChunk[] {
+  private chunkPages(pages: DocumentPage[], chunkCharLimit: number): DocumentChunk[] {
     const normalizedLimit = Math.max(1000, chunkCharLimit)
     const chunks: DocumentChunk[] = []
 

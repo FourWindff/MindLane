@@ -98,16 +98,17 @@ export const useAiStore = create<AiState>((set, get) => ({
   setThreadId: (id) => set({ threadId: id }),
   addChatMessage: (msg) => set((s) => ({ chatMessages: [...s.chatMessages, msg] })),
   setChatMessages: (msgs) => set({ chatMessages: msgs }),
-  startNewChat: () => set({
-    threadId: generateThreadId(),
-    chatMessages: [],
-    busy: false,
-    step: 'idle',
-    streamText: '',
-    errorMessage: null,
-    showSessionList: false,
-    attachedDocument: null,
-  }),
+  startNewChat: () =>
+    set({
+      threadId: generateThreadId(),
+      chatMessages: [],
+      busy: false,
+      step: 'idle',
+      streamText: '',
+      errorMessage: null,
+      showSessionList: false,
+      attachedDocument: null,
+    }),
 
   setSessions: (sessions) => set({ sessions }),
   setShowSessionList: (show) => set({ showSessionList: show }),
@@ -177,7 +178,11 @@ export async function saveChatHistory(): Promise<void> {
     messages: state.chatMessages,
   })
 
-  const sessionsResult = await api.listSessions({ workspacePath: state.workspacePath, limit: 20, offset: 0 })
+  const sessionsResult = await api.listSessions({
+    workspacePath: state.workspacePath,
+    limit: 20,
+    offset: 0,
+  })
   if (sessionsResult?.ok && sessionsResult.data) {
     useAiStore.setState({ sessions: sessionsResult.data.sessions })
   }

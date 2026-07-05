@@ -68,7 +68,10 @@ function isRetryableError(err: unknown): boolean {
 /**
  * 指数退避 + jitter 计算。
  */
-function computeBackoffDelay(attempt: number, options: Required<Pick<RetryOptions, 'baseDelay' | 'maxDelay' | 'jitterMs'>>): number {
+function computeBackoffDelay(
+  attempt: number,
+  options: Required<Pick<RetryOptions, 'baseDelay' | 'maxDelay' | 'jitterMs'>>,
+): number {
   const exponential = Math.min(options.baseDelay * Math.pow(2, attempt), options.maxDelay)
   const jitter = Math.random() * options.jitterMs
   return exponential + jitter

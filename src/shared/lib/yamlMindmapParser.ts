@@ -91,9 +91,10 @@ export function parseYamlToMindmap(yamlString: string): ParsedMindmap {
     throw new EmptyMindmapError()
   }
 
-  const title = typeof (raw as Record<string, unknown>).document === 'object'
-    ? extractTitle((raw as Record<string, unknown>).document) ?? root.label
-    : root.label
+  const title =
+    typeof (raw as Record<string, unknown>).document === 'object'
+      ? (extractTitle((raw as Record<string, unknown>).document) ?? root.label)
+      : root.label
 
   const nodes: Node[] = []
   const edges: Edge[] = []
@@ -241,9 +242,9 @@ function parseOutlineEntry(entry: unknown): MindmapYamlNode | null {
     const entries = Object.entries(obj)
     if (entries.length === 0) return null
     const [titleKey, body] = entries[0]!
-    const parsed = parseTitleString(isScalarOutlineValue(body)
-      ? formatScalarOutlineTitle(titleKey, body)
-      : titleKey)
+    const parsed = parseTitleString(
+      isScalarOutlineValue(body) ? formatScalarOutlineTitle(titleKey, body) : titleKey,
+    )
     const children = isScalarOutlineValue(body) ? [] : parseChildren(body)
     const node: MindmapYamlNode = { label: parsed.label }
     if (parsed.pageRange) node.page_range = parsed.pageRange
@@ -272,8 +273,9 @@ interface ParsedTitle {
 function parseTitleString(value: string): ParsedTitle {
   const text = String(value).trim()
 
-  const pageMatch = text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*$/i)
-    ?? text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*[—\-:]\s*(.+)$/i)
+  const pageMatch =
+    text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*$/i) ??
+    text.match(/\((p?\.?\s*\d+(?:\s*-\s*\d+)?)\)\s*[—\-:]\s*(.+)$/i)
 
   if (pageMatch) {
     const before = text.slice(0, pageMatch.index).trim()

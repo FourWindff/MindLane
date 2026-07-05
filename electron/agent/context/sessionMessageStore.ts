@@ -234,13 +234,8 @@ export class SessionMessageStore {
         return {
           ...parsed,
           lastConsolidated:
-            typeof parsed.lastConsolidated === 'number'
-              ? parsed.lastConsolidated
-              : undefined,
-          _lastSummary:
-            typeof parsed._lastSummary === 'string'
-              ? parsed._lastSummary
-              : undefined,
+            typeof parsed.lastConsolidated === 'number' ? parsed.lastConsolidated : undefined,
+          _lastSummary: typeof parsed._lastSummary === 'string' ? parsed._lastSummary : undefined,
         } as SessionMeta
       }
     } catch {
@@ -328,13 +323,13 @@ export class SessionMessageStore {
             'SELECT id, workspace_hash, title, created_at, updated_at, message_count FROM chat_sessions ORDER BY updated_at DESC',
           )
           .all() as Array<{
-            id: string
-            workspace_hash: string
-            title: string
-            created_at: string
-            updated_at: string
-            message_count: number
-          }>
+          id: string
+          workspace_hash: string
+          title: string
+          created_at: string
+          updated_at: string
+          message_count: number
+        }>
 
         const messageStmt = this.prepareLegacyMessageStmt(db)
         if (!messageStmt) {
@@ -348,10 +343,7 @@ export class SessionMessageStore {
                 const chatMsg = JSON.parse(message_json) as ChatMessage
                 messages.push(...uiMessageToBaseMessages(chatMsg))
               } catch (err) {
-                logger.warn(
-                  `[SessionMessageStore] 迁移时跳过损坏的消息 (session=${row.id}):`,
-                  err,
-                )
+                logger.warn(`[SessionMessageStore] 迁移时跳过损坏的消息 (session=${row.id}):`, err)
               }
             }
 
@@ -405,7 +397,6 @@ export class SessionMessageStore {
       return null
     }
   }
-
 }
 
 export function uiMessageToBaseMessages(msg: ChatMessage): BaseMessage[] {

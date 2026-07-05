@@ -51,7 +51,9 @@ export function WorkspaceHome() {
                   onClick={() => void switchWorkspace(workspacePath)}
                   disabled={busy}
                 >
-                  <span className="workspace-home__recent-name">{workspaceName(workspacePath)}</span>
+                  <span className="workspace-home__recent-name">
+                    {workspaceName(workspacePath)}
+                  </span>
                   <span className="workspace-home__recent-path">{workspacePath}</span>
                 </button>
               ))}
@@ -64,12 +66,17 @@ export function WorkspaceHome() {
         </div>
 
         <div className="workspace-home__hero">
-          <img className="workspace-home__logo" src="/assets/mindlane-logo.svg" alt="MindLane logo" />
+          <img
+            className="workspace-home__logo"
+            src="/assets/mindlane-logo.svg"
+            alt="MindLane logo"
+          />
           <div className="workspace-home__hero-text">
             <div className="workspace-home__section-label">MindLane</div>
             <h1 className="workspace-home__hero-title">围绕工作目录管理导图文件</h1>
             <p className="workspace-home__hero-subtitle">
-              打开一个工作目录后，只展示可用的 `.mindlane` 文档；再次启动时自动恢复你上次的仓库与文件。
+              打开一个工作目录后，只展示可用的 `.mindlane`
+              文档；再次启动时自动恢复你上次的仓库与文件。
             </p>
           </div>
           <div className="workspace-home__actions">

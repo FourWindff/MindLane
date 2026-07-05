@@ -13,10 +13,7 @@ type ProviderMeta = {
 const factories = new Map<string, ProviderFactory>()
 const metaMap = new Map<string, ProviderMeta>()
 
-function registerProvider(
-  meta: ProviderMeta,
-  factory: ProviderFactory,
-): void {
+function registerProvider(meta: ProviderMeta, factory: ProviderFactory): void {
   factories.set(meta.id, factory)
   metaMap.set(meta.id, meta)
 }

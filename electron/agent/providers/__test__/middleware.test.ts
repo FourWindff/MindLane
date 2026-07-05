@@ -1,10 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import {
-  withRetry,
-  withTimeout,
-  linkSignals,
-  sleepWithAbort,
-} from '../middleware/index.js'
+import { withRetry, withTimeout, linkSignals, sleepWithAbort } from '../middleware/index.js'
 import { TimeoutError } from '../middleware/timeout.js'
 
 describe('withRetry', () => {

@@ -8,7 +8,7 @@ import type { ContextNodeInfo } from '@/features/chat/lib/chatUtils'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 function useShallowById<T, U extends { id: string }>(
-  selector: (state: T) => U[]
+  selector: (state: T) => U[],
 ): (state: T) => U[] {
   const prev = useRef<U[]>()
   return (state) => {
@@ -48,9 +48,7 @@ export function useChatContext() {
   const apiKey = useSettingsStore((s) => s.apiKey)
   const capabilities = useSettingsStore((s) => s.capabilities)
 
-  const selectedNodes = useMindmapStore(
-    useShallowById((s) => s.nodes.filter((n) => n.selected))
-  )
+  const selectedNodes = useMindmapStore(useShallowById((s) => s.nodes.filter((n) => n.selected)))
 
   const buildContext = useCallback((): ChatContext => {
     const mindmapState = useMindmapStore.getState()

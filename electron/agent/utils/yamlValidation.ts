@@ -10,8 +10,7 @@ import {
 type MindmapYamlValidationMode = 'tree' | 'fragment'
 
 type MindmapYamlValidationResult =
-  | { ok: true; tree: MindmapYamlNode }
-  | { ok: false; reason: string }
+  { ok: true; tree: MindmapYamlNode } | { ok: false; reason: string }
 
 export function validateMindmapYaml(
   text: string,
@@ -43,10 +42,7 @@ export function validateMindmapYaml(
   }
 }
 
-function validateTreeValue(
-  value: unknown,
-  fallbackTitle: string,
-): MindmapYamlValidationResult {
+function validateTreeValue(value: unknown, fallbackTitle: string): MindmapYamlValidationResult {
   const treeCandidate = sanitizeTreeCandidate(value)
   const rootTree = extractRootTree(treeCandidate, fallbackTitle)
 
@@ -61,10 +57,7 @@ function validateTreeValue(
   return { ok: true, tree: rootTree }
 }
 
-function validateFragmentValue(
-  value: unknown,
-  fallbackTitle: string,
-): MindmapYamlValidationResult {
+function validateFragmentValue(value: unknown, fallbackTitle: string): MindmapYamlValidationResult {
   const nodes = sanitizeForestCandidate(value)
 
   if (!nodes || nodes.length === 0) {
@@ -119,11 +112,12 @@ function extractRootTree(treeCandidate: unknown, fallbackTitle: string): Mindmap
 
   if (Array.isArray(treeCandidate)) {
     const children = treeCandidate
-      .filter((item): item is MindmapYamlNode =>
-        item !== null
-        && typeof item === 'object'
-        && 'label' in item
-        && typeof (item as Record<string, unknown>).label === 'string',
+      .filter(
+        (item): item is MindmapYamlNode =>
+          item !== null &&
+          typeof item === 'object' &&
+          'label' in item &&
+          typeof (item as Record<string, unknown>).label === 'string',
       )
       .map((item) => normalizeTree(item, ''))
 

@@ -48,9 +48,7 @@ export function RenameDialog({ currentName, isFile, onConfirm, onCancel }: Renam
         }}
       >
         <div className="workspace-modal__label">重命名</div>
-        <h2 className="workspace-modal__title">
-          {isFile ? '重命名文件' : '重命名文件夹'}
-        </h2>
+        <h2 className="workspace-modal__title">{isFile ? '重命名文件' : '重命名文件夹'}</h2>
         <input
           ref={inputRef}
           className="workspace-modal__input"

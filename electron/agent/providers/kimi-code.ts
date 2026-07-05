@@ -17,11 +17,7 @@ export class KimiCodeProvider extends LLMProvider {
     return KimiCodeProvider.defaultChatModels
   }
 
-  constructor(config: {
-    apiKey: string
-    chatModel: string
-    baseUrl?: string
-  }) {
+  constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()
     if (!key) throw new Error('未填写 API Key')
 

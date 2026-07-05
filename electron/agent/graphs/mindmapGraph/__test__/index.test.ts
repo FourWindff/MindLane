@@ -46,16 +46,20 @@ vi.mock('../analyzers/pdfAnalyzer.js', () => ({
       }
     }
   },
-  chunkPages: (pages: Array<{ pageNumber: number; text: string }>) => pages.map((page, index) => ({
-    id: `chunk-${index + 1}`,
-    index,
-    startPage: page.pageNumber,
-    endPage: page.pageNumber,
-    text: page.text,
-  })),
+  chunkPages: (pages: Array<{ pageNumber: number; text: string }>) =>
+    pages.map((page, index) => ({
+      id: `chunk-${index + 1}`,
+      index,
+      startPage: page.pageNumber,
+      endPage: page.pageNumber,
+      text: page.text,
+    })),
 }))
 
-class TestInputAnalyzer extends MindmapInputAnalyzer<null, { text: string; chunks: DocumentChunk[] }> {
+class TestInputAnalyzer extends MindmapInputAnalyzer<
+  null,
+  { text: string; chunks: DocumentChunk[] }
+> {
   readonly type: MindmapInputSource['type']
   readonly loadDocument = vi.fn()
 
@@ -226,7 +230,8 @@ Short PDF:
     const longText = `${'intro '.repeat(4200)}${importantTail}`
     const mockProvider = {
       reasoningModel: {
-        invoke: vi.fn()
+        invoke: vi
+          .fn()
           .mockResolvedValueOnce({
             content: `
 Leaf Long Text 1:
@@ -276,10 +281,12 @@ Merged Long Text:
     })
 
     const firstPrompt = String(
-      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]?.content ?? '',
+      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]
+        ?.content ?? '',
     )
     const secondPrompt = String(
-      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[1]?.[0]?.[1]?.content ?? '',
+      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[1]?.[0]?.[1]
+        ?.content ?? '',
     )
 
     expect(result.error).toBe('')
@@ -293,13 +300,15 @@ Merged Long Text:
   it('loads documents through an injected analyzer registry', async () => {
     const customAnalyzer = new TestInputAnalyzer('url', {
       text: 'Loaded URL text',
-      chunks: [{
-        id: 'url-chunk-1',
-        index: 0,
-        startPage: 0,
-        endPage: 0,
-        text: 'Loaded URL text',
-      }],
+      chunks: [
+        {
+          id: 'url-chunk-1',
+          index: 0,
+          startPage: 0,
+          endPage: 0,
+          text: 'Loaded URL text',
+        },
+      ],
     })
     const mockProvider = {
       reasoningModel: {
@@ -378,13 +387,15 @@ Fresh Root:
       mindmapInputTitle: 'Fresh Root',
       mindmapYaml: 'Stale Root:\n  - Stale Child\n',
       mindmapTitle: 'Stale Root',
-      documentChunks: [{
-        id: 'stale-chunk',
-        index: 0,
-        startPage: 0,
-        endPage: 0,
-        text: 'stale text',
-      }],
+      documentChunks: [
+        {
+          id: 'stale-chunk',
+          index: 0,
+          startPage: 0,
+          endPage: 0,
+          text: 'stale text',
+        },
+      ],
       leafCursor: 99,
       pendingLeafRange: { start: 10, end: 20 },
       leafResults: [{ chunkIndex: 0, chunkId: 'stale-chunk', tree: { label: 'Stale Leaf' } }],
@@ -445,7 +456,8 @@ Fresh Root:
   it('retries text extraction when generated YAML is invalid', async () => {
     const mockProvider = {
       reasoningModel: {
-        invoke: vi.fn()
+        invoke: vi
+          .fn()
           .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
           .mockResolvedValueOnce({
             content: `
@@ -532,7 +544,8 @@ Fresh Root:
   it('retries leaf extraction before storing leaf results', async () => {
     const mockProvider = {
       reasoningModel: {
-        invoke: vi.fn()
+        invoke: vi
+          .fn()
           .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
           .mockResolvedValueOnce({
             content: `
@@ -566,13 +579,15 @@ Merged Root:
       mindmapInputTitle: 'PDF Root',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [{
-        id: 'chunk-1',
-        index: 0,
-        startPage: 1,
-        endPage: 1,
-        text: 'PDF text',
-      }],
+      documentChunks: [
+        {
+          id: 'chunk-1',
+          index: 0,
+          startPage: 1,
+          endPage: 1,
+          text: 'PDF text',
+        },
+      ],
       leafCursor: 0,
       pendingLeafRange: { start: 0, end: 1 },
       leafResults: [],
@@ -594,7 +609,8 @@ Merged Root:
   it('stores one analysis result for a multi-chunk leaf batch', async () => {
     const mockProvider = {
       reasoningModel: {
-        invoke: vi.fn()
+        invoke: vi
+          .fn()
           .mockResolvedValueOnce({
             content: `
 Leaf Batch:
@@ -694,31 +710,34 @@ Leaf ${events.length}:
     })
     const app = graph.compile()
 
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: 'large document' },
-      mindmapInputTitle: 'Large Document',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    }, {
-      recursionLimit: 100,
-    })
+    const result = await app.invoke(
+      {
+        messages: [],
+        context: null,
+        pendingSubgraph: 'mindmap',
+        pendingSubgraphToolCallId: '',
+        pendingSubgraphToolName: '',
+        response: '',
+        error: '',
+        mindmapInputSource: { type: 'text', content: 'large document' },
+        mindmapInputTitle: 'Large Document',
+        mindmapYaml: '',
+        mindmapTitle: '',
+        documentChunks: [],
+        leafCursor: 0,
+        pendingLeafRange: null,
+        leafResults: [],
+        mergeInputs: [],
+        partialMergedTrees: [],
+        mergeResults: [],
+        pendingMergeGroups: [],
+        finalTree: null,
+        documentRef: null,
+      },
+      {
+        recursionLimit: 100,
+      },
+    )
 
     expect(result.error).toBe('')
     expect(events.slice(0, 10)).toEqual([
@@ -738,7 +757,8 @@ Leaf ${events.length}:
   it('retries merge before storing merge results', async () => {
     const mockProvider = {
       reasoningModel: {
-        invoke: vi.fn()
+        invoke: vi
+          .fn()
           .mockResolvedValueOnce({
             content: `
 Leaf Root:
@@ -776,15 +796,18 @@ Merged Root:
       leafCursor: 0,
       pendingLeafRange: null,
       leafResults: [],
-      mergeInputs: [{
-        label: 'Root A',
-        page_range: '',
-        children: [{ label: 'Child A', page_range: '', children: [] }],
-      }, {
-        label: 'Root B',
-        page_range: '',
-        children: [{ label: 'Child B', page_range: '', children: [] }],
-      }],
+      mergeInputs: [
+        {
+          label: 'Root A',
+          page_range: '',
+          children: [{ label: 'Child A', page_range: '', children: [] }],
+        },
+        {
+          label: 'Root B',
+          page_range: '',
+          children: [{ label: 'Child B', page_range: '', children: [] }],
+        },
+      ],
       partialMergedTrees: [],
       mergeResults: [],
       pendingMergeGroups: [],
@@ -875,9 +898,7 @@ Root:
     const raw: MindmapYamlNode = {
       label: '  Test  ',
       page_range: '',
-      children: [
-        { label: 'Child', page_range: '', children: [] },
-      ],
+      children: [{ label: 'Child', page_range: '', children: [] }],
     }
     const normalized = normalizeTree(raw, '')
     expect(normalized.label).toBe('Test')

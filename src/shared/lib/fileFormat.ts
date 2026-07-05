@@ -1,12 +1,14 @@
-import type { PalaceNodeData } from "@/features/mindmap/nodes/palace/types"
-import type { TextNodeData } from "@/features/mindmap/nodes/text/types"
+import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
+import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 
-export type { PalaceNodeData, PalaceStation } from "@/features/mindmap/nodes/palace/types"
+export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
 export function isDefaultViewport(vp: { x: number; y: number; zoom: number }): boolean {
-  return vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
+  return (
+    vp.x === DEFAULT_VIEWPORT.x && vp.y === DEFAULT_VIEWPORT.y && vp.zoom === DEFAULT_VIEWPORT.zoom
+  )
 }
 
 export interface MindLaneFile {
@@ -41,7 +43,6 @@ interface XY {
   x: number
   y: number
 }
-
 
 export interface DocumentRef {
   id: string

@@ -1,9 +1,20 @@
 import { create } from 'zustand'
 import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange, Viewport } from '@xyflow/react'
-import { createEmptyFile, DEFAULT_VIEWPORT, type MindLaneFile, type DocumentRef, isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
+import {
+  createEmptyFile,
+  DEFAULT_VIEWPORT,
+  type MindLaneFile,
+  type DocumentRef,
+  isTextNodeData,
+  isPalaceNodeData,
+} from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
-import { parseYamlToMindmap, parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
+import {
+  parseYamlToMindmap,
+  parseYamlFragment,
+  VIRTUAL_ROOT_SYMBOL,
+} from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { findRootNode, deserializeNode, CHILD_OFFSET_X } from '@/shared/lib/mindmapTree'
 
@@ -31,7 +42,10 @@ interface MindmapState {
   setViewport: (viewport: Viewport) => void
 
   loadFile: (filePath: string, data: MindLaneFile) => void
-  loadFromYaml: (yamlString: string, options?: { fileTitle?: string; filePath?: string | null }) => void
+  loadFromYaml: (
+    yamlString: string,
+    options?: { fileTitle?: string; filePath?: string | null },
+  ) => void
   newFile: (title?: string) => void
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
@@ -40,7 +54,7 @@ interface MindmapState {
 
   insertNodesFromYaml: (
     yamlFragment: string,
-    options?: { parentId?: string; fileTitle?: string }
+    options?: { parentId?: string; fileTitle?: string },
   ) => void
 }
 
@@ -191,10 +205,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
 
   addDocumentRef: (ref) => {
     set((s) => ({
-      documentRefs: [
-        ...s.documentRefs.filter((doc) => doc.id !== ref.id),
-        ref,
-      ],
+      documentRefs: [...s.documentRefs.filter((doc) => doc.id !== ref.id), ref],
       dirty: true,
     }))
   },
@@ -237,7 +248,10 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       return [line, ...childLines].join('\n')
     }
 
-    const treeText = roots.map((r) => renderTree(r.id, 0)).filter(Boolean).join('\n')
+    const treeText = roots
+      .map((r) => renderTree(r.id, 0))
+      .filter(Boolean)
+      .join('\n')
     return `标题: ${fileTitle}\n节点数: ${nodes.length}\n\n${treeText}`
   },
 
@@ -246,10 +260,11 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
 
     const parsed = parseYamlFragment(yamlFragment)
 
-    const targetParentId = options.parentId
-      ?? existingNodes.find((n) => n.selected)?.id
-      ?? findRootNode(existingNodes, existingEdges)?.id
-      ?? existingNodes[0]?.id
+    const targetParentId =
+      options.parentId ??
+      existingNodes.find((n) => n.selected)?.id ??
+      findRootNode(existingNodes, existingEdges)?.id ??
+      existingNodes[0]?.id
 
     if (!targetParentId) {
       console.warn('[insertNodesFromYaml] 无法确定父节点')

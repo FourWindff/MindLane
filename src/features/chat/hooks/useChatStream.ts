@@ -24,22 +24,31 @@ export function useChatStream() {
   }, [])
 
   const applyMindmapData = useCallback(
-    (data: { nodes: MindLaneNode[]; edges: { id: string; source: string; target: string; type?: string }[] }) => {
+    (data: {
+      nodes: MindLaneNode[]
+      edges: { id: string; source: string; target: string; type?: string }[]
+    }) => {
       const mindmapStore = useMindmapStore.getState()
       const existingNodes = mindmapStore.nodes
       const existingEdges = mindmapStore.edges
 
       const newTargets = new Set(data.edges.map((e) => e.target))
-      const maxX = existingNodes.reduce((m, n) => Math.max(m, n.position.x + (n.measured?.width ?? 200)), 0)
+      const maxX = existingNodes.reduce(
+        (m, n) => Math.max(m, n.position.x + (n.measured?.width ?? 200)),
+        0,
+      )
       const offsetX = existingNodes.length > 0 ? maxX + 300 : 0
 
       const rawNodes: Node[] = data.nodes.map((n) => {
         const descriptor = nodeRegistry.get(n.type)
-        const deserializedData = descriptor
-          ? descriptor.deserialize(n.data)
-          : n.data
+        const deserializedData = descriptor ? descriptor.deserialize(n.data) : n.data
         const isRoot = !newTargets.has(n.id)
-        return { id: n.id, type: n.type, position: { x: offsetX, y: isRoot ? 0 : 50 }, data: deserializedData }
+        return {
+          id: n.id,
+          type: n.type,
+          position: { x: offsetX, y: isRoot ? 0 : 50 },
+          data: deserializedData,
+        }
       })
 
       const newEdges: Edge[] = data.edges.map((e) => ({
@@ -56,19 +65,25 @@ export function useChatStream() {
     [],
   )
 
-  const extractGeneratedDocumentRef = useCallback((toolCalls: Array<{ name: string; result: string }> | undefined): DocumentRef | null => {
-    if (!toolCalls) return null
-    for (const toolCall of toolCalls) {
-      if (toolCall.name !== 'generateMindmapFragment') continue
-      try {
-        const result = JSON.parse(toolCall.result) as { ok?: boolean; documentRef?: DocumentRef | null }
-        if (result.ok && result.documentRef) return result.documentRef
-      } catch {
-        return null
+  const extractGeneratedDocumentRef = useCallback(
+    (toolCalls: Array<{ name: string; result: string }> | undefined): DocumentRef | null => {
+      if (!toolCalls) return null
+      for (const toolCall of toolCalls) {
+        if (toolCall.name !== 'generateMindmapFragment') continue
+        try {
+          const result = JSON.parse(toolCall.result) as {
+            ok?: boolean
+            documentRef?: DocumentRef | null
+          }
+          if (result.ok && result.documentRef) return result.documentRef
+        } catch {
+          return null
+        }
       }
-    }
-    return null
-  }, [])
+      return null
+    },
+    [],
+  )
 
   useEffect(() => {
     const api = window.mindlane?.ai
@@ -113,13 +128,16 @@ export function useChatStream() {
 
     unsubs.push(
       api.onStreamEnd((response) => {
-        const messages = response.messages && response.messages.length > 0
-          ? response.messages
-          : [{
-              role: 'assistant' as const,
-              content: response.content || stripMarkers(streamTextRef.current),
-              toolCalls: response.toolCalls,
-            }]
+        const messages =
+          response.messages && response.messages.length > 0
+            ? response.messages
+            : [
+                {
+                  role: 'assistant' as const,
+                  content: response.content || stripMarkers(streamTextRef.current),
+                  toolCalls: response.toolCalls,
+                },
+              ]
 
         const finalizedSegmentCount = finalizedSegmentCountRef.current
         useAiStore.setState((state) => ({
@@ -139,7 +157,8 @@ export function useChatStream() {
           let appliedMindmapChange = false
           for (const toolCall of response.toolCalls) {
             if (MINDMAP_ACTION_TOOLS.includes(toolCall.name)) {
-              appliedMindmapChange = handleMindmapToolCall(toolCall, mindmapStore) || appliedMindmapChange
+              appliedMindmapChange =
+                handleMindmapToolCall(toolCall, mindmapStore) || appliedMindmapChange
             }
           }
           if (generatedDocumentRef && appliedMindmapChange) {

@@ -174,9 +174,7 @@ describe('MindLaneAgent.invoke()', () => {
   })
 
   it('direct response ends without subgraph routing', async () => {
-    const mockInvoke = vi.fn().mockResolvedValue(
-      new AIMessage({ content: '这是一个回答' }),
-    )
+    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: '这是一个回答' }))
     const agent = new MindLaneAgent(createMockProvider(mockInvoke), [mockSearchTool])
 
     const result = await agent.invoke(createInitialState())
@@ -186,11 +184,10 @@ describe('MindLaneAgent.invoke()', () => {
   })
 
   it('does not expose generatePalace when palace is disabled', () => {
-    const agent = new MindLaneAgent(
-      createMockProvider(vi.fn()),
-      [mockSearchTool],
-      { hasEmbeddings: true, hasPalace: false },
-    )
+    const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool], {
+      hasEmbeddings: true,
+      hasPalace: false,
+    })
 
     const tools = (agent as unknown as { tools: Array<{ name: string }> }).tools
 
@@ -301,11 +298,10 @@ describe('MindLaneAgent.route()', () => {
   })
 
   it('disabled palace falls back to end', () => {
-    const agent = new MindLaneAgent(
-      createMockProvider(vi.fn()),
-      [mockSearchTool],
-      { hasEmbeddings: true, hasPalace: false },
-    )
+    const agent = new MindLaneAgent(createMockProvider(vi.fn()), [mockSearchTool], {
+      hasEmbeddings: true,
+      hasPalace: false,
+    })
     const state = {
       ...createInitialState(),
       pendingSubgraph: 'palace' as const,
@@ -318,11 +314,10 @@ describe('MindLaneAgent.route()', () => {
 describe('MindLaneAgent reactive compact', () => {
   it('triggers reactive compact on prompt-too-long error', async () => {
     const error = new Error('prompt_too_long')
-    const mockInvoke = vi.fn()
+    const mockInvoke = vi
+      .fn()
       .mockRejectedValueOnce(error)
-      .mockResolvedValueOnce(
-        new AIMessage({ content: 'Compacted response' }),
-      )
+      .mockResolvedValueOnce(new AIMessage({ content: 'Compacted response' }))
 
     const provider = createMockProvider(mockInvoke)
     const agent = new MindLaneAgent(provider, [mockSearchTool])
@@ -348,11 +343,10 @@ describe('MindLaneAgent reactive compact', () => {
 
   it('returns RemoveMessage + compacted + response after reactive compact', async () => {
     const error = new Error('prompt_too_long')
-    const mockInvoke = vi.fn()
+    const mockInvoke = vi
+      .fn()
       .mockRejectedValueOnce(error)
-      .mockResolvedValueOnce(
-        new AIMessage({ content: 'Retry success' }),
-      )
+      .mockResolvedValueOnce(new AIMessage({ content: 'Retry success' }))
 
     const provider = createMockProvider(mockInvoke)
     const agent = new MindLaneAgent(provider, [mockSearchTool])

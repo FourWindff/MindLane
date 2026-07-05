@@ -8,10 +8,7 @@ import { dropOrphanToolResults, backfillMissingToolResults } from './pipelinePai
  * 优先保留 system 消息、最后一条 user 消息和最近对话。
  * 截断后重新校验并修复 tool_use / tool_result 配对。
  */
-export function snipHistory(
-  messages: BaseMessage[],
-  config: MessagePipelineConfig,
-): BaseMessage[] {
+export function snipHistory(messages: BaseMessage[], config: MessagePipelineConfig): BaseMessage[] {
   if (config.maxContextTokens <= 0) return messages
 
   const systemMsgs = messages.filter((m) => m.type === 'system')

@@ -20,14 +20,8 @@ export default defineConfig({
             rollupOptions: {
               external: (id) => {
                 if (id.startsWith('node:') || id === 'electron') return true
-                const nativeOrProblematic = [
-                  'better-sqlite3',
-                  'pdf-parse',
-                  '@anthropic-ai/sdk',
-                ]
-                return nativeOrProblematic.some(
-                  (pkg) => id === pkg || id.startsWith(pkg + '/'),
-                )
+                const nativeOrProblematic = ['better-sqlite3', 'pdf-parse', '@anthropic-ai/sdk']
+                return nativeOrProblematic.some((pkg) => id === pkg || id.startsWith(pkg + '/'))
               },
             },
           },
@@ -41,10 +35,11 @@ export default defineConfig({
       // Polyfill the Electron and Node.js API for the renderer process.
       // If you want use Node.js in Renderer process, the `nodeIntegration` needs to be enabled in the Main process.
       // See 👉 https://github.com/electron-vite/vite-plugin-electron-renderer
-      renderer: process.env.NODE_ENV === 'test'
-        // https://github.com/electron-vite/vite-plugin-electron-renderer/issues/78#issuecomment-2053600808
-        ? undefined
-        : {},
+      renderer:
+        process.env.NODE_ENV === 'test'
+          ? // https://github.com/electron-vite/vite-plugin-electron-renderer/issues/78#issuecomment-2053600808
+            undefined
+          : {},
     }),
   ],
 })

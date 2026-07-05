@@ -150,10 +150,7 @@ export class SessionManager {
   /**
    * 加载所有会话列表（支持分页）
    */
-  async listSessions(
-    limit?: number,
-    offset?: number,
-  ): Promise<SessionMeta[]> {
+  async listSessions(limit?: number, offset?: number): Promise<SessionMeta[]> {
     if (!this.store) throw new Error('SessionManager not initialized')
 
     const sessions = await this.store.listSessions(this._workspaceHash)
@@ -167,10 +164,7 @@ export class SessionManager {
    *
    * 仅追加本地尚未持久化的新消息，避免重复写入。
    */
-  async saveSession(
-    sessionId: string,
-    messages: ChatMessage[],
-  ): Promise<void> {
+  async saveSession(sessionId: string, messages: ChatMessage[]): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
 
     const storedMessages = await this.store.loadMessages(sessionId)

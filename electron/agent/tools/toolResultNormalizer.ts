@@ -2,15 +2,9 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { AGENT_LIMITS } from '../config.js'
 import { messageContentToString, sanitizeFileName } from '../utils.js'
-import {
-  GENERATE_MINDMAP_FRAGMENT_TOOL,
-  GENERATE_PALACE_TOOL,
-} from './subgraphRoutingTools.js'
+import { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL } from './subgraphRoutingTools.js'
 
-const EXEMPT_TOOLS = new Set([
-  GENERATE_MINDMAP_FRAGMENT_TOOL,
-  GENERATE_PALACE_TOOL,
-])
+const EXEMPT_TOOLS = new Set([GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL])
 
 const DEFAULT_OFFLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -120,10 +114,7 @@ async function offload(
   }
 }
 
-function buildOffloadSummary(
-  content: string,
-  offloadPath?: string,
-): string {
+function buildOffloadSummary(content: string, offloadPath?: string): string {
   const summaryLength = AGENT_LIMITS.toolResultSummaryChars
   const summary = content.slice(0, summaryLength)
   const totalLength = content.length

@@ -41,7 +41,10 @@
   background: transparent;
   padding: 0.55rem 0.7rem;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
   outline: none;
 }
 
@@ -255,7 +258,11 @@
   color: var(--ml-text-muted);
   font: inherit;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease,
+    border-color 0.15s ease;
   outline: none;
 }
 
@@ -296,7 +303,10 @@
   color: var(--ml-text);
   background: var(--ml-bg-elevated);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    border-color 0.15s ease;
   outline: none;
 }
 
@@ -341,7 +351,9 @@
   color: var(--ml-text);
   background: #ffffff;
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .panel-field__input:focus,

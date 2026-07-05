@@ -33,12 +33,11 @@ export const MINDMAP_ACTION_TOOLS = [
 
 export function handleMindmapToolCall(
   toolCall: ToolCallResult,
-  mindmapStore: ReturnType<typeof useMindmapStore.getState>
+  mindmapStore: ReturnType<typeof useMindmapStore.getState>,
 ): boolean {
   try {
     const result = JSON.parse(toolCall.result) as
-      | { ok: true; action: string; data: unknown }
-      | { ok: false; error: string }
+      { ok: true; action: string; data: unknown } | { ok: false; error: string }
 
     if (!result.ok) {
       console.warn(`[AI Tool] ${toolCall.name} failed:`, result.error)
@@ -82,9 +81,7 @@ export function handleMindmapToolCall(
         }
 
         const descriptor = nodeRegistry.get(type)
-        const deserializedData = descriptor
-          ? descriptor.deserialize(nodeData)
-          : nodeData
+        const deserializedData = descriptor ? descriptor.deserialize(nodeData) : nodeData
 
         const newNode: Node = {
           id: newNodeId,
@@ -118,11 +115,9 @@ export function handleMindmapToolCall(
             const descriptor = nodeRegistry.get(nodeType)
             return {
               ...n,
-              data: descriptor
-                ? descriptor.deserialize(mergedData)
-                : mergedData,
+              data: descriptor ? descriptor.deserialize(mergedData) : mergedData,
             }
-          })
+          }),
         )
         return true
       }
@@ -149,10 +144,8 @@ export function handleMindmapToolCall(
 
         mindmapStore.setNodes(
           nodes.map((n) =>
-            idsToDelete.has(n.id)
-              ? { ...n, data: { ...n.data, exiting: true } }
-              : n
-          )
+            idsToDelete.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n,
+          ),
         )
 
         setTimeout(() => {
@@ -160,7 +153,7 @@ export function handleMindmapToolCall(
           const currentEdges = useMindmapStore.getState().edges
           const nextNodes = currentNodes.filter((n) => !idsToDelete.has(n.id))
           const nextEdges = currentEdges.filter(
-            (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target)
+            (e) => !idsToDelete.has(e.source) && !idsToDelete.has(e.target),
           )
           const laidOut = reflowChildren('root', nextNodes, nextEdges, CHILD_OFFSET_X, CHILD_GAP_Y)
 
@@ -172,7 +165,10 @@ export function handleMindmapToolCall(
       }
 
       case 'batchAddNodes': {
-        const { yamlFragment, parentId } = result.data as { yamlFragment: string; parentId?: string }
+        const { yamlFragment, parentId } = result.data as {
+          yamlFragment: string
+          parentId?: string
+        }
 
         if (!yamlFragment) {
           console.warn('[AI Tool] batchAddNodes: yamlFragment is empty')

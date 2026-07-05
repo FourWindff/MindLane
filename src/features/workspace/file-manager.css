@@ -17,8 +17,12 @@
 }
 
 @keyframes fm-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* --- Panel --- */
@@ -475,7 +479,9 @@
   border-radius: 0 3px 3px 0;
   background: var(--ml-text-muted);
   opacity: 0.2;
-  transition: opacity 140ms ease, background-color 140ms ease;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
 }
 
 .file-manager__card--folder:hover::before {
@@ -566,7 +572,9 @@
   color: var(--ml-text-muted);
   opacity: 0;
   transform: translateY(3px);
-  transition: opacity 120ms ease, transform 120ms ease;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-hint {
@@ -584,7 +592,9 @@
   border-radius: 3px 3px 0 0;
   background: linear-gradient(90deg, rgba(28, 25, 23, 0.12), rgba(28, 25, 23, 0.06));
   opacity: 0.6;
-  transition: opacity 140ms ease, background 140ms ease;
+  transition:
+    opacity 140ms ease,
+    background 140ms ease;
 }
 
 .file-manager__card:hover .file-manager__card-accent {
@@ -648,7 +658,9 @@
   justify-content: center;
   background: var(--ml-fill-soft);
   color: var(--ml-text-muted);
-  transition: background-color 140ms ease, color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
 }
 
 .file-manager__new-card:hover .file-manager__new-card-icon {

@@ -85,31 +85,27 @@ function AppContent() {
     void initializeWorkspaceSession()
   }, [loaded, workspaceInitialized, workspaceInitializing])
 
-  useShortcut(
-    {
-      id: 'app.openSettings',
-      combo: 'mod+comma',
-      description: '打开设置',
-      group: 'app',
-      preventWhenTyping: false,
-      handler: () => {
-        setSettingsOpen(true)
-      },
+  useShortcut({
+    id: 'app.openSettings',
+    combo: 'mod+comma',
+    description: '打开设置',
+    group: 'app',
+    preventWhenTyping: false,
+    handler: () => {
+      setSettingsOpen(true)
     },
-  )
+  })
 
-  useShortcut(
-    {
-      id: 'app.openFileManager',
-      combo: 'mod+shift+f',
-      description: '打开文件管理器',
-      group: 'app',
-      preventWhenTyping: false,
-      handler: () => {
-        setFileManagerOpen((open) => !open)
-      },
+  useShortcut({
+    id: 'app.openFileManager',
+    combo: 'mod+shift+f',
+    description: '打开文件管理器',
+    group: 'app',
+    preventWhenTyping: false,
+    handler: () => {
+      setFileManagerOpen((open) => !open)
     },
-  )
+  })
 
   return (
     <div className="app-frame">
@@ -142,10 +138,7 @@ function AppContent() {
             </main>
             {hasDocumentOpen && <ChatPanel />}
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-            <FileManager
-              isOpen={fileManagerOpen}
-              onClose={() => setFileManagerOpen(false)}
-            />
+            <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
           </div>
         )}
       </div>

@@ -8,9 +8,7 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs/promises'
 
-function createState(
-  partial: Partial<PalaceSubgraphStateType> = {},
-): PalaceSubgraphStateType {
+function createState(partial: Partial<PalaceSubgraphStateType> = {}): PalaceSubgraphStateType {
   return {
     messages: [],
     context: null,

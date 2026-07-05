@@ -1,16 +1,10 @@
 import fs from 'node:fs'
-import {
-  HumanMessage,
-  SystemMessage,
-  type BaseMessage,
-} from '@langchain/core/messages'
+import { HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { AGENT_LIMITS } from '../config.js'
 import { atomicWrite } from '../../fs/atomicWrite.js'
 import { logger } from '../../shared/logger.js'
-import {
-  estimateMessageTokens,
-} from '../lib/tokenCounter.js'
+import { estimateMessageTokens } from '../lib/tokenCounter.js'
 import type { LLMProvider } from '../providers/index.js'
 import { estimateToolsSchemaTokens } from '../memory/contextCompact.js'
 import { extractTextContent, messageContentToString } from '../utils.js'
@@ -19,10 +13,7 @@ import { SessionManager } from './sessionManager.js'
 interface ConsolidatorDependencies {
   sessionManager: SessionManager
   provider: LLMProvider
-  buildMessages: (
-    messages: BaseMessage[],
-    lastSummary?: string,
-  ) => Promise<BaseMessage[]>
+  buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   getToolDefinitions: () => StructuredToolInterface[]
 }
 
@@ -63,30 +54,20 @@ export class Consolidator {
   private readonly limits: ConsolidationLimits
   private static readonly locks = new Map<string, Promise<unknown>>()
 
-  constructor(
-    deps: ConsolidatorDependencies,
-    limits?: Partial<ConsolidationLimits>,
-  ) {
+  constructor(deps: ConsolidatorDependencies, limits?: Partial<ConsolidationLimits>) {
     this.sessionManager = deps.sessionManager
     this.provider = deps.provider
     this.buildMessages = deps.buildMessages
     this.getToolDefinitions = deps.getToolDefinitions
     this.limits = {
-      contextWindowTokens:
-        limits?.contextWindowTokens ?? AGENT_LIMITS.contextWindowTokens,
-      maxCompletionTokens:
-        limits?.maxCompletionTokens ?? AGENT_LIMITS.maxCompletionTokens,
-      safetyBuffer:
-        limits?.safetyBuffer ?? AGENT_LIMITS.consolidationSafetyBuffer,
-      consolidationRatio:
-        limits?.consolidationRatio ?? AGENT_LIMITS.consolidationRatio,
-      maxContextMessages:
-        limits?.maxContextMessages ?? AGENT_LIMITS.maxContextMessages,
+      contextWindowTokens: limits?.contextWindowTokens ?? AGENT_LIMITS.contextWindowTokens,
+      maxCompletionTokens: limits?.maxCompletionTokens ?? AGENT_LIMITS.maxCompletionTokens,
+      safetyBuffer: limits?.safetyBuffer ?? AGENT_LIMITS.consolidationSafetyBuffer,
+      consolidationRatio: limits?.consolidationRatio ?? AGENT_LIMITS.consolidationRatio,
+      maxContextMessages: limits?.maxContextMessages ?? AGENT_LIMITS.maxContextMessages,
       maxMessagesBeforeTokenCheck:
-        limits?.maxMessagesBeforeTokenCheck ??
-        AGENT_LIMITS.maxMessagesBeforeTokenCheck,
-      maxConsolidationRounds:
-        limits?.maxConsolidationRounds ?? AGENT_LIMITS.maxConsolidationRounds,
+        limits?.maxMessagesBeforeTokenCheck ?? AGENT_LIMITS.maxMessagesBeforeTokenCheck,
+      maxConsolidationRounds: limits?.maxConsolidationRounds ?? AGENT_LIMITS.maxConsolidationRounds,
     }
   }
 
@@ -97,10 +78,7 @@ export class Consolidator {
     return (Consolidator.locks.get(sessionId) as Promise<void> | undefined) ?? Promise.resolve()
   }
 
-  private async withSessionLock<T>(
-    sessionId: string,
-    fn: () => Promise<T>,
-  ): Promise<T> {
+  private async withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const previous = Consolidator.locks.get(sessionId) ?? Promise.resolve()
     const current = previous.catch(() => {}).then(() => fn())
     Consolidator.locks.set(sessionId, current)
@@ -139,9 +117,7 @@ export class Consolidator {
       }
 
       const inputBudget =
-        limits.contextWindowTokens -
-        limits.maxCompletionTokens -
-        limits.safetyBuffer
+        limits.contextWindowTokens - limits.maxCompletionTokens - limits.safetyBuffer
       const target = Math.floor(inputBudget * limits.consolidationRatio)
 
       let currentLast = lastConsolidated
@@ -152,17 +128,11 @@ export class Consolidator {
         const remaining = allMessages.slice(currentLast)
         if (remaining.length === 0) break
 
-        const estimated = await this.estimateSessionPromptTokens(
-          remaining,
-          currentSummary,
-        )
+        const estimated = await this.estimateSessionPromptTokens(remaining, currentSummary)
         if (estimated <= inputBudget) break
 
         const tokensToRemove = Math.max(0, estimated - target)
-        const boundaryIdx = this.pickConsolidationBoundary(
-          remaining,
-          tokensToRemove,
-        )
+        const boundaryIdx = this.pickConsolidationBoundary(remaining, tokensToRemove)
         if (boundaryIdx < 0 || boundaryIdx >= remaining.length - 1) break
 
         const messagesToArchive = remaining.slice(0, boundaryIdx + 1)
@@ -208,13 +178,10 @@ export class Consolidator {
     const allMessages = await this.sessionManager.loadMessages(sessionId)
     const lastConsolidated = meta?.lastConsolidated ?? 0
 
-    const maxMessages =
-      options?.maxMessages ?? this.limits.maxContextMessages
+    const maxMessages = options?.maxMessages ?? this.limits.maxContextMessages
     const budget =
       options?.budget ??
-      this.limits.contextWindowTokens -
-        this.limits.maxCompletionTokens -
-        this.limits.safetyBuffer
+      this.limits.contextWindowTokens - this.limits.maxCompletionTokens - this.limits.safetyBuffer
 
     const candidate = allMessages.slice(lastConsolidated)
 
@@ -224,13 +191,10 @@ export class Consolidator {
 
     // 始终保留当前用户消息（最后一条 human）。
     const currentUserMsg =
-      nonSystem.length > 0 &&
-      nonSystem[nonSystem.length - 1].getType() === 'human'
+      nonSystem.length > 0 && nonSystem[nonSystem.length - 1].getType() === 'human'
         ? nonSystem[nonSystem.length - 1]
         : null
-    let history = currentUserMsg
-      ? nonSystem.slice(0, nonSystem.length - 1)
-      : nonSystem
+    let history = currentUserMsg ? nonSystem.slice(0, nonSystem.length - 1) : nonSystem
 
     // 条数限制：保留最近的 maxMessages 条非系统消息（含当前用户消息）。
     const historyLimit = maxMessages - (currentUserMsg ? 1 : 0)
@@ -252,20 +216,14 @@ export class Consolidator {
 
     // 兜底：若历史已清空但系统消息+当前用户仍超预算，裁剪最旧的系统消息。
     while (
-      estimateMessageTokens([
-        ...systemMessages,
-        ...(currentUserMsg ? [currentUserMsg] : []),
-      ]) > budget &&
+      estimateMessageTokens([...systemMessages, ...(currentUserMsg ? [currentUserMsg] : [])]) >
+        budget &&
       systemMessages.length > 1
     ) {
       systemMessages.shift()
     }
 
-    return [
-      ...systemMessages,
-      ...history,
-      ...(currentUserMsg ? [currentUserMsg] : []),
-    ]
+    return [...systemMessages, ...history, ...(currentUserMsg ? [currentUserMsg] : [])]
   }
 
   /**
@@ -273,10 +231,7 @@ export class Consolidator {
    *
    * @returns 归档 chunk 的结束索引（包含），-1 表示无合适边界。
    */
-  pickConsolidationBoundary(
-    messages: BaseMessage[],
-    tokensToRemove: number,
-  ): number {
+  pickConsolidationBoundary(messages: BaseMessage[], tokensToRemove: number): number {
     let accumulated = 0
     let lastUserIdx = -1
 
@@ -307,10 +262,7 @@ export class Consolidator {
     return messageTokens + toolTokens
   }
 
-  private async archive(
-    messages: BaseMessage[],
-    sessionId: string,
-  ): Promise<string> {
+  private async archive(messages: BaseMessage[], sessionId: string): Promise<string> {
     const summaryPrompt = new SystemMessage(
       '请用中文简要总结以下对话的关键信息。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续执行的任务，4）重要文件、节点或工具结果的高层结论。保持简短具体。',
     )
@@ -329,15 +281,9 @@ export class Consolidator {
     return summary
   }
 
-  private async rawArchive(
-    messages: BaseMessage[],
-    sessionId: string,
-  ): Promise<void> {
+  private async rawArchive(messages: BaseMessage[], sessionId: string): Promise<void> {
     const rawText = messages
-      .map(
-        (m) =>
-          `[${m.getType()}]: ${messageContentToString(m.content)}`,
-      )
+      .map((m) => `[${m.getType()}]: ${messageContentToString(m.content)}`)
       .join('\n')
 
     await this.appendHistoryRecord(sessionId, {
@@ -346,25 +292,18 @@ export class Consolidator {
     })
   }
 
-  private async appendHistoryRecord(
-    sessionId: string,
-    record: HistoryRecord,
-  ): Promise<void> {
+  private async appendHistoryRecord(sessionId: string, record: HistoryRecord): Promise<void> {
     const records = this.readHistoryRecords(sessionId)
     records.push(record)
 
-    const createdAt =
-      records[0]?.timestamp ?? new Date().toISOString()
+    const createdAt = records[0]?.timestamp ?? new Date().toISOString()
     const meta = {
       sessionId,
       createdAt,
       updatedAt: new Date().toISOString(),
     }
 
-    const lines = [
-      JSON.stringify(meta),
-      ...records.map((r) => JSON.stringify(r)),
-    ]
+    const lines = [JSON.stringify(meta), ...records.map((r) => JSON.stringify(r))]
 
     const historyPath = this.sessionManager.resolveHistoryPath(sessionId)
     await atomicWrite(historyPath, lines.join('\n') + '\n')

@@ -23,7 +23,8 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
   const pendingToolCalls: NonNullable<ChatMessage['toolCalls']> = []
 
   function readTimestamp(msg: BaseMessage): string | undefined {
-    const metadata = (msg as unknown as { response_metadata?: Record<string, unknown> }).response_metadata
+    const metadata = (msg as unknown as { response_metadata?: Record<string, unknown> })
+      .response_metadata
     return metadata?.timestamp ? String(metadata.timestamp) : undefined
   }
 

@@ -52,7 +52,7 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
-    expect(g.sourceX).toBe(0)    // 根节点左缘
+    expect(g.sourceX).toBe(0) // 根节点左缘
     expect(g.targetX).toBe(-140) // 子节点右缘 (-300 + 160)
   })
 

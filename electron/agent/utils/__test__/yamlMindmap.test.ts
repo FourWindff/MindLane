@@ -44,27 +44,18 @@ describe('extractYaml', () => {
       children: [
         {
           label: '目标管理',
-          children: [
-            { label: '明确验收标准' },
-            { label: '拆分阶段里程碑' },
-          ],
+          children: [{ label: '明确验收标准' }, { label: '拆分阶段里程碑' }],
         },
         {
           label: '风险控制',
-          children: [
-            { label: '识别外部依赖' },
-            { label: '预留回滚方案' },
-          ],
+          children: [{ label: '识别外部依赖' }, { label: '预留回滚方案' }],
         },
         {
           label: 'Main Topic',
           children: [
             {
               label: 'Subtopic A',
-              children: [
-                { label: 'Item 1' },
-                { label: 'Item 2' },
-              ],
+              children: [{ label: 'Item 1' }, { label: 'Item 2' }],
             },
           ],
         },
@@ -84,7 +75,7 @@ describe('extractYaml', () => {
 
 describe('sanitizeTreeCandidate', () => {
   it('converts outline format to structured tree', () => {
-    const outline = { '人工智能': ['机器学习', '深度学习'] }
+    const outline = { 人工智能: ['机器学习', '深度学习'] }
     const tree = sanitizeTreeCandidate(outline)
     expect(tree).toEqual({
       label: '人工智能',
@@ -107,9 +98,7 @@ describe('sanitizeTreeCandidate', () => {
 
   it('handles nested outline format', () => {
     const outline = {
-      '人工智能': [
-        { '机器学习': ['监督学习', '无监督学习'] },
-      ],
+      人工智能: [{ 机器学习: ['监督学习', '无监督学习'] }],
     }
     const tree = sanitizeTreeCandidate(outline)
     expect(tree).toEqual({
@@ -134,9 +123,7 @@ describe('normalizeTree', () => {
     const tree = {
       label: '  AI  ',
       page_range: 'p5',
-      children: [
-        { label: '  ML  ', page_range: 'p1-3', children: [] },
-      ],
+      children: [{ label: '  ML  ', page_range: 'p1-3', children: [] }],
     }
     const normalized = normalizeTree(tree, '1-1')
     expect(normalized.label).toBe('AI')

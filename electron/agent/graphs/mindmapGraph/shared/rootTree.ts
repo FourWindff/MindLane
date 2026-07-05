@@ -1,6 +1,9 @@
 import { normalizeTree, type MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 
-export function extractRootTree(treeCandidate: unknown, fallbackTitle: string): MindmapYamlNode | null {
+export function extractRootTree(
+  treeCandidate: unknown,
+  fallbackTitle: string,
+): MindmapYamlNode | null {
   if (!treeCandidate || typeof treeCandidate !== 'object') {
     return null
   }
@@ -13,8 +16,12 @@ export function extractRootTree(treeCandidate: unknown, fallbackTitle: string): 
 
   if (Array.isArray(treeCandidate)) {
     const children = treeCandidate
-      .filter((item): item is MindmapYamlNode =>
-        item !== null && typeof item === 'object' && 'label' in item && typeof (item as Record<string, unknown>).label === 'string',
+      .filter(
+        (item): item is MindmapYamlNode =>
+          item !== null &&
+          typeof item === 'object' &&
+          'label' in item &&
+          typeof (item as Record<string, unknown>).label === 'string',
       )
       .map((item) => normalizeTree(item, ''))
 

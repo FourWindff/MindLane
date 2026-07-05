@@ -64,7 +64,10 @@
   background: rgba(255, 255, 255, 0.7);
   color: var(--ml-text-muted);
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
 }
 
 .window-bar__control svg {

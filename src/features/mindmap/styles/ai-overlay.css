@@ -9,8 +9,14 @@
 }
 
 @keyframes ai-overlay-enter {
-  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .ai-progress-overlay__card {
@@ -34,7 +40,9 @@
 }
 
 @keyframes ai-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .ai-progress-overlay__text {
@@ -76,10 +84,13 @@
   inset: -2px;
   border-radius: 10px;
   background:
-    /* top → right */    linear-gradient(90deg, var(--ml-accent) 50%, transparent 50%) 0 0       / 12px 2px,
-    /* bottom → left */  linear-gradient(90deg, var(--ml-accent) 50%, transparent 50%) 0 100%    / 12px 2px,
-    /* left → up */      linear-gradient(0deg,  var(--ml-accent) 50%, transparent 50%) 0 0       / 2px 12px,
-    /* right → down */   linear-gradient(0deg,  var(--ml-accent) 50%, transparent 50%) 100% 0    / 2px 12px;
+    /* top → right */
+    linear-gradient(90deg, var(--ml-accent) 50%, transparent 50%) 0 0 / 12px 2px,
+    /* bottom → left */ linear-gradient(90deg, var(--ml-accent) 50%, transparent 50%) 0 100% / 12px
+      2px,
+    /* left → up */ linear-gradient(0deg, var(--ml-accent) 50%, transparent 50%) 0 0 / 2px 12px,
+    /* right → down */ linear-gradient(0deg, var(--ml-accent) 50%, transparent 50%) 100% 0 / 2px
+      12px;
   background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
   animation: marching-ants 1.6s linear infinite;
   pointer-events: none;

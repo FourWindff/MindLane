@@ -5,7 +5,11 @@ import os from 'node:os'
 import { WorkspaceTree } from '../workspaceTree.js'
 
 vi.mock('electron', () => ({
-  shell: { trashItem: vi.fn((targetPath: string) => fs.promises.rm(targetPath, { recursive: true, force: true })) },
+  shell: {
+    trashItem: vi.fn((targetPath: string) =>
+      fs.promises.rm(targetPath, { recursive: true, force: true }),
+    ),
+  },
 }))
 
 describe('WorkspaceTree', () => {

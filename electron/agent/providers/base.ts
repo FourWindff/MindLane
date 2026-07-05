@@ -49,7 +49,6 @@ export abstract class LLMProvider {
     void _input
     throw new UnsupportedCapabilityError('imageGen')
   }
-
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -72,7 +71,9 @@ function guessMime(url: string, contentType: string | null): string {
     for (const [ext, mime] of Object.entries(MIME_BY_EXT)) {
       if (pathname.endsWith(ext)) return mime
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return 'image/png'
 }
 

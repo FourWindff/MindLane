@@ -9,11 +9,7 @@
  * 注意：被包裹的 operation 必须能感知 signal，否则只是调用方提前 reject。
  */
 
-import {
-  createTimeoutSignal,
-  TimeoutError,
-  raceWithAbort,
-} from './abort.js'
+import { createTimeoutSignal, TimeoutError, raceWithAbort } from './abort.js'
 
 type WithTimeoutOptions = {
   /** 外部 AbortSignal，可与超时联动 */

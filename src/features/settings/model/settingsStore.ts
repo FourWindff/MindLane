@@ -113,7 +113,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set((state) => ({
       providerConfigs: {
         ...state.providerConfigs,
-        [providerId]: { ...state.providerConfigs[providerId], apiKey: state.providerConfigs[providerId]?.apiKey ?? '', baseUrl },
+        [providerId]: {
+          ...state.providerConfigs[providerId],
+          apiKey: state.providerConfigs[providerId]?.apiKey ?? '',
+          baseUrl,
+        },
       },
     }))
     persistToBackend({ providerConfigs: { [providerId]: { baseUrl } } })
@@ -157,12 +161,19 @@ async function loadProviders(): Promise<void> {
     const result = await window.mindlane?.ai.getProviders?.()
     if (result?.ok && result.providers) {
       useSettingsStore.getState().setProviders(
-        result.providers.map((p: { id: string; displayName: string; capabilities: string[]; models: { id: string; displayName: string }[] }) => ({
-          id: p.id,
-          displayName: p.displayName,
-          models: p.models,
-          capabilities: p.capabilities,
-        })),
+        result.providers.map(
+          (p: {
+            id: string
+            displayName: string
+            capabilities: string[]
+            models: { id: string; displayName: string }[]
+          }) => ({
+            id: p.id,
+            displayName: p.displayName,
+            models: p.models,
+            capabilities: p.capabilities,
+          }),
+        ),
       )
     }
   } catch {

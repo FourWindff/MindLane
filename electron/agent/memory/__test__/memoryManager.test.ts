@@ -25,7 +25,10 @@ describe('MemoryManager', () => {
   it('writeMemory creates file and rebuilds index', async () => {
     await manager.writeMemory('eng-mod', '用户偏好模块化', '倾向组件化')
     expect(await manager.loadIndex()).toContain('eng-mod')
-    const content = await fs.promises.readFile(path.join(tempDir, 'mindlanememory', 'eng-mod.md'), 'utf-8')
+    const content = await fs.promises.readFile(
+      path.join(tempDir, 'mindlanememory', 'eng-mod.md'),
+      'utf-8',
+    )
     expect(content).toContain('tag: eng-mod')
     expect(content).toContain('倾向组件化')
   })
@@ -33,7 +36,10 @@ describe('MemoryManager', () => {
   it('writeMemory appends to existing file', async () => {
     await manager.writeMemory('eng-mod', 'desc', '第一次')
     await manager.writeMemory('eng-mod', 'desc', '第二次')
-    const content = await fs.promises.readFile(path.join(tempDir, 'mindlanememory', 'eng-mod.md'), 'utf-8')
+    const content = await fs.promises.readFile(
+      path.join(tempDir, 'mindlanememory', 'eng-mod.md'),
+      'utf-8',
+    )
     expect(content).toContain('第一次')
     expect(content).toContain('第二次')
   })

@@ -26,10 +26,11 @@ export function extractYaml(text: string): unknown {
   if (expandedResult !== undefined) return expandedResult
 
   const lines = trimmed.split('\n')
-  const yamlStart = lines.findIndex((line) =>
-    /^\s*(label|page_range|summary|children)\s*:/.test(line)
-    || /^\s*-\s+.+/.test(line)
-    || /^\s*[^:\n]+:\s*(?:\[\]|)?\s*$/.test(line),
+  const yamlStart = lines.findIndex(
+    (line) =>
+      /^\s*(label|page_range|summary|children)\s*:/.test(line) ||
+      /^\s*-\s+.+/.test(line) ||
+      /^\s*[^:\n]+:\s*(?:\[\]|)?\s*$/.test(line),
   )
   if (yamlStart >= 0) {
     const candidate = lines.slice(yamlStart).join('\n').trim()
@@ -64,13 +65,8 @@ export function sanitizeForestCandidate(value: unknown): MindmapYamlNode[] | nul
   return null
 }
 
-export function normalizeTree(
-  node: MindmapYamlNode,
-  fallbackRange: string,
-): MindmapYamlNode {
-  const children = (node.children ?? []).map((child) =>
-    normalizeTree(child, fallbackRange),
-  )
+export function normalizeTree(node: MindmapYamlNode, fallbackRange: string): MindmapYamlNode {
+  const children = (node.children ?? []).map((child) => normalizeTree(child, fallbackRange))
   const pageRange = normalizePageRangeValue(node.page_range) ?? fallbackRange
 
   return {
@@ -81,10 +77,7 @@ export function normalizeTree(
   }
 }
 
-export function serializeMindmapOutline(
-  node: MindmapYamlNode,
-  indentLevel = 0,
-): string {
+export function serializeMindmapOutline(node: MindmapYamlNode, indentLevel = 0): string {
   const lines = serializeOutlineNode(node, indentLevel, true)
   return lines.join('\n')
 }
@@ -151,7 +144,8 @@ function parseMarkdownBulletLine(line: string): { level: number; label: string }
 
   const indentLevel = Math.floor(match[1]!.length / 2)
   const bullet = match[2]!
-  const bulletLevel = bullet === '○' || bullet === '◦' ? 2 : bullet === '▪' || bullet === '▫' ? 3 : 1
+  const bulletLevel =
+    bullet === '○' || bullet === '◦' ? 2 : bullet === '▪' || bullet === '▫' ? 3 : 1
   const level = Math.max(1, indentLevel + 1, bulletLevel)
   const label = stripMarkdownDecorators(match[3]!)
 
@@ -185,7 +179,10 @@ function sanitizeStructuredTree(value: unknown): unknown {
     ...record,
     ...(typeof record.label === 'string' ? { label: record.label.trim() } : {}),
     ...(record.page_range !== undefined
-      ? { page_range: normalizePageRangeValue(record.page_range) ?? String(record.page_range).trim() }
+      ? {
+          page_range:
+            normalizePageRangeValue(record.page_range) ?? String(record.page_range).trim(),
+        }
       : {}),
     ...(record.summary !== undefined && record.summary !== null
       ? { summary: String(record.summary).trim() }
@@ -279,10 +276,7 @@ function parseOutlineEntry(value: unknown): MindmapYamlNode | null {
   return parseOutlineObjectEntry(entries[0][0], entries[0][1])
 }
 
-function parseOutlineObjectEntry(
-  rawTitle: string,
-  rawChildren: unknown,
-): MindmapYamlNode | null {
+function parseOutlineObjectEntry(rawTitle: string, rawChildren: unknown): MindmapYamlNode | null {
   if (isScalarOutlineValue(rawChildren)) {
     return titleToTreeNode(formatScalarOutlineTitle(rawTitle, rawChildren), [])
   }
@@ -327,10 +321,7 @@ function formatScalarOutlineTitle(rawTitle: string, value: string | number | boo
   return `${rawTitle}: ${String(value).trim()}`
 }
 
-function titleToTreeNode(
-  rawTitle: string,
-  children: MindmapYamlNode[],
-): MindmapYamlNode {
+function titleToTreeNode(rawTitle: string, children: MindmapYamlNode[]): MindmapYamlNode {
   const { label, pageRange } = parseOutlineTitle(rawTitle)
   return {
     label,
@@ -356,12 +347,7 @@ function parseOutlineTitle(rawTitle: string): { label: string; pageRange: string
 }
 
 function isStructuredTreeRecord(value: Record<string, unknown>): boolean {
-  return (
-    'label' in value
-    || 'page_range' in value
-    || 'summary' in value
-    || 'children' in value
-  )
+  return 'label' in value || 'page_range' in value || 'summary' in value || 'children' in value
 }
 
 function serializeOutlineNode(
@@ -378,26 +364,17 @@ function serializeOutlineNode(
       return [`${indent}${title}: []`]
     }
 
-    return [
-      `${indent}${title}:`,
-      ...serializeOutlineChildren(children, indentLevel + 1),
-    ]
+    return [`${indent}${title}:`, ...serializeOutlineChildren(children, indentLevel + 1)]
   }
 
   if (children.length === 0) {
     return [`${indent}- ${title}`]
   }
 
-  return [
-    `${indent}- ${title}:`,
-    ...serializeOutlineChildren(children, indentLevel + 1),
-  ]
+  return [`${indent}- ${title}:`, ...serializeOutlineChildren(children, indentLevel + 1)]
 }
 
-function serializeOutlineChildren(
-  children: MindmapYamlNode[],
-  indentLevel: number,
-): string[] {
+function serializeOutlineChildren(children: MindmapYamlNode[], indentLevel: number): string[] {
   return children.flatMap((child) => serializeOutlineNode(child, indentLevel, false))
 }
 

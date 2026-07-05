@@ -27,13 +27,17 @@ const addTextNodeTool = tool(
   },
   {
     name: 'addTextNode',
-    description: '在思维导图中添加一个新的文本节点。parentId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id），如果没有明确的父节点则不提供 parentId（会添加到根节点）。',
+    description:
+      '在思维导图中添加一个新的文本节点。parentId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id），如果没有明确的父节点则不提供 parentId（会添加到根节点）。',
     schema: z.object({
-      parentId: z.string().optional().describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
+      parentId: z
+        .string()
+        .optional()
+        .describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
       label: z.string().describe('节点显示文本（必填）'),
       palaceId: z.string().optional().describe('关联的记忆宫殿ID（可选）'),
     }),
-  }
+  },
 )
 
 // ========== 添加 Palace 节点 ==========
@@ -71,23 +75,31 @@ const addPalaceNodeTool = tool(
   },
   {
     name: 'addPalaceNode',
-    description: '在思维导图中添加一个记忆宫殿节点。记忆宫殿包含多个站点，每个站点关联一个记忆内容。',
+    description:
+      '在思维导图中添加一个记忆宫殿节点。记忆宫殿包含多个站点，每个站点关联一个记忆内容。',
     schema: z.object({
-      parentId: z.string().optional().describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
+      parentId: z
+        .string()
+        .optional()
+        .describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
       label: z.string().describe('宫殿名称（必填）'),
       imageUrl: z.string().optional().describe('宫殿图片URL'),
-      stations: z.array(z.object({
-        order: z.number().optional().describe('站点顺序号'),
-        content: z.string().describe('站点记忆内容'),
-        anchorVisual: z.string().optional().describe('锚点视觉形象'),
-        association: z.string().optional().describe('联想关联内容'),
-        x: z.number().optional().describe('在图片中的X坐标'),
-        y: z.number().optional().describe('在图片中的Y坐标'),
-        linkedNodeId: z.string().describe('关联的节点ID'),
-      })).describe('宫殿站点列表（必填）'),
+      stations: z
+        .array(
+          z.object({
+            order: z.number().optional().describe('站点顺序号'),
+            content: z.string().describe('站点记忆内容'),
+            anchorVisual: z.string().optional().describe('锚点视觉形象'),
+            association: z.string().optional().describe('联想关联内容'),
+            x: z.number().optional().describe('在图片中的X坐标'),
+            y: z.number().optional().describe('在图片中的Y坐标'),
+            linkedNodeId: z.string().describe('关联的节点ID'),
+          }),
+        )
+        .describe('宫殿站点列表（必填）'),
       sourceNodeIds: z.array(z.string()).optional().describe('来源节点ID列表'),
     }),
-  }
+  },
 )
 
 // ========== 更新节点 ==========
@@ -144,13 +156,14 @@ const updateNodeTool = tool(
   },
   {
     name: 'updateMindmapNode',
-    description: '更新指定思维导图节点的属性。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。',
+    description:
+      '更新指定思维导图节点的属性。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。',
     schema: z.object({
       nodeId: z.string().describe('要更新的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
       nodeType: z.enum(['text', 'palace']).describe('节点类型（必填）'),
       changes: z.record(z.unknown()).describe('要更新的字段对象'),
     }),
-  }
+  },
 )
 
 // ========== 删除节点 ==========
@@ -171,12 +184,13 @@ const deleteNodeTool = tool(
   },
   {
     name: 'deleteMindmapNode',
-    description: '删除指定的思维导图节点。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。如果该节点有子节点，默认会一并删除其子树。',
+    description:
+      '删除指定的思维导图节点。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。如果该节点有子节点，默认会一并删除其子树。',
     schema: z.object({
       nodeId: z.string().describe('要删除的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
       confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
     }),
-  }
+  },
 )
 
 // ========== 批量操作 ==========
@@ -224,7 +238,7 @@ const batchAddNodesTool = tool(
       yamlFragment: z.string().describe('YAML 格式的大纲片段，描述要添加的节点结构'),
       parentId: z.string().optional().describe('父节点ID，不提供则插入到当前选中节点或根节点'),
     }),
-  }
+  },
 )
 
 type MindmapActionTools = {

@@ -28,7 +28,9 @@ describe('ImageGenAgent error logging', () => {
         theme: 'test',
         sceneBrief: 'a scene',
         routeStyle: 'arc',
-        stations: [{ order: 1, content: 'x', anchorVisual: 'y', mnemonicMethod: 'z', association: 'a' }],
+        stations: [
+          { order: 1, content: 'x', anchorVisual: 'y', mnemonicMethod: 'z', association: 'a' },
+        ],
       },
     } as unknown as PalaceSubgraphStateType
 

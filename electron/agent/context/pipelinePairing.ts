@@ -24,8 +24,7 @@ export function dropOrphanToolResults(messages: BaseMessage[]): BaseMessage[] {
   })
 }
 
-const MISSING_TOOL_RESULT_PLACEHOLDER =
-  '[Tool result unavailable — call was interrupted or lost]'
+const MISSING_TOOL_RESULT_PLACEHOLDER = '[Tool result unavailable — call was interrupted or lost]'
 
 /**
  * 为没有对应 tool_result 的 tool_use 插入占位结果。

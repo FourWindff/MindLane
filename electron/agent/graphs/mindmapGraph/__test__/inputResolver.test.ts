@@ -4,9 +4,7 @@ import { MindmapInputResolver } from '../inputResolver.js'
 import type { MindmapSubgraphStateType } from '../../../state.js'
 import type { DocumentRef } from '../../../state.js'
 
-function createState(
-  partial: Partial<MindmapSubgraphStateType> = {},
-): MindmapSubgraphStateType {
+function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSubgraphStateType {
   return {
     messages: [],
     context: null,
@@ -45,9 +43,7 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(
-      createState({ context: { attachedDocument: documentRef } }),
-    )
+    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
 
     expect(result).toEqual({
       source: { type: 'pdf', path: '/data/report.pdf' },
@@ -65,9 +61,7 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(
-      createState({ context: { attachedDocument: documentRef } }),
-    )
+    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
 
     expect(result).toEqual({
       source: { type: 'url', url: 'https://example.test/article' },
@@ -85,9 +79,7 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(
-      createState({ context: { attachedDocument: documentRef } }),
-    )
+    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
 
     expect(result).toEqual({
       source: { type: 'text', content: '这是附加文本内容。' },

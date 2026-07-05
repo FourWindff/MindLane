@@ -45,10 +45,7 @@ function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
 }
 
 function createDefaultAnalyzers(): MindmapInputAnalyzer<unknown, unknown>[] {
-  return [
-    new TextInputAnalyzer(),
-    new PdfInputAnalyzer(),
-  ]
+  return [new TextInputAnalyzer(), new PdfInputAnalyzer()]
 }
 
 // ===== Prompt builders =====
@@ -262,16 +259,20 @@ async function leafExtractNode(
 
     const firstChunk = chunks[0]
     const lastChunk = chunks[chunks.length - 1]
-    const chunkId = firstChunk && lastChunk && firstChunk.id !== lastChunk.id
-      ? `${firstChunk.id}..${lastChunk.id}`
-      : firstChunk?.id ?? `chunk-${range.start + 1}`
+    const chunkId =
+      firstChunk && lastChunk && firstChunk.id !== lastChunk.id
+        ? `${firstChunk.id}..${lastChunk.id}`
+        : (firstChunk?.id ?? `chunk-${range.start + 1}`)
 
     return {
-      leafResults: [...state.leafResults, {
-        chunkIndex: range.start,
-        chunkId,
-        tree,
-      }],
+      leafResults: [
+        ...state.leafResults,
+        {
+          chunkIndex: range.start,
+          chunkId,
+          tree,
+        },
+      ],
       leafCursor: range.end,
     }
   } catch (error) {

@@ -64,9 +64,12 @@ export function resolveMindmapEdgeGeometry(params: {
   const targetIsLeft = targetCenterX < sourceCenterX
 
   // 从 node 对象直接读 sourcePosition，不信任 edge prop（ReactFlow 多 Handle 无 ID 时会取错）
-  const sourcePosition = depth === 0
-    ? (targetIsLeft ? Position.Left : Position.Right)
-    : (sourceNode?.sourcePosition ?? fallback.sourcePosition)
+  const sourcePosition =
+    depth === 0
+      ? targetIsLeft
+        ? Position.Left
+        : Position.Right
+      : (sourceNode?.sourcePosition ?? fallback.sourcePosition)
 
   const targetPosition = targetIsLeft ? Position.Right : Position.Left
 

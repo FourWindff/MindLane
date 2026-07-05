@@ -58,7 +58,13 @@ export function MindMapContextMenu({
       role="menu"
       aria-label="导图菜单"
     >
-      <button type="button" className="mindmap-ctx__item" role="menuitem" onClick={() => run(onAddChild)} disabled={aiBusy}>
+      <button
+        type="button"
+        className="mindmap-ctx__item"
+        role="menuitem"
+        onClick={() => run(onAddChild)}
+        disabled={aiBusy}
+      >
         子主题
       </button>
       <button
@@ -95,7 +101,13 @@ export function MindMapContextMenu({
         </>
       )}
       <div className="mindmap-ctx__sep" role="separator" />
-      <button type="button" className="mindmap-ctx__item mindmap-ctx__item--muted" role="menuitem" onClick={() => run(onReset)} disabled={aiBusy}>
+      <button
+        type="button"
+        className="mindmap-ctx__item mindmap-ctx__item--muted"
+        role="menuitem"
+        onClick={() => run(onReset)}
+        disabled={aiBusy}
+      >
         重置
       </button>
     </div>
