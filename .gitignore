@@ -13,6 +13,7 @@ dist-ssr
 dist-electron
 release
 *.local
+tsconfig.node.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
@@ -28,11 +29,13 @@ release
 *.sln
 *.sw?
 
+# agent
 .claude
 .codex
 .agents
 skills-lock.json
-tsconfig.node.tsbuildinfo
+docs/
+.scratch/
 
 # LangGraph API
 .langgraph_api
