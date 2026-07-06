@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import Database from 'better-sqlite3'
 import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages'
 import { SessionMessageStore, type SessionMeta } from '../sessionMessageStore.js'
 
@@ -137,83 +136,5 @@ describe('SessionMessageStore', () => {
     expect(messages).toHaveLength(2)
     expect(messages[0].getType()).toBe('ai')
     expect(messages[1].getType()).toBe('tool')
-  })
-
-  it('自动从旧版 SQLite app.db 迁移数据', async () => {
-    const dbPath = path.join(tmpDir, 'app.db')
-    const db = new Database(dbPath)
-    db.exec(`
-      CREATE TABLE chat_sessions (
-        id TEXT PRIMARY KEY,
-        workspace_hash TEXT NOT NULL,
-        title TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        message_count INTEGER NOT NULL DEFAULT 0
-      );
-      CREATE TABLE chat_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        seq INTEGER NOT NULL,
-        message_json TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-    `)
-
-    const insertSession = db.prepare(
-      'INSERT INTO chat_sessions (id, workspace_hash, title, created_at, updated_at, message_count) VALUES (?, ?, ?, ?, ?, ?)',
-    )
-    const insertMessage = db.prepare(
-      'INSERT INTO chat_messages (session_id, seq, message_json, created_at) VALUES (?, ?, ?, ?)',
-    )
-
-    insertSession.run(
-      'mig-s1',
-      'ws1',
-      'Migrated Session',
-      '2024-01-01T00:00:00Z',
-      '2024-01-02T00:00:00Z',
-      2,
-    )
-    insertMessage.run(
-      'mig-s1',
-      0,
-      JSON.stringify({
-        role: 'user',
-        content: 'hello',
-        timestamp: '2024-01-01T00:00:00Z',
-      }),
-      '2024-01-01T00:00:00Z',
-    )
-    insertMessage.run(
-      'mig-s1',
-      1,
-      JSON.stringify({
-        role: 'assistant',
-        content: 'hi',
-        timestamp: '2024-01-01T00:00:01Z',
-      }),
-      '2024-01-01T00:00:01Z',
-    )
-    db.close()
-
-    const migrationStore = new SessionMessageStore()
-    await migrationStore.init(tmpDir, { legacyDbPath: dbPath })
-
-    const markerPath = path.join(tmpDir, '.migrated-to-jsonl')
-    expect(fs.existsSync(markerPath)).toBe(true)
-    expect(fs.existsSync(dbPath)).toBe(false)
-    expect(fs.readdirSync(tmpDir).some((f) => f.startsWith('app.db.bak.'))).toBe(true)
-
-    migrationStore.setWorkspace('ws1')
-    const sessions = await migrationStore.listSessions('ws1')
-    expect(sessions).toHaveLength(1)
-    expect(sessions[0].id).toBe('mig-s1')
-    expect(sessions[0].messageCount).toBe(2)
-
-    const messages = await migrationStore.loadMessages('mig-s1')
-    expect(messages).toHaveLength(2)
-    expect(messages[0].getType()).toBe('human')
-    expect(messages[1].getType()).toBe('ai')
   })
 })

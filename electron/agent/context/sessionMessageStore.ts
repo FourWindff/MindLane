@@ -26,11 +26,6 @@ export interface SessionMeta {
   _lastSummary?: string
 }
 
-export interface SessionMessageStoreOptions {
-  /** 旧版 SQLite 数据库路径，存在时执行一次性迁移 */
-  legacyDbPath?: string
-}
-
 /**
  * 基于 JSONL 的会话消息存储。
  *
@@ -40,18 +35,14 @@ export interface SessionMessageStoreOptions {
 export class SessionMessageStore {
   private baseDir = ''
   private workspaceHash = ''
-  private legacyDbPath?: string
-  private migrationPromise: Promise<void> | null = null
   private readonly writeLocks = new Map<string, Promise<void>>()
 
   /**
    * 初始化存储根目录。
    */
-  async init(baseDir: string, options?: SessionMessageStoreOptions): Promise<void> {
+  async init(baseDir: string): Promise<void> {
     this.baseDir = baseDir
-    this.legacyDbPath = options?.legacyDbPath
     await this.ensureDir(this.baseDir)
-    await this.runMigrationIfNeeded()
   }
 
   /**
@@ -291,110 +282,6 @@ export class SessionMessageStore {
       if (this.writeLocks.get(sessionId) === current) {
         this.writeLocks.delete(sessionId)
       }
-    }
-  }
-
-  // ─── 旧版 SQLite 迁移 ───
-
-  private async runMigrationIfNeeded(): Promise<void> {
-    if (!this.legacyDbPath || !fs.existsSync(this.legacyDbPath)) return
-
-    const markerPath = path.join(path.dirname(this.legacyDbPath), '.migrated-to-jsonl')
-    if (fs.existsSync(markerPath)) return
-
-    if (!this.migrationPromise) {
-      this.migrationPromise = this.migrateFromLegacyDb(markerPath)
-    }
-    try {
-      await this.migrationPromise
-    } finally {
-      this.migrationPromise = null
-    }
-  }
-
-  private async migrateFromLegacyDb(markerPath: string): Promise<void> {
-    logger.info('[SessionMessageStore] 检测到旧版 SQLite 数据库，开始迁移...')
-    try {
-      const { default: Database } = await import('better-sqlite3')
-      const db = new Database(this.legacyDbPath!)
-      try {
-        const sessionRows = db
-          .prepare(
-            'SELECT id, workspace_hash, title, created_at, updated_at, message_count FROM chat_sessions ORDER BY updated_at DESC',
-          )
-          .all() as Array<{
-          id: string
-          workspace_hash: string
-          title: string
-          created_at: string
-          updated_at: string
-          message_count: number
-        }>
-
-        const messageStmt = this.prepareLegacyMessageStmt(db)
-        if (!messageStmt) {
-          logger.warn('[SessionMessageStore] 旧版数据库缺少 message_json 列，跳过消息迁移')
-        } else {
-          for (const row of sessionRows) {
-            const messageRows = messageStmt.all(row.id) as Array<{ message_json: string }>
-            const messages: BaseMessage[] = []
-            for (const { message_json } of messageRows) {
-              try {
-                const chatMsg = JSON.parse(message_json) as ChatMessage
-                messages.push(...uiMessageToBaseMessages(chatMsg))
-              } catch (err) {
-                logger.warn(`[SessionMessageStore] 迁移时跳过损坏的消息 (session=${row.id}):`, err)
-              }
-            }
-
-            const meta: SessionMeta = {
-              id: row.id,
-              title: row.title,
-              createdAt: row.created_at,
-              updatedAt: row.updated_at,
-              messageCount: messages.length,
-            }
-
-            const savedHash = this.workspaceHash
-            this.workspaceHash = row.workspace_hash
-            try {
-              await this.createSession(row.id, meta, messages)
-            } finally {
-              this.workspaceHash = savedHash
-            }
-          }
-        }
-      } finally {
-        db.close()
-      }
-
-      const timestamp = Date.now()
-      const backupPath = `${this.legacyDbPath!}.bak.${timestamp}`
-      fs.renameSync(this.legacyDbPath!, backupPath)
-      fs.writeFileSync(markerPath, new Date().toISOString(), 'utf-8')
-      logger.info('[SessionMessageStore] 迁移完成，原数据库已备份到:', backupPath)
-    } catch (err) {
-      logger.error('[SessionMessageStore] 迁移失败，保留原数据库:', err)
-      // 不阻断启动，下次初始化仍会重试
-    }
-  }
-
-  private prepareLegacyMessageStmt(db: unknown): { all: (sessionId: string) => unknown[] } | null {
-    type ColumnInfo = { name: string }
-    type BetterSqlite3Database = {
-      prepare: (sql: string) => { all: (...args: unknown[]) => unknown[] }
-    }
-    const typedDb = db as BetterSqlite3Database
-    try {
-      const columns = typedDb.prepare('PRAGMA table_info(chat_messages)').all() as ColumnInfo[]
-      if (!columns.some((c) => c.name === 'message_json')) {
-        return null
-      }
-      return typedDb.prepare(
-        'SELECT message_json FROM chat_messages WHERE session_id = ? ORDER BY seq ASC',
-      ) as { all: (sessionId: string) => unknown[] }
-    } catch {
-      return null
     }
   }
 }

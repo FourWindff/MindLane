@@ -40,7 +40,7 @@ describe('Consolidator', () => {
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-'))
     manager = new SessionManager()
-    await manager.init(path.join(tmpDir, 'app.db'), { userDataPath: tmpDir })
+    await manager.init(tmpDir)
     manager.setWorkspace('/workspace/test')
 
     buildMessages = async (messages, lastSummary) => [

@@ -12,7 +12,7 @@ describe('SessionManager', () => {
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-manager-'))
     manager = new SessionManager()
-    await manager.init(path.join(tmpDir, 'app.db'), { userDataPath: tmpDir })
+    await manager.init(tmpDir)
     manager.setWorkspace('/workspace/test')
   })
 

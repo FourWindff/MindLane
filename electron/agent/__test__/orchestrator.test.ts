@@ -439,7 +439,7 @@ describe('AgentOrchestrator JSONL 消息持久化', () => {
     const provider = createMockProvider()
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-dedup-'))
     const sessionManager = new SessionManager()
-    await sessionManager.init(path.join(tmpDir, 'app.db'), { userDataPath: tmpDir })
+    await sessionManager.init(tmpDir)
     sessionManager.setWorkspace('/workspace/test')
 
     const aiService = createMockAiService(

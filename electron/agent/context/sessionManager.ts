@@ -24,14 +24,13 @@ export class SessionManager {
   private _workspaceHash: string = ''
 
   /**
-   * 初始化 JSONL 存储，可选从旧版 SQLite 迁移。
+   * 初始化 JSONL 存储。
    */
-  async init(dbPath: string, options?: { userDataPath?: string }): Promise<void> {
-    const userDataPath = options?.userDataPath ?? path.dirname(dbPath)
+  async init(userDataPath: string): Promise<void> {
     const baseDir = path.join(userDataPath, 'memory', 'sessions')
 
     this.store = new SessionMessageStore()
-    await this.store.init(baseDir, { legacyDbPath: dbPath })
+    await this.store.init(baseDir)
   }
 
   /**
