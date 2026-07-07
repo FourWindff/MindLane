@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises'
+import crypto from 'node:crypto'
 import { MindmapInputAnalyzer } from './types.js'
-import type { DocumentChunk, MindmapInputSource } from './types.js'
+import type { DocumentChunk, LoadedDocument, MindmapInputSource } from './types.js'
 
 interface DocumentPage {
   text: string
@@ -9,6 +10,7 @@ interface DocumentPage {
 
 export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[]> {
   readonly type = 'pdf' as const
+  private lastFileHash?: string
 
   protected resolveInput(source: MindmapInputSource): string {
     if (!source.path) {
@@ -20,6 +22,7 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
 
   async load(path: string): Promise<DocumentPage[]> {
     const data = await fs.readFile(path)
+    this.lastFileHash = crypto.createHash('sha256').update(data).digest('hex')
     const pdfParse = await import('pdf-parse')
     const PDFParseClass = (
       pdfParse as unknown as {
@@ -109,5 +112,16 @@ export class PdfInputAnalyzer extends MindmapInputAnalyzer<string, DocumentPage[
 
     pushChunk()
     return chunks
+  }
+
+  async loadDocument(source: MindmapInputSource): Promise<LoadedDocument> {
+    const loaded = await super.loadDocument(source)
+    return {
+      ...loaded,
+      metadata: {
+        ...(loaded.metadata ?? {}),
+        sha256: this.lastFileHash,
+      },
+    }
   }
 }

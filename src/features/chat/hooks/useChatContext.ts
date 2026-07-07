@@ -72,9 +72,11 @@ export function useChatContext() {
         importedAt: doc.importedAt,
         title: doc.title,
         pageCount: doc.pageCount,
+        textPath: doc.textPath,
         metadata: {
           originalPath: doc.metadata?.originalPath,
           textCacheKey: doc.metadata?.textCacheKey,
+          sha256: doc.metadata?.sha256,
         },
       }))
     }

@@ -62,7 +62,17 @@ export interface DocumentRef {
   importedAt: string
   title?: string
   pageCount?: number
-  metadata?: Record<string, unknown>
+  /** 解析后的完整文本在 userdata 下的缓存路径（相对路径） */
+  textPath?: string
+  metadata: {
+    sha256: string
+    originalPath?: string
+    textCacheKey?: string
+    size?: number
+    mtimeMs?: number
+    textCachedAt?: string
+    [key: string]: unknown
+  }
 }
 
 export type DocumentChunk = {

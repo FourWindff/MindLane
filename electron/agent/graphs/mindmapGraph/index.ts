@@ -1,6 +1,8 @@
 import { StateGraph, START, END } from '@langchain/langgraph'
+import path from 'node:path'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
+import type { DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
@@ -11,10 +13,18 @@ import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindm
 import { extractRootTree } from './shared/rootTree.js'
 import { MindmapInputResolver } from './inputResolver.js'
 
+import {
+  hashText,
+  shortHash,
+  saveDocumentTextCache,
+  buildTextPreview,
+} from './documentTextCache.js'
+
 // ===== 配置选项 =====
 
 interface MindmapSubgraphOptions {
   provider: LLMProvider
+  userDataPath?: string
   analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
 }
 
@@ -201,7 +211,75 @@ async function loadDocumentNode(
       }
     }
 
-    const documentRef = loaded.documentRef ?? state.documentRef
+    const existingRef = state.documentRef
+    const text = loaded.text
+
+    let hash: string
+    let baseFilename: string
+    let persistedSource: string
+    let filename: string
+    let type: DocumentRef['type']
+
+    switch (source.type) {
+      case 'pdf': {
+        const filePath = source.path!
+        type = 'pdf'
+        const loadedSha256 =
+          typeof loaded.metadata?.sha256 === 'string' ? loaded.metadata.sha256 : undefined
+        hash = loadedSha256 || existingRef?.metadata?.sha256 || hashText(text)
+        baseFilename = existingRef?.filename || path.basename(filePath)
+        persistedSource = filePath
+        filename = existingRef?.filename || path.basename(filePath)
+        break
+      }
+      case 'text': {
+        type = 'text'
+        hash = hashText(text)
+        baseFilename = '用户输入'
+        persistedSource = buildTextPreview(text)
+        filename = `用户输入_${shortHash(hash)}.txt`
+        break
+      }
+      case 'url': {
+        type = 'url'
+        hash = hashText(text)
+        baseFilename = existingRef?.filename || 'URL来源'
+        persistedSource = source.url!
+        filename = existingRef?.filename || `URL来源_${shortHash(hash)}.txt`
+        break
+      }
+      default: {
+        // Exhaustive fallback
+        type = source.type as DocumentRef['type']
+        hash = hashText(text)
+        baseFilename = existingRef?.filename || '未命名'
+        persistedSource = String(source.path ?? source.url ?? source.content ?? '')
+        filename = existingRef?.filename || `未命名_${shortHash(hash)}.txt`
+      }
+    }
+
+    let textPath: string | undefined
+    if (options.userDataPath) {
+      textPath = await saveDocumentTextCache(options.userDataPath, baseFilename, hash, text)
+    }
+
+    const documentRef: DocumentRef = {
+      id: hash,
+      type,
+      source: persistedSource,
+      filename,
+      importedAt: existingRef?.importedAt || new Date().toISOString(),
+      title: existingRef?.title,
+      pageCount: existingRef?.pageCount,
+      textPath,
+      metadata: {
+        ...(existingRef?.metadata ?? {}),
+        sha256: hash,
+        textCacheKey: hash,
+        textCachedAt: textPath ? new Date().toISOString() : existingRef?.metadata?.textCachedAt,
+        ...(type === 'pdf' && source.type === 'pdf' ? { originalPath: source.path } : {}),
+      },
+    }
 
     return {
       ...reset,

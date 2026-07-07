@@ -52,12 +52,14 @@ export interface DocumentRef {
   importedAt: string
   title?: string
   pageCount?: number
-  metadata?: {
+  /** 解析后的完整文本在 userdata 下的缓存路径（相对路径） */
+  textPath?: string
+  metadata: {
     originalPath?: string
     textCacheKey?: string
     size?: number
     mtimeMs?: number
-    sha256?: string
+    sha256: string
     textCachedAt?: string
     [key: string]: unknown
   }

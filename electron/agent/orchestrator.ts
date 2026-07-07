@@ -154,6 +154,7 @@ export class AgentOrchestrator {
     if (!this.compiledMindmapSubgraph) {
       this.compiledMindmapSubgraph = buildMindmapSubgraph({
         provider: this.provider,
+        userDataPath: this.options.userDataPath,
       }).compile()
     }
     return this.compiledMindmapSubgraph

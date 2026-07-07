@@ -59,6 +59,7 @@ describe('mindmapStore.documentRefs', () => {
       filename: 'source.pdf',
       importedAt: '2026-05-30T00:00:00.000Z',
       metadata: {
+        sha256: 'abc123',
         textCacheKey: 'doc-1',
       },
     })
@@ -82,6 +83,7 @@ describe('mindmapStore.documentRefs', () => {
       source: '/tmp/old.pdf',
       filename: 'old.pdf',
       importedAt: '2026-05-30T00:00:00.000Z',
+      metadata: { sha256: 'old-hash' },
     })
     store.addDocumentRef({
       id: 'doc-1',
@@ -89,6 +91,7 @@ describe('mindmapStore.documentRefs', () => {
       source: '/tmp/new.pdf',
       filename: 'new.pdf',
       importedAt: '2026-05-30T00:00:01.000Z',
+      metadata: { sha256: 'new-hash' },
     })
 
     expect(useMindmapStore.getState().documentRefs).toHaveLength(1)
