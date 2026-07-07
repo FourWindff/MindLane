@@ -5,7 +5,6 @@ import {
   HumanMessage,
   type BaseMessage,
 } from '@langchain/core/messages'
-import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider } from '../../providers/index.js'
 import type { MainGraphStateType } from '../../state.js'
@@ -14,10 +13,7 @@ import { ContextBuilder } from './context.js'
 import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '../../utils.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
 import { logger } from '../../../shared/logger.js'
-import {
-  createGenerateMindmapFragmentTool,
-  createGeneratePalaceTool,
-} from '../../tools/subgraphRoutingTools.js'
+import { ToolRegistry } from '../../tools/registry.js'
 import { route as routeSubgraph } from '../../subgraphRouter.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import { isPromptTooLongError } from '../../memory/contextCompact.js'
@@ -31,17 +27,17 @@ import {
 type AIMessageContent = AIMessage['content']
 
 /**
- * MindLaneAgent - 中央智能体，负责路由决策和上下文管理
+ * MindLaneAgent - The central agent responsible for routing decisions and context management.
  *
- * 架构职责：
- * 1. 上下文管理：使用 ContextBuilder 生成 XML 格式的系统 prompt
- * 2. 子图路由：通过虚拟工具决定是否进入 mindmap/palace 子图
- * 3. 工具调用：管理知识库搜索、思维导图操作等工具
- * 4. 直接响应：处理普通对话
+ * Architectural responsibilities:
+ * 1. Context management: uses ContextBuilder to generate XML-format system prompts.
+ * 2. Subgraph routing: decides whether to enter the mindmap/palace subgraphs via virtual tools.
+ * 3. Tool invocation: manages knowledge-base search, mindmap operations, and other tools.
+ * 4. Direct responses: handles ordinary conversations.
  *
- * 记忆与状态：
- * - 是唯一拥有持久化记忆访问权限的 Agent
- * - 通过 state.context 访问工作区、思维导图、选中节点等上下文
+ * Memory and state:
+ * - The only agent with access to persistent memory.
+ * - Accesses workspace, mindmap, selected nodes, and other context through state.context.
  */
 export interface CapabilityFlags {
   hasEmbeddings: boolean
@@ -54,7 +50,7 @@ interface MindLaneAgentOptions {
 }
 
 export class MindLaneAgent extends BaseAgent {
-  private tools: StructuredToolInterface[]
+  private toolRegistry: ToolRegistry
   private capabilityFlags: CapabilityFlags
   private modelWithTools: ReturnType<NonNullable<BaseChatModel['bindTools']>>
   private memoryManager?: MemoryManager
@@ -63,19 +59,15 @@ export class MindLaneAgent extends BaseAgent {
 
   constructor(
     provider: LLMProvider,
-    tools: StructuredToolInterface[],
+    toolRegistry: ToolRegistry,
     capabilityFlags?: CapabilityFlags,
     memoryManager?: MemoryManager,
     options?: MindLaneAgentOptions,
   ) {
     super(provider)
-    const routingTools: StructuredToolInterface[] = [createGenerateMindmapFragmentTool()]
-    if (capabilityFlags?.hasPalace ?? true) {
-      routingTools.push(createGeneratePalaceTool())
-    }
-    this.tools = [...tools, ...routingTools]
+    this.toolRegistry = toolRegistry
     this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true }
-    this.modelWithTools = this.provider.reasoningModel.bindTools!(this.tools)
+    this.modelWithTools = this.provider.reasoningModel.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
     this.messagePipelineConfig = mergeMessagePipelineConfig(options?.messagePipeline)
@@ -114,7 +106,7 @@ export class MindLaneAgent extends BaseAgent {
       return await this.invokeModel(state, systemPrompt, preprocessedMessages, 0)
     } catch (err) {
       const formatted = formatAgentError(err)
-      logger.error('[MindLaneAgent] invoke 失败:\n', formatted)
+      logger.error('[MindLaneAgent] invoke failed:\n', formatted)
       return {
         messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
@@ -197,7 +189,7 @@ export class MindLaneAgent extends BaseAgent {
       (tc) => routeSubgraph(tc, state.context, state.messages) === null,
     )
 
-    logger.info('[MindLaneAgent] 模型输出:', {
+    logger.info('[MindLaneAgent] model output:', {
       rawContent: summarizeMessageContent(response.content),
       toolCalls: toolCalls.map((tc) => ({
         id: tc.id,

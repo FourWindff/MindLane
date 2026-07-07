@@ -9,7 +9,6 @@ import {
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
-import type { StructuredToolInterface } from '@langchain/core/tools'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
 import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
@@ -28,14 +27,17 @@ import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
-import { logger } from '../shared/logger.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
-import { isVirtualSubgraphTool } from './subgraphRouter.js'
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
+  createGenerateMindmapFragmentTool,
+  createGeneratePalaceTool,
 } from './tools/subgraphRoutingTools.js'
+import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
+import { logger } from '../shared/logger.js'
+import { isVirtualSubgraphTool } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { compactContext } from './memory/contextCompact.js'
 import { extractTextContent } from './utils.js'
@@ -45,15 +47,15 @@ import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
 
 /**
- * 聊天请求 - 后端统一管理历史消息
- * 只需要传递：
- * - threadId: 会话 ID，后端据此加载历史
- * - message: 当前用户输入（单条）
- * - context: 可选的上下文数据（工作区、思维导图等）
+ * Chat request - the backend manages history centrally.
+ * Only pass:
+ * - threadId: session ID used by the backend to load history
+ * - message: current user input (single message)
+ * - context: optional context data (workspace, mindmap, etc.)
  */
 export interface ChatRequest {
   threadId: string
-  /** 当前用户输入（后端会自动加载历史） */
+  /** Current user input (history is loaded automatically by the backend). */
   message: string
   context?: MindmapContextData
   /** Optional document reference for mindmap generation from file */
@@ -83,7 +85,7 @@ interface ChatResponse {
 }
 
 /**
- * 流回调接口
+ * Streaming callback interface.
  */
 interface StreamCallbacks {
   onMessageStart?: () => void
@@ -134,12 +136,49 @@ export class AgentOrchestrator {
     unknown,
     string
   > | null = null
+  private toolRegistry = new ToolRegistry()
+  private hasPalace: boolean
 
   constructor(
     private provider: LLMProvider,
     private aiService: AiService,
     private options: AgentOrchestratorOptions = {},
-  ) {}
+  ) {
+    const caps = this.provider.capabilities
+    this.hasPalace = caps.has(ProviderCapability.ImageGen) && caps.has(ProviderCapability.Vision)
+    this.registerDefaultTools({ hasPalace: this.hasPalace })
+  }
+
+  /**
+   * Register MindLane's default tools into the toolRegistry.
+   * Action tools are registered first, followed by routing tools.
+   */
+  private registerDefaultTools(options: { hasPalace: boolean }): void {
+    const actionTools = createMindmapActionTools(options.hasPalace)
+
+    this.toolRegistry.registerTool(actionTools.addTextNodeTool)
+    this.toolRegistry.registerTool(actionTools.updateNodeTool)
+    this.toolRegistry.registerTool(actionTools.deleteNodeTool)
+    this.toolRegistry.registerTool(actionTools.batchAddNodesTool)
+
+    if (actionTools.addPalaceNodeTool) {
+      this.toolRegistry.registerTool(actionTools.addPalaceNodeTool)
+    }
+
+    this.toolRegistry.registerTool(createGenerateMindmapFragmentTool())
+
+    if (options.hasPalace) {
+      this.toolRegistry.registerTool(createGeneratePalaceTool())
+    }
+
+    logger.info(
+      '[registerDefaultTools] registered %d tools (%d executable), hasPalace=%s, names=%o',
+      this.toolRegistry.allTools.length,
+      this.toolRegistry.executableTools.length,
+      options.hasPalace,
+      this.toolRegistry.allTools.map((t) => t.name),
+    )
+  }
 
   private getCompiledMainGraph() {
     if (!this.compiledMainGraph) {
@@ -183,9 +222,9 @@ export class AgentOrchestrator {
     const sessionManager = this.aiService.sessionManager
 
     try {
-      // 1. 持久化用户消息到 JSONL，并从 JSONL 加载完整历史。
-      // 如果 UI 已经保存了同一条用户消息（例如 ChatPanel 在发送前调用 saveChatHistory），
-      // 则不再重复追加，避免会话中出现重复的第一条消息。
+      // 1. Persist the user message to JSONL and load the full history from JSONL.
+      // If the UI has already saved the same user message (e.g., ChatPanel calls saveChatHistory before sending),
+      // do not append it again to avoid duplicate first messages in the session.
       const humanMessage = new HumanMessage({
         content: request.message,
         additional_kwargs: request.documentRef
@@ -276,13 +315,13 @@ export class AgentOrchestrator {
         })
         result = snapshot.values as MainGraphStateType
       } catch (err) {
-        logger.warn('[AgentOrchestrator] getState 失败，回退到流式内容:', err)
+        logger.warn('[AgentOrchestrator] getState failed, falling back to streaming content:', err)
       }
 
       if (result) {
         callbacks.onEnd(this.buildResponse(result, fullContent))
 
-        // 将本轮新增的 AI/Tool 消息持久化到 JSONL
+        // Persist the new AI/Tool messages from this turn to JSONL.
         if (sessionManager?.isReady()) {
           try {
             const lastHumanIndex = result.messages.findLastIndex(
@@ -292,7 +331,7 @@ export class AgentOrchestrator {
               lastHumanIndex >= 0 ? result.messages.slice(lastHumanIndex + 1) : result.messages
             await sessionManager.saveMessages(request.threadId, newMessages)
           } catch (err) {
-            logger.warn('[AgentOrchestrator] 持久化 AI/Tool 消息失败:', err)
+            logger.warn('[AgentOrchestrator] Persisting AI/Tool messages failed:', err)
           }
         }
       } else {
@@ -340,7 +379,7 @@ export class AgentOrchestrator {
       }
     }
 
-    // 使用独立的 Palace Subgraph
+    // Use the dedicated Palace Subgraph.
     const app = this.getCompiledPalaceSubgraph()
 
     try {
@@ -396,21 +435,7 @@ export class AgentOrchestrator {
   }
 
   buildGraph() {
-    const caps = this.provider.capabilities
-    const hasPalace = caps.has(ProviderCapability.ImageGen) && caps.has(ProviderCapability.Vision)
-
-    const tools: StructuredToolInterface[] = []
-    const actionTools = createMindmapActionTools(hasPalace)
-    tools.push(
-      actionTools.addTextNodeTool,
-      actionTools.updateNodeTool,
-      actionTools.deleteNodeTool,
-      actionTools.batchAddNodesTool,
-    )
-    if (hasPalace && actionTools.addPalaceNodeTool) {
-      tools.push(actionTools.addPalaceNodeTool)
-    }
-    const toolNode = new ToolNode(tools)
+    const toolNode = new ToolNode(this.toolRegistry.executableTools)
     const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
       subgraph: {
         invoke: (state: MainGraphStateType, config: { recursionLimit: number }) => Promise<T>
@@ -431,7 +456,7 @@ export class AgentOrchestrator {
     const palaceSubgraphNode = async (state: MainGraphStateType) =>
       invokeSubgraph(this.getCompiledPalaceSubgraph(), state)
 
-    // 工具执行节点：过滤掉虚拟子图路由工具（已在 supervisor.invoke 中处理）
+    // Tool execution node: filter out virtual subgraph routing tools (already handled in supervisor.invoke).
     const normalizeToolMessages = async (messages: BaseMessage[]): Promise<BaseMessage[]> => {
       return Promise.all(
         messages.map(async (msg) => {
@@ -586,8 +611,8 @@ export class AgentOrchestrator {
 
     const supervisor = new MindLaneAgent(
       this.provider,
-      tools,
-      { hasEmbeddings: false, hasPalace },
+      this.toolRegistry,
+      { hasEmbeddings: false, hasPalace: this.hasPalace },
       this.aiService.memoryManager,
       {
         userDataPath: this.options.userDataPath,
@@ -595,7 +620,7 @@ export class AgentOrchestrator {
       },
     )
 
-    // 主动压缩节点：先持久化归档，再按预算读取未归档消息，最后内存级兜底
+    // Proactive compaction node: archive to persistence first, then read unarchived messages by budget, finally fall back in memory.
     const contextCompactNode = async (
       state: MainGraphStateType,
       config?: { configurable?: Record<string, unknown> },
@@ -604,9 +629,9 @@ export class AgentOrchestrator {
       const threadId = config?.configurable?.thread_id as string | undefined
 
       if (!sessionManager?.isReady() || !threadId) {
-        return compactContext(state, tools, this.provider, this.aiService.memoryManager, {
+        return compactContext(state, this.toolRegistry.allTools, this.provider, this.aiService.memoryManager, {
           hasEmbeddings: false,
-          hasPalace,
+          hasPalace: this.hasPalace,
         })
       }
 
@@ -617,7 +642,7 @@ export class AgentOrchestrator {
         const builder = new ContextBuilder()
           .withMessages(messages)
           .withContext(state.context ?? undefined)
-          .withCapabilityFlags({ hasEmbeddings: false, hasPalace })
+          .withCapabilityFlags({ hasEmbeddings: false, hasPalace: this.hasPalace })
           .withMemory(this.aiService.memoryManager)
           .withLastSummary(lastSummary)
 
@@ -627,7 +652,7 @@ export class AgentOrchestrator {
         return [new SystemMessage(builder.build()), ...messages]
       }
 
-      const getToolDefinitions = () => tools
+      const getToolDefinitions = () => this.toolRegistry.allTools
 
       const consolidator = new Consolidator(
         {
@@ -664,18 +689,18 @@ export class AgentOrchestrator {
           threadId,
           err,
         )
-        return compactContext(state, tools, this.provider, this.aiService.memoryManager, {
+        return compactContext(state, this.toolRegistry.allTools, this.provider, this.aiService.memoryManager, {
           hasEmbeddings: false,
-          hasPalace,
+          hasPalace: this.hasPalace,
         })
       }
     }
 
-    // 统一路由函数：MindLaneAgent.route() 已处理无 palace 时的回退
+    // Unified routing function: MindLaneAgent.route() already handles fallback when palace is unavailable.
     const routeFn = (state: MainGraphStateType) => supervisor.route(state)
 
-    // 统一 graph 结构：始终包含 palaceSubgraph 节点
-    // hasPalace=false 时子图仍会被编译但永远不会被执行（route() 已保证）
+    // Unified graph structure: always includes the palaceSubgraph node.
+    // When hasPalace=false the subgraph is still compiled but is never executed (route() guarantees this).
     const graph = new StateGraph(MainGraphState)
       .addNode('contextCompact', contextCompactNode)
       .addNode('supervisor', (state) => supervisor.invoke(state))
@@ -702,7 +727,7 @@ export class AgentOrchestrator {
   }
 
   /**
-   * 构建响应对象
+   * Build the response object.
    */
   private buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
     const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
