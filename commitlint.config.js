@@ -19,5 +19,6 @@ export default {
         'revert',
       ],
     ],
+    'scope-empty': [2, 'never'],
   },
 }
