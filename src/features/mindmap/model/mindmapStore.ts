@@ -3,7 +3,6 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react'
 import type { Connection, Edge, Node, OnEdgesChange, OnNodesChange, Viewport } from '@xyflow/react'
 import {
   createEmptyFile,
-  DEFAULT_VIEWPORT,
   type MindLaneFile,
   type DocumentRef,
   migrateDocumentRef,
@@ -11,11 +10,7 @@ import {
   isPalaceNodeData,
 } from '@/shared/lib/fileFormat'
 import { autoLayout } from '@/shared/lib/autoLayout'
-import {
-  parseYamlToMindmap,
-  parseYamlFragment,
-  VIRTUAL_ROOT_SYMBOL,
-} from '@/shared/lib/yamlMindmapParser'
+import { parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { findRootNode, deserializeNode, CHILD_OFFSET_X } from '@/shared/lib/mindmapTree'
 
@@ -43,10 +38,6 @@ interface MindmapState {
   setViewport: (viewport: Viewport) => void
 
   loadFile: (filePath: string, data: MindLaneFile) => void
-  loadFromYaml: (
-    yamlString: string,
-    options?: { fileTitle?: string; filePath?: string | null },
-  ) => void
   newFile: (title?: string) => void
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
@@ -131,21 +122,6 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
       fileTitle: data.metadata.title,
       dirty: false,
       viewport: data.mindmap.viewport,
-    })
-  },
-
-  loadFromYaml: (yamlString, options = {}) => {
-    const parsed = parseYamlToMindmap(yamlString)
-    const positioned = autoLayout(parsed.nodes, parsed.edges)
-    set({
-      nodes: positioned,
-      edges: parsed.edges,
-      hasDocumentOpen: true,
-      filePath: options.filePath ?? null,
-      fileTitle: options.fileTitle ?? parsed.title,
-      dirty: true,
-      editingNodeId: null,
-      viewport: DEFAULT_VIEWPORT,
     })
   },
 
