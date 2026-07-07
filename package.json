@@ -60,7 +60,7 @@
     "lint-staged": "^17.0.8",
     "prettier": "^3.9.4",
     "typescript": "^5.2.2",
-    "vite": "^5.1.6",
+    "vite": "^6.0.0",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5",
     "vitest": "^4.1.2"
