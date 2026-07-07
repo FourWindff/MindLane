@@ -64,21 +64,7 @@ export function useChatContext() {
     }
 
     if (mindmapState.documentRefs.length > 0) {
-      ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({
-        id: doc.id,
-        type: doc.type,
-        source: doc.source,
-        filename: doc.filename,
-        importedAt: doc.importedAt,
-        title: doc.title,
-        pageCount: doc.pageCount,
-        textPath: doc.textPath,
-        metadata: {
-          originalPath: doc.metadata?.originalPath,
-          textCacheKey: doc.metadata?.textCacheKey,
-          sha256: doc.metadata?.sha256,
-        },
-      }))
+      ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({ ...doc }))
     }
 
     const selected = mindmapState.nodes.filter((n) => n.selected)

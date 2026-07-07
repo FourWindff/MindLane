@@ -6,6 +6,7 @@ import {
   DEFAULT_VIEWPORT,
   type MindLaneFile,
   type DocumentRef,
+  migrateDocumentRef,
   isTextNodeData,
   isPalaceNodeData,
 } from '@/shared/lib/fileFormat'
@@ -124,7 +125,7 @@ export const useMindmapStore = create<MindmapState>((set, get) => ({
     set({
       nodes: hydratedNodes as Node[],
       edges: data.mindmap.edges as Edge[],
-      documentRefs: data.documents || [],
+      documentRefs: (data.documents || []).map(migrateDocumentRef),
       hasDocumentOpen: true,
       filePath,
       fileTitle: data.metadata.title,

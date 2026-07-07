@@ -1,7 +1,10 @@
 import { Annotation, messagesStateReducer } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
+import type { DocumentRef } from '@/shared/lib/fileFormat'
 import type { DetectedAnchor } from './providers/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
+
+export type { DocumentRef }
 
 /** 简单替换型 reducer：直接用新值覆盖旧值。 */
 function replaceReducer<T>(_prev: T, next: T): T {
@@ -52,27 +55,6 @@ export interface MindmapInputSource {
   path?: string
   url?: string
   content?: string
-}
-
-export interface DocumentRef {
-  id: string
-  type: 'pdf' | 'url' | 'text'
-  source: string
-  filename: string
-  importedAt: string
-  title?: string
-  pageCount?: number
-  /** 解析后的完整文本在 userdata 下的缓存路径（相对路径） */
-  textPath?: string
-  metadata: {
-    sha256: string
-    originalPath?: string
-    textCacheKey?: string
-    size?: number
-    mtimeMs?: number
-    textCachedAt?: string
-    [key: string]: unknown
-  }
 }
 
 export type DocumentChunk = {

@@ -62,13 +62,7 @@ export function ChatPanel() {
         source: result.data.path,
         filename: result.data.name,
         importedAt: new Date().toISOString(),
-        metadata: {
-          originalPath: result.data.path,
-          textCacheKey: id,
-          size: result.data.size,
-          mtimeMs: result.data.mtimeMs,
-          sha256: result.data.sha256,
-        },
+        sha256: result.data.sha256,
       }
       setAttachedDocument(docRef)
     }

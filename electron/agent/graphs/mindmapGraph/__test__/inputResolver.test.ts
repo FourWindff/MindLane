@@ -40,7 +40,7 @@ describe('MindmapInputResolver', () => {
       filename: 'report.pdf',
       importedAt: new Date().toISOString(),
       title: 'Annual Report',
-      metadata: { sha256: 'pdf-hash-1' },
+      sha256: 'pdf-hash-1',
     }
     const resolver = new MindmapInputResolver()
 
@@ -59,7 +59,7 @@ describe('MindmapInputResolver', () => {
       source: 'https://example.test/article',
       filename: 'article',
       importedAt: new Date().toISOString(),
-      metadata: { sha256: 'url-hash-1' },
+      sha256: 'url-hash-1',
     }
     const resolver = new MindmapInputResolver()
 
@@ -78,7 +78,7 @@ describe('MindmapInputResolver', () => {
       source: '这是附加文本内容。',
       filename: 'notes.txt',
       importedAt: new Date().toISOString(),
-      metadata: { sha256: 'text-hash-1' },
+      sha256: 'text-hash-1',
     }
     const resolver = new MindmapInputResolver()
 
@@ -116,7 +116,7 @@ describe('MindmapInputResolver', () => {
       source: '/data/report.pdf',
       filename: '',
       importedAt: new Date().toISOString(),
-      metadata: { sha256: 'pdf-hash-2' },
+      sha256: 'pdf-hash-2',
     }
     const resolver = new MindmapInputResolver()
 

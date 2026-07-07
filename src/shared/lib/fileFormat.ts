@@ -54,14 +54,33 @@ export interface DocumentRef {
   pageCount?: number
   /** 解析后的完整文本在 userdata 下的缓存路径（相对路径） */
   textPath?: string
-  metadata: {
-    originalPath?: string
-    textCacheKey?: string
-    size?: number
-    mtimeMs?: number
-    sha256: string
-    textCachedAt?: string
-    [key: string]: unknown
+  /** 文档内容哈希，用于缓存命中与去重 */
+  sha256?: string
+}
+
+/** 将旧版带 metadata 的 DocumentRef 迁移为新版扁平结构。 */
+export function migrateDocumentRef(doc: unknown): DocumentRef {
+  if (typeof doc !== 'object' || doc === null) {
+    throw new Error('Invalid DocumentRef: expected object')
+  }
+  const record = doc as Record<string, unknown>
+  const metadata = (record.metadata as Record<string, unknown> | undefined) ?? {}
+
+  return {
+    id: String(record.id ?? ''),
+    type: String(record.type ?? 'text') as DocumentRef['type'],
+    source: String(record.source ?? ''),
+    filename: String(record.filename ?? ''),
+    importedAt: String(record.importedAt ?? new Date().toISOString()),
+    title: typeof record.title === 'string' ? record.title : undefined,
+    pageCount: typeof record.pageCount === 'number' ? record.pageCount : undefined,
+    textPath: typeof record.textPath === 'string' ? record.textPath : undefined,
+    sha256:
+      typeof record.sha256 === 'string'
+        ? record.sha256
+        : typeof metadata.sha256 === 'string'
+          ? metadata.sha256
+          : undefined,
   }
 }
 

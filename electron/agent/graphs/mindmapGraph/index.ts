@@ -226,7 +226,7 @@ async function loadDocumentNode(
         type = 'pdf'
         const loadedSha256 =
           typeof loaded.metadata?.sha256 === 'string' ? loaded.metadata.sha256 : undefined
-        hash = loadedSha256 || existingRef?.metadata?.sha256 || hashText(text)
+        hash = loadedSha256 || existingRef?.sha256 || hashText(text)
         baseFilename = existingRef?.filename || path.basename(filePath)
         persistedSource = filePath
         filename = existingRef?.filename || path.basename(filePath)
@@ -272,13 +272,7 @@ async function loadDocumentNode(
       title: existingRef?.title,
       pageCount: existingRef?.pageCount,
       textPath,
-      metadata: {
-        ...(existingRef?.metadata ?? {}),
-        sha256: hash,
-        textCacheKey: hash,
-        textCachedAt: textPath ? new Date().toISOString() : existingRef?.metadata?.textCachedAt,
-        ...(type === 'pdf' && source.type === 'pdf' ? { originalPath: source.path } : {}),
-      },
+      sha256: hash,
     }
 
     return {

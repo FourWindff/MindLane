@@ -46,7 +46,7 @@ describe('MindmapSubgraphState', () => {
           source: '/test.pdf',
           filename: 'test.pdf',
           importedAt: expect.any(String),
-          metadata: { sha256: 'doc-1-hash' },
+          sha256: 'doc-1-hash',
         })
         return {}
       })
@@ -79,7 +79,7 @@ describe('MindmapSubgraphState', () => {
         source: '/test.pdf',
         filename: 'test.pdf',
         importedAt: new Date().toISOString(),
-        metadata: { sha256: 'doc-1-hash' },
+        sha256: 'doc-1-hash',
       },
     })
   })

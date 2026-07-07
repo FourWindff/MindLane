@@ -58,10 +58,7 @@ describe('mindmapStore.documentRefs', () => {
       source: '/tmp/source.pdf',
       filename: 'source.pdf',
       importedAt: '2026-05-30T00:00:00.000Z',
-      metadata: {
-        sha256: 'abc123',
-        textCacheKey: 'doc-1',
-      },
+      sha256: 'abc123',
     })
 
     const file = store.toMindLaneFile()
@@ -70,9 +67,30 @@ describe('mindmapStore.documentRefs', () => {
       expect.objectContaining({
         id: 'doc-1',
         filename: 'source.pdf',
-        metadata: expect.objectContaining({ textCacheKey: 'doc-1' }),
+        sha256: 'abc123',
       }),
     ])
+  })
+
+  it('should migrate legacy document refs with metadata on loadFile', () => {
+    const store = useMindmapStore.getState()
+    const file = createEmptyFile('测试文件')
+    file.documents = [
+      {
+        id: 'legacy-doc',
+        type: 'pdf',
+        source: '/tmp/legacy.pdf',
+        filename: 'legacy.pdf',
+        importedAt: '2026-05-30T00:00:00.000Z',
+        metadata: { sha256: 'legacy-hash' },
+      } as never,
+    ]
+
+    store.loadFile('/test/legacy.mindlane', file)
+
+    const loaded = useMindmapStore.getState().documentRefs[0]!
+    expect(loaded.sha256).toBe('legacy-hash')
+    expect(loaded).not.toHaveProperty('metadata')
   })
 
   it('should replace document refs with the same id', () => {
@@ -83,7 +101,7 @@ describe('mindmapStore.documentRefs', () => {
       source: '/tmp/old.pdf',
       filename: 'old.pdf',
       importedAt: '2026-05-30T00:00:00.000Z',
-      metadata: { sha256: 'old-hash' },
+      sha256: 'old-hash',
     })
     store.addDocumentRef({
       id: 'doc-1',
@@ -91,7 +109,7 @@ describe('mindmapStore.documentRefs', () => {
       source: '/tmp/new.pdf',
       filename: 'new.pdf',
       importedAt: '2026-05-30T00:00:01.000Z',
-      metadata: { sha256: 'new-hash' },
+      sha256: 'new-hash',
     })
 
     expect(useMindmapStore.getState().documentRefs).toHaveLength(1)
