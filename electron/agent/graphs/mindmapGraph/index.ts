@@ -1,6 +1,6 @@
 import { StateGraph, START, END } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
-import { MindmapSubgraphState, type DocumentRef } from '../../state.js'
+import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
@@ -15,7 +15,6 @@ import { MindmapInputResolver } from './inputResolver.js'
 
 interface MindmapSubgraphOptions {
   provider: LLMProvider
-  cacheDocumentText?: (docRef: DocumentRef, text: string) => Promise<DocumentRef | void>
   analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
 }
 
@@ -202,13 +201,7 @@ async function loadDocumentNode(
       }
     }
 
-    let documentRef = loaded.documentRef ?? state.documentRef
-    if (documentRef && options.cacheDocumentText) {
-      const cachedRef = await options.cacheDocumentText(documentRef, loaded.text)
-      if (cachedRef) {
-        documentRef = cachedRef
-      }
-    }
+    const documentRef = loaded.documentRef ?? state.documentRef
 
     return {
       ...reset,

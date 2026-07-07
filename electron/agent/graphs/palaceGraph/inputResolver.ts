@@ -1,8 +1,6 @@
 import { type BaseMessage } from '@langchain/core/messages'
 import { extractTextContent } from '../../utils.js'
 import type { PalaceSubgraphStateType, SelectedNodeContent } from '../../state.js'
-import type { DocumentRef } from '../../state.js'
-import type { CacheManager } from '../../../fs/cacheManager.js'
 
 export interface PalaceInputResolution {
   palaceInputNodes: SelectedNodeContent[]
@@ -26,24 +24,13 @@ function findLatestUserMessageText(messages: BaseMessage[]): string | null {
   return null
 }
 
-function resolveCacheKey(documentRef: DocumentRef): string {
-  const metadataTextCacheKey = documentRef.metadata?.textCacheKey
-  if (typeof metadataTextCacheKey === 'string' && /^[A-Za-z0-9_-]+$/.test(metadataTextCacheKey)) {
-    return metadataTextCacheKey
-  }
-  return documentRef.id
-}
-
 export class PalaceInputResolver {
-  constructor(private readonly cacheManager?: CacheManager) {}
-
   /**
    * 解析记忆宫殿子图的输入。
    *
    * 优先级：
    * 1. 当前选中的节点
    * 2. 最新用户消息文本
-   * 3. 当前附加文档的缓存文本
    */
   async resolve(state: PalaceSubgraphStateType): Promise<PalaceInputResolution | null> {
     const selectedNodes = state.context?.selectedNodes
@@ -59,17 +46,6 @@ export class PalaceInputResolver {
       return {
         palaceInputNodes: [],
         palaceInputText: userText,
-      }
-    }
-
-    const attachedDocument = state.context?.attachedDocument
-    if (attachedDocument && this.cacheManager) {
-      const text = await this.cacheManager.readDocumentText(resolveCacheKey(attachedDocument))
-      if (text) {
-        return {
-          palaceInputNodes: [],
-          palaceInputText: text,
-        }
       }
     }
 

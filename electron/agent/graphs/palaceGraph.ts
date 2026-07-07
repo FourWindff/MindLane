@@ -5,14 +5,12 @@ import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
 import { AnchorAgent } from '../agenthub/anchorAgent.js'
 import { PalaceSubgraphState } from '../state.js'
 
-import type { CacheManager } from '../../fs/cacheManager.js'
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 
 // ===== 配置选项 =====
 
 interface PalaceSubgraphOptions {
   provider: LLMProvider
-  cacheManager?: CacheManager
 }
 
 // ===== Subgraph 构建器 =====
@@ -22,12 +20,12 @@ interface PalaceSubgraphOptions {
  * 流程: START -> resolve_input -> analyze -> imageGen -> vision -> END
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
-  const { provider, cacheManager } = options
+  const { provider } = options
 
   const analyze = new AnalyzeAgent(provider)
   const imageGen = new ImageGenAgent(provider)
   const vision = new AnchorAgent(provider)
-  const inputResolver = new PalaceInputResolver(cacheManager)
+  const inputResolver = new PalaceInputResolver()
 
   // 使用 Palace 子图专用状态类型
   const graph = new StateGraph(PalaceSubgraphState)

@@ -30,7 +30,6 @@ import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
 import { logger } from '../shared/logger.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
-import { createReadLinkedDocumentTool } from './tools/readLinkedDocument.js'
 import { isVirtualSubgraphTool } from './subgraphRouter.js'
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
@@ -41,7 +40,6 @@ import { AGENT_LIMITS } from './config.js'
 import { compactContext } from './memory/contextCompact.js'
 import { extractTextContent } from './utils.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
-import type { CacheManager } from '../fs/cacheManager.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
@@ -97,7 +95,6 @@ interface StreamCallbacks {
 }
 
 interface AgentOrchestratorOptions {
-  cacheManager?: CacheManager
   userDataPath?: string
   messagePipeline?: MessagePipelineConfig
 }
@@ -137,7 +134,6 @@ export class AgentOrchestrator {
     unknown,
     string
   > | null = null
-  private activeContext: MindmapContextData | null = null
 
   constructor(
     private provider: LLMProvider,
@@ -158,26 +154,6 @@ export class AgentOrchestrator {
     if (!this.compiledMindmapSubgraph) {
       this.compiledMindmapSubgraph = buildMindmapSubgraph({
         provider: this.provider,
-        cacheDocumentText: this.options.cacheManager
-          ? async (docRef, text) => {
-              const metadataTextCacheKey = docRef.metadata?.textCacheKey
-              const textCacheKey =
-                typeof metadataTextCacheKey === 'string' &&
-                /^[A-Za-z0-9_-]+$/.test(metadataTextCacheKey)
-                  ? metadataTextCacheKey
-                  : docRef.id
-              await this.options.cacheManager!.cacheDocumentText(textCacheKey, text)
-              return {
-                ...docRef,
-                metadata: {
-                  ...docRef.metadata,
-                  originalPath: docRef.metadata?.originalPath || docRef.source,
-                  textCacheKey,
-                  textCachedAt: new Date().toISOString(),
-                },
-              }
-            }
-          : undefined,
       }).compile()
     }
     return this.compiledMindmapSubgraph
@@ -187,7 +163,6 @@ export class AgentOrchestrator {
     if (!this.compiledPalaceSubgraph) {
       this.compiledPalaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
-        cacheManager: this.options.cacheManager,
       }).compile()
     }
     return this.compiledPalaceSubgraph
@@ -199,7 +174,6 @@ export class AgentOrchestrator {
     signal?: AbortSignal,
   ): Promise<void> {
     const app = this.getCompiledMainGraph()
-    this.activeContext = request.context ?? null
 
     let fullContent = ''
     let currentSegmentContent = ''
@@ -434,14 +408,6 @@ export class AgentOrchestrator {
     )
     if (hasPalace && actionTools.addPalaceNodeTool) {
       tools.push(actionTools.addPalaceNodeTool)
-    }
-    if (this.options.cacheManager) {
-      tools.push(
-        createReadLinkedDocumentTool({
-          documents: () => this.activeContext?.linkedDocuments ?? [],
-          cacheManager: this.options.cacheManager,
-        }),
-      )
     }
     const toolNode = new ToolNode(tools)
     const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(

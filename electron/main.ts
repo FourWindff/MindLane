@@ -336,7 +336,6 @@ function registerIpcHandlers(userDataPath: string) {
         }
 
         const orchestrator = new AgentOrchestrator(provider, aiService, {
-          cacheManager: fsService.cache,
           userDataPath,
           messagePipeline: await resolveMessagePipelineConfig(),
         })
@@ -413,7 +412,6 @@ function registerIpcHandlers(userDataPath: string) {
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
       const orchestrator = new AgentOrchestrator(provider, aiService, {
-        cacheManager: fsService.cache,
         userDataPath,
         messagePipeline: await resolveMessagePipelineConfig(),
       })
