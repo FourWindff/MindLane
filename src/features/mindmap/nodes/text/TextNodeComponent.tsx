@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
-import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
+import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
@@ -7,7 +8,7 @@ import type { TextNodeData } from './types'
 
 function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TextNodeData
-  const { setNodes } = useReactFlow()
+  const editor = useActiveMindmapEditor()
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore((s) => s.busy)
@@ -16,20 +17,17 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const editing = !!data.editing
 
   const clearEditing = useCallback(() => {
-    setNodes((nds) =>
-      nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, editing: undefined } } : n)),
-    )
-  }, [id, setNodes])
+    editor.setNodeEditing(id, false)
+  }, [id, editor])
 
   const commit = useCallback(() => {
     const next = label.trim() || '未命名'
     setLabel(next)
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === id ? { ...n, data: { ...n.data, label: next, editing: undefined } } : n,
-      ),
-    )
-  }, [id, label, setNodes])
+    editor.updateNode(id, (n) => ({
+      ...n,
+      data: { ...n.data, label: next, editing: undefined },
+    }))
+  }, [id, label, editor])
 
   useEffect(() => {
     setLabel(data.label)
@@ -55,13 +53,9 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const onAnimationEnd = useCallback(
     (e: React.AnimationEvent<HTMLDivElement>) => {
       if (!e.animationName.includes('text-node-enter')) return
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === id && n.data.justAdded ? { ...n, data: { ...n.data, justAdded: undefined } } : n,
-        ),
-      )
+      editor.clearNodeFlag(id, 'justAdded')
     },
-    [id, setNodes],
+    [id, editor],
   )
 
   // 按深度/分支计算节点颜色

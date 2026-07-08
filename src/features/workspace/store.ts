@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
-import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
 interface WorkspaceStore {
@@ -140,11 +140,18 @@ async function listWorkspaceTree(workspacePath: string | null): Promise<Workspac
 }
 
 function loadMindLaneFile(filePath: string, data: unknown) {
-  useMindmapStore.getState().loadFile(filePath, data as MindLaneFile)
+  const instance = mindmapRegistry.getOrCreate(filePath)
+  instance.load(filePath, data as MindLaneFile)
+  mindmapRegistry.setActive(filePath)
 }
 
 function clearMindLaneFile() {
-  useMindmapStore.getState().clearDocument()
+  const active = mindmapRegistry.getActive()
+  if (active) {
+    mindmapRegistry.release(active.key)
+  }
+  mindmapRegistry.setActive(null)
+  mindmapRegistry.resetDefault()
 }
 
 async function createUniqueWorkspaceFile(
@@ -173,9 +180,10 @@ async function createUniqueWorkspaceFile(
 
 export async function saveCurrentDocumentSilently(): Promise<boolean> {
   const workspaceState = useWorkspaceStore.getState()
-  const mindmapState = useMindmapStore.getState()
+  const activeInstance = mindmapRegistry.getActive()
+  const mindmapState = activeInstance?.store.getState()
 
-  if (!mindmapState.hasDocumentOpen || !mindmapState.dirty) {
+  if (!mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) {
     return true
   }
 
@@ -383,7 +391,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   openWorkspaceFile: async (filePath: string) => {
-    const currentFilePath = useMindmapStore.getState().filePath
+    const activeInstance = mindmapRegistry.getActive()
+    const currentFilePath = activeInstance?.store.getState().filePath
     if (currentFilePath === filePath) return true
     if (!(await saveCurrentDocumentSilently())) {
       return false
@@ -595,7 +604,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return false
       }
 
-      const currentFilePath = useMindmapStore.getState().filePath
+      const activeInstance = mindmapRegistry.getActive()
+      const currentFilePath = activeInstance?.store.getState().filePath
       if (
         currentFilePath === targetPath ||
         (currentFilePath && currentFilePath.startsWith(targetPath + '/'))
@@ -631,9 +641,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const currentFilePath = useMindmapStore.getState().filePath
+      const activeInstance = mindmapRegistry.getActive()
+      const currentFilePath = activeInstance?.store.getState().filePath
       if (currentFilePath === oldPath) {
-        useMindmapStore.getState().setFilePath(result.data.newPath)
+        activeInstance?.store.getState().setFilePath(result.data.newPath)
+        mindmapRegistry.renameKey(oldPath, result.data.newPath)
       }
 
       const expanded = new Set(get().expandedFolders)
@@ -672,9 +684,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const currentFilePath = useMindmapStore.getState().filePath
+      const activeInstance = mindmapRegistry.getActive()
+      const currentFilePath = activeInstance?.store.getState().filePath
       if (currentFilePath === sourcePath) {
-        useMindmapStore.getState().setFilePath(result.data.newPath)
+        activeInstance?.store.getState().setFilePath(result.data.newPath)
+        mindmapRegistry.renameKey(sourcePath, result.data.newPath)
       }
 
       const tree = await listWorkspaceTree(workspacePath)

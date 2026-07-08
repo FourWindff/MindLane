@@ -36,6 +36,7 @@ tsconfig.node.tsbuildinfo
 skills-lock.json
 docs/
 .scratch/
+CONTEXT.md
 
 # LangGraph API
 .langgraph_api

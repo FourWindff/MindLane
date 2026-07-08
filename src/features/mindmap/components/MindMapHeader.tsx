@@ -8,6 +8,8 @@ import {
   Settings,
   Locate,
   Palette,
+  Undo2,
+  Redo2,
 } from 'lucide-react'
 
 type Props = {
@@ -15,6 +17,8 @@ type Props = {
   onAddSibling: () => void
   onRemove: () => void
   onReset: () => void
+  onUndo?: () => void
+  onRedo?: () => void
   onOpenSettings?: () => void
   onSwitchWorkspace?: () => void
   onSave?: () => void
@@ -23,6 +27,8 @@ type Props = {
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
+  canUndo?: boolean
+  canRedo?: boolean
   stylePanelOpen?: boolean
   /** 样式面板内容，打开时渲染在工具栏下方。 */
   stylePanel?: React.ReactNode
@@ -73,6 +79,8 @@ export function MindMapHeader({
   onAddSibling,
   onRemove,
   onReset,
+  onUndo,
+  onRedo,
   onOpenSettings,
   onSwitchWorkspace,
   onSave,
@@ -81,6 +89,8 @@ export function MindMapHeader({
   canAddChild,
   canAddSibling,
   canRemove,
+  canUndo,
+  canRedo,
   stylePanelOpen,
   stylePanel,
 }: Props) {
@@ -89,6 +99,24 @@ export function MindMapHeader({
       <div className="mindmap-header__panel">
         <nav className="float-toolbar" aria-label="导图操作">
           <div className="float-toolbar__group float-toolbar__group--edit">
+            {onUndo && (
+              <ToolbarButton
+                onClick={onUndo}
+                disabled={!canUndo}
+                ariaLabel="撤销"
+                tooltip="撤销 (Ctrl+Z)"
+                icon={<Undo2 size={22} strokeWidth={1.5} />}
+              />
+            )}
+            {onRedo && (
+              <ToolbarButton
+                onClick={onRedo}
+                disabled={!canRedo}
+                ariaLabel="重做"
+                tooltip="重做 (Ctrl+Shift+Z)"
+                icon={<Redo2 size={22} strokeWidth={1.5} />}
+              />
+            )}
             <ToolbarButton
               onClick={onAddChild}
               disabled={!canAddChild}

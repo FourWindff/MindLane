@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MindMapView } from '@/features/mindmap/components/MindMapView'
-import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { loadMindmapStyleFromBackend } from '@/features/mindmap/style/styleStore'
@@ -14,6 +14,7 @@ import {
 } from '@/features/workspace/store'
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
 import { AppToolbar } from '@/features/shell/components/AppToolbar'
+import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryContext'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import './styles/app-shell.css'
@@ -64,8 +65,8 @@ function AppContent() {
   const workspaceInitializing = useWorkspaceStore((s) => s.initializing)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
-  const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
-  const filePath = useMindmapStore((s) => s.filePath)
+  const hasDocumentOpen = useActiveMindmapStore((s) => s.hasDocumentOpen)
+  const filePath = useActiveMindmapStore((s) => s.filePath)
 
   useEffect(() => {
     void loadSettingsFromBackend()
@@ -149,7 +150,9 @@ function AppContent() {
 export function App() {
   return (
     <ShortcutRegistryProvider>
-      <AppContent />
+      <MindmapEditorProvider>
+        <AppContent />
+      </MindmapEditorProvider>
     </ShortcutRegistryProvider>
   )
 }

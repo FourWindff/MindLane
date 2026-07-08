@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
-import { Handle, Position, useReactFlow, type NodeProps } from '@xyflow/react'
+import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Image, Landmark, Minimize2 } from 'lucide-react'
+import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import type { PalaceNodeData } from './types'
 
 type TransitionPhase = 'collapsed' | 'expanding' | 'expanded' | 'collapsing'
@@ -9,7 +10,7 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as PalaceNodeData
   const stations = data.stations ?? []
   const expanded = !!data.expanded
-  const { setNodes } = useReactFlow()
+  const editor = useActiveMindmapEditor()
 
   const prevExpanded = useRef(expanded)
   const [phase, setPhase] = useState<TransitionPhase>(expanded ? 'expanded' : 'collapsed')
@@ -31,11 +32,9 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const collapse = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
-      setNodes((nds) =>
-        nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, expanded: false } } : n)),
-      )
+      editor.setNodeExpanded(id, false)
     },
-    [id, setNodes],
+    [id, editor],
   )
 
   if (data.generating) {

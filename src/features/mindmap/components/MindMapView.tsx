@@ -26,26 +26,23 @@ import '@xyflow/react/dist/style.css'
 import { MindMapHeader } from '@/features/mindmap/components/MindMapHeader'
 import { PalaceModal } from '@/features/mindmap/components/PalaceModal'
 import { nodeRegistry } from '@/features/mindmap/nodes'
-import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { isDefaultViewport } from '@/shared/lib/fileFormat'
 import {
   collectSubtreeIds,
-  createInitialEdges,
-  createInitialNodes,
   findParentId,
   findRootNode,
   getChildIdsOrdered,
   newId,
-  reflowChildren,
-  withNewChild,
-  withNewSibling,
   CHILD_OFFSET_X,
-  CHILD_GAP_Y,
 } from '@/shared/lib/mindmapTree'
 import type { PalaceNodeData } from '../nodes/palace/types'
+import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { MindMapContextMenu, type ContextMenuState } from './MindMapContextMenu'
 import { AiProgressOverlay } from './AiProgressOverlay'
@@ -54,8 +51,6 @@ import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StyleProvider } from '@/features/mindmap/style/StyleContext'
 import { useStyleStore } from '@/features/mindmap/style/styleStore'
 import { StylePanel } from './StylePanel'
-
-const NODE_EXIT_MS = 300
 
 type FlowContextEvent = ReactMouseEvent | globalThis.MouseEvent
 
@@ -81,22 +76,21 @@ function MindMapCanvas({
   }, [structureType])
   const [stylePanelOpen, setStylePanelOpen] = useState(false)
 
-  const nodes = useMindmapStore((s) => s.nodes)
-  const edges = useMindmapStore((s) => s.edges)
-  const setNodes = useMindmapStore((s) => s.setNodes)
-  const setEdges = useMindmapStore((s) => s.setEdges)
-  const onNodesChange = useMindmapStore((s) => s.onNodesChange)
-  const onEdgesChange = useMindmapStore((s) => s.onEdgesChange)
-  const onConnect = useMindmapStore((s) => s.onConnect)
+  const nodes = useActiveMindmapStore((s) => s.nodes)
+  const edges = useActiveMindmapStore((s) => s.edges)
+  const canUndo = useActiveMindmapStore((s) => s.canUndo)
+  const canRedo = useActiveMindmapStore((s) => s.canRedo)
+  const editor = useActiveMindmapEditor()
+  const activeInstance = useActiveMindmapInstance()
   const aiBusy = useAiStore((s) => s.busy)
   const apiKey = useSettingsStore((s) => s.apiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
   const capabilities = useSettingsStore((s) => s.capabilities)
   const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
-  const dirty = useMindmapStore((s) => s.dirty)
-  const filePath = useMindmapStore((s) => s.filePath)
-  const hasDocumentOpen = useMindmapStore((s) => s.hasDocumentOpen)
+  const dirty = useActiveMindmapStore((s) => s.dirty)
+  const filePath = useActiveMindmapStore((s) => s.filePath)
+  const hasDocumentOpen = useActiveMindmapStore((s) => s.hasDocumentOpen)
   const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
   const updateFilePreviewUrl = useWorkspaceStore((s) => s.updateFilePreviewUrl)
 
@@ -108,9 +102,6 @@ function MindMapCanvas({
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
   const graphRef = useRef({ nodes, edges })
-  const exitTimeoutsRef = useRef<number[]>([])
-  const layoutTimerRef = useRef<number | null>(null)
-  const isLayoutingRef = useRef(false)
   const lastRestoredFileRef = useRef<string | null>(null)
   const viewportDebounceRef = useRef<number | null>(null)
 
@@ -123,20 +114,23 @@ function MindMapCanvas({
     if (lastRestoredFileRef.current === filePath) return
     lastRestoredFileRef.current = filePath
 
-    const vp = useMindmapStore.getState().viewport
+    const vp = activeInstance.store.getState().viewport
     if (isDefaultViewport(vp)) {
       rf.fitView({ padding: 0.2, duration: 300 })
     } else {
       rf.setViewport(vp)
     }
-  }, [filePath, hasDocumentOpen, nodes.length, rf])
+  }, [filePath, hasDocumentOpen, nodes.length, rf, activeInstance.store])
 
-  const handleInit = useCallback((instance: ReactFlowInstance) => {
-    const vp = useMindmapStore.getState().viewport
-    if (!isDefaultViewport(vp)) {
-      instance.setViewport(vp)
-    }
-  }, [])
+  const handleInit = useCallback(
+    (instance: ReactFlowInstance) => {
+      const vp = activeInstance.store.getState().viewport
+      if (!isDefaultViewport(vp)) {
+        instance.setViewport(vp)
+      }
+    },
+    [activeInstance.store],
+  )
 
   const handleMoveEnd = useCallback(
     (_event: MouseEvent | TouchEvent | null, viewport: Viewport) => {
@@ -145,65 +139,39 @@ function MindMapCanvas({
       }
       viewportDebounceRef.current = window.setTimeout(() => {
         viewportDebounceRef.current = null
-        useMindmapStore.getState().setViewport(viewport)
+        activeInstance.store.getState().setViewport(viewport)
       }, 200)
     },
-    [],
+    [activeInstance.store],
   )
 
   const handleNodesChange = useCallback(
     (changes: import('@xyflow/react').NodeChange[]) => {
-      onNodesChange(changes)
-
-      if (isLayoutingRef.current) return
-
-      const hasDimensionChange = changes.some((c) => c.type === 'dimensions' && c.dimensions)
-      if (!hasDimensionChange) return
-
-      if (layoutTimerRef.current) window.clearTimeout(layoutTimerRef.current)
-      layoutTimerRef.current = window.setTimeout(() => {
-        layoutTimerRef.current = null
-        const { nodes: latestNodes, edges: curEdges } = useMindmapStore.getState()
-        isLayoutingRef.current = true
-
-        const targetIds = new Set(curEdges.map((e) => e.target))
-        const roots = latestNodes.filter((n) => !targetIds.has(n.id))
-
-        let result = latestNodes
-        for (const root of roots) {
-          result = reflowChildren(
-            root.id,
-            result,
-            curEdges,
-            CHILD_OFFSET_X,
-            CHILD_GAP_Y,
-            structureTypeRef.current,
-          )
-        }
-
-        setNodes(result)
-        requestAnimationFrame(() => {
-          isLayoutingRef.current = false
-        })
-      }, 80)
+      editor.applyNativeNodeChanges(changes, structureTypeRef.current)
     },
-    [onNodesChange, setNodes],
+    [editor],
+  )
+
+  const handleEdgesChange = useCallback(
+    (changes: import('@xyflow/react').EdgeChange[]) => {
+      editor.applyNativeEdgeChanges(changes)
+    },
+    [editor],
+  )
+
+  const handleConnect = useCallback(
+    (connection: import('@xyflow/react').Connection) => {
+      editor.applyNativeConnect(connection)
+    },
+    [editor],
   )
 
   const startEditing = useCallback(
     (nodeId: string) => {
       if (aiBusy) return
-      setNodes((nds) =>
-        nds.map((n) =>
-          n.id === nodeId && n.type === 'text'
-            ? { ...n, data: { ...n.data, editing: true } }
-            : n.data.editing
-              ? { ...n, data: { ...n.data, editing: undefined } }
-              : n,
-        ),
-      )
+      editor.setNodeEditing(nodeId, true)
     },
-    [aiBusy, setNodes],
+    [aiBusy, editor],
   )
 
   const lastClickRef = useRef<{ id: string; time: number } | null>(null)
@@ -216,9 +184,7 @@ function MindMapCanvas({
         if (pd.expanded) {
           setPalaceModal(pd)
         } else {
-          setNodes((nds) =>
-            nds.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, expanded: true } } : n)),
-          )
+          editor.setNodeExpanded(node.id, true)
         }
         return
       }
@@ -231,15 +197,8 @@ function MindMapCanvas({
         lastClickRef.current = { id: node.id, time: now }
       }
     },
-    [startEditing, setNodes],
+    [startEditing, editor],
   )
-
-  useEffect(() => {
-    return () => {
-      exitTimeoutsRef.current.forEach((id) => window.clearTimeout(id))
-      exitTimeoutsRef.current = []
-    }
-  }, [])
 
   useEffect(() => {
     return () => {
@@ -287,7 +246,7 @@ function MindMapCanvas({
       event.preventDefault()
       setSelectedId(node.id)
       if (!node.selected) {
-        setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === node.id })))
+        editor.setNodeSelected(node.id, true)
       }
       openContextMenu({
         clientX: event.clientX,
@@ -296,7 +255,7 @@ function MindMapCanvas({
         nodeId: node.id,
       })
     },
-    [openContextMenu, setNodes],
+    [openContextMenu, editor],
   )
 
   const onSelectionContextMenu = useCallback(
@@ -331,43 +290,21 @@ function MindMapCanvas({
 
   const addChild = useCallback(() => {
     if (aiBusy) return
-    const parentId = selectedId ?? 'root'
-    const { nodes: nextNodes, edges: nextEdges } = withNewChild(
-      nodes,
-      edges,
-      parentId,
-      { label: '新主题' },
-      CHILD_OFFSET_X,
-      CHILD_GAP_Y,
-      structureType,
-    )
-    setNodes(nextNodes)
-    setEdges(nextEdges)
-  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes, structureType])
+    editor.addChild(selectedId ?? 'root')
+  }, [aiBusy, editor, selectedId])
 
   const addSibling = useCallback(() => {
     if (aiBusy || !selectedId) return
-    const { nodes: nextNodes, edges: nextEdges } = withNewSibling(
-      nodes,
-      edges,
-      selectedId,
-      { label: '新主题' },
-      CHILD_OFFSET_X,
-      CHILD_GAP_Y,
-      structureType,
-    )
-    if (nextNodes === nodes && nextEdges === edges) return
-    setNodes(nextNodes)
-    setEdges(nextEdges)
-  }, [aiBusy, edges, nodes, selectedId, setEdges, setNodes, structureType])
+    editor.addSibling(selectedId)
+  }, [aiBusy, editor, selectedId])
 
   const selectNode = useCallback(
     (targetId: string) => {
       setSelectedId(targetId)
-      setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === targetId })))
+      editor.setNodeSelected(targetId, true)
       rfStore.setState({ nodesSelectionActive: false })
     },
-    [setNodes, rfStore],
+    [editor, rfStore],
   )
 
   const removeSelected = useCallback(() => {
@@ -381,23 +318,6 @@ function MindMapCanvas({
       for (const id of collectSubtreeIds(edges, t.id)) allIds.add(id)
     }
 
-    setNodes((nds) =>
-      nds.map((n) => (allIds.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n)),
-    )
-    setEdges((eds) =>
-      eds.map((e) => {
-        const touch = allIds.has(e.source) || allIds.has(e.target)
-        if (!touch) return e
-        const parts = new Set(
-          [e.className, 'mindmap-edge', 'mindmap-edge--exiting']
-            .join(' ')
-            .split(/\s+/)
-            .filter(Boolean),
-        )
-        return { ...e, className: [...parts].join(' ') }
-      }),
-    )
-
     const primaryId = targets[0]!.id
     const parentId = findParentId(edges, primaryId)
     let nextSelectedId = parentId ?? 'root'
@@ -409,32 +329,14 @@ function MindMapCanvas({
     if (allIds.has(nextSelectedId)) nextSelectedId = 'root'
     selectNode(nextSelectedId)
 
-    let timeoutId = 0
-    timeoutId = window.setTimeout(() => {
-      exitTimeoutsRef.current = exitTimeoutsRef.current.filter((tid) => tid !== timeoutId)
-      const { nodes: n, edges: e } = graphRef.current
-      const nextNodes = n.filter((node) => !allIds.has(node.id))
-      const nextEdges = e.filter((edge) => !allIds.has(edge.source) && !allIds.has(edge.target))
-      const laidOut = reflowChildren(
-        'root',
-        nextNodes,
-        nextEdges,
-        CHILD_OFFSET_X,
-        CHILD_GAP_Y,
-        structureTypeRef.current,
-      )
-      setNodes(laidOut)
-      setEdges(nextEdges)
-    }, NODE_EXIT_MS)
-    exitTimeoutsRef.current.push(timeoutId)
-  }, [aiBusy, edges, nodes, selectNode, setEdges, setNodes])
+    editor.deleteSubtrees(targets.map((t) => t.id))
+  }, [aiBusy, editor, edges, nodes, selectNode])
 
   const reset = useCallback(() => {
     if (aiBusy) return
-    setNodes(createInitialNodes() as Node[])
-    setEdges(createInitialEdges())
+    editor.reset()
     setSelectedId('root')
-  }, [aiBusy, setEdges, setNodes])
+  }, [aiBusy, editor])
 
   const navigateLeft = useCallback(() => {
     if (!selectedId) return
@@ -482,8 +384,18 @@ function MindMapCanvas({
     const centerY = rootNode.position.y + height / 2
 
     await rf.setCenter(centerX, centerY, { zoom: 1, duration: 300 })
-    useMindmapStore.getState().setViewport(rf.getViewport())
-  }, [rf, nodes, edges])
+    activeInstance.store.getState().setViewport(rf.getViewport())
+  }, [rf, nodes, edges, activeInstance.store])
+
+  const handleUndo = useCallback(() => {
+    if (aiBusy) return
+    editor.undo()
+  }, [aiBusy, editor])
+
+  const handleRedo = useCallback(() => {
+    if (aiBusy) return
+    editor.redo()
+  }, [aiBusy, editor])
 
   const canAddChild = hasSelection
 
@@ -613,6 +525,28 @@ function MindMapCanvas({
       centerRoot()
     },
   })
+  useShortcut({
+    id: 'mindmap.undo',
+    combo: 'mod+z',
+    description: '撤销',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      handleUndo()
+    },
+  })
+  useShortcut({
+    id: 'mindmap.redo',
+    combo: 'mod+shift+z',
+    description: '重做',
+    group: 'mindmap',
+    preventWhenTyping: true,
+    enabled: mindmapShortcutsEnabled,
+    handler: () => {
+      handleRedo()
+    },
+  })
 
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
   const hiddenRfInstanceRef = useRef<ReactFlowInstance | null>(null)
@@ -656,7 +590,7 @@ function MindMapCanvas({
   }, [])
 
   const doSave = useCallback(async () => {
-    const store = useMindmapStore.getState()
+    const store = activeInstance.store.getState()
     const ai = useAiStore.getState()
     try {
       const data = store.toMindLaneFile()
@@ -677,7 +611,7 @@ function MindMapCanvas({
       console.error('[MindLane] 保存失败：', e)
       ai.setError(`保存失败：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl])
+  }, [syncAfterFileSaved, generateThumbnail, updateFilePreviewUrl, activeInstance.store])
 
   void aiBusy
 
@@ -743,9 +677,6 @@ function MindMapCanvas({
       return
     }
 
-    const rollbackNodes = nodes
-    const rollbackEdges = edges
-
     const palaceId = newId()
     const parentId = findParentId(edges, selectedNodes[0]?.id ?? '') ?? 'root'
     const parentNode = nodes.find((n) => n.id === parentId)
@@ -776,6 +707,13 @@ function MindMapCanvas({
     }
 
     const selectedIdSet = new Set(selectedNodes.map((n) => n.id))
+    const rollbackPalaceGeneration = () => {
+      editor.undo()
+      for (const id of selectedIdSet) {
+        editor.clearNodeFlag(id, 'processing')
+      }
+    }
+
     const childEdges: Edge[] = selectedNodes.map((n) => ({
       id: `e-${palaceId}-${n.id}`,
       source: palaceId,
@@ -784,26 +722,18 @@ function MindMapCanvas({
       className: 'mindmap-edge',
     }))
 
-    const cleanedEdges = edges.filter(
-      (e) => !(e.source === parentId && selectedIdSet.has(e.target)),
-    )
+    const edgesToRemove = edges.filter((e) => e.source === parentId && selectedIdSet.has(e.target))
 
-    const processingIds = new Set(selectedNodes.map((n) => n.id))
-    const nextNodes = [...nodes, placeholderNode].map((n) =>
-      processingIds.has(n.id) ? { ...n, data: { ...n.data, processing: true } } : n,
-    )
-    const nextEdges = [...cleanedEdges, treeEdge, ...childEdges]
+    for (const id of selectedIdSet) {
+      editor.setNodeFlag(id, 'processing', true)
+    }
 
-    const laidOut = reflowChildren(
-      palaceId,
-      nextNodes,
-      nextEdges,
-      CHILD_OFFSET_X,
-      CHILD_GAP_Y,
-      structureType,
-    )
-    setNodes(laidOut)
-    setEdges(nextEdges)
+    const commands: MindmapCommand[] = [
+      { type: 'addNode', node: placeholderNode, edge: treeEdge },
+      ...childEdges.map((edge) => ({ type: 'addEdge' as const, edge })),
+      ...edgesToRemove.map((edge) => ({ type: 'removeEdge' as const, edgeId: edge.id })),
+    ]
+    editor.batch(commands)
 
     ai.setBusy(true)
     ai.setStep('analyzing')
@@ -820,47 +750,46 @@ function MindMapCanvas({
       ])
 
       if (!result) {
-        setNodes(rollbackNodes)
-        setEdges(rollbackEdges)
+        rollbackPalaceGeneration()
         ai.setError('生成超时（超过 2 分钟），请检查网络后重试')
         return
       }
 
       if (!result.ok) {
-        setNodes(rollbackNodes)
-        setEdges(rollbackEdges)
+        rollbackPalaceGeneration()
         const errMsg = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
         ai.setError(`AI 返回错误：${errMsg}`)
         return
       }
 
-      setNodes((nds) =>
-        nds.map((n) => {
-          if (n.id === palaceId) {
-            return {
-              ...n,
-              data: {
-                label: result.label,
-                imageUrl: result.imageUrl,
-                stations: result.stations,
-                sourceNodeIds: result.sourceNodeIds,
-                expanded: true,
-              },
-            }
-          }
-          if (n.data.processing) {
-            return { ...n, data: { ...n.data, processing: undefined } }
-          }
-          return n
-        }),
-      )
+      editor.batch([
+        {
+          type: 'updateNode',
+          nodeId: palaceId,
+          patch: (n) => ({
+            ...n,
+            data: {
+              label: result.label,
+              imageUrl: result.imageUrl,
+              stations: result.stations,
+              sourceNodeIds: result.sourceNodeIds,
+              expanded: true,
+              generating: undefined,
+            },
+          }),
+        },
+        ...[...selectedIdSet].map((nodeId) => ({
+          type: 'updateNode' as const,
+          nodeId,
+          patch: (n: Node) => ({ ...n, data: { ...n.data, processing: undefined } }),
+        })),
+      ])
       ai.reset()
     } catch (e) {
-      setNodes(rollbackNodes)
-      setEdges(rollbackEdges)
+      rollbackPalaceGeneration()
       ai.setError(`生成异常：${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [aiBusy, apiKey, chatModel, selectedId, nodes, edges, setNodes, setEdges, structureType])
+  }, [aiBusy, apiKey, chatModel, selectedId, nodes, edges, editor])
 
   // 布局类型切换时重新排布整棵树
   const prevStructureTypeRef = useRef(structureType)
@@ -868,16 +797,9 @@ function MindMapCanvas({
     if (prevStructureTypeRef.current === structureType) return
     prevStructureTypeRef.current = structureType
 
-    const { nodes: latestNodes, edges: curEdges } = useMindmapStore.getState()
-    const targetIds = new Set(curEdges.map((e) => e.target))
-    const roots = latestNodes.filter((n) => !targetIds.has(n.id))
-    let result = latestNodes
-    for (const root of roots) {
-      result = reflowChildren(root.id, result, curEdges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
-    }
-    setNodes(result)
+    editor.setStructureType(structureType)
     setTimeout(() => rf.fitView({ padding: 0.2, duration: 300 }), 50)
-  }, [structureType, setNodes, rf])
+  }, [structureType, editor, rf])
 
   return (
     <div className="mindmap-shell">
@@ -886,6 +808,8 @@ function MindMapCanvas({
         onAddSibling={addSibling}
         onRemove={removeSelected}
         onReset={reset}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={doSave}
@@ -894,6 +818,8 @@ function MindMapCanvas({
         canAddChild={canAddChild}
         canAddSibling={canAddSibling}
         canRemove={canRemove}
+        canUndo={canUndo}
+        canRedo={canRedo}
         stylePanelOpen={stylePanelOpen}
         stylePanel={stylePanelOpen ? <StylePanel onClose={() => setStylePanelOpen(false)} /> : null}
       />
@@ -902,8 +828,8 @@ function MindMapCanvas({
           nodes={nodes}
           edges={edges}
           onNodesChange={aiBusy ? undefined : handleNodesChange}
-          onEdgesChange={aiBusy ? undefined : onEdgesChange}
-          onConnect={aiBusy ? undefined : onConnect}
+          onEdgesChange={aiBusy ? undefined : handleEdgesChange}
+          onConnect={aiBusy ? undefined : handleConnect}
           onNodeClick={onNodeClick}
           onPaneContextMenu={onPaneContextMenu}
           onNodeContextMenu={onNodeContextMenu}
@@ -914,7 +840,7 @@ function MindMapCanvas({
           selectionMode={SelectionMode.Partial}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          nodesDraggable={false}
+          nodesDraggable={!aiBusy}
           nodesConnectable={!aiBusy}
           elementsSelectable={!aiBusy}
           onMoveEnd={handleMoveEnd}

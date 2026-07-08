@@ -1,5 +1,6 @@
 import { useRef, useCallback } from 'react'
-import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
+import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore } from '@/features/chat/model/aiStore'
@@ -48,10 +49,15 @@ export function useChatContext() {
   const apiKey = useSettingsStore((s) => s.apiKey)
   const capabilities = useSettingsStore((s) => s.capabilities)
 
-  const selectedNodes = useMindmapStore(useShallowById((s) => s.nodes.filter((n) => n.selected)))
+  const activeInstance = useActiveMindmapInstance()
+  const selectedNodes = activeInstance.store(
+    useShallowById((s) => s.nodes.filter((n) => n.selected)),
+  )
+
+  const editor = useActiveMindmapEditor()
 
   const buildContext = useCallback((): ChatContext => {
-    const mindmapState = useMindmapStore.getState()
+    const mindmapState = activeInstance.store.getState()
     const wsState = useWorkspaceStore.getState()
     const ctx: ChatContext = {}
 
@@ -87,12 +93,11 @@ export function useChatContext() {
     }
 
     return ctx
-  }, [])
+  }, [activeInstance])
 
   const clearNodeSelection = useCallback(() => {
-    const store = useMindmapStore.getState()
-    store.setNodes(store.nodes.map((n) => ({ ...n, selected: false })))
-  }, [])
+    editor.clearNodeSelection()
+  }, [editor])
 
   const features = ['生成思维导图']
   if (capabilities.includes('embeddings')) {

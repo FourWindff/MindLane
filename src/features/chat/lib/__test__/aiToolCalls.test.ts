@@ -1,16 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
 import { handleMindmapToolCall } from '../aiToolCalls'
-import { useMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { createMindmapStore } from '@/features/mindmap/model/mindmapStore'
+import { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import { MindmapHistory } from '@/features/mindmap/model/mindmapHistory'
 
-function resetMindmapStore(nodes: Node[], edges: Edge[]) {
-  useMindmapStore.setState({
+function resetMindmapStore(
+  store: ReturnType<typeof createMindmapStore>,
+  nodes: Node[],
+  edges: Edge[],
+) {
+  store.setState({
     nodes,
     edges,
     dirty: false,
     filePath: null,
     hasDocumentOpen: false,
   })
+}
+
+function createTestEditor() {
+  const store = createMindmapStore()
+  const history = new MindmapHistory()
+  return { editor: new MindmapEditor(store, history), store }
 }
 
 describe('handleMindmapToolCall', () => {
@@ -32,7 +44,8 @@ describe('handleMindmapToolCall', () => {
       { id: 'e-root-deleted', source: 'root', target: 'deleted', type: 'mindmap' },
       { id: 'e-root-last', source: 'root', target: 'last', type: 'mindmap' },
     ]
-    resetMindmapStore(nodes, edges)
+    const { editor, store } = createTestEditor()
+    resetMindmapStore(store, nodes, edges)
 
     const handled = handleMindmapToolCall(
       {
@@ -44,14 +57,14 @@ describe('handleMindmapToolCall', () => {
           data: { nodeId: 'deleted', confirmDeleteSubtree: true },
         }),
       },
-      useMindmapStore.getState(),
+      editor,
     )
 
     expect(handled).toBe(true)
 
     vi.advanceTimersByTime(300)
 
-    const remainingNodes = useMindmapStore.getState().nodes
+    const remainingNodes = store.getState().nodes
     expect(remainingNodes.map((node) => node.id)).toEqual(['root', 'first', 'last'])
     expect(remainingNodes.find((node) => node.id === 'first')?.position.y).toBe(-32)
     expect(remainingNodes.find((node) => node.id === 'last')?.position.y).toBe(32)
