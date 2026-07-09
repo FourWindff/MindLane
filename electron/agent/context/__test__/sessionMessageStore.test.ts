@@ -40,6 +40,17 @@ describe('SessionMessageStore', () => {
     expect(sessions[0].messageCount).toBe(2)
   })
 
+  it('跳过已经由并发写入持久化的批次开头消息', async () => {
+    await store.saveMessage('race', new HumanMessage('hello'))
+    await store.saveMessages('race', [new HumanMessage('hello'), new AIMessage('hi')])
+
+    const messages = await store.loadMessages('race')
+    expect(messages.map((msg) => [msg.getType(), msg.content])).toEqual([
+      ['human', 'hello'],
+      ['ai', 'hi'],
+    ])
+  })
+
   it('列出会话按 updatedAt 降序', async () => {
     await store.saveMessage('a', new HumanMessage('a'))
     await new Promise((r) => setTimeout(r, 20))

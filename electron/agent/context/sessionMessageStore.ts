@@ -71,7 +71,8 @@ export class SessionMessageStore {
       const lines = this.readLines(sessionPath)
       const meta = this.parseMetadata(lines[0]) ?? this.defaultMeta(sessionId)
       const stored = mapChatMessagesToStoredMessages(messages)
-      for (const s of stored) {
+      const duplicatePrefixLength = this.countDuplicateAppendPrefix(lines, stored)
+      for (const s of stored.slice(duplicatePrefixLength)) {
         lines.push(JSON.stringify(s))
       }
       meta.messageCount = lines.length - 1
@@ -270,6 +271,29 @@ export class SessionMessageStore {
 
   private async ensureDir(dir: string): Promise<void> {
     await fs.promises.mkdir(dir, { recursive: true })
+  }
+
+  private countDuplicateAppendPrefix(lines: string[], stored: StoredMessage[]): number {
+    const messageLineCount = Math.max(0, lines.length - 1)
+    const maxOverlap = Math.min(messageLineCount, stored.length)
+    for (let overlap = maxOverlap; overlap > 0; overlap -= 1) {
+      let matches = true
+      for (let i = 0; i < overlap; i += 1) {
+        const existingLine = lines[lines.length - overlap + i]
+        try {
+          const existing = JSON.parse(existingLine) as StoredMessage
+          if (JSON.stringify(existing) !== JSON.stringify(stored[i])) {
+            matches = false
+            break
+          }
+        } catch {
+          matches = false
+          break
+        }
+      }
+      if (matches) return overlap
+    }
+    return 0
   }
 
   private async withWriteLock(sessionId: string, fn: () => Promise<void>): Promise<void> {
