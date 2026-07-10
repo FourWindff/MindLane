@@ -42,7 +42,6 @@ export function MindmapCanvas({
   onEdgesChange,
   onConnect,
   onNodeClick,
-  onPaneContextMenu,
   onNodeContextMenu,
   onSelectionContextMenu,
   onEdgeContextMenu,
@@ -60,7 +59,7 @@ export function MindmapCanvas({
       onEdgesChange={disabled ? undefined : onEdgesChange}
       onConnect={disabled ? undefined : onConnect}
       onNodeClick={onNodeClick}
-      onPaneContextMenu={onPaneContextMenu}
+      onPaneContextMenu={(event) => event.preventDefault()}
       onNodeContextMenu={onNodeContextMenu}
       onSelectionContextMenu={onSelectionContextMenu}
       onEdgeContextMenu={onEdgeContextMenu}

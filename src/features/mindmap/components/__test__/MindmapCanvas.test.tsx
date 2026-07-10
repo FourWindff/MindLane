@@ -75,4 +75,29 @@ describe('MindmapCanvas', () => {
     expect(reactFlowProps?.nodesConnectable).toBe(true)
     expect(reactFlowProps?.elementsSelectable).toBe(true)
   })
+
+  it('only attaches the context menu handler to nodes', () => {
+    const onPaneContextMenu = vi.fn()
+    const onNodeContextMenu = vi.fn()
+
+    renderToString(
+      <MindmapCanvas
+        nodes={[]}
+        edges={[]}
+        nodeTypes={{}}
+        edgeTypes={{}}
+        disabled={false}
+        onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
+        onSelectionChange={vi.fn()}
+      />,
+    )
+
+    const preventDefault = vi.fn()
+    reactFlowProps?.onPaneContextMenu?.({ preventDefault } as never)
+
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(onPaneContextMenu).not.toHaveBeenCalled()
+    expect(reactFlowProps?.onNodeContextMenu).toBe(onNodeContextMenu)
+  })
 })
