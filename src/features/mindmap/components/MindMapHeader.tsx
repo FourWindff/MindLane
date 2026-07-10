@@ -11,6 +11,7 @@ import {
   Undo2,
   Redo2,
 } from 'lucide-react'
+import { useEffect } from 'react'
 
 type Props = {
   onAddChild: () => void
@@ -94,6 +95,24 @@ export function MindMapHeader({
   stylePanelOpen,
   stylePanel,
 }: Props) {
+  useEffect(() => {
+    if (!stylePanelOpen || !onToggleStylePanel) return
+
+    const dismissStylePanel = (event: PointerEvent) => {
+      const target = event.target
+      if (
+        target instanceof Element &&
+        (target.closest('.style-panel') || target.closest('[aria-label="导图样式"]'))
+      ) {
+        return
+      }
+      onToggleStylePanel()
+    }
+
+    window.addEventListener('pointerdown', dismissStylePanel, true)
+    return () => window.removeEventListener('pointerdown', dismissStylePanel, true)
+  }, [onToggleStylePanel, stylePanelOpen])
+
   return (
     <header className="mindmap-header">
       <div className="mindmap-header__panel">
