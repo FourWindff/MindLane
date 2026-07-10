@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import {
   urlToDataUrl,
   createProvider,
@@ -22,6 +22,7 @@ import { DEFAULT_SETTINGS } from './fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 import { IPC } from './ipc.js'
+import { resolveDocumentRef } from '../src/shared/lib/documentRef.js'
 
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
@@ -812,6 +813,32 @@ function registerIpcHandlers(userDataPath: string) {
       }
     },
   )
+
+  // -- Shell: open linked document refs --
+  ipcMain.handle('shell:open-document-ref', async (_e, doc: DocumentRef) => {
+    const resolved = resolveDocumentRef(doc, userDataPath)
+    if (!resolved.ok) {
+      return { ok: false, error: resolved.error }
+    }
+
+    if (doc.type === 'text' && !fs.existsSync(resolved.target)) {
+      return { ok: false, error: '缓存文件不存在' }
+    }
+
+    try {
+      if (resolved.external) {
+        await shell.openExternal(resolved.target)
+      } else {
+        const error = await shell.openPath(resolved.target)
+        if (error) {
+          return { ok: false, error }
+        }
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   // -- Settings --
   ipcMain.handle(IPC.FileSettingsLoad, async () => {

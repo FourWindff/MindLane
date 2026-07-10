@@ -17,7 +17,9 @@ import { AppToolbar } from '@/features/shell/components/AppToolbar'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryContext'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
+import { ToastContainer } from '@/shared/components/ToastContainer'
 import './styles/app-shell.css'
+import '@/shared/components/toast.css'
 import '@/features/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
 
@@ -140,6 +142,7 @@ function AppContent() {
             {hasDocumentOpen && <ChatPanel />}
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
+            <ToastContainer />
           </div>
         )}
       </div>

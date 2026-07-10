@@ -51,6 +51,7 @@ export function useMindmapOperationController() {
     : ('logic' as const)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
+  const documentRefs = useActiveMindmapStore((state) => state.documentRefs)
 
   const [selectedId, setSelectedId] = useState<string | null>('root')
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>([])
@@ -58,6 +59,7 @@ export function useMindmapOperationController() {
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ scope: 'closed' })
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const [stylePanelOpen, setStylePanelOpen] = useState(false)
+  const [documentRefsPanelOpen, setDocumentRefsPanelOpen] = useState(false)
   const contextMenuRef = useRef<HTMLDivElement>(null)
   const lastClickRef = useRef<{ id: string; time: number } | null>(null)
   const lastRestoredFileRef = useRef<string | null>(null)
@@ -364,6 +366,8 @@ export function useMindmapOperationController() {
     contextMenuRef,
     palaceModal,
     stylePanelOpen,
+    documentRefsPanelOpen,
+    hasDocumentRefs: documentRefs.length > 0,
     canAddChild: hasSelection,
     canAddSibling,
     canRemove,
@@ -396,8 +400,16 @@ export function useMindmapOperationController() {
       generatePalace,
       closeContextMenu: () => setContextMenu({ scope: 'closed' }),
       closePalaceModal: () => setPalaceModal(null),
-      toggleStylePanel: () => setStylePanelOpen((open) => !open),
+      toggleStylePanel: () => {
+        setStylePanelOpen((open) => !open)
+        setDocumentRefsPanelOpen(false)
+      },
       closeStylePanel: () => setStylePanelOpen(false),
+      toggleDocumentRefsPanel: () => {
+        setDocumentRefsPanelOpen((open) => !open)
+        setStylePanelOpen(false)
+      },
+      closeDocumentRefsPanel: () => setDocumentRefsPanelOpen(false),
     },
   }
 }

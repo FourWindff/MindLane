@@ -10,6 +10,7 @@ import {
   Palette,
   Undo2,
   Redo2,
+  Paperclip,
 } from 'lucide-react'
 import { useEffect } from 'react'
 
@@ -25,14 +26,19 @@ type Props = {
   onSave?: () => void
   onCenterRoot?: () => void
   onToggleStylePanel?: () => void
+  onToggleDocumentRefsPanel?: () => void
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
   canUndo?: boolean
   canRedo?: boolean
   stylePanelOpen?: boolean
+  documentRefsPanelOpen?: boolean
+  hasDocumentRefs?: boolean
   /** 样式面板内容，打开时渲染在工具栏下方。 */
   stylePanel?: React.ReactNode
+  /** 关联文件面板内容，打开时渲染在工具栏下方。 */
+  documentRefsPanel?: React.ReactNode
 }
 
 function ToolbarButton({
@@ -87,31 +93,43 @@ export function MindMapHeader({
   onSave,
   onCenterRoot,
   onToggleStylePanel,
+  onToggleDocumentRefsPanel,
   canAddChild,
   canAddSibling,
   canRemove,
   canUndo,
   canRedo,
   stylePanelOpen,
+  documentRefsPanelOpen,
+  hasDocumentRefs,
   stylePanel,
+  documentRefsPanel,
 }: Props) {
   useEffect(() => {
-    if (!stylePanelOpen || !onToggleStylePanel) return
+    if (
+      (!stylePanelOpen && !documentRefsPanelOpen) ||
+      (!onToggleStylePanel && !onToggleDocumentRefsPanel)
+    )
+      return
 
-    const dismissStylePanel = (event: PointerEvent) => {
+    const dismissPanel = (event: PointerEvent) => {
       const target = event.target
       if (
         target instanceof Element &&
-        (target.closest('.style-panel') || target.closest('[aria-label="导图样式"]'))
+        (target.closest('.style-panel') ||
+          target.closest('[aria-label="导图样式"]') ||
+          target.closest('.document-refs-panel') ||
+          target.closest('[aria-label="关联文件"]'))
       ) {
         return
       }
-      onToggleStylePanel()
+      if (stylePanelOpen) onToggleStylePanel?.()
+      if (documentRefsPanelOpen) onToggleDocumentRefsPanel?.()
     }
 
-    window.addEventListener('pointerdown', dismissStylePanel, true)
-    return () => window.removeEventListener('pointerdown', dismissStylePanel, true)
-  }, [onToggleStylePanel, stylePanelOpen])
+    window.addEventListener('pointerdown', dismissPanel, true)
+    return () => window.removeEventListener('pointerdown', dismissPanel, true)
+  }, [onToggleStylePanel, onToggleDocumentRefsPanel, stylePanelOpen, documentRefsPanelOpen])
 
   return (
     <header className="mindmap-header">
@@ -192,6 +210,16 @@ export function MindMapHeader({
           <div className="float-toolbar__divider" />
 
           <div className="float-toolbar__group float-toolbar__group--system">
+            {onToggleDocumentRefsPanel && (
+              <ToolbarButton
+                onClick={onToggleDocumentRefsPanel}
+                disabled={!hasDocumentRefs}
+                ariaLabel="关联文件"
+                tooltip={!hasDocumentRefs ? '当前没有关联文件' : '关联文件'}
+                active={documentRefsPanelOpen}
+                icon={<Paperclip size={22} strokeWidth={1.5} />}
+              />
+            )}
             {onToggleStylePanel && (
               <ToolbarButton
                 onClick={onToggleStylePanel}
@@ -218,6 +246,7 @@ export function MindMapHeader({
           </div>
         </nav>
         {stylePanel}
+        {documentRefsPanel}
       </div>
     </header>
   )

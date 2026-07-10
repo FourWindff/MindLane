@@ -8,6 +8,7 @@ import { AiProgressOverlay } from './AiProgressOverlay'
 import { PalaceModal } from './PalaceModal'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
+import { DocumentRefsPanel } from './DocumentRefsPanel'
 import { StyleProvider } from '@/features/mindmap/style/StyleContext'
 import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindmapOperationController'
 
@@ -34,14 +35,22 @@ function MindMapWorkspace({
         onSave={view.actions.save}
         onCenterRoot={() => void view.actions.centerRoot()}
         onToggleStylePanel={view.actions.toggleStylePanel}
+        onToggleDocumentRefsPanel={view.actions.toggleDocumentRefsPanel}
         canAddChild={view.canAddChild}
         canAddSibling={view.canAddSibling}
         canRemove={view.canRemove}
         canUndo={view.canUndo}
         canRedo={view.canRedo}
         stylePanelOpen={view.stylePanelOpen}
+        documentRefsPanelOpen={view.documentRefsPanelOpen}
+        hasDocumentRefs={view.hasDocumentRefs}
         stylePanel={
           view.stylePanelOpen ? <StylePanel onClose={view.actions.closeStylePanel} /> : null
+        }
+        documentRefsPanel={
+          view.documentRefsPanelOpen ? (
+            <DocumentRefsPanel onClose={view.actions.closeDocumentRefsPanel} />
+          ) : null
         }
       />
       <div className="mindmap-canvas-wrap">

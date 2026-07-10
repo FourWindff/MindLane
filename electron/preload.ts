@@ -37,7 +37,7 @@ type ChatContext = {
   workspaceFiles?: { name: string; filePath: string }[]
 }
 
-import type { ChatMessage, ChatToolCall } from '../src/shared/lib/fileFormat'
+import type { ChatMessage, ChatToolCall, DocumentRef } from '../src/shared/lib/fileFormat'
 import type { WorkspaceState } from './fs/types'
 
 type ChatSessionMeta = {
@@ -267,5 +267,11 @@ contextBridge.exposeInMainWorld('mindlane', {
         ipcRenderer.off(IPC.AppBeforeClose, handler)
       }
     },
+  },
+  shell: {
+    openDocumentRef: (doc: DocumentRef) =>
+      ipcRenderer.invoke('shell:open-document-ref', doc) as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
   },
 })

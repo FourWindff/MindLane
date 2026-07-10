@@ -340,5 +340,10 @@ interface Window {
       closeConfirmed: () => Promise<void>
       onBeforeClose: (callback: () => void) => () => void
     }
+    shell: {
+      openDocumentRef: (
+        doc: import('../src/shared/lib/fileFormat').DocumentRef,
+      ) => Promise<{ ok: true } | { ok: false; error: string }>
+    }
   }
 }
