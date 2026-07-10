@@ -1,4 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import { IPC } from './ipc.js'
 
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
@@ -87,20 +88,20 @@ type FsResult<T = void> = FsOk<T> | FsErr
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
     chatStream: (payload: { threadId: string; message: string; context?: ChatContext }) =>
-      ipcRenderer.invoke('ai:chat-stream', payload) as Promise<void>,
-    stopStream: () => ipcRenderer.invoke('ai:chat-stream-stop') as Promise<void>,
+      ipcRenderer.invoke(IPC.AiChatStream, payload) as Promise<void>,
+    stopStream: () => ipcRenderer.invoke(IPC.AiChatStreamStop) as Promise<void>,
     onStreamToken: (callback: (token: string) => void) => {
       const handler = (_event: unknown, token: string) => callback(token)
-      ipcRenderer.on('ai:chat-stream-token', handler)
+      ipcRenderer.on(IPC.AiChatStreamToken, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-token', handler)
+        ipcRenderer.off(IPC.AiChatStreamToken, handler)
       }
     },
     onStreamMessageStart: (callback: () => void) => {
       const handler = () => callback()
-      ipcRenderer.on('ai:chat-stream-message-start', handler)
+      ipcRenderer.on(IPC.AiChatStreamMessageStart, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-message-start', handler)
+        ipcRenderer.off(IPC.AiChatStreamMessageStart, handler)
       }
     },
     onStreamToolStart: (
@@ -108,16 +109,16 @@ contextBridge.exposeInMainWorld('mindlane', {
     ) => {
       const handler = (_event: unknown, data: { name: string; input: Record<string, unknown> }) =>
         callback(data)
-      ipcRenderer.on('ai:chat-stream-tool-start', handler)
+      ipcRenderer.on(IPC.AiChatStreamToolStart, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-tool-start', handler)
+        ipcRenderer.off(IPC.AiChatStreamToolStart, handler)
       }
     },
     onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => {
       const handler = (_event: unknown, data: { name: string; output: string }) => callback(data)
-      ipcRenderer.on('ai:chat-stream-tool-end', handler)
+      ipcRenderer.on(IPC.AiChatStreamToolEnd, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-tool-end', handler)
+        ipcRenderer.off(IPC.AiChatStreamToolEnd, handler)
       }
     },
     onStreamEnd: (
@@ -145,43 +146,41 @@ contextBridge.exposeInMainWorld('mindlane', {
     ) => {
       const handler = (_event: unknown, response: Parameters<typeof callback>[0]) =>
         callback(response)
-      ipcRenderer.on('ai:chat-stream-end', handler)
+      ipcRenderer.on(IPC.AiChatStreamEnd, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-end', handler)
+        ipcRenderer.off(IPC.AiChatStreamEnd, handler)
       }
     },
     onStreamError: (callback: (error: string) => void) => {
       const handler = (_event: unknown, error: string) => callback(error)
-      ipcRenderer.on('ai:chat-stream-error', handler)
+      ipcRenderer.on(IPC.AiChatStreamError, handler)
       return () => {
-        ipcRenderer.off('ai:chat-stream-error', handler)
+        ipcRenderer.off(IPC.AiChatStreamError, handler)
       }
     },
     nodesToPalace: (payload: {
       apiKey: string
       model: string
       selectedNodes: SelectedNodeContent[]
-    }) => ipcRenderer.invoke('ai:nodes-to-palace', payload),
-    listProviders: () => ipcRenderer.invoke('ai:list-providers'),
-    getProviders: () => ipcRenderer.invoke('ai:get-providers'),
-    getCapabilities: () => ipcRenderer.invoke('ai:get-capabilities'),
+    }) => ipcRenderer.invoke(IPC.AiNodesToPalace, payload),
+    listProviders: () => ipcRenderer.invoke(IPC.AiListProviders),
+    getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
+    getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),
     urlToDataUrl: (payload: { url: string }) =>
-      ipcRenderer.invoke('image:url-to-data-url', payload) as Promise<
-        FsResult<{ dataUrl: string }>
-      >,
+      ipcRenderer.invoke(IPC.ImageUrlToDataUrl, payload) as Promise<FsResult<{ dataUrl: string }>>,
   },
   file: {
-    open: () => ipcRenderer.invoke('file:open'),
+    open: () => ipcRenderer.invoke(IPC.FileOpen),
     save: (payload: { filePath: string | null; data: unknown }) =>
-      ipcRenderer.invoke('file:save', payload),
-    saveAs: (payload: { data: unknown }) => ipcRenderer.invoke('file:save-as', payload),
-    recentList: () => ipcRenderer.invoke('file:recent-list'),
+      ipcRenderer.invoke(IPC.FileSave, payload),
+    saveAs: (payload: { data: unknown }) => ipcRenderer.invoke(IPC.FileSaveAs, payload),
+    recentList: () => ipcRenderer.invoke(IPC.FileRecentList),
     saveThumbnail: (payload: { filePath: string; imageData: string }) =>
-      ipcRenderer.invoke('file:save-thumbnail', payload) as Promise<
+      ipcRenderer.invoke(IPC.FileSaveThumbnail, payload) as Promise<
         { ok: true; data: { previewUrl: string } } | { ok: false; error: string }
       >,
     selectDocument: () =>
-      ipcRenderer.invoke('file:select-document') as Promise<
+      ipcRenderer.invoke(IPC.FileSelectDocument) as Promise<
         | {
             ok: true
             data: { path: string; name: string; size: number; mtimeMs: number; sha256: string }
@@ -190,21 +189,21 @@ contextBridge.exposeInMainWorld('mindlane', {
       >,
   },
   workspace: {
-    openDirectory: () => ipcRenderer.invoke('workspace:open-directory'),
+    openDirectory: () => ipcRenderer.invoke(IPC.WorkspaceOpenDirectory),
     createDirectory: (payload: { name: string }) =>
-      ipcRenderer.invoke('workspace:create-directory', payload),
+      ipcRenderer.invoke(IPC.WorkspaceCreateDirectory, payload),
     createFile: (payload: { workspacePath: string; name: string; data: unknown }) =>
-      ipcRenderer.invoke('workspace:create-file', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceCreateFile, payload) as Promise<
         { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
       >,
     listFiles: (payload: { workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:list-files', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceListFiles, payload) as Promise<
         { ok: true; data: WorkspaceFileEntry[] } | { ok: false; error: string }
       >,
     openFilePath: (payload: { filePath: string }) =>
-      ipcRenderer.invoke('workspace:open-file-path', payload),
+      ipcRenderer.invoke(IPC.WorkspaceOpenFilePath, payload),
     getSession: () =>
-      ipcRenderer.invoke('workspace:get-session') as Promise<{
+      ipcRenderer.invoke(IPC.WorkspaceGetSession) as Promise<{
         workspacePath: string | null
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
@@ -212,60 +211,60 @@ contextBridge.exposeInMainWorld('mindlane', {
         restoreLastWorkspaceOnLaunch: boolean
       }>,
     updateState: (payload: { workspacePath: string } & Partial<WorkspaceState>) =>
-      ipcRenderer.invoke('workspace:update-state', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceUpdateState, payload) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
     switchDirectory: (payload: { workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:switch', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceSwitch, payload) as Promise<
         | { ok: true; data: { workspacePath: string; files: WorkspaceFileEntry[] } }
         | { ok: false; error: string }
       >,
     listTree: (payload: { workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:list-tree', payload) as Promise<FsResult<WorkspaceTreeEntry[]>>,
+      ipcRenderer.invoke(IPC.WorkspaceListTree, payload) as Promise<FsResult<WorkspaceTreeEntry[]>>,
     createSubfolder: (payload: { parentPath: string; name: string; workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:create-subfolder', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceCreateSubfolder, payload) as Promise<
         FsResult<{ path: string }>
       >,
     deleteItem: (payload: { targetPath: string; workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:delete-item', payload) as Promise<FsResult>,
+      ipcRenderer.invoke(IPC.WorkspaceDeleteItem, payload) as Promise<FsResult>,
     renameItem: (payload: { oldPath: string; newName: string; workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:rename-item', payload) as Promise<
+      ipcRenderer.invoke(IPC.WorkspaceRenameItem, payload) as Promise<
         FsResult<{ newPath: string }>
       >,
     moveItem: (payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) =>
-      ipcRenderer.invoke('workspace:move-item', payload) as Promise<FsResult<{ newPath: string }>>,
+      ipcRenderer.invoke(IPC.WorkspaceMoveItem, payload) as Promise<FsResult<{ newPath: string }>>,
   },
   chat: {
     listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
-      ipcRenderer.invoke('chat:list-sessions', payload) as Promise<
+      ipcRenderer.invoke(IPC.ChatListSessions, payload) as Promise<
         { ok: true; data: { sessions: ChatSessionMeta[] } } | { ok: false; error: string }
       >,
     loadSession: (payload: { workspacePath: string; sessionId: string }) =>
-      ipcRenderer.invoke('chat:load-session', payload) as Promise<ChatLoadSessionResult>,
+      ipcRenderer.invoke(IPC.ChatLoadSession, payload) as Promise<ChatLoadSessionResult>,
     saveSession: (payload: ChatSaveSessionPayload) =>
-      ipcRenderer.invoke('chat:save-session', payload) as Promise<
+      ipcRenderer.invoke(IPC.ChatSaveSession, payload) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
     deleteSession: (payload: { workspacePath: string; sessionId: string }) =>
-      ipcRenderer.invoke('chat:delete-session', payload) as Promise<
+      ipcRenderer.invoke(IPC.ChatDeleteSession, payload) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
   },
   settings: {
-    load: () => ipcRenderer.invoke('file:settings-load'),
+    load: () => ipcRenderer.invoke(IPC.FileSettingsLoad),
     update: (partial: Record<string, unknown>) =>
-      ipcRenderer.invoke('file:settings-update', partial),
+      ipcRenderer.invoke(IPC.FileSettingsUpdate, partial),
   },
   window: {
-    minimize: () => ipcRenderer.invoke('window:minimize'),
-    toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
-    close: () => ipcRenderer.invoke('window:close'),
-    closeConfirmed: () => ipcRenderer.invoke('window:close-confirmed'),
+    minimize: () => ipcRenderer.invoke(IPC.WindowMinimize),
+    toggleMaximize: () => ipcRenderer.invoke(IPC.WindowToggleMaximize),
+    close: () => ipcRenderer.invoke(IPC.WindowClose),
+    closeConfirmed: () => ipcRenderer.invoke(IPC.WindowCloseConfirmed),
     onBeforeClose: (callback: () => void) => {
       const handler = () => callback()
-      ipcRenderer.on('app:before-close', handler)
+      ipcRenderer.on(IPC.AppBeforeClose, handler)
       return () => {
-        ipcRenderer.off('app:before-close', handler)
+        ipcRenderer.off(IPC.AppBeforeClose, handler)
       }
     },
   },

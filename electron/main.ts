@@ -21,6 +21,7 @@ import type { AppSettings, WorkspaceState } from './fs/types.js'
 import { DEFAULT_SETTINGS } from './fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
+import { IPC } from './ipc.js'
 
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
@@ -186,12 +187,12 @@ function createWindow() {
     }
     if (!forceClose) {
       event.preventDefault()
-      browserWindow.webContents.send('app:before-close')
+      browserWindow.webContents.send(IPC.AppBeforeClose)
     }
   })
 
   win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', new Date().toLocaleString())
+    win?.webContents.send(IPC.MainProcessMessage, new Date().toLocaleString())
   })
 
   win.webContents.on('before-input-event', (event, input) => {
@@ -246,7 +247,7 @@ function registerIpcHandlers(userDataPath: string) {
   let streamAbortController: AbortController | null = null
 
   ipcMain.handle(
-    'ai:chat-stream',
+    IPC.AiChatStream,
     async (
       _e,
       payload: {
@@ -275,7 +276,7 @@ function registerIpcHandlers(userDataPath: string) {
       streamAbortController = abortController
 
       if (!aiServiceReady) {
-        win?.webContents.send('ai:chat-stream-error', 'AI service not initialized')
+        win?.webContents.send(IPC.AiChatStreamError, 'AI service not initialized')
         return
       }
 
@@ -287,7 +288,7 @@ function registerIpcHandlers(userDataPath: string) {
         const modelName = settings.chatModel || 'qwen-turbo'
 
         if (!apiKey.trim()) {
-          win?.webContents.send('ai:chat-stream-error', '未填写 API Key')
+          win?.webContents.send(IPC.AiChatStreamError, '未填写 API Key')
           return
         }
 
@@ -298,7 +299,7 @@ function registerIpcHandlers(userDataPath: string) {
         })
 
         if (!payload.message?.trim()) {
-          win?.webContents.send('ai:chat-stream-error', '消息不能为空')
+          win?.webContents.send(IPC.AiChatStreamError, '消息不能为空')
           return
         }
 
@@ -344,30 +345,30 @@ function registerIpcHandlers(userDataPath: string) {
           {
             onToken: (token) => {
               if (!abortController.signal.aborted) {
-                win?.webContents.send('ai:chat-stream-token', token)
+                win?.webContents.send(IPC.AiChatStreamToken, token)
               }
             },
             onMessageStart: () => {
               if (!abortController.signal.aborted) {
-                win?.webContents.send('ai:chat-stream-message-start')
+                win?.webContents.send(IPC.AiChatStreamMessageStart)
               }
             },
             onToolStart: (name, input) => {
               if (!abortController.signal.aborted) {
-                win?.webContents.send('ai:chat-stream-tool-start', { name, input })
+                win?.webContents.send(IPC.AiChatStreamToolStart, { name, input })
               }
             },
             onToolEnd: (name, output) => {
               if (!abortController.signal.aborted) {
-                win?.webContents.send('ai:chat-stream-tool-end', { name, output })
+                win?.webContents.send(IPC.AiChatStreamToolEnd, { name, output })
               }
             },
             onEnd: (response) => {
-              win?.webContents.send('ai:chat-stream-end', response)
+              win?.webContents.send(IPC.AiChatStreamEnd, response)
             },
             onError: (error) => {
               if (!abortController.signal.aborted) {
-                win?.webContents.send('ai:chat-stream-error', error)
+                win?.webContents.send(IPC.AiChatStreamError, error)
               }
             },
           },
@@ -376,7 +377,7 @@ function registerIpcHandlers(userDataPath: string) {
       } catch (error) {
         if (!abortController.signal.aborted) {
           win?.webContents.send(
-            'ai:chat-stream-error',
+            IPC.AiChatStreamError,
             error instanceof Error ? error.message : String(error),
           )
         }
@@ -388,13 +389,13 @@ function registerIpcHandlers(userDataPath: string) {
     },
   )
 
-  ipcMain.handle('ai:chat-stream-stop', () => {
+  ipcMain.handle(IPC.AiChatStreamStop, () => {
     streamAbortController?.abort()
     streamAbortController = null
   })
 
   // -- Image URL to base64 data URL --
-  ipcMain.handle('image:url-to-data-url', async (_e, payload: { url: string }) => {
+  ipcMain.handle(IPC.ImageUrlToDataUrl, async (_e, payload: { url: string }) => {
     try {
       const dataUrl = await urlToDataUrl(payload.url)
       return { ok: true, data: { dataUrl } }
@@ -405,7 +406,7 @@ function registerIpcHandlers(userDataPath: string) {
 
   // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
-    'ai:nodes-to-palace',
+    IPC.AiNodesToPalace,
     async (
       _e,
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
@@ -420,7 +421,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   // -- Provider management --
-  ipcMain.handle('ai:list-providers', async () => {
+  ipcMain.handle(IPC.AiListProviders, async () => {
     return {
       chat: getRegisteredProviders().map((meta) => ({
         id: meta.id,
@@ -434,7 +435,7 @@ function registerIpcHandlers(userDataPath: string) {
     }
   })
 
-  ipcMain.handle('ai:get-providers', async () => {
+  ipcMain.handle(IPC.AiGetProviders, async () => {
     return {
       ok: true,
       providers: getRegisteredProviders().map((meta) => ({
@@ -446,7 +447,7 @@ function registerIpcHandlers(userDataPath: string) {
     }
   })
 
-  ipcMain.handle('ai:get-capabilities', async () => {
+  ipcMain.handle(IPC.AiGetCapabilities, async () => {
     try {
       const settings = await fsService.appState.load()
       const providerId = settings.activeProviders.chat || 'dashscope'
@@ -465,7 +466,7 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   // -- File operations --
-  ipcMain.handle('file:open', async () => {
+  ipcMain.handle(IPC.FileOpen, async () => {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await fsService.appState.load()
     const result = await fsService.project.open(win, {
@@ -477,7 +478,7 @@ function registerIpcHandlers(userDataPath: string) {
     return result
   })
 
-  ipcMain.handle('file:save', async (_e, payload: { filePath: string | null; data: unknown }) => {
+  ipcMain.handle(IPC.FileSave, async (_e, payload: { filePath: string | null; data: unknown }) => {
     if (!win) return { ok: false, error: 'No window' }
     const data = payload.data as MindLaneFile
     const result = await fsService.project.save(payload.filePath, data, win)
@@ -487,7 +488,7 @@ function registerIpcHandlers(userDataPath: string) {
     return result
   })
 
-  ipcMain.handle('file:save-as', async (_e, payload: { data: unknown }) => {
+  ipcMain.handle(IPC.FileSaveAs, async (_e, payload: { data: unknown }) => {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await fsService.appState.load()
     const data = payload.data as MindLaneFile
@@ -500,7 +501,7 @@ function registerIpcHandlers(userDataPath: string) {
     return result
   })
 
-  ipcMain.handle('file:recent-list', async () => {
+  ipcMain.handle(IPC.FileRecentList, async () => {
     const settings = await fsService.appState.load()
     if (!settings.lastWorkspacePath || !directoryExists(settings.lastWorkspacePath)) return []
     await fsService.workspace.pruneRecentFiles(settings.lastWorkspacePath)
@@ -509,7 +510,7 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   ipcMain.handle(
-    'file:save-thumbnail',
+    IPC.FileSaveThumbnail,
     async (_e, payload: { filePath: string; imageData: string }) => {
       try {
         const url = await fsService.thumbnails.save(payload.filePath, payload.imageData)
@@ -520,7 +521,7 @@ function registerIpcHandlers(userDataPath: string) {
     },
   )
 
-  ipcMain.handle('file:select-document', async () => {
+  ipcMain.handle(IPC.FileSelectDocument, async () => {
     if (!win) return { ok: false, error: 'No window' }
 
     const result = await dialog.showOpenDialog(win, {
@@ -558,7 +559,7 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   // -- Workspace operations --
-  ipcMain.handle('workspace:open-directory', async () => {
+  ipcMain.handle(IPC.WorkspaceOpenDirectory, async () => {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await fsService.appState.load()
     const result = await dialog.showOpenDialog(win, {
@@ -578,7 +579,7 @@ function registerIpcHandlers(userDataPath: string) {
     return { ok: true, data: { workspacePath, files: filesResult.data } }
   })
 
-  ipcMain.handle('workspace:create-directory', async (_e, payload: { name: string }) => {
+  ipcMain.handle(IPC.WorkspaceCreateDirectory, async (_e, payload: { name: string }) => {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await fsService.appState.load()
     const parentResult = await dialog.showOpenDialog(win, {
@@ -601,7 +602,7 @@ function registerIpcHandlers(userDataPath: string) {
   })
 
   ipcMain.handle(
-    'workspace:create-file',
+    IPC.WorkspaceCreateFile,
     async (_e, payload: { workspacePath: string; name: string; data: unknown }) => {
       const data = payload.data as MindLaneFile
       const result = await fsService.project.createInDirectory(
@@ -623,11 +624,11 @@ function registerIpcHandlers(userDataPath: string) {
     },
   )
 
-  ipcMain.handle('workspace:list-files', async (_e, payload: { workspacePath: string }) => {
+  ipcMain.handle(IPC.WorkspaceListFiles, async (_e, payload: { workspacePath: string }) => {
     return fsService.workspaceTree.listFiles(payload.workspacePath)
   })
 
-  ipcMain.handle('workspace:open-file-path', async (_e, payload: { filePath: string }) => {
+  ipcMain.handle(IPC.WorkspaceOpenFilePath, async (_e, payload: { filePath: string }) => {
     const result = await fsService.project.loadFromPath(payload.filePath)
     if (result.ok) {
       await syncWorkspaceFromFile(result.data.filePath, result.data.data)
@@ -635,12 +636,12 @@ function registerIpcHandlers(userDataPath: string) {
     return result
   })
 
-  ipcMain.handle('workspace:get-session', async () => {
+  ipcMain.handle(IPC.WorkspaceGetSession, async () => {
     return getWorkspaceSession()
   })
 
   ipcMain.handle(
-    'workspace:update-state',
+    IPC.WorkspaceUpdateState,
     async (_e, payload: { workspacePath: string } & Partial<WorkspaceState>) => {
       if (payload.expandedFolderPaths !== undefined) {
         const result = await fsService.workspace.updateExpandedFolders(
@@ -660,7 +661,7 @@ function registerIpcHandlers(userDataPath: string) {
     },
   )
 
-  ipcMain.handle('workspace:switch', async (_e, payload: { workspacePath: string }) => {
+  ipcMain.handle(IPC.WorkspaceSwitch, async (_e, payload: { workspacePath: string }) => {
     const workspacePath = path.resolve(payload.workspacePath)
     const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
     if (!filesResult.ok) return filesResult
@@ -670,12 +671,12 @@ function registerIpcHandlers(userDataPath: string) {
     return { ok: true, data: { workspacePath, files: filesResult.data } }
   })
 
-  ipcMain.handle('workspace:list-tree', async (_e, payload: { workspacePath: string }) => {
+  ipcMain.handle(IPC.WorkspaceListTree, async (_e, payload: { workspacePath: string }) => {
     return fsService.workspaceTree.listTree(payload.workspacePath)
   })
 
   ipcMain.handle(
-    'workspace:create-subfolder',
+    IPC.WorkspaceCreateSubfolder,
     async (_e, payload: { parentPath: string; name: string; workspacePath: string }) => {
       const result = await fsService.workspaceTree.createSubdirectory(
         payload.parentPath,
@@ -688,7 +689,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'workspace:delete-item',
+    IPC.WorkspaceDeleteItem,
     async (_e, payload: { targetPath: string; workspacePath: string }) => {
       const result = await fsService.workspaceTree.deleteItem(
         payload.targetPath,
@@ -702,7 +703,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'workspace:rename-item',
+    IPC.WorkspaceRenameItem,
     async (_e, payload: { oldPath: string; newName: string; workspacePath: string }) => {
       const result = await fsService.workspaceTree.rename(
         payload.oldPath,
@@ -715,7 +716,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'workspace:move-item',
+    IPC.WorkspaceMoveItem,
     async (_e, payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) => {
       const result = await fsService.workspaceTree.move(
         payload.sourcePath,
@@ -730,7 +731,7 @@ function registerIpcHandlers(userDataPath: string) {
   // -- Chat History (Multi-session support) --
 
   ipcMain.handle(
-    'chat:list-sessions',
+    IPC.ChatListSessions,
     async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
       if (!aiServiceReady) return aiNotReadyResponse()
       try {
@@ -744,7 +745,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'chat:load-session',
+    IPC.ChatLoadSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
       if (!aiServiceReady) {
         return {
@@ -778,7 +779,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'chat:save-session',
+    IPC.ChatSaveSession,
     async (
       _e,
       payload: {
@@ -799,7 +800,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    'chat:delete-session',
+    IPC.ChatDeleteSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
       if (!aiServiceReady) return aiNotReadyResponse()
       try {
@@ -813,19 +814,19 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   // -- Settings --
-  ipcMain.handle('file:settings-load', async () => {
+  ipcMain.handle(IPC.FileSettingsLoad, async () => {
     return fsService.appState.load()
   })
 
-  ipcMain.handle('file:settings-update', async (_e, partial: Record<string, unknown>) => {
+  ipcMain.handle(IPC.FileSettingsUpdate, async (_e, partial: Record<string, unknown>) => {
     await fsService.appState.update(partial as Partial<AppSettings>)
   })
 
-  ipcMain.handle('window:minimize', () => {
+  ipcMain.handle(IPC.WindowMinimize, () => {
     win?.minimize()
   })
 
-  ipcMain.handle('window:toggle-maximize', () => {
+  ipcMain.handle(IPC.WindowToggleMaximize, () => {
     if (win?.isMaximized()) {
       win.unmaximize()
     } else {
@@ -833,16 +834,16 @@ function registerIpcHandlers(userDataPath: string) {
     }
   })
 
-  ipcMain.handle('window:close', () => {
+  ipcMain.handle(IPC.WindowClose, () => {
     win?.close()
   })
 
-  ipcMain.handle('window:close-confirmed', () => {
+  ipcMain.handle(IPC.WindowCloseConfirmed, () => {
     forceClose = true
     win?.close()
   })
 
-  ipcMain.handle('window:open-devtools', () => {
+  ipcMain.handle(IPC.WindowOpenDevtools, () => {
     win?.webContents.openDevTools()
   })
 }
