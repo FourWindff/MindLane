@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Position } from '@xyflow/react'
-import { resolveMindmapEdgeGeometry } from '../edgeGeometry'
+import { mindmapLayout } from '@/features/mindmap/model/mindmapLayout'
 
 const fallback = {
   sourceX: 0,
@@ -34,7 +34,7 @@ describe('resolveMindmapEdgeGeometry', () => {
     const root = node(0, 0, { depth: 0 })
     const child = node(300, -100)
 
-    const g = resolveMindmapEdgeGeometry({ sourceNode: root, targetNode: child, fallback })
+    const g = mindmapLayout.resolveEdgeGeometry({ sourceNode: root, targetNode: child, fallback })
 
     expect(g.sourcePosition).toBe(Position.Right)
     expect(g.targetPosition).toBe(Position.Left)
@@ -48,7 +48,7 @@ describe('resolveMindmapEdgeGeometry', () => {
     const root = node(0, 0, { depth: 0 })
     const child = node(-300, -100)
 
-    const g = resolveMindmapEdgeGeometry({ sourceNode: root, targetNode: child, fallback })
+    const g = mindmapLayout.resolveEdgeGeometry({ sourceNode: root, targetNode: child, fallback })
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
@@ -60,7 +60,11 @@ describe('resolveMindmapEdgeGeometry', () => {
     const parent = node(-300, 0, { depth: 1, sourcePosition: Position.Left })
     const child = node(-600, 40)
 
-    const g = resolveMindmapEdgeGeometry({ sourceNode: parent, targetNode: child, fallback })
+    const g = mindmapLayout.resolveEdgeGeometry({
+      sourceNode: parent,
+      targetNode: child,
+      fallback,
+    })
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
@@ -69,7 +73,7 @@ describe('resolveMindmapEdgeGeometry', () => {
   })
 
   it('节点缺失时回退到 ReactFlow 提供的坐标与方向', () => {
-    const g = resolveMindmapEdgeGeometry({ fallback })
+    const g = mindmapLayout.resolveEdgeGeometry({ fallback })
 
     expect(g).toEqual(fallback)
   })

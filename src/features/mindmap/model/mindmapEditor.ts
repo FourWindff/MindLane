@@ -1,7 +1,6 @@
 import type { Connection, Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { type MindLaneFile, type MindLaneNode } from '@/shared/lib/fileFormat'
-import { autoLayout } from '@/shared/lib/autoLayout'
 import { parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import {
@@ -16,7 +15,7 @@ import {
 } from '@/shared/lib/mindmapTree'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
-import { layoutForest, type MindmapStructureType } from './mindmapLayout'
+import { mindmapLayout, type MindmapStructureType } from './mindmapLayout'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   type MindmapCommand,
@@ -67,7 +66,7 @@ export class MindmapEditor {
       },
     )
     const nodes = this.shouldReflowAfter(transaction.commands)
-      ? layoutForest(appliedNodes, appliedEdges, this.structureType)
+      ? mindmapLayout.reflow(appliedNodes, appliedEdges, this.structureType)
       : appliedNodes
     this.state.setNodes(nodes)
     this.state.setEdges(appliedEdges)
@@ -104,7 +103,7 @@ export class MindmapEditor {
       edges = result.edges
     }
     if (!skipReflow && this.shouldReflowAfter(commands)) {
-      nodes = layoutForest(nodes, edges, this.structureType)
+      nodes = mindmapLayout.reflow(nodes, edges, this.structureType)
     }
     this.state.setNodes(nodes)
     this.state.setEdges(edges)
@@ -280,7 +279,7 @@ export class MindmapEditor {
       return
     }
 
-    const laidOut = autoLayout(parsed.nodes, parsed.edges, {
+    const laidOut = mindmapLayout.initial(parsed.nodes, parsed.edges, {
       rootX: 0,
       rootY: 0,
       direction: 'LR',
@@ -537,7 +536,7 @@ export class MindmapEditor {
   // ─── 布局与生命周期 ───
 
   reflow(): void {
-    const nodes = layoutForest(this.state.nodes, this.state.edges, this.structureType)
+    const nodes = mindmapLayout.reflow(this.state.nodes, this.state.edges, this.structureType)
     this.state.setNodesTransient(nodes)
   }
 

@@ -1,22 +1,33 @@
 import type { Edge, Node } from '@xyflow/react'
-import { reflowChildren, CHILD_OFFSET_X, CHILD_GAP_Y } from '@/shared/lib/mindmapTree'
+import { DagreLayoutAdapter, type InitialLayoutOptions } from './layout/dagreLayoutAdapter'
+import { TreeLayoutAdapter } from './layout/treeLayoutAdapter'
+import {
+  resolveEdgeGeometry,
+  type EdgeGeometry,
+  type EdgeGeometryParams,
+} from './layout/edgeGeometry'
 
 export type MindmapStructureType = 'logic' | 'mindmap'
 
-/**
- * 对整片森林重新布局。依次对每个根节点调用 `reflowChildren`，
- * 保证新增/删除/移动节点后结构保持一致。
- */
-export function layoutForest(
-  nodes: Node[],
-  edges: Edge[],
-  structureType: MindmapStructureType = 'logic',
-): Node[] {
-  const targetIds = new Set(edges.map((e) => e.target))
-  const roots = nodes.filter((n) => !targetIds.has(n.id))
-  let result = nodes
-  for (const root of roots) {
-    result = reflowChildren(root.id, result, edges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
+class MindmapLayout {
+  constructor(
+    private initialAdapter: DagreLayoutAdapter,
+    private incrementalAdapter: TreeLayoutAdapter,
+  ) {}
+
+  initial(nodes: Node[], edges: Edge[], options: InitialLayoutOptions = {}): Node[] {
+    return this.initialAdapter.layout(nodes, edges, options)
   }
-  return result
+
+  reflow(nodes: Node[], edges: Edge[], structureType: MindmapStructureType = 'logic'): Node[] {
+    return this.incrementalAdapter.layout(nodes, edges, structureType)
+  }
+
+  resolveEdgeGeometry(params: EdgeGeometryParams): EdgeGeometry {
+    return resolveEdgeGeometry(params)
+  }
 }
+
+export type { EdgeGeometry, EdgeGeometryParams, InitialLayoutOptions }
+
+export const mindmapLayout = new MindmapLayout(new DagreLayoutAdapter(), new TreeLayoutAdapter())
