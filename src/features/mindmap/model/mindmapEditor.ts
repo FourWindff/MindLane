@@ -95,8 +95,8 @@ export class MindmapEditor {
     if (commands.length === 0) return
     this.cancelPendingDeletes()
     const before = this.takeSnapshot()
-    let nodes = before.nodes
-    let edges = before.edges
+    let nodes = this.state.nodes
+    let edges = this.state.edges
     for (const command of commands) {
       const result = this.applyCommand(nodes, edges, command)
       nodes = result.nodes
