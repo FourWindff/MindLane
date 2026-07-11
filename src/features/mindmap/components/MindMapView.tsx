@@ -27,7 +27,6 @@ function MindMapWorkspace({
         onAddChild={view.actions.addChild}
         onAddSibling={view.actions.addSibling}
         onRemove={view.actions.removeSelected}
-        onReset={view.actions.reset}
         onUndo={view.actions.undo}
         onRedo={view.actions.redo}
         onOpenSettings={onOpenSettings}

@@ -23,7 +23,6 @@ const defaultProps = {
   onAddChild: vi.fn(),
   onAddSibling: vi.fn(),
   onRemove: vi.fn(),
-  onReset: vi.fn(),
   canAddChild: true,
   canAddSibling: true,
   canRemove: true,

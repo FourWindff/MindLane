@@ -2,7 +2,6 @@ import {
   GitBranch,
   BetweenHorizontalStart,
   Trash2,
-  RotateCcw,
   Save,
   FolderInput,
   Settings,
@@ -18,7 +17,6 @@ type Props = {
   onAddChild: () => void
   onAddSibling: () => void
   onRemove: () => void
-  onReset: () => void
   onUndo?: () => void
   onRedo?: () => void
   onOpenSettings?: () => void
@@ -85,7 +83,6 @@ export function MindMapHeader({
   onAddChild,
   onAddSibling,
   onRemove,
-  onReset,
   onUndo,
   onRedo,
   onOpenSettings,
@@ -237,12 +234,6 @@ export function MindMapHeader({
                 icon={<Settings size={22} strokeWidth={1.5} />}
               />
             )}
-            <ToolbarButton
-              onClick={onReset}
-              ariaLabel="重置"
-              tooltip="重置"
-              icon={<RotateCcw size={22} strokeWidth={1.5} />}
-            />
           </div>
         </nav>
         {stylePanel}
