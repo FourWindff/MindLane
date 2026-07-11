@@ -8,9 +8,8 @@ import type { LLMProvider } from '../../../providers/index.js'
 import {
   GENERATE_MINDMAP_FRAGMENT_TOOL,
   GENERATE_PALACE_TOOL,
-  createGenerateMindmapFragmentTool,
-  createGeneratePalaceTool,
-} from '../../../tools/subgraphRoutingTools.js'
+  getToolSchemas,
+} from '../../../subgraphRouter.js'
 import { createMindmapActionTools } from '../../../tools/mindmapActions.js'
 import { mergeMessagePipelineConfig } from '../../../context/pipeline.js'
 import { ToolRegistry } from '../../../tools/registry.js'
@@ -33,7 +32,9 @@ const mockSearchTool = new DynamicStructuredTool({
   func: async (input) => JSON.stringify({ results: [`result for ${input.query}`] }),
 })
 
-function createTestRegistry(options: { hasPalace?: boolean; extraTools?: StructuredToolInterface[] } = {}): ToolRegistry {
+function createTestRegistry(
+  options: { hasPalace?: boolean; extraTools?: StructuredToolInterface[] } = {},
+): ToolRegistry {
   const registry = new ToolRegistry()
   const hasPalace = options.hasPalace ?? true
 
@@ -46,9 +47,12 @@ function createTestRegistry(options: { hasPalace?: boolean; extraTools?: Structu
     registry.registerTool(actionTools.addPalaceNodeTool)
   }
 
-  registry.registerTool(createGenerateMindmapFragmentTool())
-  if (hasPalace) {
-    registry.registerTool(createGeneratePalaceTool())
+  const schemas = getToolSchemas()
+  for (const tool of schemas) {
+    if (tool.name === GENERATE_PALACE_TOOL && !hasPalace) {
+      continue
+    }
+    registry.registerTool(tool)
   }
 
   options.extraTools?.forEach((t) => registry.registerTool(t))
@@ -109,7 +113,10 @@ describe('MindLaneAgent.invoke()', () => {
         ],
       }),
     )
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     const result = await agent.invoke(createInitialState())
 
@@ -139,7 +146,10 @@ describe('MindLaneAgent.invoke()', () => {
         ],
       }),
     )
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     const result = await agent.invoke(createInitialState())
 
@@ -164,7 +174,10 @@ describe('MindLaneAgent.invoke()', () => {
         ],
       }),
     )
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     const result = await agent.invoke(createInitialState())
 
@@ -192,7 +205,10 @@ describe('MindLaneAgent.invoke()', () => {
         ],
       }),
     )
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     const result = await agent.invoke(createInitialState())
 
@@ -202,7 +218,10 @@ describe('MindLaneAgent.invoke()', () => {
 
   it('direct response ends without subgraph routing', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: '这是一个回答' }))
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     const result = await agent.invoke(createInitialState())
 
@@ -213,7 +232,9 @@ describe('MindLaneAgent.invoke()', () => {
   it('does not expose generatePalace when palace is disabled', () => {
     const registry = createTestRegistry({ hasPalace: false, extraTools: [mockSearchTool] })
 
-    expect(registry.allTools.some((tool) => tool.name === GENERATE_MINDMAP_FRAGMENT_TOOL)).toBe(true)
+    expect(registry.allTools.some((tool) => tool.name === GENERATE_MINDMAP_FRAGMENT_TOOL)).toBe(
+      true,
+    )
     expect(registry.allTools.some((tool) => tool.name === GENERATE_PALACE_TOOL)).toBe(false)
   })
 
@@ -254,7 +275,10 @@ describe('MindLaneAgent.invoke()', () => {
     const privateText = 'PRIVATE_DOCUMENT_CONTENT_SHOULD_NOT_BE_LOGGED_' + 'x'.repeat(500)
     const mockInvoke = vi.fn().mockRejectedValue(new Error('network timeout'))
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const agent = new MindLaneAgent(createMockProvider(mockInvoke), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
     const state = createInitialState()
     state.messages = [new HumanMessage(privateText)]
 
@@ -272,7 +296,10 @@ describe('MindLaneAgent.invoke()', () => {
 
 describe('MindLaneAgent.route()', () => {
   it('routes ordinary tool calls to tools', () => {
-    const agent = new MindLaneAgent(createMockProvider(vi.fn()), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
     const state = {
       ...createInitialState(),
       messages: [
@@ -294,7 +321,10 @@ describe('MindLaneAgent.route()', () => {
   })
 
   it('routes pending mindmap subgraph', () => {
-    const agent = new MindLaneAgent(createMockProvider(vi.fn()), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
     const state = {
       ...createInitialState(),
       pendingSubgraph: 'mindmap' as const,
@@ -304,7 +334,10 @@ describe('MindLaneAgent.route()', () => {
   })
 
   it('routes pending palace subgraph', () => {
-    const agent = new MindLaneAgent(createMockProvider(vi.fn()), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
     const state = {
       ...createInitialState(),
       pendingSubgraph: 'palace' as const,
@@ -314,7 +347,10 @@ describe('MindLaneAgent.route()', () => {
   })
 
   it('ends when there is no pending subgraph or action tool', () => {
-    const agent = new MindLaneAgent(createMockProvider(vi.fn()), createTestRegistry({ extraTools: [mockSearchTool] }))
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
 
     expect(agent.route(createInitialState())).toBe('__end__')
   })

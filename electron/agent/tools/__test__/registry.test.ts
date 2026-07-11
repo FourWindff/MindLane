@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { DynamicStructuredTool } from '@langchain/core/tools'
 import { z } from 'zod'
 import { ToolRegistry } from '../registry.js'
-import { createGenerateMindmapFragmentTool } from '../subgraphRoutingTools.js'
+import { getToolSchemas, GENERATE_MINDMAP_FRAGMENT_TOOL } from '../../subgraphRouter.js'
 
 function createMockTool(name: string): DynamicStructuredTool {
   return new DynamicStructuredTool({
@@ -33,12 +33,13 @@ describe('ToolRegistry', () => {
 
   it('keeps virtual routing tools out of executableTools', () => {
     const registry = new ToolRegistry()
-    const routingTool = createGenerateMindmapFragmentTool()
+    const routingTool = getToolSchemas()[0]
 
     registry.registerTool(routingTool)
 
     expect(registry.allTools).toContain(routingTool)
     expect(registry.executableTools).not.toContain(routingTool)
+    expect(routingTool.name).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
   })
 
   it('throws when registering a tool with a duplicate name', () => {

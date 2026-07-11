@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import { isVirtualSubgraphTool } from '../subgraphRouter.js'
+import { isSubgraphCall } from '../subgraphRouter.js'
 
 /**
  * ToolRegistry - A generic registry for AI tools.
@@ -30,7 +30,7 @@ export class ToolRegistry {
 
     this._allTools.push(tool)
 
-    if (!isVirtualSubgraphTool(tool.name)) {
+    if (!isSubgraphCall(tool.name)) {
       this._executableTools.push(tool)
     }
   }

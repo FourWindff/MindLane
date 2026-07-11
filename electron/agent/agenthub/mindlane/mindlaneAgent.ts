@@ -14,7 +14,7 @@ import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '
 import { MemoryManager } from '../../memory/memoryManager.js'
 import { logger } from '../../../shared/logger.js'
 import { ToolRegistry } from '../../tools/registry.js'
-import { route as routeSubgraph } from '../../subgraphRouter.js'
+import { detect as detectSubgraphCall, isSubgraphCall } from '../../subgraphRouter.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import { isPromptTooLongError } from '../../memory/contextCompact.js'
 import { AGENT_LIMITS } from '../../config.js'
@@ -182,12 +182,8 @@ export class MindLaneAgent extends BaseAgent {
     const content = extractTextContent(response.content)
     const toolCalls = response.tool_calls ?? []
 
-    const routeResults = toolCalls
-      .map((tc) => routeSubgraph(tc, state.context, state.messages))
-      .filter((r) => r !== null)
-    const hasActionToolCall = toolCalls.some(
-      (tc) => routeSubgraph(tc, state.context, state.messages) === null,
-    )
+    const subgraphCall = detectSubgraphCall(toolCalls)
+    const hasActionToolCall = toolCalls.some((tc) => !isSubgraphCall(tc.name))
 
     logger.info('[MindLaneAgent] model output:', {
       rawContent: summarizeMessageContent(response.content),
@@ -196,7 +192,7 @@ export class MindLaneAgent extends BaseAgent {
         name: tc.name,
         args: tc.args,
       })),
-      routedSubgraphs: routeResults.map((r) => r.subgraph),
+      routedSubgraph: subgraphCall?.subgraph ?? null,
       hasActionToolCall,
     })
 
@@ -216,7 +212,7 @@ export class MindLaneAgent extends BaseAgent {
       return { messages: resultMessages }
     }
 
-    const virtualRoute = routeResults[0]
+    const virtualRoute = subgraphCall
     if (virtualRoute) {
       const routeState = {
         messages: [createToolCallMessage(response, content)],

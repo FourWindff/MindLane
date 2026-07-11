@@ -2,9 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { AGENT_LIMITS } from '../config.js'
 import { messageContentToString, sanitizeFileName } from '../utils.js'
-import { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL } from './subgraphRoutingTools.js'
-
-const EXEMPT_TOOLS = new Set([GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL])
+import { isSubgraphCall } from '../subgraphRouter.js'
 
 const DEFAULT_OFFLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -31,7 +29,7 @@ export async function _normalize_tool_result(
     return fallbackEmpty(toolName)
   }
 
-  if (EXEMPT_TOOLS.has(toolName)) {
+  if (isSubgraphCall(toolName)) {
     return content
   }
 

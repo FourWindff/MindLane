@@ -154,8 +154,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     const graphWithout = buildGraphWithout()
 
     expect(Object.keys(graphWith.nodes)).toContain('palaceSubgraph')
-    expect(Object.keys(graphWith.nodes)).toContain('mindmapToolResult')
-    expect(Object.keys(graphWith.nodes)).toContain('palaceToolResult')
+    expect(Object.keys(graphWith.nodes)).toContain('subgraphResult')
     expect(Object.keys(graphWithout.nodes)).toContain('palaceSubgraph')
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes))
   })

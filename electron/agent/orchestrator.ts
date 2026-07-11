@@ -10,7 +10,6 @@ import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
-import { urlToDataUrl } from './providers/index.js'
 import type { AiService } from './service.js'
 import type {
   SelectedNodeContent,
@@ -28,16 +27,15 @@ import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
-import {
-  GENERATE_MINDMAP_FRAGMENT_TOOL,
-  GENERATE_PALACE_TOOL,
-  createGenerateMindmapFragmentTool,
-  createGeneratePalaceTool,
-} from './tools/subgraphRoutingTools.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { logger } from '../shared/logger.js'
-import { isVirtualSubgraphTool } from './subgraphRouter.js'
+import {
+  GENERATE_PALACE_TOOL,
+  getToolSchemas,
+  isSubgraphCall,
+  packageResult,
+} from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { compactContext } from './memory/contextCompact.js'
 import { extractTextContent } from './utils.js'
@@ -165,10 +163,11 @@ export class AgentOrchestrator {
       this.toolRegistry.registerTool(actionTools.addPalaceNodeTool)
     }
 
-    this.toolRegistry.registerTool(createGenerateMindmapFragmentTool())
-
-    if (options.hasPalace) {
-      this.toolRegistry.registerTool(createGeneratePalaceTool())
+    for (const tool of getToolSchemas()) {
+      if (tool.name === GENERATE_PALACE_TOOL && !options.hasPalace) {
+        continue
+      }
+      this.toolRegistry.registerTool(tool)
     }
 
     logger.info(
@@ -404,15 +403,7 @@ export class AgentOrchestrator {
         return { ok: false, error: result.error }
       }
 
-      let imageUrl = ''
-      if (result.imageUrls.length > 0) {
-        const url = result.imageUrls[0]!
-        try {
-          imageUrl = url.startsWith('data:') ? url : await urlToDataUrl(url)
-        } catch {
-          imageUrl = url
-        }
-      }
+      const imageUrl = result.imageUrls[0] ?? ''
 
       return {
         ok: true,
@@ -488,8 +479,7 @@ export class AgentOrchestrator {
         )
         if (lastMessage && lastMessage.type === 'ai') {
           const msg = lastMessage as AIMessage
-          const actionToolCalls =
-            msg.tool_calls?.filter((tc) => !isVirtualSubgraphTool(tc.name)) ?? []
+          const actionToolCalls = msg.tool_calls?.filter((tc) => !isSubgraphCall(tc.name)) ?? []
           if (actionToolCalls.length === 0) {
             return { messages: [] }
           }
@@ -536,78 +526,7 @@ export class AgentOrchestrator {
       }
     }
 
-    const mindmapToolResultNode = async (state: MainGraphStateType) => {
-      const content = state.error
-        ? {
-            ok: false,
-            error: state.response || state.error,
-          }
-        : {
-            ok: true,
-            title: state.mindmapTitle,
-            yamlFragment: state.mindmapYaml,
-            documentRef: state.documentRef,
-          }
-
-      return {
-        messages: [
-          new ToolMessage({
-            tool_call_id: state.pendingSubgraphToolCallId,
-            name: state.pendingSubgraphToolName || GENERATE_MINDMAP_FRAGMENT_TOOL,
-            content: JSON.stringify(content),
-          }),
-        ],
-        pendingSubgraph: null,
-        pendingSubgraphToolCallId: '',
-        pendingSubgraphToolName: '',
-      }
-    }
-
-    const palaceToolResultNode = async (state: MainGraphStateType) => {
-      let imageUrl = ''
-      if (!state.error && state.imageUrls.length > 0) {
-        const url = state.imageUrls[0]!
-        try {
-          imageUrl = url.startsWith('data:') ? url : await urlToDataUrl(url)
-        } catch {
-          imageUrl = url
-        }
-      }
-
-      const content = state.error
-        ? {
-            ok: false,
-            error: state.response || state.error,
-          }
-        : {
-            ok: true,
-            label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
-            stations: state.memoryRoute.map((s: MemoryPalaceStation) => ({
-              order: s.order,
-              content: s.content,
-              anchorVisual: s.anchorVisual ?? '',
-              association: s.association,
-              x: s.x,
-              y: s.y,
-              linkedNodeId: s.linkedNodeId ?? '',
-            })),
-            imageUrl,
-            sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
-          }
-
-      return {
-        messages: [
-          new ToolMessage({
-            tool_call_id: state.pendingSubgraphToolCallId,
-            name: state.pendingSubgraphToolName || GENERATE_PALACE_TOOL,
-            content: JSON.stringify(content),
-          }),
-        ],
-        pendingSubgraph: null,
-        pendingSubgraphToolCallId: '',
-        pendingSubgraphToolName: '',
-      }
-    }
+    const subgraphResultNode = async (state: MainGraphStateType) => packageResult(state)
 
     const supervisor = new MindLaneAgent(
       this.provider,
@@ -629,10 +548,16 @@ export class AgentOrchestrator {
       const threadId = config?.configurable?.thread_id as string | undefined
 
       if (!sessionManager?.isReady() || !threadId) {
-        return compactContext(state, this.toolRegistry.allTools, this.provider, this.aiService.memoryManager, {
-          hasEmbeddings: false,
-          hasPalace: this.hasPalace,
-        })
+        return compactContext(
+          state,
+          this.toolRegistry.allTools,
+          this.provider,
+          this.aiService.memoryManager,
+          {
+            hasEmbeddings: false,
+            hasPalace: this.hasPalace,
+          },
+        )
       }
 
       const buildMessages = async (
@@ -689,10 +614,16 @@ export class AgentOrchestrator {
           threadId,
           err,
         )
-        return compactContext(state, this.toolRegistry.allTools, this.provider, this.aiService.memoryManager, {
-          hasEmbeddings: false,
-          hasPalace: this.hasPalace,
-        })
+        return compactContext(
+          state,
+          this.toolRegistry.allTools,
+          this.provider,
+          this.aiService.memoryManager,
+          {
+            hasEmbeddings: false,
+            hasPalace: this.hasPalace,
+          },
+        )
       }
     }
 
@@ -707,8 +638,7 @@ export class AgentOrchestrator {
       .addNode('tools', toolsNode)
       .addNode('mindmapSubgraph', mindmapSubgraphNode)
       .addNode('palaceSubgraph', palaceSubgraphNode)
-      .addNode('mindmapToolResult', mindmapToolResultNode)
-      .addNode('palaceToolResult', palaceToolResultNode)
+      .addNode('subgraphResult', subgraphResultNode)
       .addEdge(START, 'contextCompact')
       .addEdge('contextCompact', 'supervisor')
       .addConditionalEdges('supervisor', routeFn, {
@@ -717,10 +647,9 @@ export class AgentOrchestrator {
         palaceSubgraph: 'palaceSubgraph',
         __end__: END,
       })
-      .addEdge('mindmapSubgraph', 'mindmapToolResult')
-      .addEdge('mindmapToolResult', 'supervisor')
-      .addEdge('palaceSubgraph', 'palaceToolResult')
-      .addEdge('palaceToolResult', 'supervisor')
+      .addEdge('mindmapSubgraph', 'subgraphResult')
+      .addEdge('palaceSubgraph', 'subgraphResult')
+      .addEdge('subgraphResult', 'supervisor')
       .addEdge('tools', 'supervisor')
 
     return graph

@@ -4,7 +4,7 @@ import path from 'node:path'
 import os from 'node:os'
 import { _normalize_tool_result, cleanupToolResultOffloads } from '../toolResultNormalizer.js'
 import { AGENT_LIMITS } from '../../config.js'
-import { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL } from '../subgraphRoutingTools.js'
+import { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL } from '../../subgraphRouter.js'
 
 describe('ToolResultNormalizer', () => {
   let tmpDir: string
