@@ -6,6 +6,7 @@ import { AnchorAgent } from '../agenthub/anchorAgent.js'
 import { PalaceSubgraphState } from '../state.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
+import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
 
 // ===== 配置选项 =====
 
@@ -17,7 +18,7 @@ interface PalaceSubgraphOptions {
 
 /**
  * 构建 Palace Subgraph
- * 流程: START -> resolve_input -> analyze -> imageGen -> vision -> END
+ * 流程: START -> resolve_input -> analyze -> imageGen -> normalizeImages -> vision -> END
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const { provider } = options
@@ -49,6 +50,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
     .addNode('imageGen', async (state) => {
       return imageGen.invoke(state)
     })
+    .addNode('normalizeImages', (state) => normalizePalaceImageUrls(state))
     .addNode('vision', (state) => vision.invoke(state))
 
   // 基础边
@@ -58,7 +60,8 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
     END,
   ])
   graph.addEdge('analyze', 'imageGen')
-  graph.addEdge('imageGen', 'vision')
+  graph.addEdge('imageGen', 'normalizeImages')
+  graph.addEdge('normalizeImages', 'vision')
   graph.addEdge('vision', END)
 
   return graph
