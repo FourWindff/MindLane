@@ -29,15 +29,10 @@ export interface StreamResponse {
 }
 
 interface StreamGraph {
-  streamEvents: (
+  stream: (
     input: Partial<MainGraphStateType>,
     config: Record<string, unknown>,
-  ) => AsyncIterable<{
-    event?: string
-    name?: string
-    metadata?: unknown
-    data?: { chunk?: { content?: unknown }; input?: unknown; output?: unknown }
-  }>
+  ) => Promise<AsyncIterable<[string, unknown]>>
   getState: (config: Record<string, unknown>) => Promise<{ values: MainGraphStateType }>
 }
 
@@ -84,7 +79,7 @@ export class Runner {
     const { request, runtime } = this.options
     let fullContent = ''
     let currentSegmentContent = ''
-    let hasStartedSegment = false
+    let currentMessageId: string | null = null
 
     try {
       const history = await this.prepareHistory()
@@ -94,9 +89,9 @@ export class Runner {
         documentRef: request.documentRef ?? null,
       }
       const config = {
-        version: 'v2' as const,
         signal: this.abortController.signal,
         recursionLimit: AGENT_LIMITS.recursionLimit,
+        streamMode: ['messages', 'tools', 'custom'],
         configurable: {
           thread_id: request.sessionId,
           tool_names: this.toolSnapshot.map(
@@ -106,36 +101,58 @@ export class Runner {
         },
       }
 
-      for await (const event of runtime.graph.streamEvents(initialState, config)) {
+      const stream = await runtime.graph.stream(initialState, config)
+      for await (const [mode, payload] of stream) {
         if (this.abortController.signal.aborted) break
-        const nodeName = (event.metadata as Record<string, unknown> | undefined)?.langgraph_node
 
-        if (event.event === 'on_chat_model_start') {
-          if (nodeName && nodeName !== 'supervisor') continue
-          if (hasStartedSegment && currentSegmentContent.trim()) {
+        if (mode === 'messages') {
+          const [message, metadata] = payload as [
+            { id?: string; content?: unknown },
+            Record<string, unknown>,
+          ]
+          if (metadata?.langgraph_node && metadata.langgraph_node !== 'supervisor') continue
+          const messageId = message.id ?? null
+          if (
+            messageId &&
+            currentMessageId &&
+            messageId !== currentMessageId &&
+            currentSegmentContent.trim()
+          ) {
             this.emit('message-start', null)
             currentSegmentContent = ''
           }
-          hasStartedSegment = true
-        } else if (event.event === 'on_chat_model_stream') {
-          if (nodeName && nodeName !== 'supervisor') continue
-          const token = extractTextContent(event.data?.chunk?.content)
+          if (messageId) currentMessageId = messageId
+          const token = extractTextContent(message.content)
           if (token) {
             fullContent += token
             currentSegmentContent += token
             this.emit('token', token)
           }
-        } else if (event.event === 'on_tool_start') {
-          this.emit('tool-start', {
-            name: event.name ?? 'unknown',
-            input: (event.data?.input ?? {}) as Record<string, unknown>,
-          })
-        } else if (event.event === 'on_tool_end') {
-          const output = event.data?.output
-          this.emit('tool-end', {
-            name: event.name ?? 'unknown',
-            output: typeof output === 'string' ? output : JSON.stringify(output ?? ''),
-          })
+        } else if (mode === 'tools') {
+          const event = payload as {
+            event?: string
+            name?: string
+            input?: unknown
+            output?: unknown
+          }
+          if (event.event === 'on_tool_start') {
+            if (event.name === 'batchAddMindmapNodes') this.emit('step', 'generating-map')
+            this.emit('tool-start', {
+              name: event.name ?? 'unknown',
+              input: (event.input ?? {}) as Record<string, unknown>,
+            })
+          } else if (event.event === 'on_tool_end') {
+            this.emit('tool-end', {
+              name: event.name ?? 'unknown',
+              output:
+                typeof event.output === 'string'
+                  ? event.output
+                  : JSON.stringify(event.output ?? ''),
+            })
+          }
+        } else if (mode === 'custom') {
+          const event = payload as { type?: string; step?: string }
+          if (event.type === 'mindmap-progress' && event.step) this.emit('step', event.step)
         }
       }
 

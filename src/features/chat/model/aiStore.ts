@@ -522,6 +522,9 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
         chat = { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
         break
       }
+      case 'step':
+        chat = { ...chat, step: event.payload as AiPipelineStep }
+        break
       case 'end': {
         const response = event.payload as {
           content?: string

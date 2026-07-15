@@ -1,4 +1,4 @@
-import { StateGraph, START, END } from '@langchain/langgraph'
+import { StateGraph, START, END, getWriter } from '@langchain/langgraph'
 import path from 'node:path'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
@@ -34,6 +34,12 @@ const SINGLE_PASS_CHAR_LIMIT = 8000
 const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
+
+type MindmapProgressStep = 'reading-doc' | 'extracting' | 'merging' | 'finalizing'
+
+function emitProgress(step: MindmapProgressStep): void {
+  getWriter()?.({ type: 'mindmap-progress', step })
+}
 
 function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
   return {
@@ -180,6 +186,7 @@ async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  emitProgress('reading-doc')
   const source = state.mindmapInputSource
   const reset = createMindmapRunReset()
 
@@ -307,6 +314,7 @@ async function leafExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  emitProgress('extracting')
   const range = state.pendingLeafRange
   if (!range) {
     return {}
@@ -388,6 +396,7 @@ async function mergeTreesNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  emitProgress('merging')
   const groups = state.pendingMergeGroups
   if (groups.length === 0) {
     return {}
@@ -472,6 +481,7 @@ async function collectMergeNode(
 async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  emitProgress('finalizing')
   // Preserve existing error
   if (state.error) {
     return {}
@@ -523,6 +533,7 @@ async function singleExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
+  emitProgress('extracting')
   const title = state.mindmapInputTitle || '思维导图'
   const text = state.documentChunks.map((chunk) => chunk.text).join('\n\n')
   if (!text.trim()) {

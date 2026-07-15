@@ -86,7 +86,7 @@ type FsResult<T = void> = FsOk<T> | FsErr
 export type ChatStreamEvent = {
   streamId: string
   sessionId: string
-  type: 'token' | 'message-start' | 'tool-start' | 'tool-end' | 'end' | 'error'
+  type: 'token' | 'message-start' | 'tool-start' | 'tool-end' | 'step' | 'end' | 'error'
   payload: unknown
 }
 

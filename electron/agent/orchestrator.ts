@@ -270,12 +270,16 @@ export class AgentOrchestrator {
     const toolNode = new ToolNode(toolRegistry.executableTools)
     const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
       subgraph: {
-        invoke: (state: MainGraphStateType, config: { recursionLimit: number }) => Promise<T>
+        invoke: (
+          state: MainGraphStateType,
+          config: { recursionLimit: number; callbacks: [] },
+        ) => Promise<T>
       },
       state: MainGraphStateType,
     ): Promise<Partial<MainGraphStateType>> => {
       const result = await subgraph.invoke(state, {
         recursionLimit: AGENT_LIMITS.recursionLimit,
+        callbacks: [],
       })
       const updates = { ...(result as MainGraphStateType & T) }
       delete (updates as Record<string, unknown>).messages

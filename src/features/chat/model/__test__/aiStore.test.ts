@@ -192,6 +192,21 @@ describe('aiStore per-file chat state', () => {
     expect(useAiStore.getState().fileChats['file-b']?.streamText).toBe('B')
   })
 
+  it('routes pipeline progress to the file bound to the session', () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      fileChats: { 'file-a': createFileChatState('session-a') },
+      sessionFileUuids: { 'session-a': 'file-a' },
+      activeStreamIds: { 'session-a': 'stream-a' },
+    })
+
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'step', payload: 'extracting' })
+
+    expect(useAiStore.getState().fileChats['file-a']?.step).toBe('extracting')
+  })
+
   it('drops events whose stream ID is stale or unknown', () => {
     const { emit } = installApis()
     const harness = createRegistryHarness()

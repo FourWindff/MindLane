@@ -5,6 +5,7 @@ import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../util
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 import { MindmapInputAnalyzer } from '../analyzers/types.js'
 import type { DocumentChunk, MindmapInputSource } from '../analyzers/types.js'
+import { MindmapSubgraphState } from '../../../state.js'
 
 vi.mock('../analyzers/pdfAnalyzer.js', () => ({
   PdfInputAnalyzer: class {
@@ -179,6 +180,51 @@ describe('mindmapGraph', () => {
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
   })
 
+  it('streams the short-document pipeline stages', async () => {
+    const mockProvider = {
+      reasoningModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: 'Short Document:\n  - Summary\n',
+        }),
+      },
+    } as unknown as LLMProvider
+
+    const app = buildMindmapSubgraph({ provider: mockProvider }).compile()
+    const steps: string[] = []
+    const stream = await app.stream(
+      {
+        messages: [],
+        context: null,
+        pendingSubgraph: 'mindmap',
+        pendingSubgraphToolCallId: '',
+        pendingSubgraphToolName: '',
+        response: '',
+        error: '',
+        mindmapInputSource: { type: 'text', content: 'short document' },
+        mindmapInputTitle: 'Short Document',
+        mindmapYaml: '',
+        mindmapTitle: '',
+        documentChunks: [],
+        leafCursor: 0,
+        pendingLeafRange: null,
+        leafResults: [],
+        mergeInputs: [],
+        partialMergedTrees: [],
+        mergeResults: [],
+        pendingMergeGroups: [],
+        finalTree: null,
+        documentRef: null,
+      },
+      { streamMode: 'custom' },
+    )
+
+    for await (const event of stream) {
+      steps.push((event as { step: string }).step)
+    }
+
+    expect(steps).toEqual(['reading-doc', 'extracting', 'finalizing'])
+  })
+
   it('uses single-pass extraction for a short PDF', async () => {
     const mockProvider = {
       reasoningModel: {
@@ -256,29 +302,39 @@ Merged Long Text:
     const graph = buildMindmapSubgraph({ provider: mockProvider })
     const app = graph.compile()
 
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: longText },
-      mindmapInputTitle: 'Long Text',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    const steps: string[] = []
+    let result!: typeof MindmapSubgraphState.State
+    const stream = await app.stream(
+      {
+        messages: [],
+        context: null,
+        pendingSubgraph: 'mindmap',
+        pendingSubgraphToolCallId: '',
+        pendingSubgraphToolName: '',
+        response: '',
+        error: '',
+        mindmapInputSource: { type: 'text', content: longText },
+        mindmapInputTitle: 'Long Text',
+        mindmapYaml: '',
+        mindmapTitle: '',
+        documentChunks: [],
+        leafCursor: 0,
+        pendingLeafRange: null,
+        leafResults: [],
+        mergeInputs: [],
+        partialMergedTrees: [],
+        mergeResults: [],
+        pendingMergeGroups: [],
+        finalTree: null,
+        documentRef: null,
+      },
+      { streamMode: ['custom', 'values'] },
+    )
+
+    for await (const [mode, event] of stream) {
+      if (mode === 'custom') steps.push((event as { step: string }).step)
+      if (mode === 'values') result = event as typeof MindmapSubgraphState.State
+    }
 
     const firstPrompt = String(
       (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]
@@ -295,6 +351,10 @@ Merged Long Text:
     expect(firstPrompt).not.toContain(importantTail)
     expect(secondPrompt).toContain(importantTail)
     expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
+    expect(steps[0]).toBe('reading-doc')
+    expect(steps.filter((step) => step === 'extracting')).toHaveLength(2)
+    expect(steps).toContain('merging')
+    expect(steps.at(-1)).toBe('finalizing')
   })
 
   it('loads documents through an injected analyzer registry', async () => {

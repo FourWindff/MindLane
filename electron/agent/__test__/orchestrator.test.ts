@@ -129,6 +129,28 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     expect(Object.keys(graphWithout.nodes)).toContain('palaceSubgraph')
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes))
   })
+
+  it('隔离独立子图的回调，避免父流重复结束同一 run', async () => {
+    const provider = createMockProvider()
+    const orchestrator = new AgentOrchestrator(provider, createMockAiService())
+    const invoke = vi.fn().mockResolvedValue({ messages: [], response: 'done' })
+
+    vi.spyOn(
+      orchestrator as unknown as { getCompiledMindmapSubgraph: () => { invoke: typeof invoke } },
+      'getCompiledMindmapSubgraph',
+    ).mockReturnValue({ invoke })
+
+    const graph = orchestrator.buildGraph()
+    const node = graph.nodes.mindmapSubgraph as unknown as {
+      runnable: { invoke: (state: Record<string, unknown>) => Promise<unknown> }
+    }
+    await node.runnable.invoke({ messages: [] })
+
+    expect(invoke).toHaveBeenCalledWith(
+      expect.objectContaining({ messages: [] }),
+      expect.objectContaining({ callbacks: [] }),
+    )
+  })
 })
 
 describe('AgentOrchestrator contextCompact node', () => {

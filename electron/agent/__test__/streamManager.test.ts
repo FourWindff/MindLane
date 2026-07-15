@@ -1,4 +1,10 @@
-import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
+import {
+  AIMessage,
+  AIMessageChunk,
+  HumanMessage,
+  ToolMessage,
+  type BaseMessage,
+} from '@langchain/core/messages'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StreamManager, type StreamRuntime } from '../streamManager.js'
 import { ToolRegistry } from '../tools/registry.js'
@@ -73,23 +79,30 @@ function createRuntime(options?: {
   capturedToolNames?: string[][]
   omitAssistantState?: boolean
   includeToolState?: boolean
+  progressStep?: string
+  messageChunks?: Array<{ id: string; content: string }>
 }): StreamRuntime {
   const registry = new ToolRegistry()
   registry.registerTool({ name: 'initial-tool' } as never)
   const graph = {
-    streamEvents: vi.fn().mockImplementation(async function* (
+    stream: vi.fn().mockImplementation(async function* (
       _input: unknown,
       config: { configurable?: { thread_id?: string; tool_names?: string[] } },
     ) {
       const sessionId = config.configurable?.thread_id ?? ''
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
-      yield {
-        event: 'on_chat_model_stream',
-        metadata: { langgraph_node: 'supervisor' },
-        data: {
-          chunk: { content: options?.tokensBySession?.[sessionId] ?? options?.token ?? 'hello' },
+      if (options?.progressStep) {
+        yield ['custom', { type: 'mindmap-progress', step: options.progressStep }]
+      }
+      const messageChunks = options?.messageChunks ?? [
+        {
+          id: `message-${sessionId}`,
+          content: options?.tokensBySession?.[sessionId] ?? options?.token ?? 'hello',
         },
+      ]
+      for (const chunk of messageChunks) {
+        yield ['messages', [new AIMessageChunk(chunk), { langgraph_node: 'supervisor' }]]
       }
       await options?.gatesBySession?.[sessionId]
       await options?.gate
@@ -150,6 +163,42 @@ describe('StreamManager + Runner', () => {
         expect.objectContaining({ streamId, sessionId: 'session-a', type: 'end' }),
       ]),
     )
+  })
+
+  it('emits mindmap pipeline progress', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() => createRuntime({ progressStep: 'extracting' }))
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'step',
+      payload: 'extracting',
+    })
+  })
+
+  it('starts a new assistant segment when the streamed message ID changes', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        messageChunks: [
+          { id: 'message-1', content: 'first' },
+          { id: 'message-2', content: 'second' },
+        ],
+      }),
+    )
+
+    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events.map((event) => event.type)).toEqual(['token', 'message-start', 'token', 'end'])
   })
 
   it('runs multiple streams concurrently with distinct IDs', async () => {
