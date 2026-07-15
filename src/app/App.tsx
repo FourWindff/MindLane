@@ -9,6 +9,7 @@ import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { FileManager } from '@/features/workspace/components/FileManager'
 import {
   initializeWorkspaceSession,
+  saveMindmapFileByUuidSilently,
   saveCurrentDocumentSilently,
   useWorkspaceStore,
 } from '@/features/workspace/store'
@@ -87,6 +88,7 @@ function AppContent() {
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
       getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
       handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor as never),
+      persistFile: (fileUuid) => void saveMindmapFileByUuidSilently(fileUuid),
       actionToolNames: MINDMAP_ACTION_TOOLS,
     }).start()
     return () => {

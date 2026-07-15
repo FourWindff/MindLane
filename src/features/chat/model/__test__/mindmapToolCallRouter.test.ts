@@ -21,6 +21,7 @@ describe('MindmapToolCallRouter', () => {
       resolveFileUuid: (sessionId) => (sessionId === 'session-a' ? 'file-a' : undefined),
       getEditor: (fileUuid) => (fileUuid === 'file-a' ? editorA : editorB),
       handleToolCall,
+      persistFile: vi.fn(),
       actionToolNames: ['batchAddMindmapNodes'],
     })
 
@@ -69,11 +70,60 @@ describe('MindmapToolCallRouter', () => {
       resolveFileUuid: () => 'file-a',
       getEditor: () => ({ insertMindmapData: vi.fn(), addDocumentRef: vi.fn() }),
       handleToolCall,
+      persistFile: vi.fn(),
       actionToolNames: ['batchAddMindmapNodes'],
     })
 
     router.start()
 
     expect(handleToolCall).not.toHaveBeenCalled()
+  })
+
+  it('persists changes applied to a background file before it is reopened', () => {
+    let listener: ((event: never) => void) | undefined
+    const activeEditor = {
+      insertMindmapData: vi.fn(),
+      addDocumentRef: vi.fn(),
+    }
+    const backgroundEditor = {
+      insertMindmapData: vi.fn(),
+      addDocumentRef: vi.fn(),
+    }
+    const persistFile = vi.fn()
+    const router = createMindmapToolCallRouter({
+      subscribe: (next) => {
+        listener = next
+        return () => undefined
+      },
+      resolveFileUuid: () => 'file-b',
+      getEditor: (fileUuid) => (fileUuid === 'file-b' ? backgroundEditor : activeEditor),
+      handleToolCall: (_toolCall, editor) => {
+        editor.insertMindmapData({ nodes: [], edges: [] })
+        return true
+      },
+      persistFile,
+      actionToolNames: ['batchAddMindmapNodes'],
+    })
+
+    router.start()
+    listener?.({
+      streamId: 'stream-b',
+      sessionId: 'session-b',
+      type: 'end',
+      payload: {
+        content: 'done',
+        toolCalls: [
+          {
+            name: 'batchAddMindmapNodes',
+            args: {},
+            result: JSON.stringify({ ok: true }),
+          },
+        ],
+      },
+    } as never)
+
+    expect(backgroundEditor.insertMindmapData).toHaveBeenCalledTimes(1)
+    expect(activeEditor.insertMindmapData).not.toHaveBeenCalled()
+    expect(persistFile).toHaveBeenCalledWith('file-b')
   })
 })

@@ -142,7 +142,9 @@ async function listWorkspaceTree(workspacePath: string | null): Promise<Workspac
 
 function loadMindLaneFile(filePath: string, data: unknown) {
   const instance = mindmapRegistry.getOrCreate(filePath)
-  instance.load(filePath, data as MindLaneFile)
+  if (!instance.store.getState().dirty) {
+    instance.load(filePath, data as MindLaneFile)
+  }
   mindmapRegistry.setActive(filePath)
 }
 
@@ -220,6 +222,50 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
   loadMindLaneFile(createResult.filePath, createResult.data)
   await workspaceState.syncAfterFileSaved(createResult.filePath)
   return true
+}
+
+export async function saveMindmapFileByUuidSilently(fileUuid: string): Promise<boolean> {
+  const instance = mindmapRegistry.getByFileUuid(fileUuid)
+  if (!instance) return true
+  const mindmapState = instance.store.getState()
+  if (!mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) return true
+  if (!mindmapState.filePath) {
+    useAiStore.getState().setFileError(fileUuid, '后台导图尚未关联文件，无法保存')
+    return false
+  }
+
+  try {
+    const savedNodes = mindmapState.nodes
+    const savedEdges = mindmapState.edges
+    const savedDocumentRefs = mindmapState.documentRefs
+    const result = await window.mindlane?.file.save({
+      filePath: mindmapState.filePath,
+      data: mindmapState.toMindLaneFile(),
+    })
+    if (!result?.ok) {
+      useAiStore.getState().setFileError(fileUuid, result?.error ?? '后台导图保存失败')
+      return false
+    }
+    const latestState = instance.store.getState()
+    latestState.setFilePath(result.data.filePath)
+    if (
+      latestState.nodes === savedNodes &&
+      latestState.edges === savedEdges &&
+      latestState.documentRefs === savedDocumentRefs
+    ) {
+      latestState.markClean()
+    }
+    await useWorkspaceStore.getState().syncAfterFileSaved(result.data.filePath)
+    return true
+  } catch (error) {
+    useAiStore
+      .getState()
+      .setFileError(
+        fileUuid,
+        `后台导图保存失败：${error instanceof Error ? error.message : String(error)}`,
+      )
+    return false
+  }
 }
 
 async function applySessionState(

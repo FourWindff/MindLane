@@ -11,6 +11,7 @@ interface RouterDependencies {
   resolveFileUuid: (sessionId: string) => string | undefined
   getEditor: (fileUuid: string) => ToolCallEditor | undefined
   handleToolCall: (toolCall: ChatToolCall, editor: ToolCallEditor) => boolean
+  persistFile: (fileUuid: string) => void
   actionToolNames: readonly string[]
 }
 
@@ -31,7 +32,7 @@ export function createMindmapToolCallRouter(dependencies: RouterDependencies) {
           toolCalls?: ChatToolCall[]
         }
         if (response.mindmapData) editor.insertMindmapData(response.mindmapData)
-        let appliedMindmapChange = false
+        let appliedMindmapChange = Boolean(response.mindmapData)
         let generatedDocumentRef: DocumentRef | null = null
         for (const toolCall of response.toolCalls ?? []) {
           if (toolCall.name === 'generateMindmapFragment') {
@@ -53,6 +54,7 @@ export function createMindmapToolCallRouter(dependencies: RouterDependencies) {
         if (generatedDocumentRef && appliedMindmapChange) {
           editor.addDocumentRef(generatedDocumentRef)
         }
+        if (appliedMindmapChange) dependencies.persistFile(fileUuid)
       })
       return () => {
         unsubscribe?.()
