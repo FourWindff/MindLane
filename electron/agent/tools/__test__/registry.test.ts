@@ -63,4 +63,15 @@ describe('ToolRegistry', () => {
     expect(registryA.allTools.map((t) => t.name)).toEqual(['toolA'])
     expect(registryB.allTools.map((t) => t.name)).toEqual(['toolB'])
   })
+
+  it('creates an immutable snapshot isolated from later registrations', () => {
+    const registry = new ToolRegistry()
+    registry.registerTool(createMockTool('initial'))
+
+    const snapshot = registry.snapshot()
+    registry.registerTool(createMockTool('late'))
+
+    expect(snapshot.allTools.map((tool) => tool.name)).toEqual(['initial'])
+    expect(() => snapshot.registerTool(createMockTool('other'))).toThrow()
+  })
 })

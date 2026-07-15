@@ -51,11 +51,15 @@ export interface AppSettings {
   lastWorkspacePath: string | null
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
+  workspacePathsByUuid: Record<string, string>
+  filePathsByUuid: Record<string, string>
   messagePipeline?: MessagePipelineConfig
   mindmapStyle?: Partial<MindmapStyleSettings>
 }
 
 export interface WorkspaceState {
+  workspaceUuid: string
+  activeSessionIds: Record<string, string>
   lastOpenedFilePath: string | null
   expandedFolderPaths: string[]
   recentFiles: RecentFileEntry[]
@@ -81,4 +85,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   lastWorkspacePath: null,
   recentWorkspacePaths: [],
   restoreLastWorkspaceOnLaunch: true,
+  workspacePathsByUuid: {},
+  filePathsByUuid: {},
 }

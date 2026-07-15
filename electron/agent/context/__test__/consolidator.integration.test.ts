@@ -37,12 +37,13 @@ function makeMessages(count: number): BaseMessage[] {
 describe('Consolidator integration', () => {
   let tmpDir: string
   let manager: SessionManager
+  const fileUuid = 'file-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-int-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test')
+    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
   })
 
   afterEach(() => {
@@ -52,7 +53,7 @@ describe('Consolidator integration', () => {
 
   it('200 条消息会话归档后进入 LLM 的消息数 ≤ 120 且摘要注入系统提示词', async () => {
     const sessionId = 'long-session'
-    await manager.saveMessages(sessionId, makeMessages(200))
+    await manager.saveMessages(sessionId, makeMessages(200), fileUuid)
 
     const buildMessages = async (
       messages: BaseMessage[],

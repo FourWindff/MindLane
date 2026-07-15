@@ -174,7 +174,7 @@ export function SettingsPanel() {
                   const result = await window.mindlane?.file.saveAs({ data })
                   if (result?.ok) {
                     const instance = mindmapRegistry.getOrCreate(result.data.filePath)
-                    instance.load(result.data.filePath, data)
+                    instance.load(result.data.filePath, result.data.data as MindLaneFile)
                     mindmapRegistry.setActive(result.data.filePath)
                     await syncAfterFileSaved(result.data.filePath)
                   }

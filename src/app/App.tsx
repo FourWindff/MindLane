@@ -18,6 +18,14 @@ import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEdit
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryContext'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { ToastContainer } from '@/shared/components/ToastContainer'
+import {
+  connectAiStore,
+  subscribeToChatStreamEvents,
+  useAiStore,
+} from '@/features/chat/model/aiStore'
+import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
+import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
 import '@/features/workspace/workspace.css'
@@ -73,6 +81,18 @@ function AppContent() {
   useEffect(() => {
     void loadSettingsFromBackend()
     void loadMindmapStyleFromBackend()
+    const disconnectAiStore = connectAiStore(mindmapRegistry)
+    const stopToolRouter = createMindmapToolCallRouter({
+      subscribe: subscribeToChatStreamEvents,
+      resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
+      getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
+      handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor as never),
+      actionToolNames: MINDMAP_ACTION_TOOLS,
+    }).start()
+    return () => {
+      stopToolRouter()
+      disconnectAiStore()
+    }
   }, [])
 
   useEffect(() => {

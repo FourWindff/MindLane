@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import {
   HumanMessage,
   AIMessage,
@@ -16,6 +17,7 @@ import type { ChatMessage, ChatToolCall } from '../../../src/shared/lib/fileForm
 
 export interface SessionMeta {
   id: string
+  fileUuid: string
   title: string
   createdAt: string
   updatedAt: string
@@ -29,12 +31,13 @@ export interface SessionMeta {
 /**
  * 基于 JSONL 的会话消息存储。
  *
- * 每个会话对应一个文件：`{baseDir}/{workspaceHash}/{sessionId}.jsonl`
+ * 每个会话对应一个文件：`{baseDir}/{workspaceUuid}/{sessionId}.jsonl`
  * 文件首行为 SessionMetadata，后续每行为一条 LangChain BaseMessage 的序列化对象。
  */
 export class SessionMessageStore {
   private baseDir = ''
-  private workspaceHash = ''
+  private workspaceUuid = ''
+  private readonly workspaceContext = new AsyncLocalStorage<string>()
   private readonly writeLocks = new Map<string, Promise<void>>()
 
   /**
@@ -48,30 +51,45 @@ export class SessionMessageStore {
   /**
    * 设置当前工作区哈希，所有会话操作均基于该目录。
    */
-  setWorkspace(workspaceHash: string): void {
-    this.workspaceHash = workspaceHash
+  setWorkspace(workspaceUuid: string): void {
+    this.workspaceUuid = workspaceUuid
+  }
+
+  runInWorkspace<T>(workspaceUuid: string, action: () => T): T {
+    return this.workspaceContext.run(workspaceUuid, action)
   }
 
   /**
    * 追加单条 LangChain 消息到对应会话文件，并更新首行元数据。
    */
-  async saveMessage(sessionId: string, message: BaseMessage): Promise<void> {
-    await this.saveMessages(sessionId, [message])
+  async saveMessage(sessionId: string, message: BaseMessage, fileUuid: string): Promise<void> {
+    await this.appendMessages(sessionId, [message], fileUuid, false)
   }
 
   /**
    * 批量追加 LangChain 消息到对应会话文件，并更新首行元数据。
    * 整个批次在同一写锁内完成，保证原子性。
    */
-  async saveMessages(sessionId: string, messages: BaseMessage[]): Promise<void> {
+  async saveMessages(sessionId: string, messages: BaseMessage[], fileUuid: string): Promise<void> {
+    await this.appendMessages(sessionId, messages, fileUuid, true)
+  }
+
+  private async appendMessages(
+    sessionId: string,
+    messages: BaseMessage[],
+    fileUuid: string,
+    dedupePrefix: boolean,
+  ): Promise<void> {
     if (messages.length === 0) return
     const sessionPath = this.resolveSessionPath(sessionId)
     await this.withWriteLock(sessionId, async () => {
       await fs.promises.mkdir(path.dirname(sessionPath), { recursive: true })
       const lines = this.readLines(sessionPath)
-      const meta = this.parseMetadata(lines[0]) ?? this.defaultMeta(sessionId)
+      const meta = this.parseMetadata(lines[0]) ?? this.defaultMeta(sessionId, fileUuid)
       const stored = mapChatMessagesToStoredMessages(messages)
-      const duplicatePrefixLength = this.countDuplicateAppendPrefix(lines, stored)
+      const duplicatePrefixLength = dedupePrefix
+        ? this.countDuplicateAppendPrefix(lines, stored)
+        : 0
       for (const s of stored.slice(duplicatePrefixLength)) {
         lines.push(JSON.stringify(s))
       }
@@ -110,8 +128,8 @@ export class SessionMessageStore {
   /**
    * 列出指定工作区下的所有会话元数据，按 updatedAt 降序排列。
    */
-  async listSessions(workspaceHash: string): Promise<SessionMeta[]> {
-    const dir = path.join(this.baseDir, workspaceHash)
+  async listSessions(workspaceUuid: string): Promise<SessionMeta[]> {
+    const dir = path.join(this.baseDir, workspaceUuid)
     if (!fs.existsSync(dir)) return []
 
     const entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -186,20 +204,26 @@ export class SessionMessageStore {
   }
 
   resolveSessionPath(sessionId: string): string {
-    if (!this.workspaceHash) {
-      throw new Error('[SessionMessageStore] workspaceHash 未设置，请先调用 setWorkspace()')
+    const workspaceUuid = this.workspaceContext.getStore() ?? this.workspaceUuid
+    if (!workspaceUuid) {
+      throw new Error('[SessionMessageStore] workspaceUuid 未设置，请先调用 setWorkspace()')
     }
-    return path.join(this.baseDir, this.workspaceHash, `${sessionId}.jsonl`)
+    return path.join(this.baseDir, workspaceUuid, `${sessionId}.jsonl`)
   }
 
   getBaseDir(): string {
     return this.baseDir
   }
 
-  private defaultMeta(sessionId: string): SessionMeta {
+  getWorkspaceUuid(): string {
+    return this.workspaceContext.getStore() ?? this.workspaceUuid
+  }
+
+  private defaultMeta(sessionId: string, fileUuid: string): SessionMeta {
     const now = new Date().toISOString()
     return {
       id: sessionId,
+      fileUuid,
       title: `新对话 ${new Date().toLocaleString('zh-CN', {
         month: 'short',
         day: 'numeric',
@@ -218,6 +242,7 @@ export class SessionMessageStore {
       const parsed = JSON.parse(line) as Partial<SessionMeta>
       if (
         typeof parsed.id === 'string' &&
+        typeof parsed.fileUuid === 'string' &&
         typeof parsed.title === 'string' &&
         typeof parsed.createdAt === 'string' &&
         typeof parsed.updatedAt === 'string' &&

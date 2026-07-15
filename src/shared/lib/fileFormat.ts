@@ -14,6 +14,7 @@ export function isDefaultViewport(vp: { x: number; y: number; zoom: number }): b
 export interface MindLaneFile {
   version: '1.0'
   metadata: {
+    fileUuid: string
     title: string
     createdAt: string
     updatedAt: string
@@ -127,7 +128,7 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
   const now = new Date().toISOString()
   return {
     version: '1.0',
-    metadata: { title, createdAt: now, updatedAt: now },
+    metadata: { fileUuid: crypto.randomUUID(), title, createdAt: now, updatedAt: now },
     mindmap: {
       nodes: [
         {

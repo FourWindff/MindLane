@@ -28,6 +28,7 @@ describe('PalaceInputResolver', () => {
     const result = await resolver.resolve(
       createState({
         context: {
+          fileUuid: 'file-1',
           selectedNodes: [
             { id: 'n1', type: 'text', label: 'Node 1' },
             { id: 'n2', type: 'text', label: 'Node 2' },

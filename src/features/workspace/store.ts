@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { useAiStore } from '@/features/chat/model/aiStore'
 import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
 interface WorkspaceStore {
@@ -641,11 +642,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const activeInstance = mindmapRegistry.getActive()
-      const currentFilePath = activeInstance?.store.getState().filePath
-      if (currentFilePath === oldPath) {
-        activeInstance?.store.getState().setFilePath(result.data.newPath)
+      const renamedInstance = mindmapRegistry.get(oldPath)
+      if (renamedInstance) {
+        const fileUuid = renamedInstance.store.getState().fileUuid
+        renamedInstance.store.getState().setFilePath(result.data.newPath)
         mindmapRegistry.renameKey(oldPath, result.data.newPath)
+        useAiStore.getState().updateFileLocation(fileUuid, result.data.newPath)
       }
 
       const expanded = new Set(get().expandedFolders)
@@ -684,11 +686,12 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const activeInstance = mindmapRegistry.getActive()
-      const currentFilePath = activeInstance?.store.getState().filePath
-      if (currentFilePath === sourcePath) {
-        activeInstance?.store.getState().setFilePath(result.data.newPath)
+      const movedInstance = mindmapRegistry.get(sourcePath)
+      if (movedInstance) {
+        const fileUuid = movedInstance.store.getState().fileUuid
+        movedInstance.store.getState().setFilePath(result.data.newPath)
         mindmapRegistry.renameKey(sourcePath, result.data.newPath)
+        useAiStore.getState().updateFileLocation(fileUuid, result.data.newPath)
       }
 
       const tree = await listWorkspaceTree(workspacePath)

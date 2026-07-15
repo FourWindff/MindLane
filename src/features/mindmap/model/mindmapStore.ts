@@ -16,7 +16,9 @@ export interface MindmapState {
   dirty: boolean
   hasDocumentOpen: boolean
   filePath: string | null
+  fileUuid: string
   fileTitle: string
+  fileCreatedAt: string
   editingNodeId: string | null
   viewport: Viewport
   documentRefs: DocumentRef[]
@@ -60,7 +62,9 @@ export function createMindmapStore(): MindmapStore {
     dirty: false,
     hasDocumentOpen: false,
     filePath: null,
+    fileUuid: initialFile.metadata.fileUuid,
     fileTitle: initialFile.metadata.title,
+    fileCreatedAt: initialFile.metadata.createdAt,
     viewport: initialFile.mindmap.viewport,
     editingNodeId: null,
     documentRefs: [],
@@ -116,7 +120,9 @@ export function createMindmapStore(): MindmapStore {
         documentRefs: (data.documents || []).map(migrateDocumentRef),
         hasDocumentOpen: true,
         filePath,
+        fileUuid: data.metadata.fileUuid,
         fileTitle: data.metadata.title,
+        fileCreatedAt: data.metadata.createdAt,
         dirty: false,
         viewport: data.mindmap.viewport,
         canUndo: false,
@@ -132,7 +138,9 @@ export function createMindmapStore(): MindmapStore {
         documentRefs: [],
         hasDocumentOpen: true,
         filePath: null,
+        fileUuid: f.metadata.fileUuid,
         fileTitle: f.metadata.title,
+        fileCreatedAt: f.metadata.createdAt,
         dirty: false,
         viewport: f.mindmap.viewport,
         canUndo: false,
@@ -147,7 +155,9 @@ export function createMindmapStore(): MindmapStore {
         edges: f.mindmap.edges as Edge[],
         hasDocumentOpen: false,
         filePath: null,
+        fileUuid: f.metadata.fileUuid,
         fileTitle: f.metadata.title,
+        fileCreatedAt: f.metadata.createdAt,
         dirty: false,
         editingNodeId: null,
         viewport: f.mindmap.viewport,
@@ -158,11 +168,11 @@ export function createMindmapStore(): MindmapStore {
     },
 
     toMindLaneFile: (): MindLaneFile => {
-      const { nodes, edges, fileTitle, viewport, documentRefs } = get()
+      const { nodes, edges, fileUuid, fileTitle, fileCreatedAt, viewport, documentRefs } = get()
       const now = new Date().toISOString()
       return {
         version: '1.0',
-        metadata: { title: fileTitle, createdAt: now, updatedAt: now },
+        metadata: { fileUuid, title: fileTitle, createdAt: fileCreatedAt, updatedAt: now },
         mindmap: {
           nodes: nodes.map((n) => ({
             id: n.id,

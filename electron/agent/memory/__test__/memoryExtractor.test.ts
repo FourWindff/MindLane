@@ -61,6 +61,7 @@ describe('MemoryExtractor', () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
       metadata: {
+        fileUuid: 'file-uuid-1',
         title: 'Test',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
@@ -113,6 +114,7 @@ describe('MemoryExtractor', () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
       metadata: {
+        fileUuid: 'file-uuid-1',
         title: 'Test',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',
@@ -142,6 +144,7 @@ describe('MemoryExtractor', () => {
     const mindlaneFile: MindLaneFile = {
       version: '1.0',
       metadata: {
+        fileUuid: 'file-uuid-1',
         title: 'Test',
         createdAt: '2024-01-01T00:00:00Z',
         updatedAt: '2024-01-01T00:00:00Z',

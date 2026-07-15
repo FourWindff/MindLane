@@ -16,6 +16,7 @@ describe('ContextBuilder memory', () => {
     const builder = new ContextBuilder()
     builder.withMemory(mm)
     builder.withContext({
+      fileUuid: 'file-1',
       fileTags: ['eng'],
       hasDocumentOpen: true,
       filePath: '/t.mindlane',

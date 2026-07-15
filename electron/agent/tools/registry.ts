@@ -48,4 +48,12 @@ export class ToolRegistry {
   get executableTools(): StructuredToolInterface[] {
     return this._executableTools
   }
+
+  snapshot(): ToolRegistry {
+    const snapshot = new ToolRegistry()
+    for (const tool of this._allTools) snapshot.registerTool(tool)
+    Object.freeze(snapshot._allTools)
+    Object.freeze(snapshot._executableTools)
+    return snapshot
+  }
 }

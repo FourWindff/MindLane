@@ -15,6 +15,8 @@ export interface WorkspaceTreeEntry {
 
 export interface WorkspaceSessionState {
   workspacePath: string | null
+  workspaceUuid?: string | null
+  activeSessionIds?: Record<string, string>
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
   expandedFolderPaths: string[]

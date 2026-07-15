@@ -20,15 +20,17 @@ import crypto from 'node:crypto'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
 import { DEFAULT_SETTINGS } from './fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
-import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
+import type { DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 import { IPC } from './ipc.js'
 import { resolveDocumentRef } from '../src/shared/lib/documentRef.js'
 
 import { AiService } from './agent/service.js'
-import { AgentOrchestrator, type ChatRequest } from './agent/orchestrator.js'
+import { AgentOrchestrator } from './agent/orchestrator.js'
 import type { SelectedNodeContent } from './agent/state.js'
 import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
 import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
+import { StreamManager, type StreamRequest, type StreamRuntime } from './agent/streamManager.js'
+import type { ChatContext, ChatStreamEvent } from './preload.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -50,6 +52,8 @@ let forceClose = false
 let fsService: FileSystemService
 let aiService: AiService
 let aiServiceReady = false
+let streamManager: StreamManager | null = null
+let chatOrchestrator: AgentOrchestrator | null = null
 
 function aiNotReadyResponse(): { ok: false; error: string } {
   return { ok: false, error: 'AI service not initialized' }
@@ -101,6 +105,8 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   if (!launchResult.ok) {
     return {
       workspacePath: null as string | null,
+      workspaceUuid: null as string | null,
+      activeSessionIds: {} as Record<string, string>,
       recentWorkspacePaths: [] as string[],
       lastOpenedFilePath: null as string | null,
       expandedFolderPaths: [] as string[],
@@ -111,6 +117,8 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
 
   let lastOpenedFilePath: string | null = null
   let expandedFolderPaths: string[] = []
+  let workspaceUuid: string | null = null
+  let activeSessionIds: Record<string, string> = {}
   if (workspacePath) {
     const workspaceResult = await service.workspace.load(workspacePath)
     const workspaceState = workspaceResult.ok
@@ -118,6 +126,8 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
       : { ...DEFAULT_WORKSPACE_STATE }
     expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
+    workspaceUuid = workspaceState.workspaceUuid
+    activeSessionIds = workspaceState.activeSessionIds
 
     // One-time migration of legacy workspace-scoped keys from global settings.json.
     // Only seed workspace-local state if it is still all-defaults, then remove the legacy keys.
@@ -129,6 +139,8 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
         if (reloaded.ok) {
           expandedFolderPaths = reloaded.data.expandedFolderPaths
           lastOpenedFilePath = reloaded.data.lastOpenedFilePath
+          workspaceUuid = reloaded.data.workspaceUuid
+          activeSessionIds = reloaded.data.activeSessionIds
         }
       }
     }
@@ -139,6 +151,8 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     recentWorkspacePaths,
     lastOpenedFilePath,
     expandedFolderPaths,
+    workspaceUuid,
+    activeSessionIds,
     restoreLastWorkspaceOnLaunch,
   }
 }
@@ -244,64 +258,45 @@ function registerIpcHandlers(userDataPath: string) {
     })
   }
 
-  // -- AI chat stream (with abort support) --
-  let streamAbortController: AbortController | null = null
+  // -- AI chat stream (concurrent runners) --
+  streamManager ??= new StreamManager({
+    aiService,
+    eventSink: (event: ChatStreamEvent) => {
+      win?.webContents.send(IPC.AiChatStreamEvent, event)
+    },
+    createRuntime: async () => {
+      const settings = await fsService.appState.load()
+      const providerId = settings.activeProviders.chat || 'dashscope'
+      const providerConfig = settings.providerConfigs[providerId]
+      const apiKey = providerConfig?.apiKey || settings.apiKey || ''
+      if (!apiKey.trim()) throw new Error('未填写 API Key')
+      const provider = createProvider(providerId, {
+        apiKey,
+        chatModel: settings.chatModel || 'qwen-turbo',
+        baseUrl: providerConfig?.baseUrl,
+      })
+      const messagePipeline = await resolveMessagePipelineConfig()
+      if (chatOrchestrator) chatOrchestrator.updateProvider(provider, messagePipeline)
+      else {
+        chatOrchestrator = new AgentOrchestrator(provider, aiService, {
+          userDataPath,
+          messagePipeline,
+        })
+      }
+      return chatOrchestrator.getStreamRuntime() as unknown as StreamRuntime
+    },
+  })
 
   ipcMain.handle(
     IPC.AiChatStream,
-    async (
-      _e,
-      payload: {
-        threadId: string
-        message: string
-        context?: {
-          mindmapSummary?: string
-          selectedNodes?: {
-            id: string
-            type: string
-            label: string
-            extra?: Record<string, unknown>
-          }[]
-          filePath?: string
-          fileTitle?: string
-          hasDocumentOpen?: boolean
-          workspacePath?: string
-          workspaceFiles?: { name: string; filePath: string }[]
-          attachedDocument?: DocumentRef
-          linkedDocuments?: DocumentRef[]
-        }
-      },
-    ) => {
-      streamAbortController?.abort()
-      const abortController = new AbortController()
-      streamAbortController = abortController
-
+    async (_e, payload: { threadId: string; message: string; context: ChatContext }) => {
       if (!aiServiceReady) {
-        win?.webContents.send(IPC.AiChatStreamError, 'AI service not initialized')
-        return
+        return { ok: false, error: 'AI service not initialized' }
       }
 
       try {
-        const settings = await fsService.appState.load()
-        const providerId = settings.activeProviders.chat || 'dashscope'
-        const providerConfig = settings.providerConfigs[providerId]
-        const apiKey = providerConfig?.apiKey || settings.apiKey || ''
-        const modelName = settings.chatModel || 'qwen-turbo'
-
-        if (!apiKey.trim()) {
-          win?.webContents.send(IPC.AiChatStreamError, '未填写 API Key')
-          return
-        }
-
-        const provider = createProvider(providerId, {
-          apiKey,
-          chatModel: modelName,
-          baseUrl: providerConfig?.baseUrl,
-        })
-
         if (!payload.message?.trim()) {
-          win?.webContents.send(IPC.AiChatStreamError, '消息不能为空')
-          return
+          return { ok: false, error: '消息不能为空' }
         }
 
         let fileTags: string[] | undefined
@@ -315,84 +310,44 @@ function registerIpcHandlers(userDataPath: string) {
           }
         }
 
-        const request: ChatRequest = {
-          threadId: payload.threadId || crypto.randomUUID(),
+        const workspacePath = payload.context.workspacePath
+        if (!workspacePath || !payload.context.fileUuid) {
+          return { ok: false, error: '聊天上下文缺少文件身份或工作区路径' }
+        }
+        let workspaceUuid: string
+        {
+          const workspaceState = await fsService.workspace.load(workspacePath)
+          if (!workspaceState.ok) return workspaceState
+          workspaceUuid = workspaceState.data.workspaceUuid
+          if (!workspaceUuid) return { ok: false, error: '工作区缺少稳定身份' }
+        }
+
+        const request: StreamRequest = {
+          sessionId: payload.threadId || crypto.randomUUID(),
           message: payload.message,
-          context: payload.context
-            ? {
-                ...payload.context,
-                selectedNodes: payload.context.selectedNodes?.filter(
-                  (
-                    n,
-                  ): n is {
-                    id: string
-                    type: 'text' | 'palace'
-                    label: string
-                    extra?: Record<string, unknown>
-                  } => n.type === 'text' || n.type === 'palace',
-                ),
-                fileTags,
-              }
-            : undefined,
+          workspaceUuid,
+          context: {
+            ...payload.context,
+            selectedNodes: payload.context.selectedNodes?.filter(
+              (n) => n.type === 'text' || n.type === 'palace',
+            ),
+            fileTags,
+          },
           documentRef: payload.context?.attachedDocument,
         }
 
-        const orchestrator = new AgentOrchestrator(provider, aiService, {
-          userDataPath,
-          messagePipeline: await resolveMessagePipelineConfig(),
-        })
-        await orchestrator.stream(
-          request,
-          {
-            onToken: (token) => {
-              if (!abortController.signal.aborted) {
-                win?.webContents.send(IPC.AiChatStreamToken, token)
-              }
-            },
-            onMessageStart: () => {
-              if (!abortController.signal.aborted) {
-                win?.webContents.send(IPC.AiChatStreamMessageStart)
-              }
-            },
-            onToolStart: (name, input) => {
-              if (!abortController.signal.aborted) {
-                win?.webContents.send(IPC.AiChatStreamToolStart, { name, input })
-              }
-            },
-            onToolEnd: (name, output) => {
-              if (!abortController.signal.aborted) {
-                win?.webContents.send(IPC.AiChatStreamToolEnd, { name, output })
-              }
-            },
-            onEnd: (response) => {
-              win?.webContents.send(IPC.AiChatStreamEnd, response)
-            },
-            onError: (error) => {
-              if (!abortController.signal.aborted) {
-                win?.webContents.send(IPC.AiChatStreamError, error)
-              }
-            },
-          },
-          abortController.signal,
-        )
+        return {
+          ok: true,
+          streamId: streamManager!.startStream(request),
+        }
       } catch (error) {
-        if (!abortController.signal.aborted) {
-          win?.webContents.send(
-            IPC.AiChatStreamError,
-            error instanceof Error ? error.message : String(error),
-          )
-        }
-      } finally {
-        if (streamAbortController === abortController) {
-          streamAbortController = null
-        }
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
       }
     },
   )
 
-  ipcMain.handle(IPC.AiChatStreamStop, () => {
-    streamAbortController?.abort()
-    streamAbortController = null
+  ipcMain.handle(IPC.AiChatStreamStop, (_e, payload: { streamId: string }) => {
+    return { ok: streamManager?.stopStream(payload.streamId) ?? false }
   })
 
   // -- Image URL to base64 data URL --
@@ -413,11 +368,14 @@ function registerIpcHandlers(userDataPath: string) {
       payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
     ) => {
       const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const orchestrator = new AgentOrchestrator(provider, aiService, {
-        userDataPath,
-        messagePipeline: await resolveMessagePipelineConfig(),
-      })
-      return orchestrator.runPalaceFromNodes(payload.selectedNodes)
+      const messagePipeline = await resolveMessagePipelineConfig()
+      if (!chatOrchestrator) {
+        chatOrchestrator = new AgentOrchestrator(provider, aiService, {
+          userDataPath,
+          messagePipeline,
+        })
+      }
+      return chatOrchestrator.runPalaceFromNodes(payload.selectedNodes, provider)
     },
   )
 
@@ -484,7 +442,7 @@ function registerIpcHandlers(userDataPath: string) {
     const data = payload.data as MindLaneFile
     const result = await fsService.project.save(payload.filePath, data, win)
     if (result.ok) {
-      await syncWorkspaceFromFile(result.data.filePath, data)
+      await syncWorkspaceFromFile(result.data.filePath, result.data.data)
     }
     return result
   })
@@ -497,7 +455,7 @@ function registerIpcHandlers(userDataPath: string) {
       defaultDirectory: settings.lastWorkspacePath,
     })
     if (result.ok) {
-      await syncWorkspaceFromFile(result.data.filePath, data)
+      await syncWorkspaceFromFile(result.data.filePath, result.data.data)
     }
     return result
   })
@@ -612,12 +570,12 @@ function registerIpcHandlers(userDataPath: string) {
         data,
       )
       if (result.ok) {
-        await syncWorkspaceFromFile(result.data.filePath, data)
+        await syncWorkspaceFromFile(result.data.filePath, result.data.data)
         return {
           ok: true,
           data: {
             filePath: result.data.filePath,
-            data,
+            data: result.data.data,
           },
         }
       }
@@ -643,11 +601,33 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle(
     IPC.WorkspaceUpdateState,
-    async (_e, payload: { workspacePath: string } & Partial<WorkspaceState>) => {
+    async (
+      _e,
+      payload: {
+        workspacePath: string
+        activeSession?: { fileUuid: string; sessionId: string }
+      } & Partial<WorkspaceState>,
+    ) => {
+      const activeSession = payload.activeSession
+      if (activeSession !== undefined) {
+        const result = await fsService.workspace.setActiveSessionId(
+          payload.workspacePath,
+          activeSession.fileUuid,
+          activeSession.sessionId,
+        )
+        if (!result.ok) return result
+      }
       if (payload.expandedFolderPaths !== undefined) {
         const result = await fsService.workspace.updateExpandedFolders(
           payload.workspacePath,
           payload.expandedFolderPaths,
+        )
+        if (!result.ok) return result
+      }
+      if (payload.activeSessionIds !== undefined) {
+        const result = await fsService.workspace.updateActiveSessionIds(
+          payload.workspacePath,
+          payload.activeSessionIds,
         )
         if (!result.ok) return result
       }
@@ -733,11 +713,23 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle(
     IPC.ChatListSessions,
-    async (_e, payload: { workspacePath: string; limit?: number; offset?: number }) => {
+    async (
+      _e,
+      payload: { workspacePath: string; fileUuid: string; limit?: number; offset?: number },
+    ) => {
       if (!aiServiceReady) return aiNotReadyResponse()
       try {
-        aiService.sessionManager.setWorkspace(payload.workspacePath)
-        const sessions = await aiService.sessionManager.listSessions(payload.limit, payload.offset)
+        const workspaceState = await fsService.workspace.load(payload.workspacePath)
+        if (!workspaceState.ok) return workspaceState
+        const sessions = await aiService.sessionManager.runInWorkspace(
+          workspaceState.data.workspaceUuid,
+          () =>
+            aiService.sessionManager.listSessions({
+              fileUuid: payload.fileUuid,
+              limit: payload.limit,
+              offset: payload.offset,
+            }),
+        )
         return { ok: true, data: { sessions } }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -758,8 +750,12 @@ function registerIpcHandlers(userDataPath: string) {
         }
       }
       try {
-        aiService.sessionManager.setWorkspace(payload.workspacePath)
-        const messages = await aiService.sessionManager.loadSessionMessages(payload.sessionId)
+        const workspaceState = await fsService.workspace.load(payload.workspacePath)
+        if (!workspaceState.ok) throw new Error(workspaceState.error)
+        const messages = await aiService.sessionManager.runInWorkspace(
+          workspaceState.data.workspaceUuid,
+          () => aiService.sessionManager.loadSessionMessages(payload.sessionId),
+        )
         return {
           ok: true,
           data: {
@@ -780,33 +776,28 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   ipcMain.handle(
-    IPC.ChatSaveSession,
-    async (
-      _e,
-      payload: {
-        workspacePath: string
-        sessionId: string
-        messages: ChatMessage[]
-      },
-    ) => {
-      if (!aiServiceReady) return aiNotReadyResponse()
-      try {
-        aiService.sessionManager.setWorkspace(payload.workspacePath)
-        await aiService.sessionManager.saveSession(payload.sessionId, payload.messages)
-        return { ok: true }
-      } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
-      }
-    },
-  )
-
-  ipcMain.handle(
     IPC.ChatDeleteSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
       if (!aiServiceReady) return aiNotReadyResponse()
       try {
-        aiService.sessionManager.setWorkspace(payload.workspacePath)
-        await aiService.sessionManager.deleteSession(payload.sessionId)
+        const workspaceState = await fsService.workspace.load(payload.workspacePath)
+        if (!workspaceState.ok) return workspaceState
+        const sessionMeta = await aiService.sessionManager.runInWorkspace(
+          workspaceState.data.workspaceUuid,
+          async () => {
+            const meta = aiService.sessionManager.getSessionMeta(payload.sessionId)
+            await aiService.sessionManager.deleteSession(payload.sessionId)
+            return meta
+          },
+        )
+        if (sessionMeta?.fileUuid) {
+          await fsService.workspace.setActiveSessionId(
+            payload.workspacePath,
+            sessionMeta.fileUuid,
+            null,
+            payload.sessionId,
+          )
+        }
         return { ok: true }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -847,6 +838,7 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle(IPC.FileSettingsUpdate, async (_e, partial: Record<string, unknown>) => {
     await fsService.appState.update(partial as Partial<AppSettings>)
+    streamManager?.invalidateRuntime()
   })
 
   ipcMain.handle(IPC.WindowMinimize, () => {

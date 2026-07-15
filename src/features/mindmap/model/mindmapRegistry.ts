@@ -40,6 +40,25 @@ export class MindmapRegistry {
     return this.instances.get(this.activeKey) ?? null
   }
 
+  getActiveFile(): { fileUuid: string; filePath: string; fileTitle: string } | null {
+    const active = this.getActive()
+    if (!active) return null
+    const state = active.store.getState()
+    if (!state.hasDocumentOpen || !state.filePath) return null
+    return {
+      fileUuid: state.fileUuid,
+      filePath: state.filePath,
+      fileTitle: state.fileTitle,
+    }
+  }
+
+  getByFileUuid(fileUuid: string): MindmapInstance | undefined {
+    for (const instance of this.instances.values()) {
+      if (instance.store.getState().fileUuid === fileUuid) return instance
+    }
+    return undefined
+  }
+
   getDefault(): MindmapInstance {
     return this.defaultInstance
   }

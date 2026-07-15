@@ -2,8 +2,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
 import type { FsResult, RecentFileEntry, WorkspaceState } from './types.js'
+import type { AppState } from './appState.js'
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
+  workspaceUuid: '',
+  activeSessionIds: {},
   lastOpenedFilePath: null,
   expandedFolderPaths: [],
   recentFiles: [],
@@ -39,6 +42,8 @@ export class Workspace {
   private cache = new Map<string, WorkspaceState>()
   private writeQueue = new Map<string, Promise<void>>()
 
+  constructor(private readonly appState?: AppState) {}
+
   private statePath(workspacePath: string): string {
     return path.join(workspacePath, MINDLANE_DIR, STATE_FILE)
   }
@@ -47,7 +52,10 @@ export class Workspace {
     const pending = this.writeQueue.get(workspacePath)
     if (pending) await pending
 
-    return this.loadFromDisk(workspacePath)
+    const result = await this.loadFromDisk(workspacePath)
+    if (!result.ok) return result
+    if (!this.appState && result.data.workspaceUuid) return result
+    return this.initializeIdentity(workspacePath, result.data)
   }
 
   async openFile(
@@ -82,6 +90,33 @@ export class Workspace {
     return this.saveState(workspacePath, async () => ({
       expandedFolderPaths: paths,
     }))
+  }
+
+  async updateActiveSessionIds(
+    workspacePath: string,
+    activeSessionIds: Record<string, string>,
+  ): Promise<FsResult<void>> {
+    return this.saveState(workspacePath, async () => ({ activeSessionIds }))
+  }
+
+  async setActiveSessionId(
+    workspacePath: string,
+    fileUuid: string,
+    sessionId: string | null,
+    expectedSessionId?: string,
+  ): Promise<FsResult<void>> {
+    return this.saveState(workspacePath, async () => {
+      const current = await this.loadFromDisk(workspacePath)
+      const activeSessionIds = {
+        ...(current.ok ? current.data.activeSessionIds : DEFAULT_WORKSPACE_STATE.activeSessionIds),
+      }
+      if (expectedSessionId !== undefined && activeSessionIds[fileUuid] !== expectedSessionId) {
+        return {}
+      }
+      if (sessionId === null) delete activeSessionIds[fileUuid]
+      else activeSessionIds[fileUuid] = sessionId
+      return { activeSessionIds }
+    })
   }
 
   /**
@@ -162,6 +197,15 @@ export class Workspace {
         )
         const corrected = lastOpenedFilePath !== rawLastOpenedFilePath
         const merged: WorkspaceState = {
+          workspaceUuid: typeof parsed.workspaceUuid === 'string' ? parsed.workspaceUuid : '',
+          activeSessionIds:
+            parsed.activeSessionIds && typeof parsed.activeSessionIds === 'object'
+              ? Object.fromEntries(
+                  Object.entries(parsed.activeSessionIds).filter(
+                    (entry): entry is [string, string] => typeof entry[1] === 'string',
+                  ),
+                )
+              : {},
           lastOpenedFilePath,
           expandedFolderPaths: coerceExpandedFolderPaths(parsed.expandedFolderPaths),
           recentFiles: coerceRecentFiles(parsed.recentFiles),
@@ -176,6 +220,26 @@ export class Workspace {
       // fall through to defaults
     }
     return { ok: true, data: { ...DEFAULT_WORKSPACE_STATE } }
+  }
+
+  private async initializeIdentity(
+    workspacePath: string,
+    state: WorkspaceState,
+  ): Promise<FsResult<WorkspaceState>> {
+    try {
+      const statePath = this.statePath(workspacePath)
+      const candidateUuid = state.workspaceUuid || undefined
+      const workspaceUuid = this.appState
+        ? await this.appState.claimWorkspaceUuid(workspacePath, candidateUuid)
+        : (candidateUuid ?? crypto.randomUUID())
+      const next = { ...state, workspaceUuid }
+      await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
+      await atomicWrite(statePath, JSON.stringify(next, null, 2))
+      this.cache.set(workspacePath, next)
+      return { ok: true, data: next }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
   }
 
   private resolveLastOpenedFilePath(

@@ -36,12 +36,13 @@ describe('Consolidator', () => {
   let manager: SessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   let getToolDefinitions: () => []
+  const fileUuid = 'file-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test')
+    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -57,7 +58,7 @@ describe('Consolidator', () => {
 
   it('消息数量未超阈值时跳过归档', async () => {
     const sessionId = 'skip'
-    await manager.saveMessages(sessionId, makeMessages(2))
+    await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
 
     const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
@@ -109,7 +110,7 @@ describe('Consolidator', () => {
   it('多轮归档后推进 lastConsolidated 并写入 history.jsonl', async () => {
     const sessionId = 'archive'
     const messages = makeMessages(20)
-    await manager.saveMessages(sessionId, messages)
+    await manager.saveMessages(sessionId, messages, fileUuid)
 
     const provider = new FakeProvider(
       new FakeListChatModel({ responses: ['summary one', 'summary two'] }),
@@ -144,7 +145,7 @@ describe('Consolidator', () => {
   it('LLM 失败时降级为 rawArchive 并仍推进游标', async () => {
     const sessionId = 'raw'
     const messages = makeMessages(20)
-    await manager.saveMessages(sessionId, messages)
+    await manager.saveMessages(sessionId, messages, fileUuid)
 
     const throwingModel = new FakeListChatModel({ responses: [] })
     throwingModel.invoke = async () => {
@@ -178,7 +179,7 @@ describe('Consolidator', () => {
   it('getMessagesForContext 限制条数与 token 预算', async () => {
     const sessionId = 'context'
     const messages = makeMessages(11)
-    await manager.saveMessages(sessionId, messages)
+    await manager.saveMessages(sessionId, messages, fileUuid)
 
     const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
@@ -215,7 +216,7 @@ describe('Consolidator', () => {
       new AIMessage('old reply'),
       new HumanMessage('current'),
     ]
-    await manager.saveMessages(sessionId, messages)
+    await manager.saveMessages(sessionId, messages, fileUuid)
 
     const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
@@ -245,7 +246,7 @@ describe('Consolidator', () => {
   it('并发调用同一会话串行执行', async () => {
     const sessionId = 'concurrent'
     const messages = makeMessages(30)
-    await manager.saveMessages(sessionId, messages)
+    await manager.saveMessages(sessionId, messages, fileUuid)
 
     const provider = new FakeProvider(new FakeListChatModel({ responses: ['one', 'two'] }))
     const consolidator = new Consolidator(

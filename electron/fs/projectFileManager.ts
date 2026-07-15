@@ -4,12 +4,19 @@ import { dialog, type BrowserWindow } from 'electron'
 import type { FsResult } from './types.js'
 import type { MindLaneFile } from '../../src/shared/lib/fileFormat'
 import { atomicWrite } from './atomicWrite.js'
+import type { AppState } from './appState.js'
+
+type SavedProject = { filePath: string; data: MindLaneFile }
 
 export class ProjectFileManager {
   private backupsDir: string
   private maxBackups: number
 
-  constructor(userDataPath: string, maxBackups = 5) {
+  constructor(
+    userDataPath: string,
+    maxBackups = 5,
+    private readonly appState?: AppState,
+  ) {
     this.backupsDir = path.join(userDataPath, 'backups')
     this.maxBackups = maxBackups
   }
@@ -47,6 +54,13 @@ export class ProjectFileManager {
       if (!data.version || !data.mindmap) {
         return { ok: false, error: '文件格式不正确' }
       }
+      if (this.appState && data.metadata?.fileUuid) {
+        const fileUuid = await this.appState.claimFileUuid(filePath, data.metadata.fileUuid)
+        if (fileUuid !== data.metadata.fileUuid) {
+          data.metadata.fileUuid = fileUuid
+          await atomicWrite(filePath, JSON.stringify(data, null, 2))
+        }
+      }
       return { ok: true, data: { filePath, data } }
     } catch (e) {
       return { ok: false, error: `读取失败：${e instanceof Error ? e.message : String(e)}` }
@@ -57,7 +71,7 @@ export class ProjectFileManager {
     filePath: string | null,
     data: MindLaneFile,
     win: BrowserWindow,
-  ): Promise<FsResult<{ filePath: string }>> {
+  ): Promise<FsResult<SavedProject>> {
     if (!filePath) {
       return this.saveAs(data, win)
     }
@@ -68,16 +82,23 @@ export class ProjectFileManager {
     filePath: string,
     data: MindLaneFile,
     options?: { createBackup?: boolean; overwrite?: boolean },
-  ): Promise<FsResult<{ filePath: string }>> {
+  ): Promise<FsResult<SavedProject>> {
     try {
       if (options?.overwrite === false && fs.existsSync(filePath)) {
         return { ok: false, error: '文件已存在' }
       }
+      const fileUuid = this.appState
+        ? await this.appState.claimFileUuid(filePath, data.metadata.fileUuid)
+        : data.metadata.fileUuid
+      const savedData =
+        fileUuid === data.metadata.fileUuid
+          ? data
+          : { ...data, metadata: { ...data.metadata, fileUuid } }
       if (options?.createBackup !== false) {
         await this.createBackup(filePath)
       }
-      await atomicWrite(filePath, JSON.stringify(data, null, 2))
-      return { ok: true, data: { filePath } }
+      await atomicWrite(filePath, JSON.stringify(savedData, null, 2))
+      return { ok: true, data: { filePath, data: savedData } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
     }
@@ -87,7 +108,7 @@ export class ProjectFileManager {
     directoryPath: string,
     name: string,
     data: MindLaneFile,
-  ): Promise<FsResult<{ filePath: string }>> {
+  ): Promise<FsResult<SavedProject>> {
     const trimmedName = name.trim()
     if (!trimmedName) {
       return { ok: false, error: '文件名不能为空' }
@@ -104,7 +125,7 @@ export class ProjectFileManager {
     data: MindLaneFile,
     win: BrowserWindow,
     options?: { defaultDirectory?: string | null },
-  ): Promise<FsResult<{ filePath: string }>> {
+  ): Promise<FsResult<SavedProject>> {
     const defaultFilename = `${data.metadata.title || '未命名'}.mindlane`
     const defaultPath = options?.defaultDirectory
       ? path.join(options.defaultDirectory, defaultFilename)
@@ -118,8 +139,18 @@ export class ProjectFileManager {
       return { ok: false, error: '已取消' }
     }
     try {
-      await atomicWrite(result.filePath, JSON.stringify(data, null, 2))
-      return { ok: true, data: { filePath: result.filePath } }
+      const copiedData: MindLaneFile = {
+        ...data,
+        metadata: { ...data.metadata, fileUuid: crypto.randomUUID() },
+      }
+      if (this.appState) {
+        copiedData.metadata.fileUuid = await this.appState.claimFileUuid(
+          result.filePath,
+          copiedData.metadata.fileUuid,
+        )
+      }
+      await atomicWrite(result.filePath, JSON.stringify(copiedData, null, 2))
+      return { ok: true, data: { filePath: result.filePath, data: copiedData } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
     }

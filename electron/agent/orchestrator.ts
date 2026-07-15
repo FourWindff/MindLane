@@ -1,5 +1,4 @@
 import {
-  HumanMessage,
   AIMessage,
   ToolMessage,
   SystemMessage,
@@ -17,7 +16,6 @@ import type {
   MainGraphStateType,
   PalaceSubgraphStateType,
   MindmapSubgraphStateType,
-  DocumentRef,
 } from './state.js'
 import { MainGraphState } from './state.js'
 
@@ -25,7 +23,6 @@ import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/lib/fileFormat.js'
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import type { MindmapContextData } from './tools/mindmapContext.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
@@ -38,27 +35,10 @@ import {
 } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { compactContext } from './memory/contextCompact.js'
-import { extractTextContent } from './utils.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
-
-/**
- * Chat request - the backend manages history centrally.
- * Only pass:
- * - threadId: session ID used by the backend to load history
- * - message: current user input (single message)
- * - context: optional context data (workspace, mindmap, etc.)
- */
-export interface ChatRequest {
-  threadId: string
-  /** Current user input (history is loaded automatically by the backend). */
-  message: string
-  context?: MindmapContextData
-  /** Optional document reference for mindmap generation from file */
-  documentRef?: DocumentRef
-}
 
 interface AssistantMessage {
   role: 'assistant'
@@ -80,18 +60,6 @@ interface ChatResponse {
     imageUrls?: string[]
     memoryRoute?: MemoryPalaceStation[]
   }
-}
-
-/**
- * Streaming callback interface.
- */
-interface StreamCallbacks {
-  onMessageStart?: () => void
-  onToken: (token: string) => void
-  onToolStart: (name: string, input: Record<string, unknown>) => void
-  onToolEnd: (name: string, output: string) => void
-  onEnd: (response: ChatResponse) => void
-  onError: (error: string) => void
 }
 
 interface AgentOrchestratorOptions {
@@ -147,6 +115,19 @@ export class AgentOrchestrator {
     this.registerDefaultTools({ hasPalace: this.hasPalace })
   }
 
+  updateProvider(provider: LLMProvider, messagePipeline?: MessagePipelineConfig): void {
+    this.provider = provider
+    this.options = { ...this.options, messagePipeline }
+    this.hasPalace =
+      provider.capabilities.has(ProviderCapability.ImageGen) &&
+      provider.capabilities.has(ProviderCapability.Vision)
+    this.compiledMainGraph = null
+    this.compiledMindmapSubgraph = null
+    this.compiledPalaceSubgraph = null
+    this.toolRegistry = new ToolRegistry()
+    this.registerDefaultTools({ hasPalace: this.hasPalace })
+  }
+
   /**
    * Register MindLane's default tools into the toolRegistry.
    * Action tools are registered first, followed by routing tools.
@@ -179,13 +160,25 @@ export class AgentOrchestrator {
     )
   }
 
-  private getCompiledMainGraph() {
+  getCompiledMainGraph() {
     if (!this.compiledMainGraph) {
       const graph = this.buildGraph()
       const checkpointer = this.aiService.checkpointer.getAdapter()
       this.compiledMainGraph = graph.compile(checkpointer ? { checkpointer } : undefined)
     }
     return this.compiledMainGraph
+  }
+
+  getStreamRuntime() {
+    const toolRegistry = this.toolRegistry.snapshot()
+    const graph = this.buildGraph(toolRegistry)
+    const checkpointer = this.aiService.checkpointer.getAdapter()
+    return {
+      graph: graph.compile(checkpointer ? { checkpointer } : undefined),
+      toolRegistry,
+      buildResponse: this.buildResponse.bind(this),
+      provider: this.provider,
+    }
   }
 
   private getCompiledMindmapSubgraph() {
@@ -207,170 +200,15 @@ export class AgentOrchestrator {
     return this.compiledPalaceSubgraph
   }
 
-  async stream(
-    request: ChatRequest,
-    callbacks: StreamCallbacks,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    const app = this.getCompiledMainGraph()
-
-    let fullContent = ''
-    let currentSegmentContent = ''
-    let hasStartedSegment = false
-
-    const sessionManager = this.aiService.sessionManager
-
-    try {
-      // 1. Persist the user message to JSONL and load the full history from JSONL.
-      // If the UI has already saved the same user message (e.g., ChatPanel calls saveChatHistory before sending),
-      // do not append it again to avoid duplicate first messages in the session.
-      const humanMessage = new HumanMessage({
-        content: request.message,
-        additional_kwargs: request.documentRef
-          ? { attachment: { name: request.documentRef.filename, type: request.documentRef.type } }
-          : {},
-      })
-
-      let history: BaseMessage[]
-      if (sessionManager?.isReady()) {
-        let existingMessages = await sessionManager.loadSessionBaseMessages(request.threadId, {
-          includeSystem: false,
-        })
-        const lastMessage = existingMessages[existingMessages.length - 1]
-        const alreadySaved =
-          lastMessage?.getType() === 'human' &&
-          extractTextContent(lastMessage.content) === request.message &&
-          JSON.stringify(lastMessage.additional_kwargs?.attachment) ===
-            JSON.stringify(humanMessage.additional_kwargs?.attachment)
-        if (!alreadySaved) {
-          await sessionManager.saveMessage(request.threadId, humanMessage)
-          existingMessages = await sessionManager.loadSessionBaseMessages(request.threadId, {
-            includeSystem: false,
-          })
-        }
-        history = [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...existingMessages]
-      } else {
-        history = [humanMessage]
-      }
-
-      const streamConfig = {
-        version: 'v2' as const,
-        signal,
-        recursionLimit: AGENT_LIMITS.recursionLimit,
-        configurable: { thread_id: request.threadId },
-      }
-
-      // Build initial state from request
-      const initialState: Partial<MainGraphStateType> = {
-        messages: history,
-        context: request.context ?? null,
-        documentRef: request.documentRef ?? null,
-      }
-
-      const stream = app.streamEvents(initialState, streamConfig)
-
-      for await (const event of stream) {
-        if (signal?.aborted) break
-
-        const nodeName = (event.metadata as Record<string, unknown> | undefined)?.langgraph_node
-
-        if (event.event === 'on_chat_model_start') {
-          if (nodeName && nodeName !== 'supervisor') {
-            continue
-          }
-          if (hasStartedSegment && currentSegmentContent.trim()) {
-            callbacks.onMessageStart?.()
-            currentSegmentContent = ''
-          }
-          hasStartedSegment = true
-        } else if (event.event === 'on_chat_model_stream') {
-          // Only stream tokens from the supervisor node; subgraph LLM calls
-          // (leaf_extract, merge_trees, text_extract, analyze, etc.) are internal.
-          if (nodeName && nodeName !== 'supervisor') {
-            continue
-          }
-          const chunk = event.data?.chunk
-          const token = extractTextContent(chunk?.content)
-          if (token) {
-            fullContent += token
-            currentSegmentContent += token
-            callbacks.onToken(token)
-          }
-        } else if (event.event === 'on_tool_start') {
-          const toolName = event.name ?? 'unknown'
-          const input = (event.data?.input ?? {}) as Record<string, unknown>
-          callbacks.onToolStart(toolName, input)
-        } else if (event.event === 'on_tool_end') {
-          const toolName = event.name ?? 'unknown'
-          const output = event.data?.output
-          const outputStr = typeof output === 'string' ? output : JSON.stringify(output ?? '')
-          callbacks.onToolEnd(toolName, outputStr)
-        }
-      }
-      let result: MainGraphStateType | null = null
-      try {
-        const snapshot = await app.getState({
-          configurable: { thread_id: request.threadId },
-        })
-        result = snapshot.values as MainGraphStateType
-      } catch (err) {
-        logger.warn('[AgentOrchestrator] getState failed, falling back to streaming content:', err)
-      }
-
-      if (result) {
-        callbacks.onEnd(this.buildResponse(result, fullContent))
-
-        // Persist the new AI/Tool messages from this turn to JSONL.
-        if (sessionManager?.isReady()) {
-          try {
-            const lastHumanIndex = result.messages.findLastIndex(
-              (m: BaseMessage) => m.type === 'human',
-            )
-            const newMessages =
-              lastHumanIndex >= 0 ? result.messages.slice(lastHumanIndex + 1) : result.messages
-            await sessionManager.saveMessages(request.threadId, newMessages)
-          } catch (err) {
-            logger.warn('[AgentOrchestrator] Persisting AI/Tool messages failed:', err)
-          }
-        }
-      } else {
-        callbacks.onEnd({ content: fullContent || '抱歉，我无法生成回复。' })
-      }
-
-      // Phase 2: Fire-and-forget LLM-based memory extraction after session ends.
-      const ctx = request.context
-      void (async () => {
-        if (this.aiService.memoryExtractor && ctx?.filePath) {
-          try {
-            const messages = sessionManager?.isReady()
-              ? await sessionManager.loadSessionMessages(request.threadId)
-              : await this.aiService.checkpointer.getMessages(request.threadId)
-            await this.aiService.memoryExtractor.extractAndPersist({
-              provider: this.provider,
-              messages,
-              mindmapSummary: ctx.mindmapSummary || '',
-              filePath: ctx.filePath,
-            })
-          } catch (e) {
-            logger.warn('[Orchestrator] Memory extraction failed:', e)
-          }
-        }
-      })()
-    } catch (err) {
-      if (signal?.aborted) {
-        callbacks.onEnd({ content: fullContent || '（已停止生成）' })
-        return
-      }
-      callbacks.onError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  async runPalaceFromNodes(selectedNodes: SelectedNodeContent[]): Promise<NodesToPalaceResult> {
+  async runPalaceFromNodes(
+    selectedNodes: SelectedNodeContent[],
+    provider = this.provider,
+  ): Promise<NodesToPalaceResult> {
     if (selectedNodes.length === 0) {
       return { ok: false, error: '未选中任何节点' }
     }
 
-    const caps = this.provider.capabilities
+    const caps = provider.capabilities
     if (!caps.has(ProviderCapability.ImageGen) || !caps.has(ProviderCapability.Vision)) {
       return {
         ok: false,
@@ -379,7 +217,10 @@ export class AgentOrchestrator {
     }
 
     // Use the dedicated Palace Subgraph.
-    const app = this.getCompiledPalaceSubgraph()
+    const app =
+      provider === this.provider
+        ? this.getCompiledPalaceSubgraph()
+        : buildPalaceSubgraph({ provider }).compile()
 
     try {
       const result = (await app.invoke(
@@ -425,8 +266,8 @@ export class AgentOrchestrator {
     }
   }
 
-  buildGraph() {
-    const toolNode = new ToolNode(this.toolRegistry.executableTools)
+  buildGraph(toolRegistry = this.toolRegistry) {
+    const toolNode = new ToolNode(toolRegistry.executableTools)
     const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
       subgraph: {
         invoke: (state: MainGraphStateType, config: { recursionLimit: number }) => Promise<T>
@@ -530,7 +371,7 @@ export class AgentOrchestrator {
 
     const supervisor = new MindLaneAgent(
       this.provider,
-      this.toolRegistry,
+      toolRegistry,
       { hasEmbeddings: false, hasPalace: this.hasPalace },
       this.aiService.memoryManager,
       {
@@ -550,7 +391,7 @@ export class AgentOrchestrator {
       if (!sessionManager?.isReady() || !threadId) {
         return compactContext(
           state,
-          this.toolRegistry.allTools,
+          toolRegistry.allTools,
           this.provider,
           this.aiService.memoryManager,
           {
@@ -577,7 +418,7 @@ export class AgentOrchestrator {
         return [new SystemMessage(builder.build()), ...messages]
       }
 
-      const getToolDefinitions = () => this.toolRegistry.allTools
+      const getToolDefinitions = () => toolRegistry.allTools
 
       const consolidator = new Consolidator(
         {
@@ -616,7 +457,7 @@ export class AgentOrchestrator {
         )
         return compactContext(
           state,
-          this.toolRegistry.allTools,
+          toolRegistry.allTools,
           this.provider,
           this.aiService.memoryManager,
           {
@@ -658,7 +499,7 @@ export class AgentOrchestrator {
   /**
    * Build the response object.
    */
-  private buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
+  buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
     const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
     const messages = this.extractCurrentTurnAssistantMessages(result.messages)
 

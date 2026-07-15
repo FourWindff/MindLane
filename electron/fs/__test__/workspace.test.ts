@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { Workspace } from '../workspace.js'
+import { AppState } from '../appState.js'
 
 describe('Workspace', () => {
   let tmpDir: string
@@ -28,6 +29,49 @@ describe('Workspace', () => {
     expect(result.data.lastOpenedFilePath).toBeNull()
     expect(result.data.expandedFolderPaths).toEqual([])
     expect(result.data.recentFiles).toEqual([])
+    expect(result.data.workspaceUuid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(result.data.activeSessionIds).toEqual({})
+    expect(fs.existsSync(path.join(workspacePath, '.mindlane', 'state.json'))).toBe(true)
+  })
+
+  it('preserves workspace UUID after an external move', async () => {
+    const appState = new AppState(tmpDir)
+    const indexedWorkspace = new Workspace(appState)
+    const originalPath = path.join(tmpDir, 'original')
+    const movedPath = path.join(tmpDir, 'moved')
+    fs.mkdirSync(originalPath, { recursive: true })
+
+    const original = await indexedWorkspace.load(originalPath)
+    expect(original.ok).toBe(true)
+    if (!original.ok) return
+
+    fs.renameSync(originalPath, movedPath)
+    const moved = await indexedWorkspace.load(movedPath)
+
+    expect(moved.ok).toBe(true)
+    if (!moved.ok) return
+    expect(moved.data.workspaceUuid).toBe(original.data.workspaceUuid)
+  })
+
+  it('assigns a fresh workspace UUID to a copied workspace', async () => {
+    const appState = new AppState(tmpDir)
+    const indexedWorkspace = new Workspace(appState)
+    const originalPath = path.join(tmpDir, 'original')
+    const copiedPath = path.join(tmpDir, 'copy')
+    fs.mkdirSync(originalPath, { recursive: true })
+
+    const original = await indexedWorkspace.load(originalPath)
+    expect(original.ok).toBe(true)
+    if (!original.ok) return
+    fs.cpSync(originalPath, copiedPath, { recursive: true })
+
+    const copied = await indexedWorkspace.load(copiedPath)
+
+    expect(copied.ok).toBe(true)
+    if (!copied.ok) return
+    expect(copied.data.workspaceUuid).not.toBe(original.data.workspaceUuid)
   })
 
   it('reads persisted state from disk', async () => {
@@ -215,6 +259,24 @@ describe('Workspace', () => {
     if (!loaded.ok) return
     expect(loaded.data.lastOpenedFilePath).toBe(fileA)
     expect(loaded.data.expandedFolderPaths).toEqual(['x', 'y'])
+  })
+
+  it('atomically merges concurrent active session updates', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+
+    await Promise.all([
+      workspace.setActiveSessionId(workspacePath, 'file-a', 'session-a'),
+      workspace.setActiveSessionId(workspacePath, 'file-b', 'session-b'),
+    ])
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.activeSessionIds).toEqual({
+      'file-a': 'session-a',
+      'file-b': 'session-b',
+    })
   })
 
   it('pruneRecentFiles removes entries whose files no longer exist', async () => {

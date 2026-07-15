@@ -20,32 +20,10 @@ type _WorkspaceTreeEntry = {
 type _FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
 type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
 
-type _ContextNodeInfo = {
-  id: string
-  type: 'text' | 'palace'
-  label: string
-  extra?: Record<string, unknown>
-}
-
-type _ChatContext = {
-  mindmapSummary?: string
-  selectedNodes?: _ContextNodeInfo[]
-  filePath?: string
-  fileTitle?: string
-  hasDocumentOpen?: boolean
-  workspacePath?: string
-  workspaceFiles?: { name: string; filePath: string }[]
-  attachedDocument?: import('../src/shared/lib/fileFormat').DocumentRef
-  linkedDocuments?: import('../src/shared/lib/fileFormat').DocumentRef[]
-}
+type _ChatContext = import('./preload').ChatContext
 
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
 type _ChatMessage = import('../src/shared/lib/fileFormat').ChatMessage
-
-type _ChatSessionMessagesPayload = {
-  workspacePath: string
-  messages: _ChatMessage[]
-}
 
 type _ChatLoadSessionResult = {
   ok: true
@@ -53,10 +31,6 @@ type _ChatLoadSessionResult = {
     sessionId: string
     messages: _ChatMessage[]
   }
-}
-
-type _ChatSaveSessionPayload = _ChatSessionMessagesPayload & {
-  sessionId: string
 }
 
 type _MindLaneNode = import('../src/shared/lib/fileFormat').MindLaneNode
@@ -84,6 +58,8 @@ type _MindmapGenerationProgress = {
   error?: string
 }
 
+type _ChatStreamEvent = import('./preload').ChatStreamEvent
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
@@ -91,28 +67,10 @@ interface Window {
       chatStream: (payload: {
         threadId: string
         message: string
-        context?: _ChatContext
-      }) => Promise<void>
-      stopStream: () => Promise<void>
-      onStreamToken: (callback: (token: string) => void) => () => void
-      onStreamMessageStart: (callback: () => void) => () => void
-      onStreamToolStart: (
-        callback: (data: { name: string; input: Record<string, unknown> }) => void,
-      ) => () => void
-      onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => () => void
-      onStreamEnd: (
-        callback: (response: {
-          content: string
-          messages?: Array<{ role: 'assistant'; content: string; toolCalls?: _ChatToolCall[] }>
-          toolCalls?: _ChatToolCall[]
-          mindmapData?: {
-            nodes: _MindLaneNode[]
-            edges: _MindLaneEdge[]
-            title: string
-          }
-        }) => void,
-      ) => () => void
-      onStreamError: (callback: (error: string) => void) => () => void
+        context: _ChatContext
+      }) => Promise<{ ok: true; streamId: string } | { ok: false; error: string }>
+      stopStream: (streamId: string) => Promise<{ ok: boolean }>
+      onStreamEvent: (callback: (event: _ChatStreamEvent) => void) => () => void
       nodesToPalace: (payload: {
         apiKey: string
         model: string
@@ -169,13 +127,20 @@ interface Window {
       open: () => Promise<
         { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
       >
-      save: (payload: {
-        filePath: string | null
-        data: unknown
-      }) => Promise<{ ok: true; data: { filePath: string } } | { ok: false; error: string }>
-      saveAs: (payload: {
-        data: unknown
-      }) => Promise<{ ok: true; data: { filePath: string } } | { ok: false; error: string }>
+      save: (payload: { filePath: string | null; data: unknown }) => Promise<
+        | {
+            ok: true
+            data: { filePath: string; data: import('../src/shared/lib/fileFormat').MindLaneFile }
+          }
+        | { ok: false; error: string }
+      >
+      saveAs: (payload: { data: unknown }) => Promise<
+        | {
+            ok: true
+            data: { filePath: string; data: import('../src/shared/lib/fileFormat').MindLaneFile }
+          }
+        | { ok: false; error: string }
+      >
       recentList: () => Promise<{ filePath: string; title: string; lastOpenedAt: string }[]>
       saveThumbnail: (payload: {
         filePath: string
@@ -230,13 +195,18 @@ interface Window {
       >
       getSession: () => Promise<{
         workspacePath: string | null
+        workspaceUuid: string | null
+        activeSessionIds: Record<string, string>
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
         expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>
       updateState: (
-        payload: { workspacePath: string } & Partial<_WorkspaceState>,
+        payload: {
+          workspacePath: string
+          activeSession?: { fileUuid: string; sessionId: string }
+        } & Partial<_WorkspaceState>,
       ) => Promise<{ ok: true } | { ok: false; error: string }>
       switchDirectory: (payload: { workspacePath: string }) => Promise<
         | {
@@ -269,6 +239,7 @@ interface Window {
     chat: {
       listSessions: (payload: {
         workspacePath: string
+        fileUuid: string
         limit?: number
         offset?: number
       }) => Promise<
@@ -277,6 +248,7 @@ interface Window {
             data: {
               sessions: Array<{
                 id: string
+                fileUuid: string
                 title: string
                 createdAt: string
                 updatedAt: string
@@ -290,9 +262,6 @@ interface Window {
         workspacePath: string
         sessionId: string
       }) => Promise<_ChatLoadSessionResult>
-      saveSession: (
-        payload: _ChatSaveSessionPayload,
-      ) => Promise<{ ok: true } | { ok: false; error: string }>
       deleteSession: (payload: {
         workspacePath: string
         sessionId: string

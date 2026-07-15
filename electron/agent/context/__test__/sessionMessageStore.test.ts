@@ -8,6 +8,7 @@ import { SessionMessageStore, type SessionMeta } from '../sessionMessageStore.js
 describe('SessionMessageStore', () => {
   let store: SessionMessageStore
   let tmpDir: string
+  const fileUuid = 'file-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-store-'))
@@ -26,8 +27,8 @@ describe('SessionMessageStore', () => {
   })
 
   it('追加消息后元数据正确', async () => {
-    await store.saveMessage('s1', new HumanMessage('hello'))
-    await store.saveMessage('s1', new AIMessage('hi'))
+    await store.saveMessage('s1', new HumanMessage('hello'), 'file-uuid-1')
+    await store.saveMessage('s1', new AIMessage('hi'), fileUuid)
 
     const messages = await store.loadMessages('s1')
     expect(messages).toHaveLength(2)
@@ -37,12 +38,21 @@ describe('SessionMessageStore', () => {
     const sessions = await store.listSessions('ws1')
     expect(sessions).toHaveLength(1)
     expect(sessions[0].id).toBe('s1')
+    expect(sessions[0].fileUuid).toBe('file-uuid-1')
     expect(sessions[0].messageCount).toBe(2)
   })
 
+  it('does not collapse repeated user messages with identical content', async () => {
+    await store.saveMessage('repeat', new HumanMessage('same prompt'), fileUuid)
+    await store.saveMessage('repeat', new HumanMessage('same prompt'), fileUuid)
+
+    const messages = await store.loadMessages('repeat')
+    expect(messages).toHaveLength(2)
+  })
+
   it('跳过已经由并发写入持久化的批次开头消息', async () => {
-    await store.saveMessage('race', new HumanMessage('hello'))
-    await store.saveMessages('race', [new HumanMessage('hello'), new AIMessage('hi')])
+    await store.saveMessage('race', new HumanMessage('hello'), fileUuid)
+    await store.saveMessages('race', [new HumanMessage('hello'), new AIMessage('hi')], fileUuid)
 
     const messages = await store.loadMessages('race')
     expect(messages.map((msg) => [msg.getType(), msg.content])).toEqual([
@@ -52,18 +62,18 @@ describe('SessionMessageStore', () => {
   })
 
   it('列出会话按 updatedAt 降序', async () => {
-    await store.saveMessage('a', new HumanMessage('a'))
+    await store.saveMessage('a', new HumanMessage('a'), fileUuid)
     await new Promise((r) => setTimeout(r, 20))
-    await store.saveMessage('b', new HumanMessage('b'))
+    await store.saveMessage('b', new HumanMessage('b'), fileUuid)
 
     const sessions = await store.listSessions('ws1')
     expect(sessions.map((s) => s.id)).toEqual(['b', 'a'])
   })
 
   it('不同工作区互相隔离', async () => {
-    await store.saveMessage('s1', new HumanMessage('ws1 msg'))
+    await store.saveMessage('s1', new HumanMessage('ws1 msg'), fileUuid)
     store.setWorkspace('ws2')
-    await store.saveMessage('s2', new HumanMessage('ws2 msg'))
+    await store.saveMessage('s2', new HumanMessage('ws2 msg'), fileUuid)
 
     const ws1 = await store.listSessions('ws1')
     const ws2 = await store.listSessions('ws2')
@@ -71,9 +81,28 @@ describe('SessionMessageStore', () => {
     expect(ws2.map((s) => s.id)).toEqual(['s2'])
   })
 
+  it('keeps async workspace contexts isolated while the default workspace changes', async () => {
+    const gate = new Promise<void>((resolve) => setTimeout(resolve, 10))
+    const first = store.runInWorkspace('ws1', async () => {
+      await gate
+      await store.saveMessage('same-session', new HumanMessage('from ws1'), fileUuid)
+    })
+    store.setWorkspace('ws2')
+    const second = store.runInWorkspace('ws2', async () => {
+      await store.saveMessage('same-session', new HumanMessage('from ws2'), fileUuid)
+    })
+
+    await Promise.all([first, second])
+    store.setWorkspace('ws1')
+    expect((await store.loadMessages('same-session'))[0]?.content).toBe('from ws1')
+    store.setWorkspace('ws2')
+    expect((await store.loadMessages('same-session'))[0]?.content).toBe('from ws2')
+  })
+
   it('保存并读取含 lastConsolidated 与 _lastSummary 的元数据', async () => {
     const meta: SessionMeta = {
       id: 'meta-extra',
+      fileUuid: 'file-uuid-1',
       title: 't',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -98,7 +127,7 @@ describe('SessionMessageStore', () => {
   })
 
   it('删除会话后无法读取', async () => {
-    await store.saveMessage('del', new HumanMessage('x'))
+    await store.saveMessage('del', new HumanMessage('x'), fileUuid)
     await store.deleteSession('del')
     expect(await store.loadMessages('del')).toEqual([])
     expect(await store.listSessions('ws1')).toEqual([])
@@ -109,6 +138,7 @@ describe('SessionMessageStore', () => {
     fs.mkdirSync(path.dirname(sessionPath), { recursive: true })
     const meta: SessionMeta = {
       id: 'corrupt',
+      fileUuid: 'file-uuid-1',
       title: 't',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -133,6 +163,7 @@ describe('SessionMessageStore', () => {
         content: '使用工具',
         tool_calls: [{ id: 'call-1', name: 'search', args: { q: 'x' } }],
       }),
+      fileUuid,
     )
     await store.saveMessage(
       'tool',
@@ -141,6 +172,7 @@ describe('SessionMessageStore', () => {
         name: 'search',
         content: 'result',
       }),
+      fileUuid,
     )
 
     const messages = await store.loadMessages('tool')

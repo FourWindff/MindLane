@@ -1,5 +1,4 @@
 import path from 'node:path'
-import nodeCrypto from 'node:crypto'
 import type { BaseMessage } from '@langchain/core/messages'
 import { SessionMessageStore, type SessionMeta } from './sessionMessageStore.js'
 import { uiMessageToBaseMessages } from './sessionMessageStore.js'
@@ -21,7 +20,7 @@ export class SessionManager {
   private store: SessionMessageStore | null = null
   private checkpointer: CheckpointerManager | null = null
   private _workspacePath: string = ''
-  private _workspaceHash: string = ''
+  private _workspaceUuid: string = ''
 
   /**
    * 初始化 JSONL 存储。
@@ -48,23 +47,24 @@ export class SessionManager {
   }
 
   /**
-   * 当前工作区哈希（MD5 前 12 位）
+   * 当前工作区 UUID
    */
-  get workspaceHash(): string {
-    return this._workspaceHash
+  get workspaceUuid(): string {
+    return this._workspaceUuid
   }
 
   /**
-   * 设置工作区路径并计算哈希
+   * 设置工作区路径与稳定 UUID
    */
-  setWorkspace(workspacePath: string): void {
+  setWorkspace(workspacePath: string, workspaceUuid: string): void {
     this._workspacePath = workspacePath
-    this._workspaceHash = nodeCrypto
-      .createHash('md5')
-      .update(workspacePath)
-      .digest('hex')
-      .slice(0, 12)
-    this.store?.setWorkspace(this._workspaceHash)
+    this._workspaceUuid = workspaceUuid
+    this.store?.setWorkspace(this._workspaceUuid)
+  }
+
+  runInWorkspace<T>(workspaceUuid: string, action: () => T): T {
+    if (!this.store) throw new Error('SessionManager not initialized')
+    return this.store.runInWorkspace(workspaceUuid, action)
   }
 
   /**
@@ -149,13 +149,18 @@ export class SessionManager {
   /**
    * 加载所有会话列表（支持分页）
    */
-  async listSessions(limit?: number, offset?: number): Promise<SessionMeta[]> {
+  async listSessions(
+    options: { fileUuid?: string; limit?: number; offset?: number } = {},
+  ): Promise<SessionMeta[]> {
     if (!this.store) throw new Error('SessionManager not initialized')
 
-    const sessions = await this.store.listSessions(this._workspaceHash)
-    if (limit === undefined) return sessions
-    const start = offset ?? 0
-    return sessions.slice(start, start + limit)
+    const allSessions = await this.store.listSessions(this.store.getWorkspaceUuid())
+    const sessions = options.fileUuid
+      ? allSessions.filter((session) => session.fileUuid === options.fileUuid)
+      : allSessions
+    if (options.limit === undefined) return sessions
+    const start = options.offset ?? 0
+    return sessions.slice(start, start + options.limit)
   }
 
   /**
@@ -163,7 +168,7 @@ export class SessionManager {
    *
    * 仅追加本地尚未持久化的新消息，避免重复写入。
    */
-  async saveSession(sessionId: string, messages: ChatMessage[]): Promise<void> {
+  async saveSession(sessionId: string, messages: ChatMessage[], fileUuid: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
 
     const storedMessages = await this.store.loadMessages(sessionId)
@@ -181,7 +186,11 @@ export class SessionManager {
     }
 
     if (baseMessagesToAppend.length > 0) {
-      await this.store.saveMessages(sessionId, baseMessagesToAppend)
+      await this.store.saveMessages(
+        sessionId,
+        baseMessagesToAppend,
+        existingMeta?.fileUuid ?? fileUuid,
+      )
     }
 
     // 更新标题与元数据
@@ -206,6 +215,7 @@ export class SessionManager {
     if (title !== existingMeta?.title) {
       const meta: SessionMeta = {
         id: sessionId,
+        fileUuid: existingMeta?.fileUuid ?? fileUuid,
         title,
         createdAt: existingMeta?.createdAt ?? now,
         updatedAt: now,
@@ -231,24 +241,24 @@ export class SessionManager {
    */
   async getMostRecentSessionId(): Promise<string | null> {
     if (!this.store) throw new Error('SessionManager not initialized')
-    const sessions = await this.store.listSessions(this._workspaceHash)
+    const sessions = await this.store.listSessions(this.store.getWorkspaceUuid())
     return sessions[0]?.id ?? null
   }
 
   /**
    * 持久化单条 LangChain 消息。
    */
-  async saveMessage(sessionId: string, message: BaseMessage): Promise<void> {
+  async saveMessage(sessionId: string, message: BaseMessage, fileUuid: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
-    await this.store.saveMessage(sessionId, message)
+    await this.store.saveMessage(sessionId, message, fileUuid)
   }
 
   /**
    * 批量持久化 LangChain 消息。
    */
-  async saveMessages(sessionId: string, messages: BaseMessage[]): Promise<void> {
+  async saveMessages(sessionId: string, messages: BaseMessage[], fileUuid: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
-    await this.store.saveMessages(sessionId, messages)
+    await this.store.saveMessages(sessionId, messages, fileUuid)
   }
 
   /**

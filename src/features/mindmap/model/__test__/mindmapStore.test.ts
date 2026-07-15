@@ -44,6 +44,26 @@ describe('mindmapStore.viewport', () => {
   })
 })
 
+describe('mindmapStore.fileUuid', () => {
+  it('preserves the loaded file UUID when serializing changes', () => {
+    const store = createMindmapStore()
+    const file = createEmptyFile('Identity')
+
+    store.getState().loadFile('/test/identity.mindlane', file)
+
+    expect(store.getState().toMindLaneFile().metadata.fileUuid).toBe(file.metadata.fileUuid)
+  })
+
+  it('creates a fresh UUID for a new file', () => {
+    const store = createMindmapStore()
+    const previousUuid = store.getState().toMindLaneFile().metadata.fileUuid
+
+    store.getState().newFile('Fresh')
+
+    expect(store.getState().toMindLaneFile().metadata.fileUuid).not.toBe(previousUuid)
+  })
+})
+
 describe('mindmapStore.documentRefs', () => {
   let store: ReturnType<typeof createMindmapStore>
 

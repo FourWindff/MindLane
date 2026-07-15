@@ -44,7 +44,9 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
 
     expect(result).toEqual({
       source: { type: 'pdf', path: '/data/report.pdf' },
@@ -63,7 +65,9 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
 
     expect(result).toEqual({
       source: { type: 'url', url: 'https://example.test/article' },
@@ -82,7 +86,9 @@ describe('MindmapInputResolver', () => {
     }
     const resolver = new MindmapInputResolver()
 
-    const result = resolver.resolve(createState({ context: { attachedDocument: documentRef } }))
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
 
     expect(result).toEqual({
       source: { type: 'text', content: '这是附加文本内容。' },
@@ -122,7 +128,7 @@ describe('MindmapInputResolver', () => {
 
     const result = resolver.resolve(
       createState({
-        context: { attachedDocument: documentRef, fileTitle: 'Project X' },
+        context: { fileUuid: 'file-1', attachedDocument: documentRef, fileTitle: 'Project X' },
       }),
     )
 
@@ -144,7 +150,7 @@ describe('MindmapInputResolver', () => {
       createState({
         mindmapInputSource: { type: 'text', content: 'pre-set' },
         mindmapInputTitle: 'Pre-set Title',
-        context: { attachedDocument: undefined },
+        context: { fileUuid: 'file-1', attachedDocument: undefined },
       }),
     )
 

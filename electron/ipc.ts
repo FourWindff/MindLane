@@ -4,12 +4,7 @@ export enum IPC {
 
   AiChatStream = 'ai:chat-stream',
   AiChatStreamStop = 'ai:chat-stream-stop',
-  AiChatStreamToken = 'ai:chat-stream-token',
-  AiChatStreamMessageStart = 'ai:chat-stream-message-start',
-  AiChatStreamToolStart = 'ai:chat-stream-tool-start',
-  AiChatStreamToolEnd = 'ai:chat-stream-tool-end',
-  AiChatStreamEnd = 'ai:chat-stream-end',
-  AiChatStreamError = 'ai:chat-stream-error',
+  AiChatStreamEvent = 'ai:chat-stream-event',
   AiNodesToPalace = 'ai:nodes-to-palace',
   AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
@@ -42,7 +37,6 @@ export enum IPC {
 
   ChatListSessions = 'chat:list-sessions',
   ChatLoadSession = 'chat:load-session',
-  ChatSaveSession = 'chat:save-session',
   ChatDeleteSession = 'chat:delete-session',
 
   WindowMinimize = 'window:minimize',

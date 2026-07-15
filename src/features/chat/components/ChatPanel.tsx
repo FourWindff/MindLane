@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { useAiStore, saveChatHistory, loadWorkspaceChat } from '@/features/chat/model/aiStore'
-import { useWorkspaceStore } from '@/features/workspace/store'
+import { useAiStore } from '@/features/chat/model/aiStore'
+import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 
 import { ChatFab } from './ChatFab'
 import { ChatHeader } from './ChatHeader'
 import { SessionList } from './SessionList'
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
+import { ActiveSessionsBar } from './ActiveSessionsBar'
 import { useChatStream } from '@/features/chat/hooks/useChatStream'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
+import { useWorkspaceStore } from '@/features/workspace/store'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 import '../styles/chat-panel.css'
@@ -28,9 +30,11 @@ export function ChatPanel() {
   const setShowSessionList = useAiStore((s) => s.setShowSessionList)
   const loadSession = useAiStore((s) => s.loadSession)
   const deleteSession = useAiStore((s) => s.deleteSession)
-  const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
+  const currentFileUuid = useAiStore((s) => s.currentFileUuid)
+  const activeSessionsBar = useAiStore((s) => s.activeSessionsBar)
+  const openWorkspaceFile = useWorkspaceStore((state) => state.openWorkspaceFile)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [inputRows, setInputRows] = useState(1)
@@ -39,15 +43,6 @@ export function ChatPanel() {
     useChatContext()
 
   const { streamingText, activeTools } = useChatStream()
-
-  // Load chat history when workspace changes
-  useEffect(() => {
-    if (workspacePath) {
-      void loadWorkspaceChat(workspacePath)
-    } else {
-      useAiStore.setState({ threadId: '', chatMessages: [], workspacePath: null })
-    }
-  }, [workspacePath])
 
   const handleSelectAttachment = useCallback(async () => {
     const api = window.mindlane?.file
@@ -90,28 +85,40 @@ export function ChatPanel() {
 
     useAiStore.getState().setBusy(true)
     useAiStore.getState().setStep('chatting')
-    void saveChatHistory()
-
     const api = window.mindlane?.ai
     if (!api) return
 
     const context = buildContext()
+    const originFileUuid = useAiStore.getState().currentFileUuid
+    const originSessionId = threadId
+    const originFileName = context.fileTitle
     setAttachedDocument(null) // clear after context captures the doc
-    await api.chatStream({
-      threadId,
+    const result = await api.chatStream({
+      threadId: originSessionId,
       message: text || `请根据「${doc?.filename}」生成思维导图`,
       context,
     })
+    if (result.ok) {
+      const state = useAiStore.getState()
+      if (originFileUuid) {
+        state.registerStream(originFileUuid, originSessionId, result.streamId, originFileName)
+      }
+    } else if (originFileUuid) {
+      useAiStore.getState().setFileError(originFileUuid, result.error)
+    }
   }, [apiKey, busy, threadId, addMessage, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {
     const api = window.mindlane?.ai
     if (!api) return
-    void api.stopStream()
+    const streamId = useAiStore.getState().activeStreamId
+    if (streamId) {
+      useAiStore.getState().markStreamStopping(useAiStore.getState().threadId)
+      void api.stopStream(streamId)
+    }
   }, [])
 
   const startNewChat = useCallback(async () => {
-    await saveChatHistory()
     useAiStore.getState().startNewChat()
   }, [])
 
@@ -178,6 +185,17 @@ export function ChatPanel() {
         onToggleSessionList={toggleSessionList}
         onNewChat={startNewChat}
         onMinimize={() => setIsMinimized(true)}
+      />
+
+      <ActiveSessionsBar
+        entries={Object.values(activeSessionsBar).filter(
+          (entry) => entry.fileUuid !== currentFileUuid,
+        )}
+        onSelect={(fileUuid) => {
+          const entry = useAiStore.getState().activeSessionsBar[fileUuid]
+          const filePath = mindmapRegistry.getByFileUuid(fileUuid)?.store.getState().filePath
+          if (entry && filePath) void openWorkspaceFile(filePath)
+        }}
       />
 
       <SessionList

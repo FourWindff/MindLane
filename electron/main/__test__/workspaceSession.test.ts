@@ -75,4 +75,25 @@ describe('getWorkspaceSessionForService', () => {
     expect(settings.lastWorkspacePath).toBe(workspacePath)
     expect(settings.recentWorkspacePaths).toEqual([workspacePath])
   })
+
+  it('returns workspace identity and per-file active sessions', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    await fsService.appState.update({
+      lastWorkspacePath: workspacePath,
+      recentWorkspacePaths: [workspacePath],
+      restoreLastWorkspaceOnLaunch: true,
+    })
+    const workspaceState = await fsService.workspace.load(workspacePath)
+    expect(workspaceState.ok).toBe(true)
+    if (!workspaceState.ok) return
+    await fsService.workspace.updateActiveSessionIds(workspacePath, {
+      'file-uuid': 'session-uuid',
+    })
+
+    const session = await getWorkspaceSessionForService(fsService)
+
+    expect(session.workspaceUuid).toBe(workspaceState.data.workspaceUuid)
+    expect(session.activeSessionIds).toEqual({ 'file-uuid': 'session-uuid' })
+  })
 })

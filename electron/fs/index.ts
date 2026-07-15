@@ -12,9 +12,9 @@ export class FileSystemService {
   readonly thumbnails: ThumbnailManager
 
   constructor(userDataPath: string) {
-    this.project = new ProjectFileManager(userDataPath)
     this.appState = new AppState(userDataPath)
-    this.workspace = new Workspace()
+    this.project = new ProjectFileManager(userDataPath, 5, this.appState)
+    this.workspace = new Workspace(this.appState)
     this.workspaceTree = new WorkspaceTree()
     this.thumbnails = new ThumbnailManager(userDataPath)
   }

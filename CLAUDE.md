@@ -35,7 +35,7 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
 ### Cross-Process Communication
 
 - The renderer calls main-process capabilities through `window.mindlane`; do not use raw `ipcRenderer` directly.
-- AI streaming chat starts with an `ai:chat-stream` invoke; the main process then emits `ai:chat-stream-token`, `ai:chat-stream-message-start`, `ai:chat-stream-tool-start`, `ai:chat-stream-tool-end`, `ai:chat-stream-end`, and `ai:chat-stream-error` events.
+- AI streaming chat starts with an `ai:chat-stream` invoke; the main process emits identified events through the single `ai:chat-stream-event` channel.
 - File, workspace, settings, chat session, and window-control APIs are exposed under `window.mindlane` sub-namespaces. Type definitions live in `electron/preload.ts`.
 
 ### State Management
@@ -46,11 +46,11 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
   - `src/features/chat/model/aiStore.ts`
   - `src/features/settings/model/settingsStore.ts`
   - `src/features/workspace/store.ts`
-- Main-process services (`FileSystemService`, `AiService`, `AgentOrchestrator`) are created as singletons in `electron/main.ts` and exposed via IPC.
+- Main-process services (`FileSystemService`, `AiService`, `AgentOrchestrator`, `StreamManager`) are created as singletons in `electron/main.ts` and exposed via IPC.
 
 ### Agent and AI Orchestration
 
-- `AgentOrchestrator` in `electron/agent/orchestrator.ts` receives chat requests and routes them to the appropriate subgraph.
+- `StreamManager` owns concurrent chat `Runner` lifecycles and identified stream events; its cached runtime comes from the main-owned `AgentOrchestrator` in `electron/agent/orchestrator.ts`, which compiles graphs and runs palace generation.
 - `electron/agent/graphs/mindmapGraph` and `electron/agent/graphs/palaceGraph` are the LangGraph workflow entry points for mindmap and palace generation.
 - `electron/agent/agenthub` contains specialized agents (analyze, anchor, imageGen, mindlane) and shared prompts.
 - `electron/agent/context` manages session messages and context compaction/consolidation (consolidator, pipelineCompaction, pipelinePairing, pipelineSnip).

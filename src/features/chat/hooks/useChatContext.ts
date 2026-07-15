@@ -5,8 +5,7 @@ import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { extractNodeInfo } from '@/features/chat/lib/chatUtils'
-import type { ContextNodeInfo } from '@/features/chat/lib/chatUtils'
-import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatContext } from '../../../../electron/preload'
 
 function useShallowById<T, U extends { id: string }>(
   selector: (state: T) => U[],
@@ -24,20 +23,6 @@ function useShallowById<T, U extends { id: string }>(
     prev.current = next
     return next
   }
-}
-
-interface ChatContext {
-  mindmapSummary?: string
-  selectedNodes?: ContextNodeInfo[]
-  filePath?: string
-  fileTitle?: string
-  hasDocumentOpen?: boolean
-  workspacePath?: string
-  workspaceFiles?: { name: string; filePath: string }[]
-  /** Attached document reference for mindmap generation */
-  attachedDocument?: DocumentRef
-  /** Documents already linked to the current mindmap file */
-  linkedDocuments?: DocumentRef[]
 }
 
 export interface QuickAction {
@@ -59,8 +44,9 @@ export function useChatContext() {
   const buildContext = useCallback((): ChatContext => {
     const mindmapState = activeInstance.store.getState()
     const wsState = useWorkspaceStore.getState()
-    const ctx: ChatContext = {}
+    const ctx: ChatContext = { fileUuid: mindmapState.fileUuid ?? '' }
 
+    if (!ctx.fileUuid) return ctx
     if (mindmapState.filePath) ctx.filePath = mindmapState.filePath
     if (mindmapState.fileTitle) ctx.fileTitle = mindmapState.fileTitle
     ctx.hasDocumentOpen = mindmapState.hasDocumentOpen

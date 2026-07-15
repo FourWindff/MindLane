@@ -6,6 +6,16 @@ describe('MindLaneFile tags', () => {
     const file = createEmptyFile('Test')
     expect(file.metadata.tags).toBeUndefined()
   })
+
+  it('assigns a stable UUID to each new file', () => {
+    const first = createEmptyFile('First')
+    const second = createEmptyFile('Second')
+
+    expect(first.metadata.fileUuid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    )
+    expect(second.metadata.fileUuid).not.toBe(first.metadata.fileUuid)
+  })
 })
 
 describe('migrateDocumentRef', () => {

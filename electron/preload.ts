@@ -20,37 +20,39 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 })
 
-type ContextNodeInfo = {
+export type ContextNodeInfo = {
   id: string
   type: 'text' | 'palace'
   label: string
   extra?: Record<string, unknown>
 }
 
-type ChatContext = {
+export type WorkspaceFileInfo = { name: string; filePath: string }
+
+export type ChatContext = {
+  fileUuid: string
   mindmapSummary?: string
   selectedNodes?: ContextNodeInfo[]
   filePath?: string
   fileTitle?: string
   hasDocumentOpen?: boolean
   workspacePath?: string
-  workspaceFiles?: { name: string; filePath: string }[]
+  workspaceFiles?: WorkspaceFileInfo[]
+  attachedDocument?: DocumentRef
+  linkedDocuments?: DocumentRef[]
+  fileTags?: string[]
 }
 
-import type { ChatMessage, ChatToolCall, DocumentRef } from '../src/shared/lib/fileFormat'
+import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat'
 import type { WorkspaceState } from './fs/types'
 
 type ChatSessionMeta = {
   id: string
+  fileUuid: string
   title: string
   createdAt: string
   updatedAt: string
   messageCount: number
-}
-
-type ChatSessionMessagesPayload = {
-  workspacePath: string
-  messages: ChatMessage[]
 }
 
 type ChatLoadSessionResult = {
@@ -59,10 +61,6 @@ type ChatLoadSessionResult = {
     sessionId: string
     messages: ChatMessage[]
   }
-}
-
-type ChatSaveSessionPayload = ChatSessionMessagesPayload & {
-  sessionId: string
 }
 
 type SelectedNodeContent = { id: string; label: string }
@@ -85,79 +83,28 @@ type FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
 type FsErr = { ok: false; error: string }
 type FsResult<T = void> = FsOk<T> | FsErr
 
+export type ChatStreamEvent = {
+  streamId: string
+  sessionId: string
+  type: 'token' | 'message-start' | 'tool-start' | 'tool-end' | 'end' | 'error'
+  payload: unknown
+}
+
+function onChatStreamEvent(callback: (event: ChatStreamEvent) => void): () => void {
+  const handler = (_event: unknown, event: ChatStreamEvent) => callback(event)
+  ipcRenderer.on(IPC.AiChatStreamEvent, handler)
+  return () => ipcRenderer.off(IPC.AiChatStreamEvent, handler)
+}
+
 contextBridge.exposeInMainWorld('mindlane', {
   ai: {
-    chatStream: (payload: { threadId: string; message: string; context?: ChatContext }) =>
-      ipcRenderer.invoke(IPC.AiChatStream, payload) as Promise<void>,
-    stopStream: () => ipcRenderer.invoke(IPC.AiChatStreamStop) as Promise<void>,
-    onStreamToken: (callback: (token: string) => void) => {
-      const handler = (_event: unknown, token: string) => callback(token)
-      ipcRenderer.on(IPC.AiChatStreamToken, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamToken, handler)
-      }
-    },
-    onStreamMessageStart: (callback: () => void) => {
-      const handler = () => callback()
-      ipcRenderer.on(IPC.AiChatStreamMessageStart, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamMessageStart, handler)
-      }
-    },
-    onStreamToolStart: (
-      callback: (data: { name: string; input: Record<string, unknown> }) => void,
-    ) => {
-      const handler = (_event: unknown, data: { name: string; input: Record<string, unknown> }) =>
-        callback(data)
-      ipcRenderer.on(IPC.AiChatStreamToolStart, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamToolStart, handler)
-      }
-    },
-    onStreamToolEnd: (callback: (data: { name: string; output: string }) => void) => {
-      const handler = (_event: unknown, data: { name: string; output: string }) => callback(data)
-      ipcRenderer.on(IPC.AiChatStreamToolEnd, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamToolEnd, handler)
-      }
-    },
-    onStreamEnd: (
-      callback: (response: {
-        content: string
-        messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
-        toolCalls?: ChatToolCall[]
-        mindmapData?: {
-          nodes: Array<{
-            id: string
-            type: string
-            position: { x: number; y: number }
-            data: Record<string, unknown>
-          }>
-          edges: Array<{
-            id: string
-            source: string
-            target: string
-            type?: string
-            className?: string
-          }>
-          title: string
-        }
-      }) => void,
-    ) => {
-      const handler = (_event: unknown, response: Parameters<typeof callback>[0]) =>
-        callback(response)
-      ipcRenderer.on(IPC.AiChatStreamEnd, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamEnd, handler)
-      }
-    },
-    onStreamError: (callback: (error: string) => void) => {
-      const handler = (_event: unknown, error: string) => callback(error)
-      ipcRenderer.on(IPC.AiChatStreamError, handler)
-      return () => {
-        ipcRenderer.off(IPC.AiChatStreamError, handler)
-      }
-    },
+    chatStream: (payload: { threadId: string; message: string; context: ChatContext }) =>
+      ipcRenderer.invoke(IPC.AiChatStream, payload) as Promise<
+        { ok: true; streamId: string } | { ok: false; error: string }
+      >,
+    stopStream: (streamId: string) =>
+      ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }) as Promise<{ ok: boolean }>,
+    onStreamEvent: onChatStreamEvent,
     nodesToPalace: (payload: {
       apiKey: string
       model: string
@@ -173,7 +120,10 @@ contextBridge.exposeInMainWorld('mindlane', {
     open: () => ipcRenderer.invoke(IPC.FileOpen),
     save: (payload: { filePath: string | null; data: unknown }) =>
       ipcRenderer.invoke(IPC.FileSave, payload),
-    saveAs: (payload: { data: unknown }) => ipcRenderer.invoke(IPC.FileSaveAs, payload),
+    saveAs: (payload: { data: unknown }) =>
+      ipcRenderer.invoke(IPC.FileSaveAs, payload) as Promise<
+        FsResult<{ filePath: string; data: MindLaneFile }>
+      >,
     recentList: () => ipcRenderer.invoke(IPC.FileRecentList),
     saveThumbnail: (payload: { filePath: string; imageData: string }) =>
       ipcRenderer.invoke(IPC.FileSaveThumbnail, payload) as Promise<
@@ -205,12 +155,19 @@ contextBridge.exposeInMainWorld('mindlane', {
     getSession: () =>
       ipcRenderer.invoke(IPC.WorkspaceGetSession) as Promise<{
         workspacePath: string | null
+        workspaceUuid: string | null
+        activeSessionIds: Record<string, string>
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
         expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>,
-    updateState: (payload: { workspacePath: string } & Partial<WorkspaceState>) =>
+    updateState: (
+      payload: {
+        workspacePath: string
+        activeSession?: { fileUuid: string; sessionId: string }
+      } & Partial<WorkspaceState>,
+    ) =>
       ipcRenderer.invoke(IPC.WorkspaceUpdateState, payload) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
@@ -235,16 +192,17 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke(IPC.WorkspaceMoveItem, payload) as Promise<FsResult<{ newPath: string }>>,
   },
   chat: {
-    listSessions: (payload: { workspacePath: string; limit?: number; offset?: number }) =>
+    listSessions: (payload: {
+      workspacePath: string
+      fileUuid: string
+      limit?: number
+      offset?: number
+    }) =>
       ipcRenderer.invoke(IPC.ChatListSessions, payload) as Promise<
         { ok: true; data: { sessions: ChatSessionMeta[] } } | { ok: false; error: string }
       >,
     loadSession: (payload: { workspacePath: string; sessionId: string }) =>
       ipcRenderer.invoke(IPC.ChatLoadSession, payload) as Promise<ChatLoadSessionResult>,
-    saveSession: (payload: ChatSaveSessionPayload) =>
-      ipcRenderer.invoke(IPC.ChatSaveSession, payload) as Promise<
-        { ok: true } | { ok: false; error: string }
-      >,
     deleteSession: (payload: { workspacePath: string; sessionId: string }) =>
       ipcRenderer.invoke(IPC.ChatDeleteSession, payload) as Promise<
         { ok: true } | { ok: false; error: string }

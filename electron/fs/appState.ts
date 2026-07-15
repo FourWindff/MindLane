@@ -142,6 +142,39 @@ export class AppState {
     }
   }
 
+  async claimWorkspaceUuid(workspacePath: string, candidateUuid?: string): Promise<string> {
+    const resolvedPath = path.resolve(workspacePath)
+    const settings = await this.load()
+    let workspaceUuid = candidateUuid ?? crypto.randomUUID()
+    const indexedPath = settings.workspacePathsByUuid[workspaceUuid]
+
+    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && directoryExists(indexedPath)) {
+      workspaceUuid = crypto.randomUUID()
+    }
+
+    await this.update({
+      workspacePathsByUuid: {
+        ...settings.workspacePathsByUuid,
+        [workspaceUuid]: resolvedPath,
+      },
+    })
+    return workspaceUuid
+  }
+
+  async claimFileUuid(filePath: string, candidateUuid: string): Promise<string> {
+    const resolvedPath = path.resolve(filePath)
+    const settings = await this.load()
+    let fileUuid = candidateUuid
+    const indexedPath = settings.filePathsByUuid[fileUuid]
+    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && fs.existsSync(indexedPath)) {
+      fileUuid = crypto.randomUUID()
+    }
+    await this.update({
+      filePathsByUuid: { ...settings.filePathsByUuid, [fileUuid]: resolvedPath },
+    })
+    return fileUuid
+  }
+
   /**
    * One-time migration: read legacy workspace-scoped keys from global settings.json
    * and remove them. Returns null if no legacy keys exist or if the last workspace
@@ -228,6 +261,8 @@ export class AppState {
       recentWorkspacePaths: partial.recentWorkspacePaths ?? DEFAULT_SETTINGS.recentWorkspacePaths,
       restoreLastWorkspaceOnLaunch:
         partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
+      workspacePathsByUuid: partial.workspacePathsByUuid ?? DEFAULT_SETTINGS.workspacePathsByUuid,
+      filePathsByUuid: partial.filePathsByUuid ?? DEFAULT_SETTINGS.filePathsByUuid,
       messagePipeline: partial.messagePipeline,
     }
   }

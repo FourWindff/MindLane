@@ -1,111 +1,386 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadWorkspaceChat, saveChatHistory, useAiStore, type ChatSession } from '../aiStore'
+import {
+  connectAiStore,
+  createFileChatState,
+  useAiStore,
+  type ChatSession,
+  type ChatStreamEvent,
+} from '../aiStore'
 import type { ChatMessage } from '@/shared/lib/fileFormat'
 
 type ChatApiMock = {
   listSessions: ReturnType<typeof vi.fn>
   loadSession: ReturnType<typeof vi.fn>
-  saveSession: ReturnType<typeof vi.fn>
   deleteSession: ReturnType<typeof vi.fn>
 }
 
 const sessions: ChatSession[] = [
   {
-    id: 'session-latest',
-    title: 'Latest',
+    id: 'session-restored',
+    fileUuid: 'file-a',
+    title: 'Restored',
     createdAt: '2026-06-18T00:00:00.000Z',
     updatedAt: '2026-06-18T00:01:00.000Z',
     messageCount: 1,
   },
 ]
 
-function installChatApi(overrides: Partial<ChatApiMock> = {}): ChatApiMock {
-  const api: ChatApiMock = {
+function installApis(options?: {
+  activeSessionIds?: Record<string, string>
+  loadSession?: () => Promise<{
+    ok: true
+    data: { sessionId: string; messages: ChatMessage[] }
+  }>
+  deleteSession?: () => Promise<{ ok: true }>
+}) {
+  let streamListener: ((event: ChatStreamEvent) => void) | undefined
+  const chat: ChatApiMock = {
     listSessions: vi.fn(async () => ({ ok: true, data: { sessions } })),
-    loadSession: vi.fn(async () => ({
-      ok: true,
-      data: {
-        sessionId: 'session-latest',
-        messages: [{ role: 'user', content: 'hello' } satisfies ChatMessage],
-      },
-    })),
-    saveSession: vi.fn(async () => ({ ok: true })),
-    deleteSession: vi.fn(async () => ({ ok: true })),
-    ...overrides,
+    loadSession: vi.fn(
+      options?.loadSession ??
+        (async () => ({
+          ok: true as const,
+          data: {
+            sessionId: 'session-restored',
+            messages: [{ role: 'user', content: 'restored' } satisfies ChatMessage],
+          },
+        })),
+    ),
+    deleteSession: vi.fn(options?.deleteSession ?? (async () => ({ ok: true as const }))),
   }
 
-  Object.defineProperty(globalThis, 'window', {
-    configurable: true,
-    value: globalThis,
-  })
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: globalThis })
   Object.defineProperty(globalThis.window, 'mindlane', {
     configurable: true,
-    value: { chat: api },
+    value: {
+      ai: {
+        onStreamEvent: vi.fn((listener: (event: ChatStreamEvent) => void) => {
+          streamListener = listener
+          return () => {
+            streamListener = undefined
+          }
+        }),
+      },
+      chat,
+      workspace: {
+        getSession: vi.fn(async () => ({
+          workspacePath: '/workspace',
+          workspaceUuid: 'workspace-uuid',
+          activeSessionIds: options?.activeSessionIds ?? {},
+          recentWorkspacePaths: ['/workspace'],
+          lastOpenedFilePath: '/a.mindlane',
+          expandedFolderPaths: [],
+          restoreLastWorkspaceOnLaunch: true,
+        })),
+        updateState: vi.fn(async () => ({ ok: true })),
+      },
+    },
   })
 
-  return api
+  return { chat, emit: (event: ChatStreamEvent) => streamListener?.(event) }
 }
 
-describe('aiStore session chat API', () => {
+function createRegistryHarness() {
+  let listener: (() => void) | undefined
+  let active: { fileUuid: string; filePath: string; fileTitle: string } | null = null
+  return {
+    registry: {
+      getActiveFile: () => active,
+      subscribe: (next: () => void) => {
+        listener = next
+        return () => {
+          listener = undefined
+        }
+      },
+    },
+    activate(fileUuid: string, filePath: string, fileTitle: string) {
+      active = { fileUuid, filePath, fileTitle }
+      listener?.()
+    },
+  }
+}
+
+describe('aiStore per-file chat state', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     useAiStore.setState({
-      busy: false,
-      step: 'idle',
-      streamText: '',
-      errorMessage: null,
-      threadId: '',
-      chatMessages: [],
-      workspacePath: null,
-      sessions: [],
+      currentFileUuid: null,
+      currentFilePath: null,
+      fileChats: {},
+      loadedFileChats: {},
+      sessionFileUuids: {},
+      activeStreamIds: {},
+      activeSessionsBar: {},
+      workspacePath: '/workspace',
       showSessionList: false,
       isMinimized: false,
       attachedDocument: null,
     })
   })
 
-  it('saves chat history through the session API', async () => {
-    const api = installChatApi()
-    useAiStore.setState({
-      workspacePath: '/workspace',
-      threadId: 'thread-1',
-      chatMessages: [{ role: 'user', content: 'hello' }],
-    })
+  it('loads the newly active file after a registry switch', async () => {
+    installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
 
-    await saveChatHistory()
+    harness.activate('file-a', '/a.mindlane', 'A')
+    await vi.waitFor(() => expect(useAiStore.getState().currentFileUuid).toBe('file-a'))
 
-    expect(api.saveSession).toHaveBeenCalledWith({
-      workspacePath: '/workspace',
-      sessionId: 'thread-1',
-      messages: [{ role: 'user', content: 'hello' }],
-    })
-    expect(api.listSessions).toHaveBeenCalledWith({
-      workspacePath: '/workspace',
-      limit: 20,
-      offset: 0,
-    })
-    expect(useAiStore.getState().sessions).toEqual(sessions)
+    expect(useAiStore.getState().currentFilePath).toBe('/a.mindlane')
+    expect(useAiStore.getState().fileChats['file-a']).toBeDefined()
   })
 
-  it('loads the latest workspace chat through listSessions and loadSession', async () => {
-    const api = installChatApi()
+  it('retries a file load after an earlier activation became stale', async () => {
+    installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
 
-    await loadWorkspaceChat('/workspace')
+    harness.activate('file-a', '/a.mindlane', 'A')
+    harness.activate('file-b', '/b.mindlane', 'B')
+    harness.activate('file-a', '/a.mindlane', 'A')
 
-    expect(api.listSessions).toHaveBeenCalledWith({
+    await vi.waitFor(() => expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true))
+    expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-restored')
+  })
+
+  it('coalesces concurrent loads for the same file', async () => {
+    const { chat } = installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    useAiStore.setState({ workspacePath: '/workspace' })
+
+    await Promise.all([
+      useAiStore.getState().loadFileChat('file-a'),
+      useAiStore.getState().loadFileChat('file-a'),
+    ])
+
+    expect(chat.listSessions).toHaveBeenCalledTimes(1)
+    expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true)
+  })
+
+  it('updates active-session navigation metadata after a file move', () => {
+    installApis()
+    useAiStore.setState({
+      currentFileUuid: 'file-b',
+      currentFilePath: '/b.mindlane',
+      activeSessionsBar: {
+        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle' },
+      },
+    })
+
+    useAiStore.getState().updateFileLocation('file-a', '/folder/renamed.mindlane')
+
+    expect(useAiStore.getState().activeSessionsBar['file-a']?.fileName).toBe('renamed.mindlane')
+    expect(useAiStore.getState().currentFilePath).toBe('/b.mindlane')
+  })
+
+  it('routes stream events to the file bound to the session', () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      fileChats: {
+        'file-a': createFileChatState('session-a'),
+        'file-b': createFileChatState('session-b'),
+      },
+      sessionFileUuids: { 'session-a': 'file-a', 'session-b': 'file-b' },
+      activeStreamIds: { 'session-a': 'stream-a', 'session-b': 'stream-b' },
+    })
+
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'token', payload: 'A' })
+    emit({ streamId: 'stream-b', sessionId: 'session-b', type: 'token', payload: 'B' })
+
+    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('A')
+    expect(useAiStore.getState().fileChats['file-b']?.streamText).toBe('B')
+  })
+
+  it('drops events whose stream ID is stale or unknown', () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      fileChats: { 'file-a': createFileChatState('session-a') },
+      sessionFileUuids: { 'session-a': 'file-a' },
+      activeStreamIds: { 'session-a': 'current-stream' },
+    })
+
+    emit({ streamId: 'stale-stream', sessionId: 'session-a', type: 'token', payload: 'stale' })
+    emit({ streamId: 'unknown-stream', sessionId: 'unknown', type: 'token', payload: 'unknown' })
+
+    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('')
+  })
+
+  it('replays events that arrive while a known session is awaiting its stream ID', () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), busy: true },
+      },
+      sessionFileUuids: { 'session-a': 'file-a' },
+    })
+
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'token', payload: 'early' })
+    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a', 'A')
+
+    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('early')
+  })
+
+  it('restores the workspace active session for the file', async () => {
+    const { chat } = installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+
+    harness.activate('file-a', '/a.mindlane', 'A')
+    await vi.waitFor(() =>
+      expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-restored'),
+    )
+
+    expect(chat.listSessions).toHaveBeenCalledWith({
       workspacePath: '/workspace',
+      fileUuid: 'file-a',
       limit: 20,
       offset: 0,
     })
-    expect(api.loadSession).toHaveBeenCalledWith({
+    expect(chat.loadSession).toHaveBeenCalledWith({
       workspacePath: '/workspace',
-      sessionId: 'session-latest',
+      sessionId: 'session-restored',
     })
-    expect(useAiStore.getState()).toMatchObject({
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      { role: 'user', content: 'restored' },
+    ])
+  })
+
+  it('keeps a pending loadSession result bound to its originating file', async () => {
+    let resolveLoad!: (value: {
+      ok: true
+      data: { sessionId: string; messages: ChatMessage[] }
+    }) => void
+    const loadSession = () =>
+      new Promise<{
+        ok: true
+        data: { sessionId: string; messages: ChatMessage[] }
+      }>((resolve) => {
+        resolveLoad = resolve
+      })
+    const { chat } = installApis({ loadSession })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
       workspacePath: '/workspace',
-      threadId: 'session-latest',
-      chatMessages: [{ role: 'user', content: 'hello' }],
-      sessions,
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': createFileChatState('session-a'),
+        'file-b': createFileChatState('session-b'),
+      },
     })
+
+    const loading = useAiStore.getState().loadSession('session-a')
+    useAiStore.setState({ currentFileUuid: 'file-b', workspacePath: '/workspace-b' })
+    resolveLoad({
+      ok: true,
+      data: { sessionId: 'session-a', messages: [{ role: 'user', content: 'from A' }] },
+    })
+    await loading
+
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      { role: 'user', content: 'from A' },
+    ])
+    expect(useAiStore.getState().fileChats['file-b']?.chatMessages).toEqual([])
+    expect(chat.loadSession).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      sessionId: 'session-a',
+    })
+    expect(window.mindlane!.workspace.updateState).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      activeSession: { fileUuid: 'file-a', sessionId: 'session-a' },
+    })
+  })
+
+  it('keeps a pending deleteSession replacement bound to its originating file', async () => {
+    let resolveDelete!: (value: { ok: true }) => void
+    const deleteSession = () =>
+      new Promise<{ ok: true }>((resolve) => {
+        resolveDelete = resolve
+      })
+    installApis({ deleteSession })
+    useAiStore.setState({
+      workspacePath: '/workspace',
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': createFileChatState('session-a'),
+        'file-b': createFileChatState('session-b'),
+      },
+    })
+
+    const deleting = useAiStore.getState().deleteSession('session-a')
+    useAiStore.setState({ currentFileUuid: 'file-b' })
+    resolveDelete({ ok: true })
+    await deleting
+
+    expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).not.toBe('session-a')
+    expect(useAiStore.getState().fileChats['file-b']?.activeSessionId).toBe('session-b')
+  })
+
+  it('does not let a stale delete replace a newer session on the same file', async () => {
+    let resolveDelete!: (value: { ok: true }) => void
+    const deleteSession = () =>
+      new Promise<{ ok: true }>((resolve) => {
+        resolveDelete = resolve
+      })
+    installApis({ deleteSession })
+    useAiStore.setState({
+      workspacePath: '/workspace',
+      currentFileUuid: 'file-a',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+    })
+
+    const deleting = useAiStore.getState().deleteSession('session-a')
+    useAiStore.setState({ fileChats: { 'file-a': createFileChatState('session-new') } })
+    resolveDelete({ ok: true })
+    await deleting
+
+    expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-new')
+  })
+
+  it('tracks active session status from generating through stopping to idle', () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      fileChats: { 'file-a': createFileChatState('session-a') },
+      sessionFileUuids: { 'session-a': 'file-a' },
+    })
+
+    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a', 'File A')
+    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('generating')
+
+    useAiStore.getState().markStreamStopping('session-a')
+    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('stopping')
+
+    emit({
+      streamId: 'stream-a',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: 'done' },
+    })
+    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('idle')
+  })
+
+  it('writes a stream startup error to its originating background file', () => {
+    installApis()
+    useAiStore.setState({
+      currentFileUuid: 'file-b',
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), busy: true },
+        'file-b': createFileChatState('session-b'),
+      },
+    })
+
+    useAiStore.getState().setFileError('file-a', 'startup failed')
+
+    expect(useAiStore.getState().fileChats['file-a']?.errorMessage).toBe('startup failed')
+    expect(useAiStore.getState().fileChats['file-a']?.busy).toBe(false)
+    expect(useAiStore.getState().fileChats['file-b']?.errorMessage).toBeNull()
   })
 })
