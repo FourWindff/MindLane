@@ -169,16 +169,18 @@ function AppContent() {
               )}
             </main>
             {hasDocumentOpen && (
-              <ChatCapsuleBar
-                expanded={capsuleExpanded}
-                onToggleExpand={() => setCapsuleExpanded((e) => !e)}
-              />
-            )}
-            {hasDocumentOpen && chatOpen && (
-              <>
-                <ChatInputBar onOpenSettings={() => setSettingsOpen(true)} />
-                <ChatMessageList />
-              </>
+              <aside className="chat-panel" aria-label="聊天面板">
+                <ChatCapsuleBar
+                  expanded={capsuleExpanded}
+                  onToggleExpand={() => setCapsuleExpanded((e) => !e)}
+                />
+                {chatOpen && (
+                  <>
+                    <ChatMessageList />
+                    <ChatInputBar onOpenSettings={() => setSettingsOpen(true)} />
+                  </>
+                )}
+              </aside>
             )}
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />

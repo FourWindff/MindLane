@@ -1,8 +1,5 @@
 .chat-capsule-bar {
-  position: fixed;
-  top: 56px;
-  left: calc(100vw - 230px);
-  right: 10px;
+  position: relative;
   z-index: 90;
   display: inline-flex;
   align-items: center;
@@ -16,17 +13,15 @@
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.04);
-  transition:
-    left 0.25s ease,
-    width 0.25s ease;
-  width: 220px;
-  max-width: 220px;
+  transition: width 0.25s ease;
+  width: 100%;
+  max-width: 100%;
 }
 
 .chat-capsule-bar--expanded {
-  left: var(--app-toolbar-right);
-  width: calc(100vw - var(--app-toolbar-right) - 10px);
-  max-width: calc(100vw - var(--app-toolbar-right) - 10px);
+  align-self: flex-end;
+  width: calc(100vw - var(--app-toolbar-right) - 16px);
+  max-width: calc(100vw - var(--app-toolbar-right) - 16px);
 }
 
 .chat-capsule-bar__toggle {

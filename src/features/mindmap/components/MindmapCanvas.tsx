@@ -1,7 +1,6 @@
 import type { ComponentProps } from 'react'
 import {
   Controls,
-  MiniMap,
   ReactFlow,
   SelectionMode,
   useOnSelectionChange,
@@ -78,7 +77,6 @@ export function MindmapCanvas({
       proOptions={{ hideAttribution: true }}
     >
       <Controls showInteractive={false} />
-      <MiniMap nodeStrokeWidth={3} zoomable pannable className="mindmap-minimap" />
     </ReactFlow>
   )
 }

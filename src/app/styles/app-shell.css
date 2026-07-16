@@ -37,3 +37,21 @@
   background: var(--ml-bg-elevated);
   position: relative;
 }
+
+.chat-panel {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  bottom: 24px;
+  z-index: 70;
+  display: flex;
+  width: min(360px, calc(100vw - 32px));
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.chat-panel > * {
+  pointer-events: auto;
+}

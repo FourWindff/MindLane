@@ -45,12 +45,6 @@
   cursor: default;
 }
 
-.mindmap-minimap {
-  background: var(--ml-bg-subtle) !important;
-  border: 1px solid var(--ml-border) !important;
-  border-radius: 8px;
-}
-
 /* —— Smooth position transitions for all nodes —— */
 .react-flow__node {
   transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);

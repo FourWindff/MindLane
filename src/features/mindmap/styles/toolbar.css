@@ -3,7 +3,7 @@
   position: absolute;
   top: 0;
   left: var(--app-toolbar-right);
-  right: 230px;
+  right: 376px;
   z-index: 100;
   display: flex;
   justify-content: center;

@@ -1,10 +1,7 @@
 .chat-message-list {
-  position: fixed;
-  top: 96px;
-  right: 0;
-  bottom: 120px;
-  width: 360px;
-  z-index: 70;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;

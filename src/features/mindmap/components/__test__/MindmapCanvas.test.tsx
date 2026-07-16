@@ -14,7 +14,6 @@ vi.mock('@xyflow/react', async () => {
       return <div data-testid="react-flow">{props.children}</div>
     },
     Controls: () => <div data-testid="controls" />,
-    MiniMap: () => <div data-testid="minimap" />,
     useOnSelectionChange: vi.fn(),
   }
 })
