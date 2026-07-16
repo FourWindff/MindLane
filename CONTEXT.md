@@ -41,12 +41,40 @@
 - 保存在 workspace `state.json` 的 `activeSessionIds: Record<fileUuid, sessionId>` 中。
 - 切换文件时自动加载对应 `sessionId` 的历史消息；若 `sessionId` 已被删除，则新建对话。
 
-### 其他活跃会话列表
+## 聊天界面组件
 
-- 聊天面板顶部的快速切换条，显示本次 MindLane 启动以来**运行过流**的其他文件。
-- 每个条目展示文件名与状态：`generating`（流运行中）、`stopping`（已请求停止）、`idle`（流已结束）。
-- 点击条目切换当前文件并加载其 `activeSessionId`。
-- 重启后列表为空。
+### ChatInputBar
+
+- 应用底部居中的长条对话输入组件。
+- 包含添加附件按钮、设置按钮、语音输入按钮、发送按钮。
+- 附件按钮保持现有行为：打开文件选择器，选中的文档以标签形式显示在输入框上方，随下一次发送一起提交。
+- 设置按钮打开全局设置面板。
+- 语音输入按钮为纯视觉占位：长按时在输入框上方显示音频跳动动画，松开结束，不产生实际录音或转文本数据。
+- 由 `shell` 统一布局，不再属于 `ChatPanel` 浮层面板。
+
+### ChatMessageList
+
+- 应用右方、位于 `ChatCapsuleBar` 下方的消息列表组件。
+- 两种显示模式：
+  - **消息模式**：按时间顺序渲染当前 `activeSessionId` 的用户与 AI 消息。
+  - **会话列表模式**：点击当前激活胶囊上的“切换会话”按钮后，显示该文件的历史会话列表；选中会话后切回消息模式。
+- 消息气泡为全宽矩形，所有气泡的左、右边缘对齐，文字全部左对齐。
+- 消息列表无背景；消息气泡使用半透明玻璃状背景。
+
+### ChatCapsuleBar
+
+- 应用窗口右上方的文件级对话入口组件（原 `ActiveSessionsBar`）。
+- 每个胶囊对应一个 `fileUuid`，展示文件名与当前对话状态：`generating`（生成中）、`stopping`（终止中）、`idle`（空闲）。
+- 按用户最近一次输入时间排序，最近的排在最前；当前文件的胶囊排在首位并放大显示。
+- 状态样式：`generating` 为绿色滚动边框，`stopping` 为红色滚动边框，`idle` 为灰色背景。
+- 点击胶囊切换到对应文件并加载其 `activeSessionId`。
+- 展开/收起按钮始终在胶囊组左侧；默认收起，点击展开后胶囊组整体向左平移（右边缘固定），展开按钮变为收起按钮并紧靠 `shell` 工具栏的文件名组件右侧。
+- 当前激活胶囊右侧在鼠标悬浮时显示“切换会话”按钮，点击后将 `ChatMessageList` 切换到会话列表模式。
+
+### ChatPanelToggle
+
+- `shell` 工具栏中的聊天气泡图标按钮，用于显示或隐藏 `ChatInputBar` 与 `ChatMessageList`。
+- 默认状态为显示；点击后图标反转，`ChatInputBar` 与 `ChatMessageList` 隐藏，`ChatCapsuleBar` 保持可见且可操作。
 
 ## 运行时组件
 
@@ -105,12 +133,13 @@
 - 传给 `chatStream` 的上下文对象，包含 `fileUuid`、`filePath`、`fileTitle`、`workspacePath`、选中的节点、附件等。
 - `fileUuid` 由前端提供，供 `Runner` 写入 `SessionMeta` 与执行 memory 提取。
 
-### activeSessionsBar
+### ChatCapsuleBar 状态
 
-- 聊天面板顶部“其他活跃会话”列表的状态。
-- `Record<fileUuid, { fileUuid, fileName, status }>`。
-- 开始流时加入或更新为 `generating`；调用停止时改为 `stopping`；收到 `end`/`error` 后改为 `idle`。
-- 渲染时过滤掉当前 `fileUuid`。
+- 维护“最近对话过的文件”列表，key 为 `fileUuid`。
+- 每个条目包含：`fileUuid`、`fileName`、`status`、最近一次用户输入时间 `lastInputAt`。
+- 用户发送消息时更新 `lastInputAt`，并把该文件移到最前。
+- 开始流时 `status` 为 `generating`；调用停止时改为 `stopping`；收到 `end`/`error` 后改为 `idle`。
+- 当前 `fileUuid` 的条目不会被过滤，而是排在首位并放大显示。
 
 ### Mindmap Tool Call Router
 
@@ -129,7 +158,7 @@
 
 ### rename / move
 
-- `fileUuid` 不变，`aiStore` 更新 `currentFilePath` 与 `activeSessionsBar` 中的文件名。
+- `fileUuid` 不变，`aiStore` 更新 `currentFilePath` 与 `chatFileCapsules` 中的文件名。
 - `activeSessionIds` 以 `fileUuid` 为 key，无需改动。
 
 ### copy / saveAs

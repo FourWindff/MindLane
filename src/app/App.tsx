@@ -4,7 +4,9 @@ import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmap
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { loadMindmapStyleFromBackend } from '@/features/mindmap/style/styleStore'
-import { ChatPanel } from '@/features/chat/components/ChatPanel'
+import { ChatInputBar } from '@/features/chat/components/ChatInputBar'
+import { ChatMessageList } from '@/features/chat/components/ChatMessageList'
+import { ChatCapsuleBar } from '@/features/chat/components/ChatCapsuleBar'
 import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { FileManager } from '@/features/workspace/components/FileManager'
 import {
@@ -71,6 +73,8 @@ function WorkspaceEmptyState() {
 function AppContent() {
   const [fileManagerOpen, setFileManagerOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(true)
+  const [capsuleExpanded, setCapsuleExpanded] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
   const workspaceInitialized = useWorkspaceStore((s) => s.initialized)
   const workspaceInitializing = useWorkspaceStore((s) => s.initializing)
@@ -143,13 +147,15 @@ function AppContent() {
         ) : !workspacePath ? (
           <WorkspaceHome />
         ) : (
-          <div className="app-shell">
+          <div className={`app-shell ${capsuleExpanded ? 'app-shell--capsule-expanded' : ''}`}>
             <main className="app-shell__main">
               {workspacePath && (
                 <AppToolbar
                   onOpenFileManager={() => setFileManagerOpen(true)}
                   fileManagerOpen={fileManagerOpen}
                   filePath={filePath ?? undefined}
+                  chatOpen={chatOpen}
+                  onToggleChat={() => setChatOpen((open) => !open)}
                 />
               )}
               {hasDocumentOpen ? (
@@ -161,7 +167,18 @@ function AppContent() {
                 <WorkspaceEmptyState />
               )}
             </main>
-            {hasDocumentOpen && <ChatPanel />}
+            {hasDocumentOpen && (
+              <ChatCapsuleBar
+                expanded={capsuleExpanded}
+                onToggleExpand={() => setCapsuleExpanded((e) => !e)}
+              />
+            )}
+            {hasDocumentOpen && chatOpen && (
+              <>
+                <ChatInputBar onOpenSettings={() => setSettingsOpen(true)} />
+                <ChatMessageList />
+              </>
+            )}
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
             <ToastContainer />

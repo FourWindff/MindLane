@@ -48,6 +48,7 @@ export interface ActiveSessionBarEntry {
   fileUuid: string
   fileName: string
   status: 'generating' | 'stopping' | 'idle'
+  lastInputAt: number
 }
 
 interface ActiveFileInfo {
@@ -82,7 +83,6 @@ interface AiState {
   activeStreamId: string | null
 
   showSessionList: boolean
-  isMinimized: boolean
   attachedDocument: DocumentRef | null
 
   setBusy: (busy: boolean) => void
@@ -101,7 +101,6 @@ interface AiState {
   setShowSessionList: (show: boolean) => void
   loadSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
-  setIsMinimized: (value: boolean) => void
   setAttachedDocument: (document: DocumentRef | null) => void
   loadFileChat: (fileUuid: string) => Promise<void>
   updateFileLocation: (fileUuid: string, filePath: string) => void
@@ -140,6 +139,27 @@ function currentProjection(state: AiState, fileChats = state.fileChats) {
   }
 }
 
+export function getActiveSessionBarEntries(
+  activeSessionsBar: Record<string, ActiveSessionBarEntry>,
+  currentFileUuid: string | null,
+  currentFilePath: string | null,
+): ActiveSessionBarEntry[] {
+  const entries = Object.values(activeSessionsBar)
+  if (currentFileUuid && !activeSessionsBar[currentFileUuid]) {
+    entries.push({
+      fileUuid: currentFileUuid,
+      fileName: currentFilePath?.split(/[\\/]/).pop() ?? currentFileUuid,
+      status: 'idle',
+      lastInputAt: 0,
+    })
+  }
+  return entries.sort((a, b) => {
+    if (a.fileUuid === currentFileUuid) return -1
+    if (b.fileUuid === currentFileUuid) return 1
+    return b.lastInputAt - a.lastInputAt
+  })
+}
+
 function patchCurrentChat(state: AiState, patch: Partial<FileChatState>): Partial<AiState> | null {
   if (!state.currentFileUuid) return patch
   const current = state.fileChats[state.currentFileUuid] ?? createFileChatState()
@@ -176,7 +196,6 @@ export const useAiStore = create<AiState>((set, get) => ({
   threadId: '',
   activeStreamId: null,
   showSessionList: false,
-  isMinimized: false,
   attachedDocument: null,
 
   setBusy: (busy) => set((state) => patchCurrentChat(state, { busy }) ?? { busy }),
@@ -225,12 +244,27 @@ export const useAiStore = create<AiState>((set, get) => ({
   setThreadId: (activeSessionId) =>
     set((state) => patchCurrentChat(state, { activeSessionId }) ?? { threadId: activeSessionId }),
   addChatMessage: (message) =>
-    set(
-      (state) =>
-        patchCurrentChat(state, { chatMessages: [...state.chatMessages, message] }) ?? {
-          chatMessages: [...state.chatMessages, message],
+    set((state) => {
+      const patch = patchCurrentChat(state, { chatMessages: [...state.chatMessages, message] }) ?? {
+        chatMessages: [...state.chatMessages, message],
+      }
+      if (!state.currentFileUuid) return patch
+      const existing = state.activeSessionsBar[state.currentFileUuid]
+      const fileName =
+        existing?.fileName ?? state.currentFilePath?.split(/[\\/]/).pop() ?? state.currentFileUuid
+      return {
+        ...patch,
+        activeSessionsBar: {
+          ...state.activeSessionsBar,
+          [state.currentFileUuid]: {
+            fileUuid: state.currentFileUuid,
+            fileName,
+            status: existing?.status ?? 'idle',
+            lastInputAt: Date.now(),
+          },
         },
-    ),
+      }
+    }),
   setChatMessages: (chatMessages) =>
     set((state) => patchCurrentChat(state, { chatMessages }) ?? { chatMessages }),
   startNewChat: () => {
@@ -252,7 +286,6 @@ export const useAiStore = create<AiState>((set, get) => ({
   },
   setSessions: (sessions) => set((state) => patchCurrentChat(state, { sessions }) ?? { sessions }),
   setShowSessionList: (showSessionList) => set({ showSessionList }),
-  setIsMinimized: (isMinimized) => set({ isMinimized }),
   setAttachedDocument: (attachedDocument) => set({ attachedDocument }),
 
   loadSession: async (sessionId) => {
@@ -390,6 +423,7 @@ export const useAiStore = create<AiState>((set, get) => ({
             fileUuid,
             fileName: fileName ?? state.currentFilePath?.split(/[\\/]/).pop() ?? fileUuid,
             status: 'generating' as const,
+            lastInputAt: Date.now(),
           },
         },
       }

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
   createFileChatState,
+  getActiveSessionBarEntries,
   useAiStore,
   type ChatSession,
   type ChatStreamEvent,
@@ -113,7 +114,6 @@ describe('aiStore per-file chat state', () => {
       activeSessionsBar: {},
       workspacePath: '/workspace',
       showSessionList: false,
-      isMinimized: false,
       attachedDocument: null,
     })
   })
@@ -162,7 +162,7 @@ describe('aiStore per-file chat state', () => {
       currentFileUuid: 'file-b',
       currentFilePath: '/b.mindlane',
       activeSessionsBar: {
-        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle' },
+        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 0 },
       },
     })
 
@@ -397,5 +397,85 @@ describe('aiStore per-file chat state', () => {
     expect(useAiStore.getState().fileChats['file-a']?.errorMessage).toBe('startup failed')
     expect(useAiStore.getState().fileChats['file-a']?.busy).toBe(false)
     expect(useAiStore.getState().fileChats['file-b']?.errorMessage).toBeNull()
+  })
+})
+
+describe('activeSessionsBar projection', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    useAiStore.setState({
+      currentFileUuid: null,
+      currentFilePath: null,
+      fileChats: {},
+      loadedFileChats: {},
+      sessionFileUuids: {},
+      activeStreamIds: {},
+      activeSessionsBar: {},
+      workspacePath: '/workspace',
+      showSessionList: false,
+      attachedDocument: null,
+    })
+  })
+
+  it('includes the current file first even when it has no active session entry', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-current',
+      currentFilePath: '/current.mindlane',
+      activeSessionsBar: {
+        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 100 },
+      },
+    })
+
+    const entries = getActiveSessionBarEntries(
+      useAiStore.getState().activeSessionsBar,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+
+    expect(entries[0]?.fileUuid).toBe('file-current')
+    expect(entries).toHaveLength(2)
+  })
+
+  it('sorts non-current files by lastInputAt descending', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-current',
+      currentFilePath: '/current.mindlane',
+      activeSessionsBar: {
+        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 100 },
+        'file-b': { fileUuid: 'file-b', fileName: 'b.mindlane', status: 'idle', lastInputAt: 300 },
+        'file-c': { fileUuid: 'file-c', fileName: 'c.mindlane', status: 'idle', lastInputAt: 200 },
+      },
+    })
+
+    const entries = getActiveSessionBarEntries(
+      useAiStore.getState().activeSessionsBar,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+    const nonCurrent = entries.slice(1).map((e) => e.fileUuid)
+
+    expect(nonCurrent).toEqual(['file-b', 'file-c', 'file-a'])
+  })
+
+  it('updates lastInputAt when a message is added for the current file', () => {
+    const before = Date.now()
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      currentFilePath: '/a.mindlane',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+    })
+
+    useAiStore.getState().addChatMessage({ role: 'user', content: 'hello' })
+
+    const entry = useAiStore.getState().activeSessionsBar['file-a']
+    expect(entry).toBeDefined()
+    expect(entry!.lastInputAt).toBeGreaterThanOrEqual(before)
+    expect(entry!.fileName).toBe('a.mindlane')
+  })
+
+  it('keeps showSessionList as the single mode switch source', () => {
+    expect(useAiStore.getState().showSessionList).toBe(false)
+    useAiStore.getState().setShowSessionList(true)
+    expect(useAiStore.getState().showSessionList).toBe(true)
   })
 })

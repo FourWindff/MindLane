@@ -1,10 +1,12 @@
-import { Menu } from 'lucide-react'
+import { Menu, MessageCircle, MessageCircleOff } from 'lucide-react'
 import '../styles/window.css'
 
 type Props = {
   onOpenFileManager: () => void
   fileManagerOpen: boolean
   filePath?: string
+  chatOpen: boolean
+  onToggleChat: () => void
 }
 
 function extractFileName(filePath: string | undefined): string | null {
@@ -15,7 +17,13 @@ function extractFileName(filePath: string | undefined): string | null {
     .replace(/\.mindlane$/, '')
 }
 
-export function AppToolbar({ onOpenFileManager, fileManagerOpen, filePath }: Props) {
+export function AppToolbar({
+  onOpenFileManager,
+  fileManagerOpen,
+  filePath,
+  chatOpen,
+  onToggleChat,
+}: Props) {
   const fileName = extractFileName(filePath)
 
   return (
@@ -37,6 +45,20 @@ export function AppToolbar({ onOpenFileManager, fileManagerOpen, filePath }: Pro
           </span>
         </>
       )}
+      <span className="app-toolbar__divider" />
+      <button
+        type="button"
+        className={`app-toolbar__menu${chatOpen ? '' : ' app-toolbar__menu--active'}`}
+        onClick={onToggleChat}
+        title={chatOpen ? '隐藏聊天' : '显示聊天'}
+        aria-label={chatOpen ? '隐藏聊天' : '显示聊天'}
+      >
+        {chatOpen ? (
+          <MessageCircle size={18} strokeWidth={1.5} />
+        ) : (
+          <MessageCircleOff size={18} strokeWidth={1.5} />
+        )}
+      </button>
     </div>
   )
 }
