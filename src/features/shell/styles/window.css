@@ -116,6 +116,14 @@
   user-select: none;
 }
 
+.app-shell {
+  --app-toolbar-right: 58px;
+}
+
+.app-shell:has(.app-toolbar--with-filename) {
+  --app-toolbar-right: 227px;
+}
+
 .app-toolbar__menu {
   width: 36px;
   height: 36px;

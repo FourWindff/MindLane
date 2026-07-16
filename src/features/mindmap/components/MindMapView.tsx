@@ -15,9 +15,15 @@ import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindm
 function MindMapWorkspace({
   onSwitchWorkspace,
   onOpenSettings,
+  chatOpen,
+  capsuleExpanded,
+  onToggleChat,
 }: {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
+  chatOpen: boolean
+  capsuleExpanded: boolean
+  onToggleChat: () => void
 }) {
   const view = useMindmapOperationController()
 
@@ -30,6 +36,9 @@ function MindMapWorkspace({
         onUndo={view.actions.undo}
         onRedo={view.actions.redo}
         onOpenSettings={onOpenSettings}
+        chatOpen={chatOpen}
+        capsuleExpanded={capsuleExpanded}
+        onToggleChat={onToggleChat}
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={view.actions.save}
         onCenterRoot={() => void view.actions.centerRoot()}
@@ -118,14 +127,26 @@ function MindMapWorkspace({
 export function MindMapView({
   onSwitchWorkspace,
   onOpenSettings,
+  chatOpen,
+  capsuleExpanded,
+  onToggleChat,
 }: {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
+  chatOpen: boolean
+  capsuleExpanded: boolean
+  onToggleChat: () => void
 }) {
   return (
     <StyleProvider>
       <ReactFlowProvider>
-        <MindMapWorkspace onSwitchWorkspace={onSwitchWorkspace} onOpenSettings={onOpenSettings} />
+        <MindMapWorkspace
+          onSwitchWorkspace={onSwitchWorkspace}
+          onOpenSettings={onOpenSettings}
+          chatOpen={chatOpen}
+          capsuleExpanded={capsuleExpanded}
+          onToggleChat={onToggleChat}
+        />
       </ReactFlowProvider>
     </StyleProvider>
   )

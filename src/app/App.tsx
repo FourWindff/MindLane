@@ -147,21 +147,22 @@ function AppContent() {
         ) : !workspacePath ? (
           <WorkspaceHome />
         ) : (
-          <div className={`app-shell ${capsuleExpanded ? 'app-shell--capsule-expanded' : ''}`}>
+          <div className="app-shell">
             <main className="app-shell__main">
               {workspacePath && (
                 <AppToolbar
                   onOpenFileManager={() => setFileManagerOpen(true)}
                   fileManagerOpen={fileManagerOpen}
                   filePath={filePath ?? undefined}
-                  chatOpen={chatOpen}
-                  onToggleChat={() => setChatOpen((open) => !open)}
                 />
               )}
               {hasDocumentOpen ? (
                 <MindMapView
                   onSwitchWorkspace={() => void switchWorkspace()}
                   onOpenSettings={() => setSettingsOpen(true)}
+                  chatOpen={chatOpen}
+                  capsuleExpanded={capsuleExpanded}
+                  onToggleChat={() => setChatOpen((open) => !open)}
                 />
               ) : (
                 <WorkspaceEmptyState />

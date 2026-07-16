@@ -1,6 +1,7 @@
 .chat-capsule-bar {
   position: fixed;
   top: 56px;
+  left: calc(100vw - 230px);
   right: 10px;
   z-index: 90;
   display: inline-flex;
@@ -15,12 +16,17 @@
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: max-width 0.25s ease;
+  transition:
+    left 0.25s ease,
+    width 0.25s ease;
+  width: 220px;
   max-width: 220px;
 }
 
 .chat-capsule-bar--expanded {
-  max-width: min(640px, calc(100vw - 220px));
+  left: var(--app-toolbar-right);
+  width: calc(100vw - var(--app-toolbar-right) - 10px);
+  max-width: calc(100vw - var(--app-toolbar-right) - 10px);
 }
 
 .chat-capsule-bar__toggle {
@@ -149,10 +155,4 @@
 .chat-capsule__switch:hover {
   background: rgba(0, 0, 0, 0.12);
   color: var(--ml-text);
-}
-
-/* Collapse the toolbar filename when capsules are expanded to make room. */
-.app-shell--capsule-expanded .app-toolbar__filename,
-.app-shell--capsule-expanded .app-toolbar__divider:last-of-type {
-  display: none;
 }

@@ -2,18 +2,27 @@
 .mindmap-header {
   position: absolute;
   top: 0;
-  left: 0;
-  right: 0;
+  left: var(--app-toolbar-right);
+  right: 230px;
   z-index: 100;
   display: flex;
   justify-content: center;
+  min-width: 0;
   padding: 6px 0;
   pointer-events: none;
+  transition: right 0.25s ease;
+}
+
+.mindmap-header--capsule-expanded {
+  right: calc(100vw - var(--app-toolbar-right));
 }
 
 .mindmap-header__panel {
   position: relative;
   display: inline-flex;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
   padding: 4px 5px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
@@ -24,10 +33,24 @@
     0 4px 20px rgba(0, 0, 0, 0.06),
     0 1px 3px rgba(0, 0, 0, 0.04);
   pointer-events: auto;
+  opacity: 1;
+  transition: opacity 0.25s ease;
+}
+
+.mindmap-header--capsule-expanded .mindmap-header__panel {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mindmap-header__toolbar-viewport {
+  display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .float-toolbar {
-  display: flex;
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0;
 }

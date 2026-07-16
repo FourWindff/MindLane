@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import ReactDOMServer from 'react-dom/server'
 
 let runEffect: (() => void | (() => void)) | undefined
 
-vi.mock('react', () => ({
-  useEffect: (effect: () => void | (() => void)) => {
-    runEffect = effect
-  },
-}))
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>()
+  return {
+    ...actual,
+    useEffect: (effect: () => void | (() => void)) => {
+      runEffect = effect
+    },
+  }
+})
 
 import { MindMapHeader } from '../MindMapHeader'
 
@@ -83,5 +88,28 @@ describe('MindMapHeader style panel dismissal', () => {
     mount(false)
 
     expect(addEventListener).not.toHaveBeenCalled()
+  })
+
+  it('owns the chat toggle and enters the capsule-compressed state', () => {
+    const html = ReactDOMServer.renderToString(
+      <MindMapHeader {...defaultProps} chatOpen capsuleExpanded onToggleChat={vi.fn()} />,
+    )
+
+    expect(html).toContain('mindmap-header--capsule-expanded')
+    expect(html).toContain('aria-label="隐藏聊天"')
+  })
+
+  it('restores the regular header state when capsules collapse', () => {
+    const html = ReactDOMServer.renderToString(
+      <MindMapHeader
+        {...defaultProps}
+        chatOpen={false}
+        capsuleExpanded={false}
+        onToggleChat={vi.fn()}
+      />,
+    )
+
+    expect(html).not.toContain('mindmap-header--capsule-expanded')
+    expect(html).toContain('aria-label="显示聊天"')
   })
 })
