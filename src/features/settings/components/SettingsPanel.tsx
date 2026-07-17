@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { icons } from 'lucide-react'
+import { Plug } from 'lucide-react'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
@@ -37,6 +37,11 @@ const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
   failed: '连接失败',
 }
 
+// Brand icons live in public/assets, keyed by server id; unknown ids fall back to a generic plug icon.
+const MCP_ICONS: Record<string, string> = {
+  notion: '/assets/notion.svg',
+}
+
 function McpIntegrationsSection() {
   const [servers, setServers] = useState<McpServerStatusInfo[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -67,32 +72,37 @@ function McpIntegrationsSection() {
   return (
     <>
       {servers.map((server) => {
-        const Icon = icons[server.icon as keyof typeof icons] ?? icons.Plug
+        const iconSrc = MCP_ICONS[server.id]
         const connected = server.state === 'connected'
         const busy = busyId === server.id || server.state === 'connecting'
+        const statusLabel =
+          MCP_STATE_LABELS[server.state] +
+          (connected && server.workspaceName ? ` · ${server.workspaceName}` : '')
         return (
           <div className="settings-card__row" key={server.id}>
-            <div>
-              <div className="settings-card__label">
-                <Icon size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
-                {server.displayName}
-              </div>
-              <div className="settings-card__value">
-                {MCP_STATE_LABELS[server.state]}
-                {connected && server.workspaceName ? ` · ${server.workspaceName}` : ''}
-              </div>
+            {iconSrc ? <img src={iconSrc} alt="" width={28} height={28} /> : <Plug size={28} />}
+            <div className="mcp-server__text">
+              <div className="settings-card__label">{server.displayName}</div>
               <div className="settings-card__hint">
                 {server.state === 'failed' && server.error ? server.error : server.description}
               </div>
             </div>
-            <button
-              type="button"
-              className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
-              disabled={busy}
-              onClick={() => void runAction(server.id, !connected)}
-            >
-              {busy ? '处理中…' : connected ? '断开' : '连接'}
-            </button>
+            <div className="mcp-server__actions">
+              <span
+                className={`mcp-status-dot${connected ? ' mcp-status-dot--on' : ''}`}
+                role="img"
+                aria-label={statusLabel}
+                title={statusLabel}
+              />
+              <button
+                type="button"
+                className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
+                disabled={busy}
+                onClick={() => void runAction(server.id, !connected)}
+              >
+                {busy ? '处理中…' : connected ? '断开' : '连接'}
+              </button>
+            </div>
           </div>
         )
       })}

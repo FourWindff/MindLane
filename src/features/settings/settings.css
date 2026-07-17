@@ -170,6 +170,30 @@
   color: var(--ml-text-muted);
 }
 
+.mcp-server__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-server__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.mcp-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ml-danger);
+}
+
+.mcp-status-dot--on {
+  background: var(--ml-success);
+}
+
 .settings-card__switch {
   display: inline-flex;
   align-items: center;

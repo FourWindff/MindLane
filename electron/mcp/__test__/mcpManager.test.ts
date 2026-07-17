@@ -21,7 +21,6 @@ function makeDef(id: string): McpServerDefinition {
   return {
     id,
     displayName: id.toUpperCase(),
-    icon: 'Notebook',
     description: `Mock server ${id}`,
     transport: 'http',
     connection: { url: `https://mcp.example.com/${id}` },

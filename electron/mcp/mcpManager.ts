@@ -103,7 +103,6 @@ export class McpManager {
     return [...this.servers.values()].map((def) => ({
       id: def.id,
       displayName: def.displayName,
-      icon: def.icon,
       description: def.description,
       ...(this.statuses.get(def.id) ?? { state: 'disconnected' as const }),
     }))

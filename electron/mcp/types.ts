@@ -22,7 +22,6 @@ export interface McpServerStatus {
 export interface McpServerStatusInfo extends McpServerStatus {
   id: string
   displayName: string
-  icon: string
   description: string
 }
 
@@ -40,8 +39,6 @@ export interface McpAuthContext {
 export interface McpServerDefinition {
   id: string
   displayName: string
-  /** lucide 图标名 */
-  icon: string
   /** 设置面板中展示的一句话说明 */
   description: string
   transport: 'stdio' | 'http' | 'sse'

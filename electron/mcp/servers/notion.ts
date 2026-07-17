@@ -8,7 +8,6 @@ import { LoopbackOAuthProvider } from '../oauth.js'
 export const notionServer: McpServerDefinition = {
   id: 'notion',
   displayName: 'Notion',
-  icon: 'Notebook',
   description: '连接后 AI 可以搜索和读取你的 Notion 内容。',
   transport: 'http',
   connection: { url: 'https://mcp.notion.com/mcp' },
