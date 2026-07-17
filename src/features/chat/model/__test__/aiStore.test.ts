@@ -266,6 +266,37 @@ describe('aiStore per-file chat state', () => {
     ])
   })
 
+  it('falls back to the most recent session when the persisted id is a phantom', async () => {
+    const { chat } = installApis({ activeSessionIds: { 'file-a': 'phantom-session' } })
+    useAiStore.setState({ workspacePath: '/workspace' })
+
+    await useAiStore.getState().loadFileChat('file-a')
+
+    expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-restored')
+    expect(chat.loadSession).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      sessionId: 'session-restored',
+    })
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      { role: 'user', content: 'restored' },
+    ])
+    expect(window.mindlane!.workspace.updateState).toHaveBeenCalledWith({
+      workspacePath: '/workspace',
+      activeSession: { fileUuid: 'file-a', sessionId: 'session-restored' },
+    })
+  })
+
+  it('does not clobber the persisted session mapping when listing fails', async () => {
+    const { chat } = installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    chat.listSessions.mockResolvedValueOnce({ ok: false, error: 'boom' })
+    useAiStore.setState({ workspacePath: '/workspace' })
+
+    await useAiStore.getState().loadFileChat('file-a')
+
+    expect(window.mindlane!.workspace.updateState).not.toHaveBeenCalled()
+    expect(useAiStore.getState().loadedFileChats['file-a']).toBeUndefined()
+  })
+
   it('keeps a pending loadSession result bound to its originating file', async () => {
     let resolveLoad!: (value: {
       ok: true

@@ -459,14 +459,19 @@ async function loadFileChat(fileUuid: string): Promise<void> {
     window.mindlane?.workspace.getSession(),
     window.mindlane?.chat?.listSessions({ workspacePath, fileUuid, limit: 20, offset: 0 }),
   ])
-  const sessions = sessionsResult?.ok ? sessionsResult.data.sessions : []
+  // 查询失败时直接放弃：此时无法区分"会话不存在"与"查询出错"，
+  // 继续往下走会生成幻影 id 并覆写 state.json 中仍然有效的映射。
+  if (!sessionsResult?.ok) return
+  const sessions = sessionsResult.data.sessions
   const restoredSessionId = workspaceSession?.activeSessionIds?.[fileUuid]
+  // state.json 可能指向从未写入消息的幻影会话（如新建对话后未发言就退出），
+  // 此时回退到最近的现有会话，而不是再生成一个新幻影。
   const activeSessionId =
     restoredSessionId && sessions.some((session) => session.id === restoredSessionId)
       ? restoredSessionId
-      : generateSessionId()
+      : (sessions[0]?.id ?? generateSessionId())
   let chatMessages: ChatMessage[] = []
-  if (restoredSessionId === activeSessionId) {
+  if (sessions.some((session) => session.id === activeSessionId)) {
     const loaded = await window.mindlane?.chat?.loadSession({
       workspacePath,
       sessionId: activeSessionId,
