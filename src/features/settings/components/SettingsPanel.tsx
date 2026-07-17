@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { icons } from 'lucide-react'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
@@ -7,12 +8,13 @@ import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
 import type { MindLaneFile } from '@/shared/lib/fileFormat'
 
-type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor'
+type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor' | 'integrations'
 
 const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; description: string }[] = [
   { id: 'about', label: '关于', description: '版本与基础信息' },
   { id: 'workspace', label: '文件与工作区', description: '仓库与文档行为' },
   { id: 'ai', label: 'AI 配置', description: '模型与密钥' },
+  { id: 'integrations', label: '集成', description: '外部服务连接' },
   { id: 'editor', label: '编辑器', description: '保存与快捷键' },
 ]
 
@@ -22,6 +24,81 @@ const AUTO_SAVE_OPTIONS = [
   { value: 30_000, label: '30 秒' },
   { value: 60_000, label: '1 分钟' },
 ]
+
+type McpServerStatusInfo = Extract<
+  Awaited<ReturnType<NonNullable<typeof window.mindlane>['settings']['mcpStatus']>>,
+  { ok: true }
+>['data'][number]
+
+const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
+  disconnected: '未连接',
+  connecting: '连接中…',
+  connected: '已连接',
+  failed: '连接失败',
+}
+
+function McpIntegrationsSection() {
+  const [servers, setServers] = useState<McpServerStatusInfo[]>([])
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  const refresh = async () => {
+    const res = await window.mindlane?.settings.mcpStatus()
+    if (res?.ok) setServers(res.data)
+  }
+
+  const runAction = async (serverId: string, connect: boolean) => {
+    setBusyId(serverId)
+    try {
+      const settings = window.mindlane?.settings
+      if (connect) await settings?.mcpConnect(serverId)
+      else await settings?.mcpDisconnect(serverId)
+    } finally {
+      await refresh()
+      setBusyId(null)
+    }
+  }
+
+  if (servers.length === 0) return null
+
+  return (
+    <>
+      {servers.map((server) => {
+        const Icon = icons[server.icon as keyof typeof icons] ?? icons.Plug
+        const connected = server.state === 'connected'
+        const busy = busyId === server.id || server.state === 'connecting'
+        return (
+          <div className="settings-card__row" key={server.id}>
+            <div>
+              <div className="settings-card__label">
+                <Icon size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} />
+                {server.displayName}
+              </div>
+              <div className="settings-card__value">
+                {MCP_STATE_LABELS[server.state]}
+                {connected && server.workspaceName ? ` · ${server.workspaceName}` : ''}
+              </div>
+              <div className="settings-card__hint">
+                {server.state === 'failed' && server.error ? server.error : server.description}
+              </div>
+            </div>
+            <button
+              type="button"
+              className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
+              disabled={busy}
+              onClick={() => void runAction(server.id, !connected)}
+            >
+              {busy ? '处理中…' : connected ? '断开' : '连接'}
+            </button>
+          </div>
+        )
+      })}
+    </>
+  )
+}
 
 export function SettingsPanel() {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('about')
@@ -253,6 +330,13 @@ export function SettingsPanel() {
             <div className="settings-card__hint">
               当前文件：{currentFilePath ?? '未绑定文件'}，AI 流程会优先使用这里配置的模型。
             </div>
+          </section>
+
+          <section
+            className={`settings-card${activeSection === 'integrations' ? '' : ' settings-card--hidden'}`}
+          >
+            <div className="settings-card__title">集成</div>
+            <McpIntegrationsSection />
           </section>
 
           <section

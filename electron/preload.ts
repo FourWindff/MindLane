@@ -45,6 +45,7 @@ export type ChatContext = {
 
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat'
 import type { WorkspaceState } from './fs/types'
+import type { McpServerStatusInfo } from './mcp/types'
 
 type ChatSessionMeta = {
   id: string
@@ -212,6 +213,18 @@ contextBridge.exposeInMainWorld('mindlane', {
     load: () => ipcRenderer.invoke(IPC.FileSettingsLoad),
     update: (partial: Record<string, unknown>) =>
       ipcRenderer.invoke(IPC.FileSettingsUpdate, partial),
+    mcpConnect: (serverId: string) =>
+      ipcRenderer.invoke(IPC.McpConnect, { serverId }) as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
+    mcpDisconnect: (serverId: string) =>
+      ipcRenderer.invoke(IPC.McpDisconnect, { serverId }) as Promise<
+        { ok: true } | { ok: false; error: string }
+      >,
+    mcpStatus: () =>
+      ipcRenderer.invoke(IPC.McpStatus) as Promise<
+        { ok: true; data: McpServerStatusInfo[] } | { ok: false; error: string }
+      >,
   },
   window: {
     minimize: () => ipcRenderer.invoke(IPC.WindowMinimize),

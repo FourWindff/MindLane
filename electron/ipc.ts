@@ -39,6 +39,10 @@ export enum IPC {
   ChatLoadSession = 'chat:load-session',
   ChatDeleteSession = 'chat:delete-session',
 
+  McpConnect = 'mcp:connect',
+  McpDisconnect = 'mcp:disconnect',
+  McpStatus = 'mcp:status',
+
   WindowMinimize = 'window:minimize',
   WindowToggleMaximize = 'window:toggle-maximize',
   WindowClose = 'window:close',

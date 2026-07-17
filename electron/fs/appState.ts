@@ -264,6 +264,7 @@ export class AppState {
       workspacePathsByUuid: partial.workspacePathsByUuid ?? DEFAULT_SETTINGS.workspacePathsByUuid,
       filePathsByUuid: partial.filePathsByUuid ?? DEFAULT_SETTINGS.filePathsByUuid,
       messagePipeline: partial.messagePipeline,
+      mcpServers: partial.mcpServers ?? DEFAULT_SETTINGS.mcpServers,
     }
   }
 }

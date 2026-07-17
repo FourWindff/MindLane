@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
 import {
   urlToDataUrl,
   createProvider,
@@ -31,6 +31,10 @@ import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
 import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
 import { StreamManager, type StreamRequest, type StreamRuntime } from './agent/streamManager.js'
 import type { ChatContext, ChatStreamEvent } from './preload.js'
+import { McpManager } from './mcp/mcpManager.js'
+import { createMcpClient } from './mcp/clientFactory.js'
+import type { McpServerStatus } from './mcp/types.js'
+import { logger } from './shared/logger.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -54,6 +58,30 @@ let aiService: AiService
 let aiServiceReady = false
 let streamManager: StreamManager | null = null
 let chatOrchestrator: AgentOrchestrator | null = null
+let mcpManager: McpManager | null = null
+
+/**
+ * MCP 用户态记录的是用户的授权意图，只持久化 connected / disconnected。
+ * connecting / failed 是会话内瞬态——若把 failed 落盘，一次临时故障会把
+ * server 永久移出启动重连集合（凭据其实还在）。
+ */
+async function persistMcpStatus(serverId: string, status: McpServerStatus): Promise<void> {
+  if (status.state !== 'connected' && status.state !== 'disconnected') return
+  try {
+    const settings = await fsService.appState.load()
+    await fsService.appState.update({
+      mcpServers: {
+        ...settings.mcpServers,
+        [serverId]: {
+          state: status.state,
+          ...(status.workspaceName ? { workspaceName: status.workspaceName } : {}),
+        },
+      },
+    })
+  } catch (err) {
+    logger.warn('[mcp] failed to persist status for %s: %o', serverId, err)
+  }
+}
 
 function aiNotReadyResponse(): { ok: false; error: string } {
   return { ok: false, error: 'AI service not initialized' }
@@ -283,6 +311,8 @@ function registerIpcHandlers(userDataPath: string) {
           messagePipeline,
         })
       }
+      // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
+      chatOrchestrator.setMcpTools(mcpManager?.getTools() ?? [])
       return chatOrchestrator.getStreamRuntime() as unknown as StreamRuntime
     },
   })
@@ -841,6 +871,30 @@ function registerIpcHandlers(userDataPath: string) {
     streamManager?.invalidateRuntime()
   })
 
+  // -- MCP servers (catalog + OAuth) --
+  ipcMain.handle(IPC.McpConnect, async (_e, payload: { serverId: string }) => {
+    if (!mcpManager) return { ok: false, error: 'MCP 模块未初始化' }
+    try {
+      const status = await mcpManager.connect(payload.serverId)
+      if (status.state !== 'connected') {
+        return { ok: false, error: status.error ?? '连接失败' }
+      }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle(IPC.McpDisconnect, async (_e, payload: { serverId: string }) => {
+    if (!mcpManager) return { ok: false, error: 'MCP 模块未初始化' }
+    await mcpManager.disconnect(payload.serverId)
+    return { ok: true }
+  })
+
+  ipcMain.handle(IPC.McpStatus, async () => {
+    return { ok: true, data: mcpManager?.getStatuses() ?? [] }
+  })
+
   ipcMain.handle(IPC.WindowMinimize, () => {
     win?.minimize()
   })
@@ -885,6 +939,34 @@ app.whenReady().then(async () => {
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
   fsService.workspaceTree.setThumbnailManager(fsService.thumbnails)
+
+  // MCP：safeStorage 不可用时凭据仅驻留内存（McpCredentialStore 会记录警告）
+  mcpManager = new McpManager({
+    userDataPath,
+    createClient: createMcpClient,
+    credentialCrypto: safeStorage.isEncryptionAvailable()
+      ? {
+          encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+          decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, 'base64')),
+        }
+      : undefined,
+    openBrowser: (url) => void shell.openExternal(url),
+    onToolsChanged: (tools) => {
+      chatOrchestrator?.setMcpTools(tools)
+      streamManager?.invalidateRuntime()
+    },
+    onStatusChanged: (serverId, status) => void persistMcpStatus(serverId, status),
+  })
+  // 异步静默重连已授权 server，不阻塞 app 可用
+  const manager = mcpManager
+  void (async () => {
+    try {
+      const settings = await fsService.appState.load()
+      await manager.start(settings.mcpServers)
+    } catch (err) {
+      logger.warn('[mcp] startup connect failed: %o', err)
+    }
+  })()
 
   aiService = new AiService()
   try {

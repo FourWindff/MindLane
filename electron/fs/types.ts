@@ -1,4 +1,5 @@
 import type { MessagePipelineConfig } from '../agent/context/pipelineTypes.js'
+import type { McpServerUserState } from '../mcp/types.js'
 
 export type FsResult<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -55,6 +56,8 @@ export interface AppSettings {
   filePathsByUuid: Record<string, string>
   messagePipeline?: MessagePipelineConfig
   mindmapStyle?: Partial<MindmapStyleSettings>
+  /** MCP 用户态：每个 server 的连接状态与非敏感展示信息（不含任何凭据） */
+  mcpServers: Record<string, McpServerUserState>
 }
 
 export interface WorkspaceState {
@@ -87,4 +90,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   restoreLastWorkspaceOnLaunch: true,
   workspacePathsByUuid: {},
   filePathsByUuid: {},
+  mcpServers: {},
 }

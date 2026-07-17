@@ -172,6 +172,31 @@
 - 从 `activeSessionIds` 中移除该 `fileUuid` 条目。
 - 不删除底层会话数据。
 
+## MCP 集成
+
+### MCP catalog
+
+- 应用内置的 MCP server 目录，作为代码资产随应用发版，不由用户编辑。
+- 每个条目是一个 server 定义：`id`、显示名、icon、transport 类型、连接配置、授权工厂。
+- 新增 MCP server = 在 catalog 中新增一个定义文件，不改其他代码。
+
+### MCP 用户态
+
+- 用户在 MCP 上的全部持久化状态，仅存于 `settings.json`。
+- 每个 server 只有连接状态与非敏感展示信息（如 workspace 名）；**不含**任何 JSON 格式的连接配置。
+- OAuth token、DCR client 凭据等敏感数据不属于用户态，经 `safeStorage` 加密后单独存放。
+
+### MCP 可选开关
+
+- 用户启用/停用某个 MCP server 的唯一方式：设置面板中的"连接 / 断开"操作。
+- "连接"触发该 server 的授权流程（如 OAuth 浏览器授权）；"断开"删除凭据并移除其工具。
+- 不存在独立于授权状态的 enabled 布尔开关。
+
+### MCP 工具前缀
+
+- 所有 MCP 工具注册进 `ToolRegistry` 时统一加 server 名前缀（如 `notion__API-post-search`）。
+- 保证多 server 工具名永不冲突，并让模型与 UI 能识别工具来源。
+
 ## 本次范围外
 
 ### MemoryExtractor

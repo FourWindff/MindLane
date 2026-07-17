@@ -8,6 +8,7 @@ import {
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
+import type { StructuredToolInterface } from '@langchain/core/tools'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
 import type { AiService } from './service.js'
 import type {
@@ -103,6 +104,7 @@ export class AgentOrchestrator {
     string
   > | null = null
   private toolRegistry = new ToolRegistry()
+  private mcpTools: StructuredToolInterface[] = []
   private hasPalace: boolean
 
   constructor(
@@ -112,7 +114,7 @@ export class AgentOrchestrator {
   ) {
     const caps = this.provider.capabilities
     this.hasPalace = caps.has(ProviderCapability.ImageGen) && caps.has(ProviderCapability.Vision)
-    this.registerDefaultTools({ hasPalace: this.hasPalace })
+    this.rebuildToolRegistry()
   }
 
   updateProvider(provider: LLMProvider, messagePipeline?: MessagePipelineConfig): void {
@@ -124,8 +126,26 @@ export class AgentOrchestrator {
     this.compiledMainGraph = null
     this.compiledMindmapSubgraph = null
     this.compiledPalaceSubgraph = null
+    this.rebuildToolRegistry()
+  }
+
+  /**
+   * Hot-swap MCP tools: rebuild the registry (default tools + MCP tools) and
+   * invalidate the cached main graph. In-flight chats are unaffected because
+   * Runners hold a registry snapshot taken at stream start.
+   */
+  setMcpTools(tools: StructuredToolInterface[]): void {
+    this.mcpTools = [...tools]
+    this.compiledMainGraph = null
+    this.rebuildToolRegistry()
+  }
+
+  private rebuildToolRegistry(): void {
     this.toolRegistry = new ToolRegistry()
     this.registerDefaultTools({ hasPalace: this.hasPalace })
+    for (const tool of this.mcpTools) {
+      this.toolRegistry.registerTool(tool)
+    }
   }
 
   /**

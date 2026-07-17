@@ -60,6 +60,8 @@ type _MindmapGenerationProgress = {
 
 type _ChatStreamEvent = import('./preload').ChatStreamEvent
 
+type _McpServerStatusInfo = import('./mcp/types').McpServerStatusInfo
+
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
   mindlane?: {
@@ -299,8 +301,14 @@ interface Window {
         lastWorkspacePath: string | null
         recentWorkspacePaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
+        mcpServers?: Record<string, import('./mcp/types').McpServerUserState>
       }>
       update: (partial: Record<string, unknown>) => Promise<void>
+      mcpConnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+      mcpDisconnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+      mcpStatus: () => Promise<
+        { ok: true; data: _McpServerStatusInfo[] } | { ok: false; error: string }
+      >
     }
     window: {
       minimize: () => Promise<void>
