@@ -3,6 +3,8 @@
  * 使用原生 ANSI 颜色码实现，无外部依赖
  */
 
+import { format } from 'node:util'
+
 const ANSI_COLORS = {
   reset: '\x1b[0m',
   cyan: '\x1b[36m',
@@ -74,12 +76,12 @@ class Logger {
     const coloredLevel = this.colorize(level, `[${levelLabel}]`)
     const contextStr = this.context ? ` [${this.context}]` : ''
 
-    const output = `${timestamp} ${coloredLevel}${contextStr}`
+    const output = `${timestamp} ${coloredLevel}${contextStr} ${format(...args)}`
 
     if (level === 'error') {
-      console.error(output, ...args)
+      console.error(output)
     } else {
-      console.log(output, ...args)
+      console.log(output)
     }
   }
 
