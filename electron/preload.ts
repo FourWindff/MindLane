@@ -29,6 +29,15 @@ export type ContextNodeInfo = {
 
 export type WorkspaceFileInfo = { name: string; filePath: string }
 
+export type SelectedDocumentInfo = {
+  path: string
+  name: string
+  size: number
+  mtimeMs: number
+  sha256: string
+  type: DocumentRef['type']
+}
+
 export type ChatContext = {
   fileUuid: string
   mindmapSummary?: string
@@ -131,13 +140,7 @@ contextBridge.exposeInMainWorld('mindlane', {
         { ok: true; data: { previewUrl: string } } | { ok: false; error: string }
       >,
     selectDocument: () =>
-      ipcRenderer.invoke(IPC.FileSelectDocument) as Promise<
-        | {
-            ok: true
-            data: { path: string; name: string; size: number; mtimeMs: number; sha256: string }
-          }
-        | { ok: false; error: string }
-      >,
+      ipcRenderer.invoke(IPC.FileSelectDocument) as Promise<FsResult<SelectedDocumentInfo>>,
   },
   workspace: {
     openDirectory: () => ipcRenderer.invoke(IPC.WorkspaceOpenDirectory),

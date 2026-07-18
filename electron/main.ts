@@ -23,6 +23,7 @@ import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 import { IPC } from './ipc.js'
 import { resolveDocumentRef } from '../src/shared/lib/documentRef.js'
+import { detectDocumentType } from './main/documentType.js'
 
 import { AiService } from './agent/service.js'
 import { AgentOrchestrator } from './agent/orchestrator.js'
@@ -544,8 +545,7 @@ function registerIpcHandlers(userDataPath: string) {
     const result = await dialog.showOpenDialog(win, {
       properties: ['openFile'],
       filters: [
-        { name: 'PDF Documents', extensions: ['pdf'] },
-        { name: 'All Files', extensions: ['*'] },
+        { name: 'Documents', extensions: ['pdf', 'docx', 'pptx', 'xlsx', 'md', 'markdown'] },
       ],
     })
 
@@ -555,6 +555,7 @@ function registerIpcHandlers(userDataPath: string) {
 
     const filePath = result.filePaths[0]
     try {
+      const type = detectDocumentType(filePath)
       const stats = await fs.promises.stat(filePath)
       const hash = await fileSha256(filePath)
       return {
@@ -565,6 +566,7 @@ function registerIpcHandlers(userDataPath: string) {
           size: stats.size,
           mtimeMs: stats.mtimeMs,
           sha256: hash,
+          type: type!,
         },
       }
     } catch (error) {

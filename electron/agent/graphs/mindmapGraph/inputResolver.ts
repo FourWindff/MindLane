@@ -13,7 +13,11 @@ export interface MindmapInputResolution {
 function resolveAttachedDocument(documentRef: DocumentRef): MindmapInputSource {
   switch (documentRef.type) {
     case 'pdf':
-      return { type: 'pdf', path: documentRef.source }
+    case 'docx':
+    case 'pptx':
+    case 'xlsx':
+    case 'markdown':
+      return { type: documentRef.type, path: documentRef.source }
     case 'url':
       return { type: 'url', url: documentRef.source }
     case 'text':

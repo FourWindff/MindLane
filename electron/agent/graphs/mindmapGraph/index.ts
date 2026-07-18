@@ -276,9 +276,13 @@ async function loadDocumentNode(
     let type: DocumentRef['type']
 
     switch (source.type) {
-      case 'pdf': {
+      case 'pdf':
+      case 'docx':
+      case 'pptx':
+      case 'xlsx':
+      case 'markdown': {
         const filePath = source.path!
-        type = 'pdf'
+        type = source.type
         hash =
           (await hashFile(filePath).catch(() => undefined)) ?? existingRef?.sha256 ?? hashText(text)
         baseFilename = existingRef?.filename || path.basename(filePath)

@@ -34,7 +34,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
       const id = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
       const docRef: DocumentRef = {
         id,
-        type: 'pdf',
+        type: result.data.type,
         source: result.data.path,
         filename: result.data.name,
         importedAt: new Date().toISOString(),

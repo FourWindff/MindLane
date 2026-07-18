@@ -218,6 +218,29 @@ describe('mindmapGraph', () => {
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
 
+  it('records file-backed document metadata through an injected office loader', async () => {
+    const docxLoader = vi.fn().mockResolvedValue([new Document({ pageContent: 'Office text' })])
+    const provider = mockProvider(() => ({ content: 'Office Root:\n  - Office text\n' }))
+    const app = buildMindmapSubgraph({ provider, loaders: { docx: docxLoader } }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'docx', path: '/tmp/report.docx' },
+        mindmapInputTitle: 'Office Root',
+      }),
+    )
+
+    expect(docxLoader).toHaveBeenCalledWith({ type: 'docx', path: '/tmp/report.docx' })
+    expect(result.error).toBe('')
+    expect(result.documentRef).toEqual(
+      expect.objectContaining({
+        type: 'docx',
+        source: '/tmp/report.docx',
+        filename: 'report.docx',
+      }),
+    )
+  })
+
   it('returns a clear error when the document has no extractable text', async () => {
     const pdfLoader = vi.fn().mockResolvedValue([new Document({ pageContent: '' })])
     const provider = mockProvider()

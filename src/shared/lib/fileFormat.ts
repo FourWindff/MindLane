@@ -47,7 +47,7 @@ interface XY {
 
 export interface DocumentRef {
   id: string
-  type: 'pdf' | 'url' | 'text'
+  type: 'pdf' | 'docx' | 'pptx' | 'xlsx' | 'markdown' | 'url' | 'text'
   source: string
   filename: string
   importedAt: string
@@ -93,7 +93,7 @@ export interface ChatToolCall {
 
 interface ChatMessageAttachment {
   name: string
-  type: 'pdf' | 'url' | 'text'
+  type: DocumentRef['type']
 }
 
 export interface ChatMessage {

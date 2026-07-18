@@ -201,9 +201,9 @@
 
 ### Loader（加载器）
 
-- 把一种输入源（PDF 文件、URL、文本）解析为一组 LangChain `Document` 的组件。
-- 优先使用 `@langchain/community` 的 loader（`PDFLoader`、`CheerioWebBaseLoader`）。
-- 每种输入源对应一个 loader，输出统一为 `Document[]`（PDF 每页一个，页码在 `metadata.loc.pageNumber`）。
+- 把一种输入源（PDF、DOCX、PPTX、XLSX、Markdown 文件、URL、文本）解析为一组 LangChain `Document` 的组件。
+- PDF 与 URL 优先使用 `@langchain/community` 的 loader（`PDFLoader`、`CheerioWebBaseLoader`）；Office 三种格式共用一个按来源类型配置的 `officeparser` loader；Markdown 直接读取 UTF-8 文本。
+- 每种输入源类型都在 loader registry 中注册，输出统一为 `Document[]`。PDF 每页一个，页码在 `metadata.loc.pageNumber`；PPTX 按 slide、XLSX 按 sheet、DOCX 按 paragraph 边界输出，位置 metadata 由 loader 透传。
 
 ### Chunk（切块）
 

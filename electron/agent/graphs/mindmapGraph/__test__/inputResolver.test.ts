@@ -53,6 +53,31 @@ describe('MindmapInputResolver', () => {
     })
   })
 
+  it.each([
+    ['docx', '/data/report.docx'],
+    ['pptx', '/data/slides.pptx'],
+    ['xlsx', '/data/workbook.xlsx'],
+    ['markdown', '/data/notes.md'],
+  ] as const)('resolves attached %s document', (type, source) => {
+    const documentRef: DocumentRef = {
+      id: `doc-${type}`,
+      type,
+      source,
+      filename: source.split('/').at(-1)!,
+      importedAt: new Date().toISOString(),
+      sha256: `${type}-hash`,
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type, path: source },
+      title: documentRef.filename,
+    })
+  })
+
   it('resolves attached URL document', () => {
     const documentRef: DocumentRef = {
       id: 'doc-2',

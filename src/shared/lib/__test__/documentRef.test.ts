@@ -24,6 +24,29 @@ describe('resolveDocumentRef', () => {
     })
   })
 
+  it.each(['docx', 'pptx', 'xlsx', 'markdown'] as const)(
+    'returns filename and source path for %s',
+    (type) => {
+      const result = resolveDocumentRef(
+        {
+          id: `doc-${type}`,
+          type,
+          source: `/tmp/report.${type === 'markdown' ? 'md' : type}`,
+          filename: `report.${type === 'markdown' ? 'md' : type}`,
+          importedAt: '2026-07-10T00:00:00.000Z',
+        },
+        userDataPath,
+      )
+
+      expect(result).toEqual({
+        ok: true,
+        displayText: `report.${type === 'markdown' ? 'md' : type}`,
+        target: `/tmp/report.${type === 'markdown' ? 'md' : type}`,
+        external: false,
+      })
+    },
+  )
+
   it('returns source url and marks url as external', () => {
     const result = resolveDocumentRef(
       {

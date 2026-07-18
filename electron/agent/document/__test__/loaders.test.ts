@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { Document } from '@langchain/core/documents'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
 import { loadDocument, createDefaultLoaders, type DocumentLoaderRegistry } from '../loaders.js'
+import {
+  createDocxFixture,
+  createPptxFixture,
+  createXlsxFixture,
+} from './fixtures/officeFixtures.js'
 
 function fakeRegistry(): DocumentLoaderRegistry & {
   pdf: ReturnType<typeof vi.fn>
@@ -70,8 +78,80 @@ describe('default text loader', () => {
 })
 
 describe('default registry', () => {
-  it('covers pdf / url / text input types', () => {
+  it('covers all supported input types', () => {
     const registry = createDefaultLoaders()
-    expect(Object.keys(registry).sort()).toEqual(['pdf', 'text', 'url'])
+    expect(Object.keys(registry).sort()).toEqual([
+      'docx',
+      'markdown',
+      'pdf',
+      'pptx',
+      'text',
+      'url',
+      'xlsx',
+    ])
+  })
+})
+
+describe('default file loaders', () => {
+  async function fixturePath(filename: string, content: string | Buffer): Promise<string> {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'mindlane-document-'))
+    const filePath = path.join(directory, filename)
+    await writeFile(filePath, content)
+    return filePath
+  }
+
+  it('loads docx content along paragraph boundaries', async () => {
+    const filePath = await fixturePath('report.docx', createDocxFixture())
+
+    const docs = await loadDocument({ type: 'docx', path: filePath })
+
+    expect(docs.map((doc) => doc.pageContent)).toEqual(['Quarterly report', 'Revenue increased'])
+  })
+
+  it('loads pptx content with slide metadata', async () => {
+    const filePath = await fixturePath('slides.pptx', createPptxFixture())
+
+    const docs = await loadDocument({ type: 'pptx', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.slideNumber])).toEqual([
+      ['Opening slide', 1],
+      ['Closing slide', 2],
+    ])
+  })
+
+  it('loads xlsx content with sheet metadata', async () => {
+    const filePath = await fixturePath('workbook.xlsx', createXlsxFixture())
+
+    const docs = await loadDocument({ type: 'xlsx', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.sheetName])).toEqual([
+      ['Total revenue', 'Summary'],
+      ['Region north', 'Details'],
+    ])
+  })
+
+  it('loads markdown as one document', async () => {
+    const filePath = await fixturePath('notes.md', '# Notes\n\nUseful details')
+
+    const docs = await loadDocument({ type: 'markdown', path: filePath })
+
+    expect(docs).toHaveLength(1)
+    expect(docs[0]!.pageContent).toBe('# Notes\n\nUseful details')
+  })
+
+  it('reports corrupt office documents clearly', async () => {
+    const filePath = await fixturePath('broken.docx', 'not an office archive')
+
+    await expect(loadDocument({ type: 'docx', path: filePath })).rejects.toThrow(
+      '无法解析 DOCX 文档',
+    )
+  })
+
+  it('reports empty markdown clearly', async () => {
+    const filePath = await fixturePath('empty.markdown', '   \n')
+
+    await expect(loadDocument({ type: 'markdown', path: filePath })).rejects.toThrow(
+      'Markdown 文档未包含文本内容。',
+    )
   })
 })
