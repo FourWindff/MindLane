@@ -244,5 +244,6 @@ contextBridge.exposeInMainWorld('mindlane', {
       ipcRenderer.invoke('shell:open-document-ref', doc) as Promise<
         { ok: true } | { ok: false; error: string }
       >,
+    openLogs: () => ipcRenderer.invoke(IPC.ShellOpenLogs) as Promise<{ ok: true }>,
   },
 })

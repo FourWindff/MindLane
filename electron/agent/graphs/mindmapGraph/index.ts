@@ -16,6 +16,9 @@ import {
 } from '../../document/index.js'
 import { extractRootTree } from './shared/rootTree.js'
 import { MindmapInputResolver } from './inputResolver.js'
+import { logger } from '../../../shared/logger.js'
+import { currentStreamId } from '../../../shared/runContext.js'
+import { takeModelCallCount } from '../../providers/metering.js'
 
 import {
   hashText,
@@ -24,6 +27,8 @@ import {
   saveDocumentTextCache,
   buildTextPreview,
 } from './documentTextCache.js'
+
+const log = logger.withContext('mindmap')
 
 // ===== 配置选项 =====
 
@@ -35,6 +40,31 @@ interface MindmapSubgraphOptions {
 
 const MERGE_GROUP_SIZE = 8
 const YAML_GENERATION_ATTEMPTS = 3
+
+/** Per-run start times keyed by streamId so summary lines can report total elapsed. */
+const runStarts = new Map<string, number>()
+
+function runKey(): string {
+  return currentStreamId() ?? '(no-stream)'
+}
+
+/** Read and clear the run start (build_output always runs, so this never leaks). */
+function takeRunStart(): number | undefined {
+  const key = runKey()
+  const start = runStarts.get(key)
+  runStarts.delete(key)
+  return start
+}
+
+function countTreeNodes(node: { children?: unknown[] }): number {
+  return (
+    1 +
+    (node.children ?? []).reduce(
+      (sum: number, child) => sum + countTreeNodes(child as { children?: unknown[] }),
+      0,
+    )
+  )
+}
 
 type PromptMessage = { role: string; content: string }
 
@@ -110,7 +140,7 @@ async function generateValidMindmapYaml(
   provider: LLMProvider,
   initialMessages: PromptMessage[],
   fallbackTitle: string,
-): Promise<MindmapYamlNode> {
+): Promise<{ tree: MindmapYamlNode; attempts: number }> {
   let messages = initialMessages
   let lastReason = 'YAML 校验失败'
   let lastOutput = ''
@@ -124,14 +154,27 @@ async function generateValidMindmapYaml(
     })
 
     if (validation.ok) {
-      return validation.tree
+      return { tree: validation.tree, attempts: attempt }
     }
 
     lastReason = validation.reason
     lastOutput = content
+    log.warn(
+      'YAML 校验失败（attempt %d/%d，%s）：%s',
+      attempt,
+      YAML_GENERATION_ATTEMPTS,
+      fallbackTitle,
+      lastReason,
+    )
     messages = buildYamlRepairPrompt(initialMessages, lastOutput, lastReason)
   }
 
+  log.error(
+    'YAML 校验连续 %d 次失败（%s）：%s',
+    YAML_GENERATION_ATTEMPTS,
+    fallbackTitle,
+    lastReason,
+  )
   throw new Error(`YAML 校验失败：${lastReason}`)
 }
 
@@ -173,6 +216,8 @@ async function resolveInputNode(
     }
   }
 
+  runStarts.set(runKey(), Date.now())
+  log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
   return {
     ...reset,
     mindmapInputSource: resolution.source,
@@ -211,6 +256,15 @@ async function loadDocumentNode(
         response: '文档未能提取出任何文本内容。',
       }
     }
+
+    log.info(
+      '文档管线： source=%s, docs=%d, chunks=%d, batches=%d, budget=%d 字符',
+      source.type,
+      docs.length,
+      chunks.length,
+      batches.length,
+      budgetChars,
+    )
 
     const existingRef = state.documentRef
     const text = docs.map((doc) => doc.pageContent).join('\n\n')
@@ -283,6 +337,7 @@ async function loadDocumentNode(
     }
   } catch (error) {
     const formatted = formatAgentError(error)
+    log.error('加载文档失败： %s', formatted.split('\n')[0])
     return {
       ...reset,
       error: formatted,
@@ -303,12 +358,23 @@ async function leafExtractNode(
   }
 
   const chunksText = batch.map((doc) => doc.pageContent).join('\n\n---\n\n')
+  const batchStart = Date.now()
 
   try {
-    const tree = await generateValidMindmapYaml(
+    const { tree, attempts } = await generateValidMindmapYaml(
       options.provider,
       buildLeafExtractPrompt(chunksText),
       `Batch ${batchIndex + 1}`,
+    )
+
+    const branches = (tree as { children?: unknown[] }).children?.length ?? 0
+    log.info(
+      'leaf %d/%d, 提取 %d 分支, %.1fs, 重试 %d 次',
+      batchIndex + 1,
+      state.documentBatches.length,
+      branches,
+      (Date.now() - batchStart) / 1000,
+      attempts - 1,
     )
 
     return {
@@ -324,6 +390,12 @@ async function leafExtractNode(
     }
   } catch (error) {
     const formatted = formatAgentError(error)
+    log.error(
+      'leaf %d/%d 提取失败： %s',
+      batchIndex + 1,
+      state.documentBatches.length,
+      formatted.split('\n')[0],
+    )
     return {
       error: formatted,
       response: `提取结构失败：${formatted.split('\n')[0]}`,
@@ -397,10 +469,20 @@ async function mergeTreesNode(
       .join('\n\n')
 
     try {
-      const tree = await generateValidMindmapYaml(
+      const groupStart = Date.now()
+      const { tree, attempts } = await generateValidMindmapYaml(
         options.provider,
         buildMergePrompt(treesYaml),
         `Merged Tree ${group.groupIndex + 1}`,
+      )
+
+      log.info(
+        'merge group %d/%d, 合并 %d 棵树, %.1fs, 重试 %d 次',
+        group.groupIndex + 1,
+        groups.length,
+        group.trees.length,
+        (Date.now() - groupStart) / 1000,
+        attempts - 1,
       )
 
       results.push({
@@ -465,6 +547,9 @@ async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
   emitProgress('finalizing')
+  // build_output always terminates a run — consume the run start here so
+  // failed runs don't leak entries in runStarts.
+  const runStart = takeRunStart()
   // Preserve existing error
   if (state.error) {
     return {}
@@ -496,6 +581,14 @@ async function buildOutputNode(
       response: '生成思维导图失败：未提取到任何要点',
     }
   }
+
+  log.info(
+    '完成： 总耗时 %.1fs, 产出 %d 节点, 模型调用 %d 次, title=%s',
+    runStart ? (Date.now() - runStart) / 1000 : 0,
+    countTreeNodes(rootTree),
+    takeModelCallCount(currentStreamId() ?? ''),
+    finalTitle,
+  )
 
   return {
     pendingSubgraph: null,

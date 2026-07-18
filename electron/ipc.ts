@@ -43,6 +43,8 @@ export enum IPC {
   McpDisconnect = 'mcp:disconnect',
   McpStatus = 'mcp:status',
 
+  ShellOpenLogs = 'shell:open-logs',
+
   WindowMinimize = 'window:minimize',
   WindowToggleMaximize = 'window:toggle-maximize',
   WindowClose = 'window:close',

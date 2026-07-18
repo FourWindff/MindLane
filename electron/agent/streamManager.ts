@@ -8,9 +8,31 @@ import type { DocumentRef } from '../../src/shared/lib/fileFormat.js'
 import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
+import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import type { ChatStreamEvent } from '../preload.js'
 
 type ChatStreamEventType = ChatStreamEvent['type']
+
+const runnerLog = logger.withContext('runner')
+
+/** One-line preview of tool args for info logs; full payload goes to debug. */
+function summarizeToolPayload(payload: unknown): string {
+  const text = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {})
+  return text.length > 200 ? `${text.slice(0, 200)}…` : text
+}
+
+/** Result summary must expose scale (chars / node count) so "succeeded but empty" is visible. */
+function summarizeToolResult(output: string): string {
+  let size = `${output.length} 字符`
+  try {
+    const parsed = JSON.parse(output) as { nodes?: unknown[] }
+    if (Array.isArray(parsed?.nodes)) size = `${parsed.nodes.length} 节点, ${size}`
+  } catch {
+    /* not JSON — chars only */
+  }
+  const preview = output.length > 120 ? `${output.slice(0, 120)}…` : output
+  return `${size}, ${preview}`
+}
 
 export interface StreamRequest {
   sessionId: string
@@ -64,15 +86,19 @@ export class Runner {
   }
 
   abort(): void {
+    // Called from the IPC context (outside AsyncLocalStorage), so the streamId
+    // is attached explicitly rather than auto-derived from the run context.
+    logger.withContext(`runner:${shortStreamId(this.options.streamId)}`).info('用户主动停止生成')
     this.abortController.abort()
   }
 
   async run(): Promise<void> {
     const { sessionManager } = this.options.aiService
+    const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
     if (sessionManager?.isReady()) {
-      return sessionManager.runInWorkspace(this.options.request.workspaceUuid, () => this.execute())
+      return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
     }
-    return this.execute()
+    return execute()
   }
 
   private async execute(): Promise<void> {
@@ -137,17 +163,19 @@ export class Runner {
           }
           if (event.event === 'on_tool_start') {
             if (event.name === 'batchAddMindmapNodes') this.emit('step', 'generating-map')
+            runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
+            runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
             this.emit('tool-start', {
               name: event.name ?? 'unknown',
               input: (event.input ?? {}) as Record<string, unknown>,
             })
           } else if (event.event === 'on_tool_end') {
+            const output =
+              typeof event.output === 'string' ? event.output : JSON.stringify(event.output ?? '')
+            runnerLog.info('tool 结果： %s, %s', event.name, summarizeToolResult(output))
             this.emit('tool-end', {
               name: event.name ?? 'unknown',
-              output:
-                typeof event.output === 'string'
-                  ? event.output
-                  : JSON.stringify(event.output ?? ''),
+              output,
             })
           }
         } else if (mode === 'custom') {
@@ -207,7 +235,7 @@ export class Runner {
       })
       return snapshot.values
     } catch (error) {
-      logger.warn('[Runner] getState failed, falling back to streaming content:', error)
+      runnerLog.warn('getState failed, falling back to streaming content:', error)
       return null
     }
   }
@@ -269,7 +297,7 @@ export class Runner {
           filePath: request.context!.filePath!,
         })
       } catch (error) {
-        logger.warn('[Runner] Memory extraction failed:', error)
+        runnerLog.warn('Memory extraction failed:', error)
       }
     })()
   }

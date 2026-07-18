@@ -321,6 +321,7 @@ interface Window {
       openDocumentRef: (
         doc: import('../src/shared/lib/fileFormat').DocumentRef,
       ) => Promise<{ ok: true } | { ok: false; error: string }>
+      openLogs: () => Promise<{ ok: true }>
     }
   }
 }

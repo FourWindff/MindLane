@@ -221,7 +221,7 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      logger.error('[AnalyzeAgent] analyzeFromText 失败:\n', formatAgentError(error))
+      logger.withContext('AnalyzeAgent').error('analyzeFromText 失败:\n', formatAgentError(error))
       return { error: formatAgentError(error) }
     }
   }
@@ -284,7 +284,7 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      logger.error('[AnalyzeAgent] analyzeFromNodes 失败:\n', formatAgentError(error))
+      logger.withContext('AnalyzeAgent').error('analyzeFromNodes 失败:\n', formatAgentError(error))
       return { error: formatAgentError(error) }
     }
   }

@@ -10,6 +10,8 @@ import { estimateToolsSchemaTokens } from '../memory/contextCompact.js'
 import { extractTextContent, messageContentToString } from '../utils.js'
 import { SessionManager } from './sessionManager.js'
 
+const log = logger.withContext('consolidator')
+
 interface ConsolidatorDependencies {
   sessionManager: SessionManager
   provider: LLMProvider
@@ -138,9 +140,19 @@ export class Consolidator {
         const messagesToArchive = remaining.slice(0, boundaryIdx + 1)
         try {
           currentSummary = await this.archive(messagesToArchive, sessionId)
+          const remainingAfter = allMessages.slice(currentLast + boundaryIdx + 1)
+          log.info(
+            'compact: 归档 %d 条（剩余 %d 条），估算 tokens ~%d → 目标 ~%d, summarizer=%s',
+            messagesToArchive.length,
+            remainingAfter.length,
+            estimated,
+            target,
+            this.summarizerModel(),
+          )
+          log.debug('compact 摘要全文：\n%s', currentSummary)
         } catch (err) {
-          logger.warn(
-            '[Consolidator] LLM summary failed, falling back to raw archive for session %s:',
+          log.warn(
+            'LLM summary failed, falling back to raw archive for session %s:',
             sessionId,
             err,
           )
@@ -260,6 +272,10 @@ export class Consolidator {
     const messageTokens = estimateMessageTokens(fullMessages)
     const toolTokens = estimateToolsSchemaTokens(tools)
     return messageTokens + toolTokens
+  }
+
+  private summarizerModel(): string {
+    return (this.provider.reasoningModel as { model?: string }).model ?? 'unknown'
   }
 
   private async archive(messages: BaseMessage[], sessionId: string): Promise<string> {

@@ -111,7 +111,7 @@ export class McpManager {
   private async connectServer(serverId: string, interactive: boolean): Promise<void> {
     const def = this.servers.get(serverId)
     if (!def) {
-      logger.warn('[mcp] unknown server: %s', serverId)
+      logger.withContext('mcp').warn('unknown server: %s', serverId)
       return
     }
     const token = this.bumpToken(serverId)
@@ -137,11 +137,11 @@ export class McpManager {
       }
       this.setStatus(serverId, { state: 'connected', workspaceName })
       this.emitToolsChanged()
-      logger.info('[mcp] server %s connected, %d tools', serverId, tools.length)
+      logger.withContext('mcp').info('server %s connected, %d tools', serverId, tools.length)
     } catch (err) {
       if (!this.isCurrent(serverId, token)) return
       const message = err instanceof Error ? err.message : String(err)
-      logger.warn('[mcp] server %s connect failed: %s', serverId, message)
+      logger.withContext('mcp').warn('server %s connect failed: %s', serverId, message)
       this.setStatus(serverId, { state: 'failed', error: message })
     }
   }

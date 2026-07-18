@@ -9,6 +9,9 @@
  */
 
 import { TimeoutError, sleepWithAbort } from './abort.js'
+import { logger } from '../../../shared/logger.js'
+
+const log = logger.withContext('provider')
 
 type RetryOptions = {
   /** 最多重试次数（默认 3） */
@@ -97,10 +100,25 @@ export async function withRetry<T>(
       return await operation()
     } catch (err) {
       lastErr = err
-      if (attempt >= maxRetries || !shouldRetry(err)) {
+      const retryable = shouldRetry(err)
+      if (attempt >= maxRetries || !retryable) {
+        if (attempt >= maxRetries && retryable) {
+          log.error(
+            '重试 %d 次后仍失败：%s',
+            maxRetries + 1,
+            err instanceof Error ? err.message : String(err),
+          )
+        }
         break
       }
       const delay = computeBackoffDelay(attempt, { baseDelay, maxDelay, jitterMs })
+      log.warn(
+        'attempt %d/%d 失败：%s，%.1fs 后重试',
+        attempt + 1,
+        maxRetries + 1,
+        err instanceof Error ? err.message : String(err),
+        delay / 1000,
+      )
       await sleepWithAbort(delay)
     }
   }

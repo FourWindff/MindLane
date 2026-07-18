@@ -228,6 +228,26 @@
 - `contextWindow` 来自 provider 的 `ChatModelOption`，未填写时回退 32k。
 - 40% 是刻意保留的裕量，同时覆盖 prompt 模板与模型输出开销，不做精确 token 计数。
 
+## 日志
+
+### 日志上下文（Log Context）
+
+- 每条日志携带的层级化标识，格式为 `模块名:streamId短前缀`，如 `mindmapGraph:a1b2c3d4`。
+- 用于把一次运行中跨图、跨模块的日志关联到一起。
+- 日志中一次运行的身份统一使用 `streamId`，不存在独立的 `runId` 概念。
+
+### 排障日志（Diagnostic Log）
+
+- 日志的第一读者是开发者与用户排障场景，不是程序自身。
+- 持久化到 `userData` 下的日志文件，文件不出本机；发送给开发者是用户的显式动作。
+- 文件内记录包含 debug 级别（含完整 prompt 等详细内容），console 仅 info 及以上。
+
+### 计量日志（Metering Log）
+
+- 每次模型调用固定输出的一行 info 日志：模型名、耗时、token 输入/输出。
+- provider 不返回 token 用量时对应字段打 `?`，不因数据缺失放弃该 provider 的可观测性。
+- 与 compact 日志互相印证：compact 生效后下一次模型调用的输入 token 应下降。
+
 ## 本次范围外
 
 ### MemoryExtractor

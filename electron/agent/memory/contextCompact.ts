@@ -154,10 +154,12 @@ export async function compactContext(
     return { messages: [] }
   }
 
-  logger.info(
-    '[contextCompact] Input over budget: %d > %d, trimming...',
+  const log = logger.withContext('compact')
+  log.info(
+    'compact: 输入超预算（~%d > %d tokens），%d 条消息，开始裁剪',
     estimatedTokens,
     inputBudget,
+    state.messages.length,
   )
 
   // Step 1: 轻量裁剪 — 保留最近窗口
@@ -172,9 +174,11 @@ export async function compactContext(
   )
 
   if (compactedEstimate <= inputBudget) {
-    logger.info(
-      '[contextCompact] Trimmed to %d messages, estimate: %d',
+    log.info(
+      'compact: 裁剪 %d → %d 条，估算 ~%d → ~%d tokens',
+      state.messages.length,
       compacted.length,
+      estimatedTokens,
       compactedEstimate,
     )
     return {
@@ -183,7 +187,7 @@ export async function compactContext(
   }
 
   // Step 2: LLM 摘要
-  logger.info('[contextCompact] Trim insufficient, generating summary...')
+  log.info('compact: 裁剪仍不足，生成摘要…')
 
   try {
     const summary = await generateSummary(state.messages, provider.reasoningModel)
@@ -204,17 +208,21 @@ export async function compactContext(
       capabilityFlags,
     )
 
-    logger.info(
-      '[contextCompact] Summary compacted to %d messages, estimate: %d',
+    log.info(
+      'compact: 摘要压缩 %d → %d 条，估算 ~%d → ~%d tokens, summarizer=%s',
+      state.messages.length,
       compacted.length,
+      estimatedTokens,
       finalEstimate,
+      (provider.reasoningModel as { model?: string }).model ?? 'unknown',
     )
+    log.debug('compact 摘要全文：\n%s', summary)
 
     return {
       messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...compacted],
     }
   } catch (err) {
-    logger.warn('[contextCompact] LLM summary failed, falling back to smaller trim:', err)
+    log.warn('LLM summary failed, falling back to smaller trim:', err)
 
     // 退化：保留更小的窗口
     compacted = trimToRecentWindow(

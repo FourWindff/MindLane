@@ -280,7 +280,9 @@ export class AnchorAgent extends PalaceAgent {
           memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
         }
       } catch (err) {
-        logger.warn('[AnchorAgent] locateAnchors 失败，降级到标准布局:\n', formatAgentError(err))
+        logger
+          .withContext('AnchorAgent')
+          .warn('locateAnchors 失败，降级到标准布局:\n', formatAgentError(err))
         memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
       }
     } else {
@@ -304,7 +306,9 @@ export class AnchorAgent extends PalaceAgent {
         summary = buildFallbackSummary(memoryRoute, hasImage)
       }
     } catch (err) {
-      logger.warn('[AnchorAgent] 总结生成失败，使用 fallback 摘要:\n', formatAgentError(err))
+      logger
+        .withContext('AnchorAgent')
+        .warn('总结生成失败，使用 fallback 摘要:\n', formatAgentError(err))
       summary = buildFallbackSummary(memoryRoute, hasImage)
     }
 

@@ -1,5 +1,6 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { EmbeddingsInterface } from '@langchain/core/embeddings'
+import { attachMetering } from './metering.js'
 
 export enum ProviderCapability {
   Chat = 'chat',
@@ -37,6 +38,8 @@ export abstract class LLMProvider {
     this.reasoningModel = reasoningModel
     this.visionModel = visionModel
     this.chatModelId = chatModelId ?? ''
+    attachMetering(reasoningModel)
+    if (visionModel) attachMetering(visionModel)
   }
 
   abstract get capabilities(): Set<ProviderCapability>

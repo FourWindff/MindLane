@@ -34,7 +34,26 @@ import type { ChatContext, ChatStreamEvent } from './preload.js'
 import { McpManager } from './mcp/mcpManager.js'
 import { createMcpClient } from './mcp/clientFactory.js'
 import type { McpServerStatus } from './mcp/types.js'
-import { logger } from './shared/logger.js'
+import { logger, RotatingFileSink } from './shared/logger.js'
+
+const appLog = logger.withContext('app')
+const providerLog = logger.withContext('provider')
+const mcpLog = logger.withContext('mcp')
+
+let logFileSink: RotatingFileSink | null = null
+
+/** Collect every configured API key from settings for literal redaction in the file sink. */
+function collectApiKeys(settings: AppSettings): string[] {
+  const keys = Object.values(settings.providerConfigs ?? {})
+    .map((config) => config?.apiKey)
+    .filter((key): key is string => typeof key === 'string' && key.trim().length > 0)
+  if (settings.apiKey?.trim()) keys.push(settings.apiKey)
+  return keys
+}
+
+function refreshLogSecrets(settings: AppSettings): void {
+  logFileSink?.setSecrets(collectApiKeys(settings))
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -52,6 +71,14 @@ app.commandLine.appendSwitch('remote-debugging-port', '9222')
 
 let win: BrowserWindow | null
 let forceClose = false
+
+// Crash evidence must land in the log file; the sink attaches once app is ready.
+process.on('uncaughtException', (err) => {
+  appLog.error('uncaughtException:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  appLog.error('unhandledRejection:', reason)
+})
 
 let fsService: FileSystemService
 let aiService: AiService
@@ -79,7 +106,7 @@ async function persistMcpStatus(serverId: string, status: McpServerStatus): Prom
       },
     })
   } catch (err) {
-    logger.warn('[mcp] failed to persist status for %s: %o', serverId, err)
+    mcpLog.warn('failed to persist status for %s: %o', serverId, err)
   }
 }
 
@@ -303,6 +330,7 @@ function registerIpcHandlers(userDataPath: string) {
         chatModel: settings.chatModel || 'qwen-turbo',
         baseUrl: providerConfig?.baseUrl,
       })
+      providerLog.info('初始化： %s, model=%s', providerId, settings.chatModel || 'qwen-turbo')
       const messagePipeline = await resolveMessagePipelineConfig()
       if (chatOrchestrator) chatOrchestrator.updateProvider(provider, messagePipeline)
       else {
@@ -861,6 +889,12 @@ function registerIpcHandlers(userDataPath: string) {
     }
   })
 
+  // -- Shell: reveal the log file so users can attach it to a bug report --
+  ipcMain.handle(IPC.ShellOpenLogs, () => {
+    shell.showItemInFolder(path.join(userDataPath, 'logs', 'mindlane.log'))
+    return { ok: true }
+  })
+
   // -- Settings --
   ipcMain.handle(IPC.FileSettingsLoad, async () => {
     return fsService.appState.load()
@@ -869,6 +903,9 @@ function registerIpcHandlers(userDataPath: string) {
   ipcMain.handle(IPC.FileSettingsUpdate, async (_e, partial: Record<string, unknown>) => {
     await fsService.appState.update(partial as Partial<AppSettings>)
     streamManager?.invalidateRuntime()
+    // API keys may have changed — refresh the redaction list on the file sink.
+    const settings = await fsService.appState.load()
+    refreshLogSecrets(settings)
   })
 
   // -- MCP servers (catalog + OAuth) --
@@ -936,6 +973,17 @@ app.on('activate', () => {
 
 app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData')
+
+  // File sink first: every later log line (debug included) lands on disk.
+  logFileSink = new RotatingFileSink({ filePath: path.join(userDataPath, 'logs', 'mindlane.log') })
+  logger.setSink(logFileSink)
+  appLog.info(
+    '启动： version=%s, platform=%s, arch=%s',
+    app.getVersion(),
+    process.platform,
+    process.arch,
+  )
+
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
   fsService.workspaceTree.setThumbnailManager(fsService.thumbnails)
@@ -955,7 +1003,15 @@ app.whenReady().then(async () => {
       chatOrchestrator?.setMcpTools(tools)
       streamManager?.invalidateRuntime()
     },
-    onStatusChanged: (serverId, status) => void persistMcpStatus(serverId, status),
+    onStatusChanged: (serverId, status) => {
+      mcpLog.info(
+        'server %s: %s%s',
+        serverId,
+        status.state,
+        status.error ? ` — ${status.error}` : '',
+      )
+      void persistMcpStatus(serverId, status)
+    },
   })
   // 异步静默重连已授权 server，不阻塞 app 可用
   const manager = mcpManager
@@ -964,13 +1020,14 @@ app.whenReady().then(async () => {
       const settings = await fsService.appState.load()
       await manager.start(settings.mcpServers)
     } catch (err) {
-      logger.warn('[mcp] startup connect failed: %o', err)
+      mcpLog.warn('startup connect failed: %o', err)
     }
   })()
 
   aiService = new AiService()
   try {
     const settings = await fsService.appState.load()
+    refreshLogSecrets(settings)
     const providerId = settings.activeProviders.chat || 'dashscope'
     const providerConfig = settings.providerConfigs[providerId]
     const apiKey = providerConfig?.apiKey || settings.apiKey || ''
@@ -980,11 +1037,15 @@ app.whenReady().then(async () => {
         chatModel: settings.chatModel || 'qwen-turbo',
         baseUrl: providerConfig?.baseUrl,
       })
+      providerLog.info('初始化： %s, model=%s', providerId, settings.chatModel || 'qwen-turbo')
+    } else {
+      providerLog.info('未配置 API Key，provider 初始化推迟到首次对话')
     }
     await aiService.init(userDataPath)
     await cleanupToolResultOffloads(userDataPath)
     aiServiceReady = true
   } catch (err) {
+    appLog.error('AI service init failed:', err)
     console.error('AI service init failed:', err)
   }
 

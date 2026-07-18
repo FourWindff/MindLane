@@ -42,7 +42,7 @@ export class McpCredentialStore {
         return this.memory
       }
     } catch (err) {
-      logger.warn('[mcp] failed to read credentials %s: %o', this.filePath, err)
+      logger.withContext('mcp').warn('failed to read credentials %s: %o', this.filePath, err)
     }
     this.memory = {}
     return this.memory
@@ -61,7 +61,7 @@ export class McpCredentialStore {
     try {
       if (fs.existsSync(this.filePath)) fs.unlinkSync(this.filePath)
     } catch (err) {
-      logger.warn('[mcp] failed to delete credentials %s: %o', this.filePath, err)
+      logger.withContext('mcp').warn('failed to delete credentials %s: %o', this.filePath, err)
     }
   }
 
@@ -88,7 +88,7 @@ export class McpCredentialStore {
       })
       fs.renameSync(tmpPath, this.filePath)
     } catch (err) {
-      logger.warn('[mcp] failed to persist credentials %s: %o', this.filePath, err)
+      logger.withContext('mcp').warn('failed to persist credentials %s: %o', this.filePath, err)
     }
   }
 }

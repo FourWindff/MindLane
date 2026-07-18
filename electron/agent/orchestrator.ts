@@ -171,8 +171,8 @@ export class AgentOrchestrator {
       this.toolRegistry.registerTool(tool)
     }
 
-    logger.info(
-      '[registerDefaultTools] registered %d tools (%d executable), hasPalace=%s, names=%o',
+    logger.withContext('orchestrator').info(
+      'registered %d tools (%d executable), hasPalace=%s, names=%o',
       this.toolRegistry.allTools.length,
       this.toolRegistry.executableTools.length,
       options.hasPalace,
@@ -335,10 +335,11 @@ export class AgentOrchestrator {
     }
 
     const toolsNode = async (state: MainGraphStateType) => {
+      const log = logger.withContext('tools')
       try {
         const lastMessage = state.messages[state.messages.length - 1]
-        logger.info(
-          '[toolsNode] last message type: %s, tool_calls: %o',
+        log.debug(
+          'last message type: %s, tool_calls: %o',
           lastMessage?.getType(),
           (lastMessage as AIMessage)?.tool_calls?.map((tc) => ({ id: tc.id, name: tc.name })),
         )
@@ -358,18 +359,14 @@ export class AgentOrchestrator {
               }),
             ],
           }
-          logger.info('[toolsNode] invoking toolNode with %d calls', actionToolCalls.length)
+          log.debug('invoking toolNode with %d calls', actionToolCalls.length)
           const result = await toolNode.invoke(filteredState)
           const messages = result.messages ?? result
-          logger.info(
-            '[toolsNode] toolNode returned %d messages',
-            Array.isArray(messages) ? messages.length : 1,
-          )
           const normalized = await normalizeToolMessages(
             Array.isArray(messages) ? messages : [messages],
           )
-          logger.info(
-            '[toolsNode] normalized messages: %o',
+          log.debug(
+            'normalized messages: %o',
             normalized.map((m) => ({
               type: m.getType(),
               content:
@@ -386,7 +383,7 @@ export class AgentOrchestrator {
           messages: await normalizeToolMessages(Array.isArray(messages) ? messages : [messages]),
         }
       } catch (err) {
-        logger.error('[toolsNode] error:', err)
+        log.error('error:', err)
         throw err
       }
     }
@@ -474,11 +471,13 @@ export class AgentOrchestrator {
           messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...contextMessages],
         }
       } catch (err) {
-        logger.warn(
-          '[contextCompact] Consolidator failed for session %s, falling back to compactContext:',
-          threadId,
-          err,
-        )
+        logger
+          .withContext('compact')
+          .warn(
+            'Consolidator failed for session %s, falling back to compactContext:',
+            threadId,
+            err,
+          )
         return compactContext(
           state,
           toolRegistry.allTools,

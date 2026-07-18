@@ -38,7 +38,7 @@ export async function preprocessMessages(
         typeof (m as { getType?: unknown }).getType === 'function',
       )
       if (!isValid) {
-        logger.warn('[preprocessMessages] dropping invalid input message at %d: %o', i, m)
+        logger.withContext('pipeline').warn('dropping invalid input message at %d: %o', i, m)
       }
       return isValid
     })
@@ -69,7 +69,7 @@ export async function preprocessMessages(
   for (let i = 0; i < result.length; i++) {
     const m = result[i]
     if (!m || typeof m !== 'object' || !('type' in m)) {
-      logger.warn('[preprocessMessages] invalid output message at %d: %o', i, m)
+      logger.withContext('pipeline').warn('invalid output message at %d: %o', i, m)
     }
   }
 

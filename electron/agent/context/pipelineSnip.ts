@@ -2,6 +2,9 @@ import { type BaseMessage } from '@langchain/core/messages'
 import { estimateMessageTokens } from '../lib/tokenCounter.js'
 import type { MessagePipelineConfig } from './pipelineTypes.js'
 import { dropOrphanToolResults, backfillMissingToolResults } from './pipelinePairing.js'
+import { logger } from '../../shared/logger.js'
+
+const log = logger.withContext('pipeline')
 
 /**
  * 按 token 预算截断历史消息。
@@ -52,6 +55,11 @@ function trimHistoryToBudget(messages: BaseMessage[], budget: number): BaseMessa
   while (start < messages.length && total > budget) {
     total -= estimateMessageTokens([messages[start]])
     start++
+  }
+
+  if (start > 0) {
+    // Dropped history can hide upstream message-construction bugs — keep it visible.
+    log.warn('snip: 丢弃 %d/%d 条历史消息（budget %d tokens）', start, messages.length, budget)
   }
 
   return messages.slice(start)

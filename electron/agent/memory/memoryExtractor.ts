@@ -52,19 +52,19 @@ export class MemoryExtractor {
    */
   async extractAndPersist(options: ExtractOptions): Promise<void> {
     const { provider, messages, mindmapSummary, filePath } = options
-    logger.info('[MemoryExtractor] Starting extraction for file:', filePath)
+    logger.withContext('memory').debug('Starting extraction for file:', filePath)
     const patterns = await this.extract(provider, messages, mindmapSummary)
     if (patterns.length === 0) {
-      logger.info('[MemoryExtractor] No patterns extracted, skipping persist')
+      logger.withContext('memory').debug('No patterns extracted, skipping persist')
       return
     }
-    logger.info(
-      `[MemoryExtractor] Extracted ${patterns.length} pattern(s):`,
+    logger.withContext('memory').debug(
+      `Extracted ${patterns.length} pattern(s):`,
       patterns.map((p) => `${p.discipline}-${p.subTag}`),
     )
 
     await Promise.all([this.persist(patterns), this.updateMindlaneTags(filePath, patterns)])
-    logger.info('[MemoryExtractor] Persist and tag update completed')
+    logger.withContext('memory').debug('Persist and tag update completed')
   }
 
   /** Call LLM to extract thinking patterns from conversation. */
@@ -102,20 +102,17 @@ export class MemoryExtractor {
         existing.add(p.discipline)
       }
       if (existing.size === originalSize) {
-        logger.info('[MemoryExtractor] No new tags to add, skipping .mindlane rewrite')
+        logger.withContext('memory').debug('No new tags to add, skipping .mindlane rewrite')
         return
       }
       data.metadata.tags = Array.from(existing)
       data.metadata.updatedAt = new Date().toISOString()
       await fs.promises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      logger.info(
-        '[MemoryExtractor] Updated .mindlane tags:',
-        Array.from(existing),
-        'file:',
-        filePath,
-      )
+      logger
+        .withContext('memory')
+        .debug('Updated .mindlane tags:', Array.from(existing), 'file:', filePath)
     } catch (e) {
-      logger.warn('[MemoryExtractor] Failed to update .mindlane tags:', e, 'file:', filePath)
+      logger.withContext('memory').warn('Failed to update .mindlane tags:', e, 'file:', filePath)
     }
   }
 
@@ -216,7 +213,9 @@ ${mindmapSummary || '（无）'}
 
       return patterns
     } catch (e) {
-      logger.warn('[MemoryExtractor] Failed to parse LLM response:', e, 'raw:', text.slice(0, 500))
+      logger
+        .withContext('memory')
+        .warn('Failed to parse LLM response:', e, 'raw:', text.slice(0, 500))
       return []
     }
   }

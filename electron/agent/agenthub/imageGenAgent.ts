@@ -60,7 +60,7 @@ export class ImageGenAgent extends PalaceAgent {
       }
     } catch (err) {
       const formatted = formatAgentError(err)
-      logger.error('[ImageGenAgent] 图像生成失败:', formatted)
+      logger.withContext('ImageGenAgent').error('图像生成失败:', formatted)
       return {
         imagePrompt: '',
         imageUrls: [],

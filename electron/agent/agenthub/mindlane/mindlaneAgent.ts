@@ -24,6 +24,8 @@ import {
   type MessagePipelineConfig,
 } from '../../context/pipeline.js'
 
+const log = logger.withContext('MindLaneAgent')
+
 type AIMessageContent = AIMessage['content']
 
 /**
@@ -74,7 +76,7 @@ export class MindLaneAgent extends BaseAgent {
   }
 
   async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {
-    logger.info('[MindLaneAgent] invoke called with %d messages', state.messages.length)
+    log.info('invoke called with %d messages', state.messages.length)
     // Surface subgraph errors
     if (state.error) {
       return {
@@ -106,7 +108,7 @@ export class MindLaneAgent extends BaseAgent {
       return await this.invokeModel(state, systemPrompt, preprocessedMessages, 0)
     } catch (err) {
       const formatted = formatAgentError(err)
-      logger.error('[MindLaneAgent] invoke failed:\n', formatted)
+      log.error('invoke failed:\n', formatted)
       return {
         messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
@@ -140,11 +142,12 @@ export class MindLaneAgent extends BaseAgent {
     preprocessedMessages: BaseMessage[],
     retryCount: number,
   ): Promise<Partial<MainGraphStateType>> {
-    logger.info('[MindLaneAgent] invokeModel called with %d messages', state.messages.length)
+    log.info('invokeModel called with %d messages', state.messages.length)
     const messagesWithSystem = [new SystemMessage(systemPrompt), ...preprocessedMessages]
 
-    logger.info(
-      '[MindLaneAgent] messages before invoke:',
+    // Full prompt (system + history) goes to debug — file-only, never floods the console.
+    log.debug(
+      'messages before invoke:',
       JSON.stringify(messagesWithSystem.map(summarizeMessageForLog)),
     )
 
@@ -155,17 +158,17 @@ export class MindLaneAgent extends BaseAgent {
       response = (await this.modelWithTools.invoke(messagesWithSystem)) as AIMessage
       response.content = sanitizeAIMessageContent(response.content) as AIMessageContent
     } catch (err) {
-      logger.error('[MindLaneAgent] invoke error:', err)
-      logger.error(
-        '[MindLaneAgent] invoke error messages:',
+      log.error('invoke error:', err)
+      log.error(
+        'invoke error messages:',
         JSON.stringify(messagesWithSystem.map(summarizeMessageForLog), null, 2),
       )
       if (!isPromptTooLongError(err) || retryCount >= AGENT_LIMITS.reactiveCompactMaxRetries) {
         throw err
       }
 
-      logger.warn(
-        '[MindLaneAgent] Prompt too long, performing reactive compact (retry %d/%d)',
+      log.warn(
+        'Prompt too long, performing reactive compact (retry %d/%d)',
         retryCount + 1,
         AGENT_LIMITS.reactiveCompactMaxRetries,
       )
@@ -185,7 +188,14 @@ export class MindLaneAgent extends BaseAgent {
     const subgraphCall = detectSubgraphCall(toolCalls)
     const hasActionToolCall = toolCalls.some((tc) => !isSubgraphCall(tc.name))
 
-    logger.info('[MindLaneAgent] model output:', {
+    // info: decision summary only; full content/args go to debug (file).
+    log.info(
+      'model 输出: 内容 %d 字符, tool_calls=[%s], routed=%s',
+      content.length,
+      toolCalls.map((tc) => tc.name).join(', '),
+      subgraphCall?.subgraph ?? 'none',
+    )
+    log.debug('model 输出全量:', {
       rawContent: summarizeMessageContent(response.content),
       toolCalls: toolCalls.map((tc) => ({
         id: tc.id,
@@ -252,7 +262,7 @@ export class MindLaneAgent extends BaseAgent {
 
       return [summaryMsg, ...tailMessages]
     } catch (err) {
-      logger.warn('[MindLaneAgent] Reactive summary failed, trimming to tail:', err)
+      log.warn('Reactive summary failed, trimming to tail:', err)
       return messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
     }
   }

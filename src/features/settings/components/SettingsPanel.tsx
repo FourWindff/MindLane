@@ -182,6 +182,21 @@ export function SettingsPanel() {
                 <div className="settings-card__hint">{workspacePath ?? '尚未选择本地仓库'}</div>
               </div>
             </div>
+            <div className="settings-card__row">
+              <div>
+                <div className="settings-card__label">排障日志</div>
+                <div className="settings-card__hint">
+                  遇到问题时打开日志目录，把日志文件发给开发者。
+                </div>
+              </div>
+              <button
+                type="button"
+                className="panel-btn"
+                onClick={() => void window.mindlane?.shell.openLogs()}
+              >
+                打开日志目录
+              </button>
+            </div>
           </section>
 
           <section

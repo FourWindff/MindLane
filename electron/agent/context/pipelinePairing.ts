@@ -1,4 +1,7 @@
 import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
+import { logger } from '../../shared/logger.js'
+
+const log = logger.withContext('pipeline')
 
 /**
  * 删除没有对应 tool_use 的孤儿 tool_result 消息
@@ -17,11 +20,19 @@ export function dropOrphanToolResults(messages: BaseMessage[]): BaseMessage[] {
     }
   }
 
-  return messages.filter((msg) => {
+  const kept = messages.filter((msg) => {
     if (msg.type !== 'tool') return true
     const toolMsg = msg as ToolMessage
     return toolCallIds.has(toolMsg.tool_call_id)
   })
+
+  const dropped = messages.length - kept.length
+  if (dropped > 0) {
+    // Orphan tool_result means upstream lost the matching tool_use — log as warn.
+    log.warn('pairing: 丢弃 %d 条孤儿 tool_result', dropped)
+  }
+
+  return kept
 }
 
 const MISSING_TOOL_RESULT_PLACEHOLDER = '[Tool result unavailable — call was interrupted or lost]'
@@ -39,6 +50,7 @@ export function backfillMissingToolResults(messages: BaseMessage[]): BaseMessage
   }
 
   const result: BaseMessage[] = []
+  let backfilled = 0
   for (const msg of messages) {
     result.push(msg)
 
@@ -54,8 +66,14 @@ export function backfillMissingToolResults(messages: BaseMessage[]): BaseMessage
           }),
         )
         existingResultIds.add(tc.id)
+        backfilled += 1
       }
     }
+  }
+
+  if (backfilled > 0) {
+    // A missing tool_result means upstream dropped or interrupted a tool call — log as warn.
+    log.warn('pairing: 为 %d 个 tool_use 补占位 tool_result', backfilled)
   }
 
   return result
