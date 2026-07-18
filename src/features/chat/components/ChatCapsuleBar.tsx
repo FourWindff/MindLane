@@ -86,7 +86,7 @@ function Capsule({
       onClick={() => onSelect(entry.fileUuid)}
       title={entry.fileName}
     >
-      <span className="chat-capsule__name">{entry.fileName}</span>
+      <span className="chat-capsule__name">{entry.fileName.replace(/\.[^.]+$/, '')}</span>
       {current && (
         <span
           className="chat-capsule__switch"
