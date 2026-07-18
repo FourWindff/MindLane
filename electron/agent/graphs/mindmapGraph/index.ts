@@ -369,11 +369,11 @@ async function leafExtractNode(
 
     const branches = (tree as { children?: unknown[] }).children?.length ?? 0
     log.info(
-      'leaf %d/%d, 提取 %d 分支, %.1fs, 重试 %d 次',
+      'leaf %d/%d, 提取 %d 分支, %ss, 重试 %d 次',
       batchIndex + 1,
       state.documentBatches.length,
       branches,
-      (Date.now() - batchStart) / 1000,
+      ((Date.now() - batchStart) / 1000).toFixed(1),
       attempts - 1,
     )
 
@@ -477,11 +477,11 @@ async function mergeTreesNode(
       )
 
       log.info(
-        'merge group %d/%d, 合并 %d 棵树, %.1fs, 重试 %d 次',
+        'merge group %d/%d, 合并 %d 棵树, %ss, 重试 %d 次',
         group.groupIndex + 1,
         groups.length,
         group.trees.length,
-        (Date.now() - groupStart) / 1000,
+        ((Date.now() - groupStart) / 1000).toFixed(1),
         attempts - 1,
       )
 
@@ -583,8 +583,8 @@ async function buildOutputNode(
   }
 
   log.info(
-    '完成： 总耗时 %.1fs, 产出 %d 节点, 模型调用 %d 次, title=%s',
-    runStart ? (Date.now() - runStart) / 1000 : 0,
+    '完成： 总耗时 %ss, 产出 %d 节点, 模型调用 %d 次, title=%s',
+    runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
     countTreeNodes(rootTree),
     takeModelCallCount(currentStreamId() ?? ''),
     finalTitle,

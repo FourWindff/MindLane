@@ -23,6 +23,17 @@ const ANSI_COLORS = {
   gray: '\x1b[90m',
 }
 
+/** Stable per-module colors for the console context prefix; unknown modules hash into the fallback palette. */
+const CONTEXT_COLORS: Record<string, string> = {
+  mindmap: '\x1b[32m', // green
+  palace: '\x1b[35m', // magenta
+  MindLaneAgent: '\x1b[34m', // blue
+  llm: '\x1b[36m', // cyan
+  runner: '\x1b[93m', // bright yellow
+  app: '\x1b[97m', // bright white
+}
+const FALLBACK_CONTEXT_COLORS = ['\x1b[92m', '\x1b[94m', '\x1b[95m', '\x1b[96m', '\x1b[91m']
+
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
 export interface LogSink {
@@ -172,6 +183,18 @@ class Logger {
     return `${color}${text}${ANSI_COLORS.reset}`
   }
 
+  /** Console-only: color the `[context]` prefix per module so subgraph vs agent lines read apart at a glance. */
+  private colorizeContext(context: string): string {
+    const module = context.split(':')[0] ?? context
+    let color = CONTEXT_COLORS[module]
+    if (!color) {
+      let hash = 0
+      for (let i = 0; i < module.length; i += 1) hash = (hash * 31 + module.charCodeAt(i)) | 0
+      color = FALLBACK_CONTEXT_COLORS[Math.abs(hash) % FALLBACK_CONTEXT_COLORS.length]
+    }
+    return `${color}[${context}]${ANSI_COLORS.reset}`
+  }
+
   private getLevelColor(level: LogLevel): string {
     switch (level) {
       case 'info':
@@ -204,7 +227,8 @@ class Logger {
     // Console: info and above only, with colors and short timestamp.
     if (level !== 'debug') {
       const timestamp = new Date().toISOString().slice(11, 19)
-      const output = `${timestamp} ${this.colorize(level, `[${levelLabel}]`)}${contextStr} ${message}`
+      const coloredContext = context ? ` ${this.colorizeContext(context)}` : ''
+      const output = `${timestamp} ${this.colorize(level, `[${levelLabel}]`)}${coloredContext} ${message}`
       if (level === 'error') {
         console.error(output)
       } else {

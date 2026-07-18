@@ -65,7 +65,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       const start = Date.now()
       const result = await analyze.invoke(state)
       const stations = (result as { palace?: { stations?: unknown[] } }).palace?.stations
-      log.info('analyze 完成： %d 站, %.1fs', stations?.length ?? 0, (Date.now() - start) / 1000)
+      log.info(
+        'analyze 完成： %d 站, %ss',
+        stations?.length ?? 0,
+        ((Date.now() - start) / 1000).toFixed(1),
+      )
       return result
     })
     .addNode('imageGen', async (state) => {
@@ -76,9 +80,9 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       if (imageError) log.warn('imageGen 失败： %s', imageError)
       else
         log.info(
-          'imageGen 完成： 生成 %d 张图, %.1fs',
+          'imageGen 完成： 生成 %d 张图, %ss',
           urls?.length ?? 0,
-          (Date.now() - start) / 1000,
+          ((Date.now() - start) / 1000).toFixed(1),
         )
       return result
     })
@@ -87,14 +91,18 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       const start = Date.now()
       const result = await vision.invoke(state)
       const route = (result as { memoryRoute?: unknown[] }).memoryRoute
-      log.info('vision 完成： 定位 %d 站, %.1fs', route?.length ?? 0, (Date.now() - start) / 1000)
+      log.info(
+        'vision 完成： 定位 %d 站, %ss',
+        route?.length ?? 0,
+        ((Date.now() - start) / 1000).toFixed(1),
+      )
 
       const key = runKey()
       const runStart = runStarts.get(key)
       runStarts.delete(key)
       log.info(
-        '完成： 总耗时 %.1fs, 产出 %d 站, 模型调用 %d 次',
-        runStart ? (Date.now() - runStart) / 1000 : 0,
+        '完成： 总耗时 %ss, 产出 %d 站, 模型调用 %d 次',
+        runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
         route?.length ?? 0,
         takeModelCallCount(currentStreamId() ?? ''),
       )

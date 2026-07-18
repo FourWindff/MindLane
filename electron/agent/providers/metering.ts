@@ -61,18 +61,36 @@ function extractModelName(llm: Serialized): string {
 
 class MeteringHandler extends BaseCallbackHandler {
   name = 'metering'
-  private readonly starts = new Map<string, { start: number; model: string }>()
+  private readonly starts = new Map<string, { start: number; model: string; node?: string }>()
 
-  private recordStart(llm: Serialized, runId: string): void {
-    this.starts.set(runId, { start: Date.now(), model: extractModelName(llm) })
+  /** LangGraph puts `langgraph_node` in run metadata — that tells us WHO is calling the model. */
+  private recordStart(llm: Serialized, runId: string, metadata?: Record<string, unknown>): void {
+    const node = typeof metadata?.langgraph_node === 'string' ? metadata.langgraph_node : undefined
+    this.starts.set(runId, { start: Date.now(), model: extractModelName(llm), node })
   }
 
-  override handleChatModelStart(llm: Serialized, _messages: unknown, runId: string): void {
-    this.recordStart(llm, runId)
+  override handleChatModelStart(
+    llm: Serialized,
+    _messages: unknown,
+    runId: string,
+    _parentRunId?: string,
+    _extraParams?: Record<string, unknown>,
+    _tags?: string[],
+    metadata?: Record<string, unknown>,
+  ): void {
+    this.recordStart(llm, runId, metadata)
   }
 
-  override handleLLMStart(llm: Serialized, _prompts: string[], runId: string): void {
-    this.recordStart(llm, runId)
+  override handleLLMStart(
+    llm: Serialized,
+    _prompts: string[],
+    runId: string,
+    _parentRunId?: string,
+    _extraParams?: Record<string, unknown>,
+    _tags?: string[],
+    metadata?: Record<string, unknown>,
+  ): void {
+    this.recordStart(llm, runId, metadata)
   }
 
   override handleLLMEnd(output: LLMResult, runId: string): void {
@@ -82,10 +100,13 @@ class MeteringHandler extends BaseCallbackHandler {
 
     const usage = extractUsage(output)
     const elapsed = (Date.now() - record.start) / 1000
-    log.info(
-      '%s 完成，耗时 %.1fs，tokens in=%s out=%s',
+    // Node-tagged context (llm:supervisor / llm:leaf_extract / …) distinguishes
+    // supervisor calls from subgraph calls; falls back to plain `llm`.
+    const line = record.node ? logger.withContext(`llm:${record.node}`) : log
+    line.info(
+      '%s 完成，耗时 %ss，tokens in=%s out=%s',
       record.model,
-      elapsed,
+      elapsed.toFixed(1),
       usage.input ?? '?',
       usage.output ?? '?',
     )

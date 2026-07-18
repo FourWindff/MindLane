@@ -113,11 +113,11 @@ export async function withRetry<T>(
       }
       const delay = computeBackoffDelay(attempt, { baseDelay, maxDelay, jitterMs })
       log.warn(
-        'attempt %d/%d 失败：%s，%.1fs 后重试',
+        'attempt %d/%d 失败：%s，%ss 后重试',
         attempt + 1,
         maxRetries + 1,
         err instanceof Error ? err.message : String(err),
-        delay / 1000,
+        (delay / 1000).toFixed(1),
       )
       await sleepWithAbort(delay)
     }
