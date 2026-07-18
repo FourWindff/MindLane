@@ -87,17 +87,6 @@ describe('ToolResultNormalizer', () => {
     expect(result).toContain('字符上限，已截断。]')
   })
 
-  it('truncates with file reference when offloaded and still too long', async () => {
-    const summaryPadding = 500
-    const content = 'a'.repeat(
-      AGENT_LIMITS.toolResultMaxChars + AGENT_LIMITS.toolResultSummaryChars + summaryPadding,
-    )
-    const result = await _normalize_tool_result('searchTool', content, 'call-big', tmpDir)
-
-    expect(result).toContain('完整结果已保存到：')
-    expect(result.length).toBeLessThanOrEqual(AGENT_LIMITS.toolResultMaxChars)
-  })
-
   it('keeps exempt tools unchanged and does not offload', async () => {
     const content = 'a'.repeat(AGENT_LIMITS.toolResultMaxChars + 100)
 
@@ -131,11 +120,11 @@ describe('ToolResultNormalizer', () => {
     expect(result).toContain('该工具（generateMindmapFragment）未返回任何内容')
   })
 
-  it('returns plain summary when userDataDir is missing', async () => {
+  it('truncates without file reference when userDataDir is missing', async () => {
     const content = 'b'.repeat(AGENT_LIMITS.toolResultOffloadChars + 50)
     const result = await _normalize_tool_result('searchTool', content, 'call-nodir')
 
-    expect(result).toContain('[工具结果较长，但转存到本地文件失败]')
+    expect(result).toContain('[内容已超出')
     expect(result).not.toContain('完整结果路径：')
   })
 

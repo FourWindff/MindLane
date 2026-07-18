@@ -15,7 +15,7 @@ const DEFAULT_OFFLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
  * 3. 豁免工具（generateMindmapFragment / generatePalace）跳过 offload 与截断。
  * 4. 超过 toolResultOffloadChars 时，将完整内容写入 userData/tool-results/，
  *    返回前 toolResultSummaryChars 字符摘要 + 文件路径引用。
- * 5. 超过 toolResultMaxChars 时，保留头部并附加截断标记。
+ * 5. 转存失败且超过 toolResultMaxChars 时，保留头部并附加截断标记。
  */
 export async function _normalize_tool_result(
   toolName: string,
@@ -33,14 +33,14 @@ export async function _normalize_tool_result(
     return content
   }
 
-  if (content.length > AGENT_LIMITS.toolResultMaxChars) {
-    const offloadPath = await offload(toolName, toolCallId, content, userDataDir)
-    return truncate(content, offloadPath)
-  }
-
   if (content.length > AGENT_LIMITS.toolResultOffloadChars) {
     const offloadPath = await offload(toolName, toolCallId, content, userDataDir)
-    return buildOffloadSummary(content, offloadPath)
+    if (offloadPath) {
+      return buildOffloadSummary(content, offloadPath)
+    }
+    if (content.length > AGENT_LIMITS.toolResultMaxChars) {
+      return truncate(content)
+    }
   }
 
   return content
@@ -112,25 +112,17 @@ async function offload(
   }
 }
 
-function buildOffloadSummary(content: string, offloadPath?: string): string {
+function buildOffloadSummary(content: string, offloadPath: string): string {
   const summaryLength = AGENT_LIMITS.toolResultSummaryChars
   const summary = content.slice(0, summaryLength)
   const totalLength = content.length
 
-  if (offloadPath) {
-    return `[工具结果较长，已转存到本地文件]\n以下前 ${summaryLength} 字符为摘要，完整内容共 ${totalLength} 字符。\n\n${summary}\n\n完整结果路径：${offloadPath}`
-  }
-
-  return `[工具结果较长，但转存到本地文件失败]\n以下前 ${summaryLength} 字符为摘要，完整内容共 ${totalLength} 字符。\n\n${summary}`
+  return `[工具结果较长，已转存到本地文件]\n以下前 ${summaryLength} 字符为摘要，完整内容共 ${totalLength} 字符。\n\n${summary}\n\n完整结果路径：${offloadPath}`
 }
 
-function truncate(content: string, offloadPath?: string): string {
+function truncate(content: string): string {
   const maxLength = AGENT_LIMITS.toolResultMaxChars
-
-  const marker = offloadPath
-    ? `\n\n[内容已超出 ${maxLength} 字符上限，已截断。完整结果已保存到：${offloadPath}]`
-    : `\n\n[内容已超出 ${maxLength} 字符上限，已截断。]`
-
+  const marker = `\n\n[内容已超出 ${maxLength} 字符上限，已截断。]`
   const headLength = Math.max(0, maxLength - marker.length)
   return content.slice(0, headLength) + marker
 }

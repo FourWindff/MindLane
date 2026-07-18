@@ -46,8 +46,8 @@ export const AGENT_LIMITS = {
   maxContextMessages: 120,
   maxMessagesBeforeTokenCheck: 120,
   maxConsolidationRounds: 5,
-  toolResultOffloadChars: 8_000,
-  toolResultMaxChars: 32_000,
+  toolResultOffloadChars: 16_000,
+  toolResultMaxChars: 16_000,
   toolResultSummaryChars: 1_000,
   toolResultOffloadDirName: 'tool-results',
 } as const
