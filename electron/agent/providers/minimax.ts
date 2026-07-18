@@ -80,10 +80,10 @@ function extractImageUrls(body: MiniMaxImageResponse | null): string[] {
 
 export class MiniMaxProvider extends LLMProvider {
   static readonly defaultChatModels: ChatModelOption[] = [
-    { id: 'MiniMax-M2.7', displayName: 'MiniMax M2.7' },
-    { id: 'MiniMax-M2.5', displayName: 'MiniMax M2.5' },
-    { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1' },
-    { id: 'MiniMax-M2', displayName: 'MiniMax M2' },
+    { id: 'MiniMax-M2.7', displayName: 'MiniMax M2.7', contextWindow: 204_800 },
+    { id: 'MiniMax-M2.5', displayName: 'MiniMax M2.5', contextWindow: 204_800 },
+    { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', contextWindow: 204_800 },
+    { id: 'MiniMax-M2', displayName: 'MiniMax M2', contextWindow: 204_800 },
   ]
 
   private readonly apiKey: string
@@ -101,15 +101,18 @@ export class MiniMaxProvider extends LLMProvider {
     if (!key) throw new Error('未填写 API Key')
 
     const baseURL = config.baseUrl?.trim() || MINIMAX_ANTHROPIC_BASE_URL
+    const chatModelId = config.chatModel.trim() || DEFAULT_CHAT_MODEL
 
     super(
       new ChatAnthropic({
-        model: config.chatModel.trim() || DEFAULT_CHAT_MODEL,
+        model: chatModelId,
         anthropicApiKey: key,
         temperature: 0.35,
         maxRetries: 1,
         clientOptions: { baseURL },
       }),
+      undefined,
+      chatModelId,
     )
 
     this.apiKey = key

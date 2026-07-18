@@ -197,6 +197,37 @@
 - 所有 MCP 工具注册进 `ToolRegistry` 时统一加 server 名前缀（如 `notion__API-post-search`）。
 - 保证多 server 工具名永不冲突，并让模型与 UI 能识别工具来源。
 
+## 文档导入管线
+
+### Loader（加载器）
+
+- 把一种输入源（PDF 文件、URL、文本）解析为一组 LangChain `Document` 的组件。
+- 优先使用 `@langchain/community` 的 loader（`PDFLoader`、`CheerioWebBaseLoader`）。
+- 每种输入源对应一个 loader，输出统一为 `Document[]`（PDF 每页一个，页码在 `metadata.loc.pageNumber`）。
+
+### Chunk（切块）
+
+- 一个 `Document` 经 splitter 切割后的文本片段，本身仍是 LangChain `Document`。
+- 由 `RecursiveCharacterTextSplitter` 产出，目标约 2000 字符，无 overlap。
+- _Avoid_: DocumentChunk（已删除的旧类型，含死字段 startPage/endPage）
+
+### Batch（leaf 批次）
+
+- 累加器把若干 chunk 贪心组合而成的单元，作为一次 leaf agent 调用的输入。
+- 批次在 load 节点一次性预计算，leaf 循环只按批次下标推进。
+- _Avoid_: pendingLeafRange、leaf range
+
+### 累加器（Batcher）
+
+- 按上下文预算把 chunk 序列组合成 batch 序列的纯函数。
+- 单个 chunk 超过预算时独占一个 batch（允许超限），不切割 chunk。
+
+### 上下文预算（Context Budget）
+
+- 单个 batch 允许容纳的最大文本量 = 当前模型 `contextWindow` × 40%，以 2 字符 ≈ 1 token 折算为字符数。
+- `contextWindow` 来自 provider 的 `ChatModelOption`，未填写时回退 32k。
+- 40% 是刻意保留的裕量，同时覆盖 prompt 模板与模型输出开销，不做精确 token 计数。
+
 ## 本次范围外
 
 ### MemoryExtractor

@@ -50,10 +50,10 @@ export class DashScopeProvider extends LLMProvider {
   private readonly baseURL: string
 
   static readonly defaultChatModels: ChatModelOption[] = [
-    { id: 'qwen-turbo', displayName: 'qwen-turbo' },
-    { id: 'qwen-plus', displayName: 'qwen-plus' },
-    { id: 'qwen-max', displayName: 'qwen-max' },
-    { id: 'qwen-long', displayName: 'qwen-long' },
+    { id: 'qwen-turbo', displayName: 'qwen-turbo', contextWindow: 1_000_000 },
+    { id: 'qwen-plus', displayName: 'qwen-plus', contextWindow: 131_072 },
+    { id: 'qwen-max', displayName: 'qwen-max', contextWindow: 32_768 },
+    { id: 'qwen-long', displayName: 'qwen-long', contextWindow: 10_000_000 },
   ]
 
   get capabilities(): Set<ProviderCapability> {
@@ -79,9 +79,10 @@ export class DashScopeProvider extends LLMProvider {
     if (!key) throw new Error('未填写 API Key')
 
     const baseURL = config.baseUrl?.trim() || DASHSCOPE_COMPAT_BASE
+    const chatModelId = config.chatModel.trim() || 'qwen-turbo'
     super(
       new ChatOpenAI({
-        model: config.chatModel.trim() || 'qwen-turbo',
+        model: chatModelId,
         apiKey: key,
         temperature: 0.35,
         timeout: 60_000,
@@ -96,6 +97,7 @@ export class DashScopeProvider extends LLMProvider {
         maxRetries: 1,
         configuration: { baseURL },
       }),
+      chatModelId,
     )
     this.apiKey = key
     this.baseURL = baseURL

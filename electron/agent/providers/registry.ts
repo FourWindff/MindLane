@@ -1,4 +1,4 @@
-import { LLMProvider, ProviderCapability } from './base.js'
+import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
 import type { ProviderConfig } from '../../fs/types.js'
 
 type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
@@ -7,7 +7,7 @@ type ProviderMeta = {
   id: string
   displayName: string
   capabilities: ProviderCapability[]
-  defaultModels: { id: string; displayName: string }[]
+  defaultModels: ChatModelOption[]
 }
 
 const factories = new Map<string, ProviderFactory>()

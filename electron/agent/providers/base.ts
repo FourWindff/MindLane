@@ -15,7 +15,10 @@ class UnsupportedCapabilityError extends Error {
   }
 }
 
-export type ChatModelOption = { id: string; displayName: string }
+export type ChatModelOption = { id: string; displayName: string; contextWindow?: number }
+
+/** Conservative fallback window (32k tokens) for models without a declared contextWindow */
+export const DEFAULT_CONTEXT_WINDOW = 32_768
 
 export type DetectedAnchor = {
   order: number
@@ -27,15 +30,26 @@ export type DetectedAnchor = {
 export abstract class LLMProvider {
   readonly reasoningModel: BaseChatModel
   readonly visionModel: BaseChatModel | undefined
+  /** Id of the current reasoning model, used to look up contextWindow in chatModels */
+  protected readonly chatModelId: string
 
-  constructor(reasoningModel: BaseChatModel, visionModel?: BaseChatModel) {
+  constructor(reasoningModel: BaseChatModel, visionModel?: BaseChatModel, chatModelId?: string) {
     this.reasoningModel = reasoningModel
     this.visionModel = visionModel
+    this.chatModelId = chatModelId ?? ''
   }
 
   abstract get capabilities(): Set<ProviderCapability>
 
   abstract get chatModels(): ChatModelOption[]
+
+  /** Context window (tokens) of the current reasoning model; falls back to 32k when undeclared */
+  get contextWindow(): number {
+    return (
+      this.chatModels.find((model) => model.id === this.chatModelId)?.contextWindow ??
+      DEFAULT_CONTEXT_WINDOW
+    )
+  }
 
   createEmbeddings(): EmbeddingsInterface {
     throw new UnsupportedCapabilityError('embeddings')

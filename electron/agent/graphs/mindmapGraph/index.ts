@@ -6,15 +6,20 @@ import type { DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
-import { PdfInputAnalyzer } from './analyzers/pdfAnalyzer.js'
-import { TextInputAnalyzer, findInputAnalyzer } from './analyzers/textAnalyzer.js'
-import type { MindmapInputAnalyzer } from './analyzers/types.js'
-import { buildExtractStructureMessages } from '../../agenthub/prompts/docToMindmap.js'
+import {
+  loadDocument,
+  createDefaultLoaders,
+  splitDocuments,
+  batchDocuments,
+  computeBudgetChars,
+  type DocumentLoaderRegistry,
+} from '../../document/index.js'
 import { extractRootTree } from './shared/rootTree.js'
 import { MindmapInputResolver } from './inputResolver.js'
 
 import {
   hashText,
+  hashFile,
   shortHash,
   saveDocumentTextCache,
   buildTextPreview,
@@ -25,12 +30,10 @@ import {
 interface MindmapSubgraphOptions {
   provider: LLMProvider
   userDataPath?: string
-  analyzers?: MindmapInputAnalyzer<unknown, unknown>[]
+  loaders?: DocumentLoaderRegistry
 }
 
-const LEAF_BATCH_SIZE = 5
 const MERGE_GROUP_SIZE = 8
-const SINGLE_PASS_CHAR_LIMIT = 8000
 const YAML_GENERATION_ATTEMPTS = 3
 
 type PromptMessage = { role: string; content: string }
@@ -47,9 +50,8 @@ function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
     error: '',
     mindmapYaml: '',
     mindmapTitle: '',
-    documentChunks: [],
+    documentBatches: [],
     leafCursor: 0,
-    pendingLeafRange: null,
     leafResults: [],
     mergeInputs: [],
     partialMergedTrees: [],
@@ -57,10 +59,6 @@ function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
     pendingMergeGroups: [],
     finalTree: null,
   }
-}
-
-function createDefaultAnalyzers(): MindmapInputAnalyzer<unknown, unknown>[] {
-  return [new TextInputAnalyzer(), new PdfInputAnalyzer()]
 }
 
 // ===== Prompt builders =====
@@ -198,19 +196,15 @@ async function loadDocumentNode(
     }
   }
 
-  const analyzer = findInputAnalyzer(options.analyzers ?? createDefaultAnalyzers(), source)
-  if (!analyzer) {
-    return {
-      ...reset,
-      error: `不支持的输入类型: ${source.type}`,
-      response: `不支持的输入类型: ${source.type}`,
-    }
-  }
-
   try {
-    const loaded = await analyzer.loadDocument(source)
+    // Document ingestion pipeline: load → split → batch; batches are precomputed into state
+    const loaders = { ...createDefaultLoaders(), ...options.loaders }
+    const docs = await loadDocument(source, loaders)
+    const chunks = await splitDocuments(docs)
+    const budgetChars = computeBudgetChars(options.provider.contextWindow)
+    const batches = batchDocuments(chunks, budgetChars)
 
-    if (loaded.chunks.length === 0) {
+    if (batches.length === 0) {
       return {
         ...reset,
         error: '文档未能提取出任何文本内容。',
@@ -219,7 +213,7 @@ async function loadDocumentNode(
     }
 
     const existingRef = state.documentRef
-    const text = loaded.text
+    const text = docs.map((doc) => doc.pageContent).join('\n\n')
 
     let hash: string
     let baseFilename: string
@@ -231,9 +225,8 @@ async function loadDocumentNode(
       case 'pdf': {
         const filePath = source.path!
         type = 'pdf'
-        const loadedSha256 =
-          typeof loaded.metadata?.sha256 === 'string' ? loaded.metadata.sha256 : undefined
-        hash = loadedSha256 || existingRef?.sha256 || hashText(text)
+        hash =
+          (await hashFile(filePath).catch(() => undefined)) ?? existingRef?.sha256 ?? hashText(text)
         baseFilename = existingRef?.filename || path.basename(filePath)
         persistedSource = filePath
         filename = existingRef?.filename || path.basename(filePath)
@@ -284,9 +277,8 @@ async function loadDocumentNode(
 
     return {
       ...reset,
-      documentChunks: loaded.chunks,
+      documentBatches: batches,
       leafCursor: 0,
-      pendingLeafRange: { start: 0, end: Math.min(LEAF_BATCH_SIZE, loaded.chunks.length) },
       documentRef,
     }
   } catch (error) {
@@ -299,54 +291,36 @@ async function loadDocumentNode(
   }
 }
 
-async function dispatchLeafNode(
-  state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const start = state.leafCursor
-  const end = Math.min(start + LEAF_BATCH_SIZE, state.documentChunks.length)
-
-  return {
-    pendingLeafRange: start < end ? { start, end } : null,
-  }
-}
-
 async function leafExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
   emitProgress('extracting')
-  const range = state.pendingLeafRange
-  if (!range) {
+  const batchIndex = state.leafCursor
+  const batch = state.documentBatches[batchIndex]
+  if (!batch) {
     return {}
   }
 
-  const chunks = state.documentChunks.slice(range.start, range.end)
-  const chunksText = chunks.map((c) => c.text).join('\n\n---\n\n')
+  const chunksText = batch.map((doc) => doc.pageContent).join('\n\n---\n\n')
 
   try {
     const tree = await generateValidMindmapYaml(
       options.provider,
       buildLeafExtractPrompt(chunksText),
-      `Chunk ${range.start + 1}`,
+      `Batch ${batchIndex + 1}`,
     )
-
-    const firstChunk = chunks[0]
-    const lastChunk = chunks[chunks.length - 1]
-    const chunkId =
-      firstChunk && lastChunk && firstChunk.id !== lastChunk.id
-        ? `${firstChunk.id}..${lastChunk.id}`
-        : (firstChunk?.id ?? `chunk-${range.start + 1}`)
 
     return {
       leafResults: [
         ...state.leafResults,
         {
-          chunkIndex: range.start,
-          chunkId,
+          batchIndex,
+          batchId: `batch-${batchIndex + 1}`,
           tree,
         },
       ],
-      leafCursor: range.end,
+      leafCursor: batchIndex + 1,
     }
   } catch (error) {
     const formatted = formatAgentError(error)
@@ -365,15 +339,24 @@ async function collectLeafNode(
     return {}
   }
 
-  return {
-    mergeInputs: [...state.mergeInputs, latestResult.tree],
+  const mergeInputs = [...state.mergeInputs, latestResult.tree]
+  const leafDone = state.leafCursor >= state.documentBatches.length
+
+  // A single leaf result needs no merge — it becomes the finalTree directly
+  if (leafDone && mergeInputs.length === 1 && state.partialMergedTrees.length === 0) {
+    return {
+      mergeInputs: [],
+      finalTree: mergeInputs[0],
+    }
   }
+
+  return { mergeInputs }
 }
 
 async function dispatchMergeNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const leafDone = state.leafCursor >= state.documentChunks.length
+  const leafDone = state.leafCursor >= state.documentBatches.length
   const inputs = leafDone
     ? [...state.partialMergedTrees, ...state.mergeInputs]
     : state.mergeInputs.slice(0, MERGE_GROUP_SIZE)
@@ -447,7 +430,7 @@ async function collectMergeNode(
 
   const results = state.mergeResults
   const trees = results.map((r) => r.tree)
-  const leafDone = state.leafCursor >= state.documentChunks.length
+  const leafDone = state.leafCursor >= state.documentBatches.length
 
   if (!leafDone) {
     return {
@@ -487,11 +470,6 @@ async function buildOutputNode(
     return {}
   }
 
-  // If mindmapYaml is already set (e.g., from text fast path), nothing to do
-  if (state.mindmapYaml) {
-    return {}
-  }
-
   const tree = state.finalTree
   const title = state.mindmapInputTitle || '思维导图'
 
@@ -527,53 +505,6 @@ async function buildOutputNode(
   }
 }
 
-// ===== Single-pass extraction =====
-
-async function singleExtractNode(
-  state: typeof MindmapSubgraphState.State,
-  options: MindmapSubgraphOptions,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  emitProgress('extracting')
-  const title = state.mindmapInputTitle || '思维导图'
-  const text = state.documentChunks.map((chunk) => chunk.text).join('\n\n')
-  if (!text.trim()) {
-    return {
-      error: '文本输入内容为空。',
-      response: '文本输入内容为空。',
-    }
-  }
-
-  try {
-    const rootTree = await generateValidMindmapYaml(
-      options.provider,
-      buildExtractStructureMessages(text),
-      title,
-    )
-
-    const finalTitle = rootTree.label || title
-
-    if (!rootTree.children || rootTree.children.length === 0) {
-      return {
-        error: '未提取到任何要点',
-        response: '生成思维导图失败：未提取到任何要点',
-      }
-    }
-
-    return {
-      pendingSubgraph: null,
-      mindmapYaml: serializeMindmapOutline(rootTree),
-      mindmapTitle: finalTitle,
-      response: `已生成思维导图「${finalTitle}」。`,
-    }
-  } catch (error) {
-    const formatted = formatAgentError(error)
-    return {
-      error: formatted,
-      response: `生成思维导图失败：${formatted.split('\n')[0]}`,
-    }
-  }
-}
-
 // ===== Edge routing functions =====
 
 function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): string {
@@ -583,27 +514,21 @@ function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): strin
 
 function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string {
   if (state.error) return 'build_output'
-  const totalChars = state.documentChunks.reduce((sum, chunk) => sum + chunk.text.length, 0)
-  if (totalChars <= SINGLE_PASS_CHAR_LIMIT) return 'single_extract'
-  return 'dispatch_leaf'
-}
-
-function routeAfterDispatchLeaf(state: typeof MindmapSubgraphState.State): string {
-  if (state.pendingLeafRange) return 'leaf_extract'
-  return 'dispatch_merge'
+  return 'leaf_extract'
 }
 
 function routeAfterCollectLeaf(state: typeof MindmapSubgraphState.State): string {
+  if (state.error || state.finalTree) return 'build_output'
   if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
-  if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
+  if (state.leafCursor < state.documentBatches.length) return 'leaf_extract'
   if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
 
 function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): string {
-  if (state.finalTree) return 'build_output'
+  if (state.error || state.finalTree) return 'build_output'
   if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
-  if (state.leafCursor < state.documentChunks.length) return 'dispatch_leaf'
+  if (state.leafCursor < state.documentBatches.length) return 'leaf_extract'
   if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
   return 'build_output'
 }
@@ -611,27 +536,25 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
 // ===== Subgraph 构建器 =====
 
 /**
- * 构建 Mindmap Subgraph
+ * Build the Mindmap Subgraph
  *
- * 流程:
- * START -> resolve_input -> load_document
- *   - small document -> single_extract -> build_output -> END
- *   - large document -> dispatch_leaf -> leaf_extract -> collect_leaf -> (loop or merge)
- *                     -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
- *                     -> build_output -> END
+ * Flow:
+ * START -> resolve_input -> load_document (load → split → batch, precomputed once)
+ *   -> leaf_extract -> collect_leaf -> (loop by batch index, or merge)
+ *   -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
+ *   -> build_output -> END
+ * A single leaf result skips merge and goes straight to output.
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
     .addNode('resolve_input', (state) => resolveInputNode(state))
     .addNode('load_document', (state) => loadDocumentNode(state, options))
-    .addNode('dispatch_leaf', (state) => dispatchLeafNode(state))
     .addNode('leaf_extract', (state) => leafExtractNode(state, options))
     .addNode('collect_leaf', (state) => collectLeafNode(state))
     .addNode('dispatch_merge', (state) => dispatchMergeNode(state))
     .addNode('merge_trees', (state) => mergeTreesNode(state, options))
     .addNode('collect_merge', (state) => collectMergeNode(state))
     .addNode('build_output', (state) => buildOutputNode(state))
-    .addNode('single_extract', (state) => singleExtractNode(state, options))
 
   // START -> resolve_input -> load_document
   graph.addEdge(START, 'resolve_input')
@@ -640,25 +563,15 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     'build_output',
   ])
 
-  // load_document branches based on document size
+  // load_document precomputes batches, then enters the leaf loop directly
   graph.addConditionalEdges('load_document', routeAfterLoadDocument, [
-    'single_extract',
-    'dispatch_leaf',
-    'build_output',
-  ])
-
-  // Single-pass path for small documents
-  graph.addEdge('single_extract', 'build_output')
-
-  // PDF/document pipeline
-  graph.addConditionalEdges('dispatch_leaf', routeAfterDispatchLeaf, [
     'leaf_extract',
-    'dispatch_merge',
+    'build_output',
   ])
 
   graph.addEdge('leaf_extract', 'collect_leaf')
   graph.addConditionalEdges('collect_leaf', routeAfterCollectLeaf, [
-    'dispatch_leaf',
+    'leaf_extract',
     'dispatch_merge',
     'build_output',
   ])
@@ -667,7 +580,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   graph.addEdge('merge_trees', 'collect_merge')
   graph.addConditionalEdges('collect_merge', routeAfterCollectMerge, [
     'dispatch_merge',
-    'dispatch_leaf',
+    'leaf_extract',
     'build_output',
   ])
 

@@ -1,139 +1,56 @@
 import { describe, it, expect, vi } from 'vitest'
+import { Document } from '@langchain/core/documents'
 import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
 import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
 import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
-import { MindmapInputAnalyzer } from '../analyzers/types.js'
-import type { DocumentChunk, MindmapInputSource } from '../analyzers/types.js'
 import { MindmapSubgraphState } from '../../../state.js'
 
-vi.mock('../analyzers/pdfAnalyzer.js', () => ({
-  PdfInputAnalyzer: class {
-    supports(source: { type: string }) {
-      return source.type === 'pdf'
-    }
+type InvokeMock = ReturnType<typeof vi.fn>
 
-    async load(path: string) {
-      if (path.includes('short')) {
-        return [{ pageNumber: 1, text: 'Short PDF text' }]
-      }
+function mockProvider(
+  impl?: (messages: Array<{ content: string }>) => unknown,
+  contextWindow = 32_768,
+) {
+  return {
+    reasoningModel: {
+      invoke: impl ? vi.fn(impl) : vi.fn(),
+    },
+    contextWindow,
+  } as unknown as LLMProvider
+}
 
-      return [
-        { pageNumber: 1, text: 'PDF text 1'.repeat(900) },
-        { pageNumber: 2, text: 'PDF text 2'.repeat(900) },
-        { pageNumber: 3, text: 'PDF text 3'.repeat(900) },
-        { pageNumber: 4, text: 'PDF text 4'.repeat(900) },
-        { pageNumber: 5, text: 'PDF text 5'.repeat(900) },
-      ]
-    }
+function invokeMock(provider: LLMProvider): InvokeMock {
+  return provider.reasoningModel.invoke as unknown as InvokeMock
+}
 
-    async loadDocument(source: { path?: string }) {
-      if (!source.path) {
-        throw new Error('PDF source requires a path')
-      }
-
-      const pages = await this.load(source.path)
-      const chunks = pages.map((page, index) => ({
-        id: `chunk-${index + 1}`,
-        index,
-        startPage: page.pageNumber,
-        endPage: page.pageNumber,
-        text: page.text,
-      }))
-
-      return {
-        text: pages.map((page) => page.text).join('\n\n'),
-        chunks,
-      }
-    }
-  },
-  chunkPages: (pages: Array<{ pageNumber: number; text: string }>) =>
-    pages.map((page, index) => ({
-      id: `chunk-${index + 1}`,
-      index,
-      startPage: page.pageNumber,
-      endPage: page.pageNumber,
-      text: page.text,
-    })),
-}))
-
-class TestInputAnalyzer extends MindmapInputAnalyzer<
-  null,
-  { text: string; chunks: DocumentChunk[] }
-> {
-  readonly type: MindmapInputSource['type']
-  readonly loadDocument = vi.fn()
-
-  constructor(
-    type: MindmapInputSource['type'],
-    private readonly loaded: { text: string; chunks: DocumentChunk[] },
-  ) {
-    super()
-    this.type = type
-    this.loadDocument.mockResolvedValue(loaded)
-  }
-
-  protected resolveInput(): null {
-    return null
-  }
-
-  async load(): Promise<{ text: string; chunks: DocumentChunk[] }> {
-    return this.loaded
-  }
-
-  protected getText(raw: { text: string }): string {
-    return raw.text
-  }
-
-  protected chunk(raw: { chunks: DocumentChunk[] }): DocumentChunk[] {
-    return raw.chunks
+function baseInput(overrides: Record<string, unknown> = {}) {
+  return {
+    messages: [],
+    context: null,
+    pendingSubgraph: 'mindmap' as const,
+    pendingSubgraphToolCallId: '',
+    pendingSubgraphToolName: '',
+    response: '',
+    error: '',
+    mindmapInputSource: null,
+    mindmapInputTitle: '',
+    mindmapYaml: '',
+    mindmapTitle: '',
+    documentBatches: [],
+    leafCursor: 0,
+    leafResults: [],
+    mergeInputs: [],
+    partialMergedTrees: [],
+    mergeResults: [],
+    pendingMergeGroups: [],
+    finalTree: null,
+    documentRef: null,
+    ...overrides,
   }
 }
 
-describe('mindmapGraph', () => {
-  it('returns error when no input source is provided', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn(),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: null,
-      mindmapInputTitle: '',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
-
-    expect(result.error).toContain('请提供要生成思维导图的文档或文本')
-    expect(mockProvider.reasoningModel.invoke).not.toHaveBeenCalled()
-  })
-
-  it('produces YAML output for text input', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: `
+const VALID_TREE_YAML = `
 人工智能导论:
   - 机器学习:
     - 监督学习
@@ -141,80 +58,69 @@ describe('mindmapGraph', () => {
   - 深度学习:
     - 神经网络
     - 反向传播
-`,
-        }),
-      },
-    } as unknown as LLMProvider
+`
 
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
+describe('mindmapGraph', () => {
+  it('returns error when no input source is provided', async () => {
+    const provider = mockProvider()
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-      mindmapInputTitle: '人工智能导论',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    const result = await app.invoke(baseInput({ mindmapInputSource: null }))
 
-    expect(result.mindmapYaml).toBeTruthy()
-    expect(result.mindmapTitle).toBe('人工智能导论')
-    expect(result.pendingSubgraph).toBeNull()
-    expect(result.error).toBe('')
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+    expect(result.error).toContain('请提供要生成思维导图的文档或文本')
+    expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
-  it('streams the short-document pipeline stages', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: 'Short Document:\n  - Summary\n',
-        }),
-      },
-    } as unknown as LLMProvider
+  it('precomputes documentBatches in the load node', async () => {
+    const provider = mockProvider(() => ({ content: VALID_TREE_YAML }))
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const app = buildMindmapSubgraph({ provider: mockProvider }).compile()
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+        mindmapInputTitle: '人工智能导论',
+      }),
+    )
+
+    expect(result.error).toBe('')
+    expect(result.documentBatches).toHaveLength(1)
+    expect(result.documentBatches[0]![0]).toBeInstanceOf(Document)
+    expect(result.documentBatches[0]![0]!.pageContent).toContain('人工智能')
+  })
+
+  it('sends a single-batch document straight to build_output without merging', async () => {
+    const provider = mockProvider(() => ({ content: VALID_TREE_YAML }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+        mindmapInputTitle: '人工智能导论',
+      }),
+    )
+
+    expect(result.error).toBe('')
+    expect(result.mindmapYaml).toContain('人工智能导论')
+    expect(result.mindmapTitle).toBe('人工智能导论')
+    expect(result.pendingSubgraph).toBeNull()
+    expect(result.leafResults).toHaveLength(1)
+    expect(result.finalTree).toBeTruthy()
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
+    // the only call is leaf extraction, not merge
+    const systemPrompt = String(invokeMock(provider).mock.calls[0]?.[0]?.[0]?.content ?? '')
+    expect(systemPrompt).toContain('extraction assistant')
+  })
+
+  it('streams the single-batch pipeline stages', async () => {
+    const provider = mockProvider(() => ({ content: 'Short Document:\n  - Summary\n' }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
     const steps: string[] = []
     const stream = await app.stream(
-      {
-        messages: [],
-        context: null,
-        pendingSubgraph: 'mindmap',
-        pendingSubgraphToolCallId: '',
-        pendingSubgraphToolName: '',
-        response: '',
-        error: '',
+      baseInput({
         mindmapInputSource: { type: 'text', content: 'short document' },
         mindmapInputTitle: 'Short Document',
-        mindmapYaml: '',
-        mindmapTitle: '',
-        documentChunks: [],
-        leafCursor: 0,
-        pendingLeafRange: null,
-        leafResults: [],
-        mergeInputs: [],
-        partialMergedTrees: [],
-        mergeResults: [],
-        pendingMergeGroups: [],
-        finalTree: null,
-        documentRef: null,
-      },
+      }),
       { streamMode: 'custom' },
     )
 
@@ -225,109 +131,29 @@ describe('mindmapGraph', () => {
     expect(steps).toEqual(['reading-doc', 'extracting', 'finalizing'])
   })
 
-  it('uses single-pass extraction for a short PDF', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: `
-Short PDF:
-  - Summary
-  - Detail
-`,
-        }),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'pdf', path: '/tmp/short.pdf' },
-      mindmapInputTitle: 'Short PDF',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
-
-    expect(result.error).toBe('')
-    expect(result.mindmapYaml).toContain('Short PDF')
-    expect(result.leafResults).toHaveLength(0)
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
-  })
-
-  it('routes long text through multiple chunk extraction batches instead of truncating it', async () => {
-    const importantTail = 'TAIL_MARKER'
-    const longText = `${'intro '.repeat(4200)}${importantTail}`
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi
-          .fn()
-          .mockResolvedValueOnce({
-            content: `
-Leaf Long Text 1:
-  - First Batch
-`,
-          })
-          .mockResolvedValueOnce({
-            content: `
-Leaf Long Text 2:
-  - Preserved Tail
-`,
-          })
-          .mockResolvedValue({
-            content: `
-Merged Long Text:
-  - Preserved Tail
-`,
-          }),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
+  it('routes a long document through leaf batches and a final merge', async () => {
+    const tail = 'TAIL_MARKER'
+    const para1 = 'a'.repeat(1500)
+    const para2 = 'b'.repeat(1500)
+    const para3 = `${'c'.repeat(1490)}${tail}`
+    const longText = [para1, para2, para3].join('\n\n')
+    // small window → 409-char budget → each chunk gets its own batch
+    const provider = mockProvider((messages) => {
+      const systemPrompt = messages[0]?.content ?? ''
+      if (systemPrompt.includes('merging assistant')) {
+        return { content: 'Merged Long Text:\n  - Preserved Tail\n' }
+      }
+      return { content: 'Leaf Tree:\n  - Extracted\n' }
+    }, 512)
+    const app = buildMindmapSubgraph({ provider }).compile()
 
     const steps: string[] = []
     let result!: typeof MindmapSubgraphState.State
     const stream = await app.stream(
-      {
-        messages: [],
-        context: null,
-        pendingSubgraph: 'mindmap',
-        pendingSubgraphToolCallId: '',
-        pendingSubgraphToolName: '',
-        response: '',
-        error: '',
+      baseInput({
         mindmapInputSource: { type: 'text', content: longText },
         mindmapInputTitle: 'Long Text',
-        mindmapYaml: '',
-        mindmapTitle: '',
-        documentChunks: [],
-        leafCursor: 0,
-        pendingLeafRange: null,
-        leafResults: [],
-        mergeInputs: [],
-        partialMergedTrees: [],
-        mergeResults: [],
-        pendingMergeGroups: [],
-        finalTree: null,
-        documentRef: null,
-      },
+      }),
       { streamMode: ['custom', 'values'] },
     )
 
@@ -336,470 +162,219 @@ Merged Long Text:
       if (mode === 'values') result = event as typeof MindmapSubgraphState.State
     }
 
-    const firstPrompt = String(
-      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.[1]
-        ?.content ?? '',
-    )
-    const secondPrompt = String(
-      (mockProvider.reasoningModel.invoke as ReturnType<typeof vi.fn>).mock.calls[1]?.[0]?.[1]
-        ?.content ?? '',
-    )
+    const calls = invokeMock(provider).mock.calls
+    const firstPrompt = String(calls[0]?.[0]?.[1]?.content ?? '')
+    const thirdPrompt = String(calls[2]?.[0]?.[1]?.content ?? '')
 
     expect(result.error).toBe('')
-    expect(result.leafResults).toHaveLength(2)
+    expect(result.documentBatches).toHaveLength(3)
+    expect(result.leafResults).toHaveLength(3)
     expect(result.mindmapYaml).toContain('Merged Long Text')
-    expect(firstPrompt).not.toContain(importantTail)
-    expect(secondPrompt).toContain(importantTail)
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
+    expect(firstPrompt).not.toContain(tail)
+    expect(thirdPrompt).toContain(tail)
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
     expect(steps[0]).toBe('reading-doc')
-    expect(steps.filter((step) => step === 'extracting')).toHaveLength(2)
+    expect(steps.filter((step) => step === 'extracting')).toHaveLength(3)
     expect(steps).toContain('merging')
     expect(steps.at(-1)).toBe('finalizing')
   })
 
-  it('loads documents through an injected analyzer registry', async () => {
-    const customAnalyzer = new TestInputAnalyzer('url', {
-      text: 'Loaded URL text',
-      chunks: [
-        {
-          id: 'url-chunk-1',
-          index: 0,
-          startPage: 0,
-          endPage: 0,
-          text: 'Loaded URL text',
-        },
-      ],
-    })
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: `
-URL Root:
-  - Loaded URL text
-`,
-        }),
-      },
-    } as unknown as LLMProvider
+  it('grows batch size with the model context window', async () => {
+    const longText = ['a'.repeat(1500), 'b'.repeat(1500), 'c'.repeat(1500)].join('\n\n')
+    const smallWindow = mockProvider(() => ({ content: 'Tree:\n  - X\n' }), 512)
+    const largeWindow = mockProvider(() => ({ content: 'Tree:\n  - X\n' }), 128_000)
 
-    const graph = buildMindmapSubgraph({
-      provider: mockProvider,
-      analyzers: [customAnalyzer],
-    })
-    const app = graph.compile()
+    const smallResult = await buildMindmapSubgraph({ provider: smallWindow })
+      .compile()
+      .invoke(baseInput({ mindmapInputSource: { type: 'text', content: longText } }))
+    const largeResult = await buildMindmapSubgraph({ provider: largeWindow })
+      .compile()
+      .invoke(baseInput({ mindmapInputSource: { type: 'text', content: longText } }))
 
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'url', url: 'https://example.test/doc' },
-      mindmapInputTitle: 'URL Root',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    expect(smallResult.documentBatches.length).toBeGreaterThan(largeResult.documentBatches.length)
+    expect(largeResult.documentBatches).toHaveLength(1)
+    expect(invokeMock(largeWindow)).toHaveBeenCalledTimes(1)
+  })
 
-    expect(customAnalyzer.loadDocument).toHaveBeenCalledWith({
-      type: 'url',
-      url: 'https://example.test/doc',
-    })
+  it('loads URL input through an injected loader', async () => {
+    const urlLoader = vi.fn().mockResolvedValue([new Document({ pageContent: 'Loaded URL text' })])
+    const provider = mockProvider(() => ({ content: 'URL Root:\n  - Loaded URL text\n' }))
+    const app = buildMindmapSubgraph({
+      provider,
+      loaders: { url: urlLoader },
+    }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'url', url: 'https://example.test/doc' },
+        mindmapInputTitle: 'URL Root',
+      }),
+    )
+
+    expect(urlLoader).toHaveBeenCalledWith({ type: 'url', url: 'https://example.test/doc' })
     expect(result.error).toBe('')
     expect(result.mindmapYaml).toContain('URL Root')
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+    expect(result.documentRef?.type).toBe('url')
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns a clear error when the document has no extractable text', async () => {
+    const pdfLoader = vi.fn().mockResolvedValue([new Document({ pageContent: '' })])
+    const provider = mockProvider()
+    const app = buildMindmapSubgraph({ provider, loaders: { pdf: pdfLoader } }).compile()
+
+    const result = await app.invoke(
+      baseInput({ mindmapInputSource: { type: 'pdf', path: '/tmp/blank.pdf' } }),
+    )
+
+    expect(result.error).toContain('文档未能提取出任何文本内容')
+    expect(invokeMock(provider)).not.toHaveBeenCalled()
+  })
+
+  it('returns a clear error when the loader fails', async () => {
+    const urlLoader = vi.fn().mockRejectedValue(new Error('fetch failed: HTTP 404'))
+    const provider = mockProvider()
+    const app = buildMindmapSubgraph({ provider, loaders: { url: urlLoader } }).compile()
+
+    const result = await app.invoke(
+      baseInput({ mindmapInputSource: { type: 'url', url: 'https://example.test/missing' } }),
+    )
+
+    expect(result.error).toContain('fetch failed')
+    expect(result.response).toContain('加载文档失败')
+    expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
   it('clears stale mindmap run state before generating a new mindmap', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: `
-Fresh Root:
-  - Fresh Child
-`,
-        }),
-      },
-    } as unknown as LLMProvider
+    const provider = mockProvider(() => ({ content: 'Fresh Root:\n  - Fresh Child\n' }))
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: 'stale response',
-      error: 'stale error',
-      mindmapInputSource: { type: 'text', content: 'fresh text' },
-      mindmapInputTitle: 'Fresh Root',
-      mindmapYaml: 'Stale Root:\n  - Stale Child\n',
-      mindmapTitle: 'Stale Root',
-      documentChunks: [
-        {
-          id: 'stale-chunk',
-          index: 0,
-          startPage: 0,
-          endPage: 0,
-          text: 'stale text',
-        },
-      ],
-      leafCursor: 99,
-      pendingLeafRange: { start: 10, end: 20 },
-      leafResults: [{ chunkIndex: 0, chunkId: 'stale-chunk', tree: { label: 'Stale Leaf' } }],
-      mergeInputs: [{ label: 'Stale Merge Input' }],
-      partialMergedTrees: [{ label: 'Stale Partial' }],
-      mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge' } }],
-      pendingMergeGroups: [{ groupIndex: 0, trees: [{ label: 'Stale Group' }] }],
-      finalTree: { label: 'Stale Final' },
-      documentRef: null,
-    })
+    const result = await app.invoke(
+      baseInput({
+        response: 'stale response',
+        error: 'stale error',
+        mindmapInputSource: { type: 'text', content: 'fresh text' },
+        mindmapInputTitle: 'Fresh Root',
+        mindmapYaml: 'Stale Root:\n  - Stale Child\n',
+        mindmapTitle: 'Stale Root',
+        documentBatches: [[new Document({ pageContent: 'stale text' })]],
+        leafCursor: 99,
+        leafResults: [{ batchIndex: 0, batchId: 'stale-batch', tree: { label: 'Stale Leaf' } }],
+        mergeInputs: [{ label: 'Stale Merge Input' }],
+        partialMergedTrees: [{ label: 'Stale Partial' }],
+        mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge' } }],
+        pendingMergeGroups: [{ groupIndex: 0, trees: [{ label: 'Stale Group' }] }],
+        finalTree: { label: 'Stale Final' },
+      }),
+    )
 
     expect(result.error).toBe('')
     expect(result.mindmapYaml).toContain('Fresh Root')
     expect(result.mindmapYaml).not.toContain('Stale Root')
     expect(result.mindmapTitle).toBe('Fresh Root')
-    expect(result.leafResults).toHaveLength(0)
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(1)
+    expect(result.leafResults).toHaveLength(1)
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
 
   it('includes stack trace in state.error when generation fails', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockRejectedValue(new Error('LLM timeout')),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: 'some document text' },
-      mindmapInputTitle: '',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
+    const provider = mockProvider(() => {
+      throw new Error('LLM timeout')
     })
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
+    )
 
     expect(result.error).toContain('LLM timeout')
     expect(result.error).toContain('at') // stack trace
   })
 
-  it('retries text extraction when generated YAML is invalid', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi
-          .fn()
-          .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
-          .mockResolvedValueOnce({
-            content: `
-人工智能导论:
-  - 机器学习
-  - 深度学习
-`,
-          }),
-      },
-    } as unknown as LLMProvider
+  it('retries leaf extraction when generated YAML is invalid', async () => {
+    const provider = mockProvider()
+    invokeMock(provider)
+      .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
+      .mockResolvedValueOnce({ content: VALID_TREE_YAML })
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-      mindmapInputTitle: '人工智能导论',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+        mindmapInputTitle: '人工智能导论',
+      }),
+    )
 
     expect(result.error).toBe('')
     expect(result.mindmapYaml).toContain('人工智能导论')
-    expect(result.pendingSubgraph).toBeNull()
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
 
   it('returns an error after repeated invalid YAML output', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockResolvedValue({ content: 'mindmap: ":\n  - "unclosed' }),
-      },
-    } as unknown as LLMProvider
+    const provider = mockProvider(() => ({ content: 'mindmap: ":\n  - "unclosed' }))
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'text', content: 'some document text' },
-      mindmapInputTitle: '',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    const result = await app.invoke(
+      baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
+    )
 
     expect(result.error).toContain('YAML 校验失败：Unexpected scalar at node end')
     expect(result.mindmapYaml).toBe('')
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
 
-  it('retries leaf extraction before storing leaf results', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi
-          .fn()
-          .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
-          .mockResolvedValueOnce({
-            content: `
-Leaf Root:
-  - Leaf A
-  - Leaf B
-`,
-          })
-          .mockResolvedValue({
-            content: `
-Merged Root:
-  - Leaf A
-  - Leaf B
-`,
-          }),
-      },
-    } as unknown as LLMProvider
+  it('retries merge before storing merge results', async () => {
+    const longText = ['a'.repeat(1500), 'b'.repeat(1500)].join('\n\n')
+    // small window puts each paragraph in its own batch
+    const provider = mockProvider(undefined, 512)
+    invokeMock(provider)
+      .mockResolvedValueOnce({ content: 'Leaf A:\n  - Child A\n' })
+      .mockResolvedValueOnce({ content: 'Leaf B:\n  - Child B\n' })
+      .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
+      .mockResolvedValueOnce({ content: 'Merged Root:\n  - Child A\n  - Child B\n' })
+    const app = buildMindmapSubgraph({ provider }).compile()
 
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'pdf', path: '/tmp/test.pdf' },
-      mindmapInputTitle: 'PDF Root',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [
-        {
-          id: 'chunk-1',
-          index: 0,
-          startPage: 1,
-          endPage: 1,
-          text: 'PDF text',
-        },
-      ],
-      leafCursor: 0,
-      pendingLeafRange: { start: 0, end: 1 },
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: longText },
+        mindmapInputTitle: 'PDF Root',
+      }),
+    )
 
     expect(result.error).toBe('')
-    expect(result.leafResults).toHaveLength(1)
+    expect(result.leafResults).toHaveLength(2)
+    expect(result.finalTree).toBeTruthy()
     expect(result.mindmapYaml).toContain('Merged Root')
-    expect(result.pendingSubgraph).toBeNull()
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
-  })
-
-  it('stores one analysis result for a multi-chunk leaf batch', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi
-          .fn()
-          .mockResolvedValueOnce({
-            content: `
-Leaf Batch:
-  - Leaf A
-  - Leaf B
-`,
-          })
-          .mockResolvedValue({
-            content: `
-Merged Root:
-  - Leaf A
-  - Leaf B
-`,
-          }),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'pdf', path: '/tmp/test.pdf' },
-      mindmapInputTitle: 'PDF Root',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
-
-    expect(result.error).toBe('')
-    expect(result.leafResults).toHaveLength(1)
-    expect(result.leafResults[0]).toMatchObject({
-      chunkIndex: 0,
-      chunkId: 'chunk-1..chunk-5',
-    })
-    expect(result.mergeInputs).toHaveLength(0)
-    expect(result.mindmapYaml).toContain('Merged Root')
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(2)
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
 
   it('merges a full analysis queue before dispatching remaining leaf batches', async () => {
-    const chunks = Array.from({ length: 45 }, (_, index) => ({
-      id: `chunk-${index + 1}`,
-      index,
-      startPage: index + 1,
-      endPage: index + 1,
-      text: `chunk ${index + 1} ${'body '.repeat(50)}`,
-    }))
-    const customAnalyzer = new TestInputAnalyzer('text', {
-      text: chunks.map((chunk) => chunk.text).join('\n\n'),
-      chunks,
-    })
+    // 9 paragraphs of ~1900 chars → 9 chunks; small window gives each its own batch
+    const paragraphs = Array.from({ length: 9 }, (_, i) => `p${i}${'w'.repeat(1898)}`)
+    const longText = paragraphs.join('\n\n')
     const events: string[] = []
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi.fn().mockImplementation(async (messages: Array<{ content: string }>) => {
-          const systemPrompt = messages[0]?.content ?? ''
-          if (systemPrompt.includes('merging assistant')) {
-            events.push('merge')
-            return {
-              content: `
-Merged ${events.length}:
-  - Combined
-`,
-            }
-          }
-
-          events.push('leaf')
-          return {
-            content: `
-Leaf ${events.length}:
-  - Extracted
-`,
-          }
-        }),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({
-      provider: mockProvider,
-      analyzers: [customAnalyzer],
-    })
-    const app = graph.compile()
+    const provider = mockProvider((messages) => {
+      const systemPrompt = messages[0]?.content ?? ''
+      if (systemPrompt.includes('merging assistant')) {
+        events.push('merge')
+        return { content: `Merged ${events.length}:\n  - Combined\n` }
+      }
+      events.push('leaf')
+      return { content: `Leaf ${events.length}:\n  - Extracted\n` }
+    }, 512)
+    const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
-      {
-        messages: [],
-        context: null,
-        pendingSubgraph: 'mindmap',
-        pendingSubgraphToolCallId: '',
-        pendingSubgraphToolName: '',
-        response: '',
-        error: '',
-        mindmapInputSource: { type: 'text', content: 'large document' },
+      baseInput({
+        mindmapInputSource: { type: 'text', content: longText },
         mindmapInputTitle: 'Large Document',
-        mindmapYaml: '',
-        mindmapTitle: '',
-        documentChunks: [],
-        leafCursor: 0,
-        pendingLeafRange: null,
-        leafResults: [],
-        mergeInputs: [],
-        partialMergedTrees: [],
-        mergeResults: [],
-        pendingMergeGroups: [],
-        finalTree: null,
-        documentRef: null,
-      },
+      }),
       {
         recursionLimit: 100,
       },
     )
 
     expect(result.error).toBe('')
+    expect(result.leafResults).toHaveLength(9)
     expect(events.slice(0, 10)).toEqual([
       'leaf',
       'leaf',
@@ -813,88 +388,11 @@ Leaf ${events.length}:
       'leaf',
     ])
   })
-
-  it('retries merge before storing merge results', async () => {
-    const mockProvider = {
-      reasoningModel: {
-        invoke: vi
-          .fn()
-          .mockResolvedValueOnce({
-            content: `
-Leaf Root:
-  - Child A
-  - Child B
-`,
-          })
-          .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
-          .mockResolvedValueOnce({
-            content: `
-Merged Root:
-  - Child A
-  - Child B
-`,
-          }),
-      },
-    } as unknown as LLMProvider
-
-    const graph = buildMindmapSubgraph({ provider: mockProvider })
-    const app = graph.compile()
-
-    const result = await app.invoke({
-      messages: [],
-      context: null,
-      pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: '',
-      pendingSubgraphToolName: '',
-      response: '',
-      error: '',
-      mindmapInputSource: { type: 'pdf', path: '/tmp/test.pdf' },
-      mindmapInputTitle: 'PDF Root',
-      mindmapYaml: '',
-      mindmapTitle: '',
-      documentChunks: [],
-      leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [],
-      mergeInputs: [
-        {
-          label: 'Root A',
-          page_range: '',
-          children: [{ label: 'Child A', page_range: '', children: [] }],
-        },
-        {
-          label: 'Root B',
-          page_range: '',
-          children: [{ label: 'Child B', page_range: '', children: [] }],
-        },
-      ],
-      partialMergedTrees: [],
-      mergeResults: [],
-      pendingMergeGroups: [],
-      finalTree: null,
-      documentRef: null,
-    })
-
-    expect(result.error).toBe('')
-    expect(result.finalTree).toBeTruthy()
-    expect(result.mindmapYaml).toContain('Merged Root')
-    expect(result.pendingSubgraph).toBeNull()
-    expect(mockProvider.reasoningModel.invoke).toHaveBeenCalledTimes(3)
-  })
 })
 
 describe('mindmapGraph YAML parsing', () => {
   it('parses outline-format YAML into structured tree', () => {
-    const yaml = `
-人工智能导论:
-  - 机器学习:
-    - 监督学习
-    - 无监督学习
-  - 深度学习:
-    - 神经网络
-    - 反向传播
-`
-    const parsed = extractYaml(yaml)
+    const parsed = extractYaml(VALID_TREE_YAML)
     const tree = sanitizeTreeCandidate(parsed)
 
     expect(tree).toMatchObject({

@@ -1,10 +1,13 @@
 import { Annotation, messagesStateReducer } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
+import type { Document } from '@langchain/core/documents'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { DetectedAnchor } from './providers/index.js'
 import type { MindmapContextData } from './tools/mindmapContext.js'
 
 export type { DocumentRef }
+export type { MindmapInputSource }
 
 /** 简单替换型 reducer：直接用新值覆盖旧值。 */
 function replaceReducer<T>(_prev: T, next: T): T {
@@ -48,21 +51,6 @@ export type MemoryPalaceStation = {
   mnemonicMethod?: string
   association?: string
   linkedNodeId?: string
-}
-
-export interface MindmapInputSource {
-  type: 'pdf' | 'url' | 'text'
-  path?: string
-  url?: string
-  content?: string
-}
-
-export type DocumentChunk = {
-  id: string
-  index: number
-  startPage: number
-  endPage: number
-  text: string
 }
 
 type PendingSubgraph = 'mindmap' | 'palace'
@@ -165,7 +153,7 @@ const MindmapStateAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
-  documentChunks: Annotation<DocumentChunk[]>({
+  documentBatches: Annotation<Document[][]>({
     reducer: replaceReducer,
     default: () => [],
   }),
@@ -173,11 +161,7 @@ const MindmapStateAnnotations = {
     reducer: replaceReducer,
     default: () => 0,
   }),
-  pendingLeafRange: Annotation<{ start: number; end: number } | null>({
-    reducer: replaceReducer,
-    default: () => null,
-  }),
-  leafResults: Annotation<Array<{ chunkIndex: number; chunkId: string; tree: unknown }>>({
+  leafResults: Annotation<Array<{ batchIndex: number; batchId: string; tree: unknown }>>({
     reducer: replaceReducer,
     default: () => [],
   }),

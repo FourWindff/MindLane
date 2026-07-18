@@ -26,9 +26,8 @@ describe('MindmapSubgraphState', () => {
       mindmapInputTitle: 'Test',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
@@ -66,9 +65,8 @@ describe('MindmapSubgraphState', () => {
       mindmapInputTitle: '',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
@@ -106,9 +104,8 @@ describe('MindmapSubgraphState', () => {
       mindmapInputTitle: '',
       mindmapYaml: 'root:\n  label: Test\n',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
@@ -120,7 +117,7 @@ describe('MindmapSubgraphState', () => {
   it('replaces leafResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addLeaf', async () => {
-        return { leafResults: [{ chunkIndex: 1, chunkId: 'c2', tree: { root: 'b' } }] }
+        return { leafResults: [{ batchIndex: 1, batchId: 'c2', tree: { root: 'b' } }] }
       })
       .addEdge('__start__', 'addLeaf')
       .addEdge('addLeaf', '__end__')
@@ -138,10 +135,9 @@ describe('MindmapSubgraphState', () => {
       mindmapInputTitle: '',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
-      leafResults: [{ chunkIndex: 0, chunkId: 'c1', tree: { root: 'a' } }],
+      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
       mergeInputs: [],
       partialMergedTrees: [],
       mergeResults: [],
@@ -149,7 +145,7 @@ describe('MindmapSubgraphState', () => {
     })
 
     expect(result.leafResults).toHaveLength(1)
-    expect(result.leafResults[0].chunkId).toBe('c2')
+    expect(result.leafResults[0].batchId).toBe('c2')
   })
 
   it('replaces mergeResults via reducer', async () => {
@@ -173,9 +169,8 @@ describe('MindmapSubgraphState', () => {
       mindmapInputTitle: '',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
@@ -213,9 +208,8 @@ describe('MainGraphState', () => {
       mindmapInputTitle: 'Test',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
@@ -250,9 +244,8 @@ describe('MainGraphState', () => {
       mindmapInputTitle: '',
       mindmapYaml: '',
       mindmapTitle: '',
-      documentChunks: [],
+      documentBatches: [],
       leafCursor: 0,
-      pendingLeafRange: null,
       leafResults: [],
       mergeInputs: [],
       partialMergedTrees: [],
