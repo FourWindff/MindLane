@@ -33,11 +33,14 @@ updates:
       - dependency-name: 'zod'
       - dependency-name: 'zustand'
       - dependency-name: '@types/dagre'
+      - dependency-name: '@eslint/js'
       - dependency-name: '@typescript-eslint/eslint-plugin'
       - dependency-name: '@typescript-eslint/parser'
       - dependency-name: 'eslint'
+      - dependency-name: 'eslint-config-prettier'
       - dependency-name: 'eslint-plugin-react-hooks'
       - dependency-name: 'eslint-plugin-react-refresh'
+      - dependency-name: 'globals'
       - dependency-name: 'typescript'
       - dependency-name: 'vitest'
     ignore:
@@ -77,8 +80,17 @@ updates:
           - 'minor'
         patterns:
           - '@types/*'
-          - '@typescript-eslint/*'
-          - 'eslint'
-          - 'eslint-plugin-*'
           - 'typescript'
           - 'vitest'
+      eslint:
+        dependency-type: 'development'
+        update-types:
+          - 'patch'
+          - 'minor'
+        patterns:
+          - '@eslint/js'
+          - '@typescript-eslint/*'
+          - 'eslint'
+          - 'eslint-config-*'
+          - 'eslint-plugin-*'
+          - 'globals'
