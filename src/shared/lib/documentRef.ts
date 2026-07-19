@@ -8,6 +8,10 @@ export type ResolvedDocumentRef =
 export function resolveDocumentRef(doc: DocumentRef, userDataPath: string): ResolvedDocumentRef {
   switch (doc.type) {
     case 'pdf':
+    case 'docx':
+    case 'pptx':
+    case 'xlsx':
+    case 'markdown':
       return { ok: true, displayText: doc.filename, target: doc.source, external: false }
     case 'url':
       return { ok: true, displayText: doc.source, target: doc.source, external: true }

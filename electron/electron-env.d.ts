@@ -21,6 +21,7 @@ type _FsOk<T = void> = T extends void ? { ok: true } : { ok: true; data: T }
 type _FsResult<T = void> = _FsOk<T> | { ok: false; error: string }
 
 type _ChatContext = import('./preload').ChatContext
+type _SelectedDocumentInfo = import('./preload').SelectedDocumentInfo
 
 type _ChatToolCall = import('../src/shared/lib/fileFormat').ChatToolCall
 type _ChatMessage = import('../src/shared/lib/fileFormat').ChatMessage
@@ -148,13 +149,7 @@ interface Window {
         filePath: string
         imageData: string
       }) => Promise<{ ok: true; data: { previewUrl: string } } | { ok: false; error: string }>
-      selectDocument: () => Promise<
-        | {
-            ok: true
-            data: { path: string; name: string; size: number; mtimeMs: number; sha256: string }
-          }
-        | { ok: false; error: string }
-      >
+      selectDocument: () => Promise<_FsResult<_SelectedDocumentInfo>>
     }
     workspace: {
       openDirectory: () => Promise<

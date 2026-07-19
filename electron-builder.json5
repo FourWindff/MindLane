@@ -16,6 +16,11 @@
     'node_modules/file-uri-to-path/**/*',
     'node_modules/node-addon-api/**/*',
     'node_modules/prebuild-install/**/*',
+    {
+      from: 'node_modules/officeparser',
+      to: 'node_modules/officeparser',
+      filter: ['package.json', 'dist/officeparser.browser.slim.mjs'],
+    },
   ],
   asarUnpack: ['node_modules/better-sqlite3/**'],
   mac: {

@@ -19,6 +19,21 @@ describe('MindLaneFile tags', () => {
 })
 
 describe('migrateDocumentRef', () => {
+  it.each(['pdf', 'url', 'text', 'docx', 'pptx', 'xlsx', 'markdown'] as const)(
+    'preserves the %s document type',
+    (type) => {
+      expect(
+        migrateDocumentRef({
+          id: `doc-${type}`,
+          type,
+          source: 'source',
+          filename: 'document',
+          importedAt: '2026-05-30T00:00:00.000Z',
+        }).type,
+      ).toBe(type)
+    },
+  )
+
   it('should lift sha256 from metadata to top level', () => {
     const migrated = migrateDocumentRef({
       id: 'doc-1',

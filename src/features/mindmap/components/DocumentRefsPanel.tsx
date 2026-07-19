@@ -6,6 +6,10 @@ import { showToast } from '@/shared/model/toastStore'
 function DocumentRefIcon({ type }: { type: DocumentRef['type'] }) {
   switch (type) {
     case 'pdf':
+    case 'docx':
+    case 'pptx':
+    case 'xlsx':
+    case 'markdown':
       return <FileText size={16} strokeWidth={1.5} />
     case 'url':
       return <Link size={16} strokeWidth={1.5} />
@@ -15,7 +19,7 @@ function DocumentRefIcon({ type }: { type: DocumentRef['type'] }) {
 }
 
 function getDocumentRefLabel(doc: DocumentRef): string {
-  return doc.type === 'pdf' ? doc.filename : doc.source
+  return doc.type === 'url' || doc.type === 'text' ? doc.source : doc.filename
 }
 
 export function DocumentRefsPanel({ onClose }: { onClose?: () => void }) {

@@ -53,6 +53,31 @@ describe('MindmapInputResolver', () => {
     })
   })
 
+  it.each([
+    ['docx', '/data/report.docx'],
+    ['pptx', '/data/slides.pptx'],
+    ['xlsx', '/data/workbook.xlsx'],
+    ['markdown', '/data/notes.md'],
+  ] as const)('resolves attached %s document', (type, source) => {
+    const documentRef: DocumentRef = {
+      id: `doc-${type}`,
+      type,
+      source,
+      filename: source.split('/').at(-1)!,
+      importedAt: new Date().toISOString(),
+      sha256: `${type}-hash`,
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type, path: source },
+      title: documentRef.filename,
+    })
+  })
+
   it('resolves attached URL document', () => {
     const documentRef: DocumentRef = {
       id: 'doc-2',
@@ -156,6 +181,29 @@ describe('MindmapInputResolver', () => {
     expect(result).toEqual({
       source: { type: 'text', content: 'pre-set' },
       title: 'Pre-set Title',
+    })
+  })
+
+  it('prefers the current attachment over a source restored from an earlier run', () => {
+    const currentDocument: DocumentRef = {
+      id: 'doc-md',
+      type: 'markdown',
+      source: '/data/MEMORY.md',
+      filename: 'MEMORY.md',
+      importedAt: new Date().toISOString(),
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({
+        mindmapInputSource: { type: 'docx', path: '/data/简历.docx' },
+        mindmapInputTitle: '简历.docx',
+        context: { fileUuid: 'file-1', attachedDocument: currentDocument },
+      }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'markdown', path: '/data/MEMORY.md' },
+      title: 'MEMORY.md',
     })
   })
 })
