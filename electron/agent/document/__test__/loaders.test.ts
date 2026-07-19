@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { loadDocument, createDefaultLoaders, type DocumentLoaderRegistry } from '../loaders.js'
+import { OfficeConverter } from 'officeparser/slim'
 import {
   createDocxFixture,
   createPptxFixture,
@@ -106,6 +107,21 @@ describe('default file loaders', () => {
     const docs = await loadDocument({ type: 'docx', path: filePath })
 
     expect(docs.map((doc) => doc.pageContent)).toEqual(['Quarterly report', 'Revenue increased'])
+  })
+
+  it('falls back to the office text conversion when no chunks are produced', async () => {
+    const filePath = await fixturePath('report.docx', createDocxFixture())
+    const convertSpy = vi
+      .spyOn(OfficeConverter, 'convert')
+      .mockResolvedValueOnce({ value: [], messages: [] } as never)
+      .mockResolvedValueOnce({ value: 'Recovered DOCX text', messages: [] } as never)
+
+    await expect(loadDocument({ type: 'docx', path: filePath })).resolves.toEqual([
+      expect.objectContaining({ pageContent: 'Recovered DOCX text' }),
+    ])
+
+    expect(convertSpy).toHaveBeenCalledTimes(2)
+    convertSpy.mockRestore()
   })
 
   it('loads pptx content with slide metadata', async () => {

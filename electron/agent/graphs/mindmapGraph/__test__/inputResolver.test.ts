@@ -183,4 +183,27 @@ describe('MindmapInputResolver', () => {
       title: 'Pre-set Title',
     })
   })
+
+  it('prefers the current attachment over a source restored from an earlier run', () => {
+    const currentDocument: DocumentRef = {
+      id: 'doc-md',
+      type: 'markdown',
+      source: '/data/MEMORY.md',
+      filename: 'MEMORY.md',
+      importedAt: new Date().toISOString(),
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({
+        mindmapInputSource: { type: 'docx', path: '/data/简历.docx' },
+        mindmapInputTitle: '简历.docx',
+        context: { fileUuid: 'file-1', attachedDocument: currentDocument },
+      }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'markdown', path: '/data/MEMORY.md' },
+      title: 'MEMORY.md',
+    })
+  })
 })

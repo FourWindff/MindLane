@@ -54,14 +54,6 @@ function findLatestUserMessageText(messages: BaseMessage[]): string | null {
  */
 export class MindmapInputResolver {
   resolve(state: MindmapSubgraphStateType): MindmapInputResolution | null {
-    // 如果状态里已经有输入源（例如直接注入或上一轮保留），直接复用
-    if (state.mindmapInputSource) {
-      return {
-        source: state.mindmapInputSource,
-        title: state.mindmapInputTitle || state.context?.fileTitle || '',
-      }
-    }
-
     const attachedDocument = state.context?.attachedDocument
     const fileTitle = state.context?.fileTitle
 
@@ -69,6 +61,14 @@ export class MindmapInputResolver {
       return {
         source: resolveAttachedDocument(attachedDocument),
         title: resolveTitle(attachedDocument, fileTitle),
+      }
+    }
+
+    // 如果没有新的附加文档，再复用状态里已有的输入源（例如子图重试）。
+    if (state.mindmapInputSource) {
+      return {
+        source: state.mindmapInputSource,
+        title: state.mindmapInputTitle || fileTitle || '',
       }
     }
 

@@ -98,9 +98,9 @@ async function loadOffice(source: DocumentSource): Promise<Document[]> {
         },
       },
     })
-    const chunks = result.value as OfficeChunk[]
-    const documents = chunks
-      .filter((chunk) => chunk.text.trim())
+    const chunks = Array.isArray(result.value) ? (result.value as OfficeChunk[]) : []
+    let documents = chunks
+      .filter((chunk) => typeof chunk.text === 'string' && chunk.text.trim())
       .map(
         (chunk) =>
           new Document({
@@ -108,6 +108,18 @@ async function loadOffice(source: DocumentSource): Promise<Document[]> {
             metadata: officeChunkMetadata(chunk),
           }),
       )
+
+    // Some valid OOXML files do not expose paragraph/slide boundaries to the
+    // chunk generator. Fall back to the parser's plain-text representation so
+    // readable content is not discarded merely because chunking returned no
+    // structural chunks.
+    if (documents.length === 0) {
+      const textResult = await OfficeConverter.convert(file, 'text', {
+        parseConfig: { fileType: type },
+      })
+      const text = typeof textResult.value === 'string' ? textResult.value.trim() : ''
+      if (text) documents = [new Document({ pageContent: text })]
+    }
 
     if (documents.length === 0) {
       throw new Error(`${type.toUpperCase()} 文档未包含可提取的文本内容。`)
