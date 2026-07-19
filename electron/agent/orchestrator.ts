@@ -25,6 +25,7 @@ import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
+import { createReadFileTool } from './tools/readFile.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { logger } from '../shared/logger.js'
@@ -163,6 +164,11 @@ export class AgentOrchestrator {
     if (actionTools.addPalaceNodeTool) {
       this.toolRegistry.registerTool(actionTools.addPalaceNodeTool)
     }
+
+    // Read-only workspace file access for the mindlane chat agent.
+    this.toolRegistry.registerTool(
+      createReadFileTool(() => this.aiService.sessionManager?.workspacePath ?? ''),
+    )
 
     for (const tool of getToolSchemas()) {
       if (tool.name === GENERATE_PALACE_TOOL && !options.hasPalace) {
