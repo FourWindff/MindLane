@@ -823,7 +823,7 @@ function registerIpcHandlers(userDataPath: string) {
             messages,
           },
         }
-      } catch (err) {
+      } catch {
         return {
           ok: true,
           data: {

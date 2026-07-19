@@ -143,7 +143,6 @@ async function generateValidMindmapYaml(
 ): Promise<{ tree: MindmapYamlNode; attempts: number }> {
   let messages = initialMessages
   let lastReason = 'YAML 校验失败'
-  let lastOutput = ''
 
   for (let attempt = 1; attempt <= YAML_GENERATION_ATTEMPTS; attempt += 1) {
     const response = await provider.reasoningModel.invoke(messages)
@@ -158,7 +157,6 @@ async function generateValidMindmapYaml(
     }
 
     lastReason = validation.reason
-    lastOutput = content
     log.warn(
       'YAML 校验失败（attempt %d/%d，%s）：%s',
       attempt,
@@ -166,7 +164,7 @@ async function generateValidMindmapYaml(
       fallbackTitle,
       lastReason,
     )
-    messages = buildYamlRepairPrompt(initialMessages, lastOutput, lastReason)
+    messages = buildYamlRepairPrompt(initialMessages, content, lastReason)
   }
 
   log.error(
