@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { loadDocument, createDefaultLoaders, type DocumentLoaderRegistry } from '../loaders.js'
 import { OfficeConverter } from 'officeparser/slim'
+import { PDFParse } from 'pdf-parse'
 import {
   createDocxFixture,
   createPptxFixture,
@@ -153,6 +154,64 @@ describe('default file loaders', () => {
 
     expect(docs).toHaveLength(1)
     expect(docs[0]!.pageContent).toBe('# Notes\n\nUseful details')
+  })
+
+  it('loads PDF content by page with source metadata', async () => {
+    const filePath = await fixturePath('report.pdf', 'stubbed PDF content')
+    const getText = vi.spyOn(PDFParse.prototype, 'getText').mockResolvedValue({
+      pages: [
+        { num: 1, text: 'First page' },
+        { num: 2, text: '   ' },
+        { num: 3, text: 'Third page' },
+      ],
+      total: 3,
+    } as never)
+    const getInfo = vi.spyOn(PDFParse.prototype, 'getInfo').mockResolvedValue({
+      info: { Title: 'Report' },
+      metadata: { format: 'PDF 1.7' },
+    } as never)
+    const destroy = vi.spyOn(PDFParse.prototype, 'destroy').mockResolvedValue()
+
+    const docs = await loadDocument({ type: 'pdf', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.loc.pageNumber])).toEqual([
+      ['First page', 1],
+      ['Third page', 3],
+    ])
+    expect(docs[0]!.metadata).toEqual(
+      expect.objectContaining({
+        source: filePath,
+        pdf: expect.objectContaining({ totalPages: 3, info: { Title: 'Report' } }),
+      }),
+    )
+    expect(getText).toHaveBeenCalledOnce()
+    expect(getInfo).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
+  it('loads URL body text and title metadata', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          '<html><head><title>Example</title></head><body><main>Hello web</main></body></html>',
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/article' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Hello web',
+        metadata: { source: 'https://example.test/article', title: 'Example' },
+      }),
+    ])
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.test/article',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    vi.unstubAllGlobals()
   })
 
   it('reports corrupt office documents clearly', async () => {

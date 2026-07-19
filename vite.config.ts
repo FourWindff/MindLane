@@ -20,12 +20,7 @@ export default defineConfig({
             rollupOptions: {
               external: (id) => {
                 if (id.startsWith('node:') || id === 'electron') return true
-                const nativeOrProblematic = [
-                  'better-sqlite3',
-                  'pdf-parse',
-                  '@anthropic-ai/sdk',
-                  'officeparser',
-                ]
+                const nativeOrProblematic = ['better-sqlite3', 'pdf-parse', 'officeparser']
                 return nativeOrProblematic.some((pkg) => id === pkg || id.startsWith(pkg + '/'))
               },
             },

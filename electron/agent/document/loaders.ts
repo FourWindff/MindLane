@@ -1,8 +1,8 @@
 import { Document } from '@langchain/core/documents'
-import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf'
-import { CheerioWebBaseLoader } from '@langchain/community/document_loaders/web/cheerio'
+import { load as loadHtml } from 'cheerio'
 import { readFile } from 'node:fs/promises'
 import { OfficeConverter, type OfficeChunk } from 'officeparser/slim'
+import { PDFParse } from 'pdf-parse'
 
 /** Input source of the document ingestion pipeline */
 export type DocumentSource = {
@@ -21,16 +21,50 @@ async function loadPdf(source: DocumentSource): Promise<Document[]> {
   if (!source.path) {
     throw new Error('PDF source requires a path')
   }
-  // PDFLoader detects the pdf-parse v2 PDFParse class and reuses it natively;
-  // one Document per page, page number kept in metadata.loc.pageNumber.
-  return new PDFLoader(source.path).load()
+  const file = await readFile(source.path)
+  const parser = new PDFParse({ data: file })
+
+  try {
+    const textResult = await parser.getText()
+    const infoResult = await parser.getInfo()
+    const format = (infoResult.metadata as { format?: string } | undefined)?.format ?? 'unknown'
+
+    return textResult.pages
+      .filter((page) => page.text.trim())
+      .map(
+        (page) =>
+          new Document({
+            pageContent: page.text,
+            metadata: {
+              source: source.path,
+              pdf: {
+                version: format,
+                info: infoResult.info,
+                metadata: infoResult.metadata,
+                totalPages: textResult.total,
+              },
+              loc: { pageNumber: page.num },
+            },
+          }),
+      )
+  } finally {
+    await parser.destroy()
+  }
 }
 
 async function loadUrl(source: DocumentSource): Promise<Document[]> {
   if (!source.url) {
     throw new Error('URL source requires a url')
   }
-  return new CheerioWebBaseLoader(source.url).load()
+  const response = await fetch(source.url, { signal: AbortSignal.timeout(10_000) })
+  const $ = loadHtml(await response.text())
+
+  return [
+    new Document({
+      pageContent: $('body').text(),
+      metadata: { source: source.url, title: $('title').text() },
+    }),
+  ]
 }
 
 async function loadText(source: DocumentSource): Promise<Document[]> {

@@ -20,7 +20,8 @@ updates:
     allow:
       # Keep automated version updates limited to dependencies that are not
       # part of the Electron startup, packaging, native-module, or agent-runtime
-      # stack. Review the excluded set manually.
+      # stack. LangChain is the exception: its coupled packages update together.
+      - dependency-name: '@langchain/*'
       - dependency-name: 'dagre'
       - dependency-name: 'html-to-image'
       - dependency-name: 'js-tiktoken'
@@ -46,6 +47,13 @@ updates:
         update-types:
           - 'version-update:semver-major'
     groups:
+      langchain:
+        dependency-type: 'production'
+        update-types:
+          - 'patch'
+          - 'minor'
+        patterns:
+          - '@langchain/*'
       low-risk-runtime:
         dependency-type: 'production'
         update-types:

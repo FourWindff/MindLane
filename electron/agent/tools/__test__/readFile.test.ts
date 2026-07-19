@@ -146,7 +146,13 @@ describe('createReadFileTool', () => {
 
     const result = await run({ path: 'big.txt' })
 
-    expect(result).toMatchObject({ ok: true, totalLines: 2100, startLine: 1, endLine: 2000, truncated: true })
+    expect(result).toMatchObject({
+      ok: true,
+      totalLines: 2100,
+      startLine: 1,
+      endLine: 2000,
+      truncated: true,
+    })
     expect(result.content).toContain('2000→line2000')
     expect(result.content).not.toContain('2001→')
     expect(result.content).toContain('2100')
