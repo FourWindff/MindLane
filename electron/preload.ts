@@ -249,4 +249,14 @@ contextBridge.exposeInMainWorld('mindlane', {
       >,
     openLogs: () => ipcRenderer.invoke(IPC.ShellOpenLogs) as Promise<{ ok: true }>,
   },
+  editlog: {
+    /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */
+    append: (payload: {
+      workspacePath: string
+      fileUuid: string
+      nodeId: string
+      before: string
+      after: string
+    }) => ipcRenderer.send(IPC.EditlogAppend, payload),
+  },
 })

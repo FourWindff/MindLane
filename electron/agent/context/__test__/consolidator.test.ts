@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -8,6 +8,9 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { Consolidator } from '../consolidator.js'
 import { SessionManager } from '../sessionManager.js'
 import { LLMProvider, ProviderCapability } from '../../providers/base.js'
+import { MemoryExtractor, createExtractionCallback } from '../../memory/memoryExtractor.js'
+import { MemoryManager } from '../../memory/memoryManager.js'
+import { EditLogStore } from '../../memory/editLogStore.js'
 
 class FakeProvider extends LLMProvider {
   constructor(model: BaseChatModel) {
@@ -274,5 +277,202 @@ describe('Consolidator', () => {
 
     const meta = manager.getSessionMeta(sessionId)
     expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
+  })
+})
+
+describe('Consolidator 提取回调接缝', () => {
+  let tmpDir: string
+  let manager: SessionManager
+  let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
+  const workspaceUuid = 'workspace-uuid-1'
+  const fileUuid = 'file-uuid-1'
+
+  const ARCHIVE_LIMITS = {
+    contextWindowTokens: 30,
+    maxCompletionTokens: 0,
+    safetyBuffer: 0,
+    consolidationRatio: 0.5,
+    maxContextMessages: 120,
+    maxMessagesBeforeTokenCheck: 3,
+    maxConsolidationRounds: 5,
+  }
+
+  const EXTRACTION_JSON = JSON.stringify({
+    disciplines: [
+      {
+        name: 'engineering',
+        patterns: [
+          { subTag: 'modular', description: '用户偏好模块化', observation: '倾向组件化设计' },
+        ],
+      },
+    ],
+  })
+
+  /** Summary calls return text; extraction calls (prompt contains the analyst marker) return JSON. */
+  function makeExtractionAwareModel(): BaseChatModel {
+    const model = new FakeListChatModel({ responses: ['summary'] })
+    model.invoke = (async (input: unknown) => {
+      const text = JSON.stringify(input)
+      return new AIMessage(text.includes('认知模式分析师') ? EXTRACTION_JSON : 'summary')
+    }) as unknown as BaseChatModel['invoke']
+    return model
+  }
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-seam-'))
+    manager = new SessionManager()
+    await manager.init(tmpDir)
+    manager.setWorkspace('/workspace/test', workspaceUuid)
+
+    buildMessages = async (messages, lastSummary) => [
+      new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
+      ...messages,
+    ]
+  })
+
+  afterEach(() => {
+    manager.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('归档后 onArchived 收到全部归档切片', async () => {
+    const sessionId = 'callback-slice'
+    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+
+    const onArchived = vi.fn()
+    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+    const consolidator = new Consolidator(
+      {
+        sessionManager: manager,
+        provider,
+        buildMessages,
+        getToolDefinitions: () => [],
+        onArchived,
+      },
+      ARCHIVE_LIMITS,
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+    expect(changed).toBe(true)
+
+    await vi.waitFor(() => expect(onArchived).toHaveBeenCalledTimes(1))
+    const slice = onArchived.mock.calls[0]![0] as BaseMessage[]
+    expect(slice.length).toBeGreaterThan(0)
+    expect(slice.every((m) => typeof m.getType === 'function')).toBe(true)
+    // 回调切片与推进后的游标一致：同一批消息不会被重复提取
+    const meta = manager.getSessionMeta(sessionId)
+    expect(slice.length).toBe(meta?.lastConsolidated)
+  })
+
+  it('未发生归档时不触发 onArchived', async () => {
+    const sessionId = 'no-archive'
+    await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
+
+    const onArchived = vi.fn()
+    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+    const consolidator = new Consolidator(
+      {
+        sessionManager: manager,
+        provider,
+        buildMessages,
+        getToolDefinitions: () => [],
+        onArchived,
+      },
+      { ...ARCHIVE_LIMITS, contextWindowTokens: 100, maxMessagesBeforeTokenCheck: 5 },
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+    expect(changed).toBe(false)
+    expect(onArchived).not.toHaveBeenCalled()
+  })
+
+  it('提取成功后 editlog 被删除且记忆已写入', async () => {
+    const sessionId = 'extract-success'
+    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+
+    const editLogStore = new EditLogStore(tmpDir)
+    await editLogStore.append(workspaceUuid, fileUuid, {
+      ts: 1,
+      nodeId: 'n1',
+      before: 'AI 写的',
+      after: '用户改的',
+    })
+
+    const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
+    const provider = new FakeProvider(makeExtractionAwareModel())
+    const consolidator = new Consolidator(
+      {
+        sessionManager: manager,
+        provider,
+        buildMessages,
+        getToolDefinitions: () => [],
+        onArchived: createExtractionCallback({
+          extractor,
+          editLogStore,
+          provider,
+          workspaceUuid,
+          fileUuid,
+        }),
+      },
+      ARCHIVE_LIMITS,
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+    expect(changed).toBe(true)
+
+    // 提取回调是 fire-and-forget：等它落地后断言产物
+    await vi.waitFor(async () => {
+      expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
+    })
+    const memoryDir = path.join(tmpDir, 'mindlanememory')
+    const memoryContent = fs.readFileSync(path.join(memoryDir, 'engineering-modular.md'), 'utf-8')
+    expect(memoryContent).toContain('倾向组件化设计')
+  })
+
+  it('提取回调抛错时压缩不受影响且 editlog 保留', async () => {
+    const sessionId = 'extract-failure'
+    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+
+    const editLogStore = new EditLogStore(tmpDir)
+    await editLogStore.append(workspaceUuid, fileUuid, {
+      ts: 1,
+      nodeId: 'n1',
+      before: 'AI 写的',
+      after: '用户改的',
+    })
+
+    const failingExtractor = {
+      extractAndPersist: vi.fn(async () => {
+        throw new Error('extraction boom')
+      }),
+    }
+    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+    const consolidator = new Consolidator(
+      {
+        sessionManager: manager,
+        provider,
+        buildMessages,
+        getToolDefinitions: () => [],
+        onArchived: createExtractionCallback({
+          extractor: failingExtractor as never,
+          editLogStore,
+          provider,
+          workspaceUuid,
+          fileUuid,
+        }),
+      },
+      ARCHIVE_LIMITS,
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+    expect(changed).toBe(true)
+
+    await vi.waitFor(() => expect(failingExtractor.extractAndPersist).toHaveBeenCalled())
+
+    // 压缩主流程产物完好
+    const historyContent = fs.readFileSync(manager.resolveHistoryPath(sessionId), 'utf-8')
+    expect(historyContent).toContain('summary')
+    // 提取失败：editlog 证据保留
+    expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
   })
 })

@@ -46,6 +46,15 @@ export abstract class LLMProvider {
 
   abstract get chatModels(): ChatModelOption[]
 
+  /**
+   * Chat-tier model for light tasks (e.g. memory extraction), as opposed to
+   * deep-reasoning work. Providers currently configure a single model, so this
+   * aliases `reasoningModel` until a separate cheap tier is introduced.
+   */
+  get chatModel(): BaseChatModel {
+    return this.reasoningModel
+  }
+
   /** Context window (tokens) of the current reasoning model; falls back to 32k when undeclared */
   get contextWindow(): number {
     return (

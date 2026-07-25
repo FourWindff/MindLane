@@ -2,8 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from '../../fs/atomicWrite.js'
 
-const THRESHOLDS = { maxParagraphs: 50, maxFiles: 30, maxDays: 7 }
-
 export class MemoryManager {
   private dir: string
   private indexPath: string
@@ -66,27 +64,15 @@ export class MemoryManager {
     await atomicWrite(this.indexPath, lines.join('\n') + '\n')
   }
 
-  async shouldConsolidate(): Promise<boolean> {
-    const files = await this.listFiles()
-    if (files.length > THRESHOLDS.maxFiles) return true
-    for (const f of files) {
-      const content = await fs.promises.readFile(path.join(this.dir, f), 'utf-8')
-      const paragraphCount = this.extractBody(content)
-        .split(/\n\n+/)
-        .filter((p) => p.trim()).length
-      if (paragraphCount > THRESHOLDS.maxParagraphs) return true
+  /** List all existing memory tags (from file frontmatter), for subTag reuse-first prompting. */
+  async listTags(): Promise<string[]> {
+    const tags: string[] = []
+    for (const file of await this.listFiles()) {
+      const content = await fs.promises.readFile(path.join(this.dir, file), 'utf-8')
+      const { tag } = this.parseFrontmatter(content)
+      if (tag) tags.push(tag)
     }
-    try {
-      const stat = await fs.promises.stat(path.join(this.dir, '.last-consolidated'))
-      if ((Date.now() - stat.mtimeMs) / 86400000 > THRESHOLDS.maxDays) return true
-    } catch {
-      if (files.length > 0) return true
-    }
-    return false
-  }
-
-  async consolidate(): Promise<void> {
-    await fs.promises.writeFile(path.join(this.dir, '.last-consolidated'), String(Date.now()))
+    return tags
   }
 
   private async listFiles(): Promise<string[]> {

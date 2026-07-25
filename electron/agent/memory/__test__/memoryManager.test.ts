@@ -51,8 +51,9 @@ describe('MemoryManager', () => {
     expect((await manager.loadMemoriesForTags(['eng', 'hum'])).length).toBe(2)
   })
 
-  it('shouldConsolidate when >30 files', async () => {
-    for (let i = 0; i < 31; i++) await manager.writeMemory(`t${i}`, `d${i}`, `c${i}`)
-    expect(await manager.shouldConsolidate()).toBe(true)
+  it('listTags returns all memory tags', async () => {
+    await manager.writeMemory('eng-mod', 'd1', 'c1')
+    await manager.writeMemory('hum-tl', 'd2', 'c2')
+    expect((await manager.listTags()).sort()).toEqual(['eng-mod', 'hum-tl'])
   })
 })

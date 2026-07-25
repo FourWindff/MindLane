@@ -4,12 +4,14 @@ import { CheckpointerManager } from './memory/checkpointer.js'
 import { SessionManager } from './context/sessionManager.js'
 import { MemoryManager } from './memory/memoryManager.js'
 import { MemoryExtractor } from './memory/memoryExtractor.js'
+import { EditLogStore } from './memory/editLogStore.js'
 
 export class AiService {
   readonly checkpointer = new CheckpointerManager()
   readonly sessionManager = new SessionManager()
   memoryManager?: MemoryManager
   memoryExtractor?: MemoryExtractor
+  editLogStore?: EditLogStore
 
   async init(userDataPath: string): Promise<void> {
     const dbDir = path.join(userDataPath, 'memory')
@@ -22,5 +24,6 @@ export class AiService {
 
     this.memoryManager = new MemoryManager(userDataPath)
     this.memoryExtractor = new MemoryExtractor(this.memoryManager)
+    this.editLogStore = new EditLogStore(userDataPath)
   }
 }

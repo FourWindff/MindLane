@@ -41,6 +41,7 @@ import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
+import { createExtractionCallback } from './memory/memoryExtractor.js'
 
 interface AssistantMessage {
   role: 'assistant'
@@ -447,12 +448,30 @@ export class AgentOrchestrator {
 
       const getToolDefinitions = () => toolRegistry.allTools
 
+      // Memory extraction hooks into consolidation: the archived slice plus
+      // the file's editlog are the extraction input (fire-and-forget).
+      const fileUuid = state.context?.fileUuid
+      const memoryExtractor = this.aiService.memoryExtractor
+      const editLogStore = this.aiService.editLogStore
+      const onArchived =
+        fileUuid && memoryExtractor && editLogStore
+          ? createExtractionCallback({
+              extractor: memoryExtractor,
+              editLogStore,
+              provider: this.provider,
+              workspaceUuid: sessionManager.workspaceUuid,
+              fileUuid,
+              filePath: state.context?.filePath,
+            })
+          : undefined
+
       const consolidator = new Consolidator(
         {
           sessionManager,
           provider: this.provider,
           buildMessages,
           getToolDefinitions,
+          onArchived,
         },
         {
           safetyBuffer: AGENT_LIMITS.consolidationSafetyBuffer,

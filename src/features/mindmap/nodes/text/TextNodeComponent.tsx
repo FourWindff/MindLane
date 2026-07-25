@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
+import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
@@ -9,6 +10,7 @@ import type { TextNodeData } from './types'
 function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TextNodeData
   const editor = useActiveMindmapEditor()
+  const instance = useActiveMindmapInstance()
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore((s) => s.busy)
@@ -21,13 +23,35 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   }, [id, editor])
 
   const commit = useCallback(() => {
+    const before = data.label
     const next = label.trim() || '未命名'
     setLabel(next)
     editor.updateNode(id, (n) => ({
       ...n,
       data: { ...n.data, label: next, editing: undefined },
     }))
-  }, [id, label, editor])
+    // Report manual text edits as memory evidence (fire-and-forget). AI edits
+    // never pass through this commit point, so they are never reported.
+    // workspace/store is dynamically imported to avoid an import cycle
+    // (workspace/store -> mindmapRegistry -> this component).
+    if (next !== before) {
+      const fileUuid = instance.store.getState().fileUuid
+      if (fileUuid) {
+        void import('@/features/workspace/store').then(({ useWorkspaceStore }) => {
+          const workspacePath = useWorkspaceStore.getState().workspacePath
+          if (workspacePath) {
+            window.mindlane?.editlog?.append({
+              workspacePath,
+              fileUuid,
+              nodeId: id,
+              before,
+              after: next,
+            })
+          }
+        })
+      }
+    }
+  }, [id, label, editor, data.label, instance])
 
   useEffect(() => {
     setLabel(data.label)

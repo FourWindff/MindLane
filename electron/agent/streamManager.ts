@@ -188,7 +188,6 @@ export class Runner {
       if (this.abortController.signal.aborted) {
         await this.persistAbortedResult(result, fullContent)
         this.emit('end', { content: fullContent || '（已停止生成）' })
-        this.extractMemory()
         return
       }
       if (result) {
@@ -198,12 +197,10 @@ export class Runner {
         await this.persistPartialContent(fullContent)
         this.emit('end', { content: fullContent || '（已停止生成）' })
       }
-      this.extractMemory()
     } catch (error) {
       if (this.abortController.signal.aborted) {
         await this.persistPartialContent(fullContent)
         this.emit('end', { content: fullContent || '（已停止生成）' })
-        this.extractMemory()
         return
       }
       this.emit('error', error instanceof Error ? error.message : String(error))
@@ -280,26 +277,6 @@ export class Runner {
       (message) => message.type === 'ai' && extractTextContent(message.content) === content,
     )
     if (!contentAlreadyPersisted) await this.persistPartialContent(content)
-  }
-
-  private extractMemory(): void {
-    const { request, aiService, runtime } = this.options
-    if (!aiService.memoryExtractor || !request.context?.filePath || !runtime.provider) return
-    void (async () => {
-      try {
-        const messages = aiService.sessionManager?.isReady()
-          ? await aiService.sessionManager.loadSessionMessages(request.sessionId)
-          : await aiService.checkpointer.getMessages(request.sessionId)
-        await aiService.memoryExtractor?.extractAndPersist({
-          provider: runtime.provider as never,
-          messages,
-          mindmapSummary: request.context?.mindmapSummary || '',
-          filePath: request.context!.filePath!,
-        })
-      } catch (error) {
-        runnerLog.warn('Memory extraction failed:', error)
-      }
-    })()
   }
 
   private emit(type: ChatStreamEventType, payload: unknown): void {

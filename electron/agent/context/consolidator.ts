@@ -17,6 +17,12 @@ interface ConsolidatorDependencies {
   provider: LLMProvider
   buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   getToolDefinitions: () => StructuredToolInterface[]
+  /**
+   * Optional memory-extraction hook. Fired fire-and-forget after an archive
+   * round with the archived message slice; rejections are swallowed and
+   * logged, never affecting consolidation.
+   */
+  onArchived?: (archived: BaseMessage[]) => void | Promise<void>
 }
 
 interface ConsolidationLimits {
@@ -53,6 +59,7 @@ export class Consolidator {
   private readonly provider: LLMProvider
   private readonly buildMessages: ConsolidatorDependencies['buildMessages']
   private readonly getToolDefinitions: ConsolidatorDependencies['getToolDefinitions']
+  private readonly onArchived: ConsolidatorDependencies['onArchived']
   private readonly limits: ConsolidationLimits
   private static readonly locks = new Map<string, Promise<unknown>>()
 
@@ -61,6 +68,7 @@ export class Consolidator {
     this.provider = deps.provider
     this.buildMessages = deps.buildMessages
     this.getToolDefinitions = deps.getToolDefinitions
+    this.onArchived = deps.onArchived
     this.limits = {
       contextWindowTokens: limits?.contextWindowTokens ?? AGENT_LIMITS.contextWindowTokens,
       maxCompletionTokens: limits?.maxCompletionTokens ?? AGENT_LIMITS.maxCompletionTokens,
@@ -125,6 +133,7 @@ export class Consolidator {
       let currentLast = lastConsolidated
       let currentSummary = meta?._lastSummary
       let changed = false
+      const archivedSlices: BaseMessage[] = []
 
       for (let round = 0; round < limits.maxConsolidationRounds; round++) {
         const remaining = allMessages.slice(currentLast)
@@ -158,6 +167,7 @@ export class Consolidator {
           )
           await this.rawArchive(messagesToArchive, sessionId)
         }
+        archivedSlices.push(...messagesToArchive)
 
         currentLast += boundaryIdx + 1
         changed = true
@@ -173,6 +183,18 @@ export class Consolidator {
           lastConsolidated: currentLast,
           _lastSummary: currentSummary ?? meta._lastSummary,
         })
+      }
+
+      // Memory extraction rides on consolidation: the archived slice is the
+      // extraction input and lastConsolidated doubles as the extraction cursor.
+      // Fire-and-forget — failures are logged, never propagated.
+      const onArchived = this.onArchived
+      if (changed && onArchived && archivedSlices.length > 0) {
+        void Promise.resolve()
+          .then(() => onArchived(archivedSlices))
+          .catch((err) => {
+            log.warn('extraction callback failed for session %s:', sessionId, err)
+          })
       }
 
       return changed

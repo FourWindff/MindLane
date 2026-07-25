@@ -45,6 +45,8 @@ export enum IPC {
 
   ShellOpenLogs = 'shell:open-logs',
 
+  EditlogAppend = 'editlog:append',
+
   WindowMinimize = 'window:minimize',
   WindowToggleMaximize = 'window:toggle-maximize',
   WindowClose = 'window:close',

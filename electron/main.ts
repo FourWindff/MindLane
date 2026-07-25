@@ -409,6 +409,42 @@ function registerIpcHandlers(userDataPath: string) {
     return { ok: streamManager?.stopStream(payload.streamId) ?? false }
   })
 
+  // One-way (send, not invoke): renderer never awaits. Resolve workspaceUuid
+  // here so the renderer only needs workspacePath + fileUuid.
+  ipcMain.on(
+    IPC.EditlogAppend,
+    (
+      _e,
+      payload: {
+        workspacePath?: string
+        fileUuid?: string
+        nodeId?: string
+        before?: string
+        after?: string
+      },
+    ) => {
+      void (async () => {
+        try {
+          if (!aiServiceReady || !aiService.editLogStore) return
+          const { workspacePath, fileUuid, nodeId, before, after } = payload ?? {}
+          if (!workspacePath || !fileUuid || !nodeId || before == null || after == null) return
+          const workspaceState = await fsService.workspace.load(workspacePath)
+          if (!workspaceState.ok) return
+          const workspaceUuid = workspaceState.data.workspaceUuid
+          if (!workspaceUuid) return
+          await aiService.editLogStore.append(workspaceUuid, fileUuid, {
+            ts: Date.now(),
+            nodeId,
+            before,
+            after,
+          })
+        } catch (err) {
+          appLog.warn('editlog append failed:', err)
+        }
+      })()
+    },
+  )
+
   // -- Image URL to base64 data URL --
   ipcMain.handle(IPC.ImageUrlToDataUrl, async (_e, payload: { url: string }) => {
     try {

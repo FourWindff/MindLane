@@ -248,6 +248,39 @@
 - provider 不返回 token 用量时对应字段打 `?`，不因数据缺失放弃该 provider 的可观测性。
 - 与 compact 日志互相印证：compact 生效后下一次模型调用的输入 token 应下降。
 
+## 记忆系统
+
+### 思维模式记忆（Pattern Memory）
+
+- 记忆系统目前唯一的记忆类型：用户的学科思维模式与偏好。
+- 归属于 6 个固定学科分类（formal-sciences / natural-sciences / engineering / humanities / social-sciences / creative-arts），分类下挂 subTag。
+- 消费方：聊天时按 `.mindlane` 文件的 tags 加载相关记忆，注入 system prompt 以适配用户思维风格。
+
+### 记忆证据来源（Memory Evidence Source）
+
+- 思维模式记忆的输入语料，目前有两个：
+  1. **对话内容**：会话中的用户与 AI 消息。
+  2. **节点编辑历史**：用户在前端对节点**文本内容**的编辑记录。属于"用户亲笔写的东西"，与对话同质；不含加节点、拖布局等结构性操作。
+
+### 记忆提取时机
+
+- 记忆提取**挂钩在会话压缩（consolidation）上**：`Consolidator` 归档旧消息时，被归档的消息切片即为提取输入，`lastConsolidated` 游标复用为提取游标。
+- 从不触发压缩的会话不做提取——这是有意接受的盲区（短会话信号不足）；节点编辑历史随该会话的下一次压缩一起提取，不做独立兜底。
+
+### subTag
+
+- 思维模式记忆在学科分类下的细分标签，kebab-case，一个 subTag 对应记忆目录下的一个 `.md` 文件。
+- 开放词表但**复用优先**：提取时把现有 subTag 清单喂给 LLM，只有现有 tag 均不匹配时才允许新建。
+- 提取使用 chatModel（非 reasoningModel）。
+
+### 节点编辑历史（Node Edit Log）
+
+- 按 `fileUuid` 存储的 append-only JSONL：`memory/editlog/{workspaceUuid}/{fileUuid}.jsonl`。
+- 只在用户**手动提交文本编辑**时记录一条 `{ts, nodeId, before, after}`；`before` 必存（改动前后的对比是思维模式的最强证据）。
+- AI 对节点文本的修改**不记录**——不是用户的思维证据。
+- 环形封顶 200 条，超出丢最旧（防止永不压缩的会话无限累积）。
+- 提取时被拼入提取 prompt，提取成功后删除该文件。
+
 ## 本次范围外
 
 ### MemoryExtractor

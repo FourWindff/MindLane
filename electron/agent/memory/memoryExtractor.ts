@@ -1,10 +1,11 @@
-import { SystemMessage } from '@langchain/core/messages'
+import { SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { LLMProvider } from '../providers/index.js'
 import { MemoryManager } from './memoryManager.js'
-import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
+import type { EditLogEntry, EditLogStore } from './editLogStore.js'
 import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { logger } from '../../shared/logger.js'
+import { messageContentToString } from '../utils.js'
 
 const DISCIPLINES = [
   'formal-sciences',
@@ -38,22 +39,25 @@ interface LLMExtractionResponse {
 
 interface ExtractOptions {
   provider: LLMProvider
-  messages: ChatMessage[]
-  mindmapSummary: string
-  filePath: string
+  /** Archived message slice supplied by the caller (the extraction cursor rides on `lastConsolidated`). */
+  messages: BaseMessage[]
+  /** Node edit history for the current fileUuid (may be empty). */
+  editlogEntries: EditLogEntry[]
+  /** .mindlane path for metadata.tags update; skipped when absent. */
+  filePath?: string
 }
 
 export class MemoryExtractor {
   constructor(private manager: MemoryManager) {}
 
   /**
-   * Extract thinking patterns from conversation using LLM,
+   * Extract thinking patterns from the given evidence slice using LLM,
    * persist them to memory files, and update .mindlane tags.
    */
   async extractAndPersist(options: ExtractOptions): Promise<void> {
-    const { provider, messages, mindmapSummary, filePath } = options
-    logger.withContext('memory').debug('Starting extraction for file:', filePath)
-    const patterns = await this.extract(provider, messages, mindmapSummary)
+    const { provider, messages, editlogEntries, filePath } = options
+    logger.withContext('memory').debug('Starting extraction for file:', filePath ?? '(unknown)')
+    const patterns = await this.extract(provider, messages, editlogEntries)
     if (patterns.length === 0) {
       logger.withContext('memory').debug('No patterns extracted, skipping persist')
       return
@@ -67,14 +71,15 @@ export class MemoryExtractor {
     logger.withContext('memory').debug('Persist and tag update completed')
   }
 
-  /** Call LLM to extract thinking patterns from conversation. */
+  /** Call LLM to extract thinking patterns from the evidence slice. */
   private async extract(
     provider: LLMProvider,
-    messages: ChatMessage[],
-    mindmapSummary: string,
+    messages: BaseMessage[],
+    editlogEntries: EditLogEntry[],
   ): Promise<ExtractedPattern[]> {
-    const prompt = this.buildExtractionPrompt(messages, mindmapSummary)
-    const response = await provider.reasoningModel.invoke([new SystemMessage(prompt)])
+    const existingTags = await this.manager.listTags()
+    const prompt = this.buildExtractionPrompt(messages, editlogEntries, existingTags)
+    const response = await provider.chatModel.invoke([new SystemMessage(prompt)])
     return this.parseExtractionResponse(response.content)
   }
 
@@ -85,14 +90,14 @@ export class MemoryExtractor {
       await this.manager.writeMemory(tag, p.description, p.observation, { skipIndexRebuild: true })
     }
     await this.manager.rebuildIndex()
-
-    if (await this.manager.shouldConsolidate()) {
-      await this.manager.consolidate()
-    }
   }
 
   /** Update .mindlane file metadata.tags with discovered disciplines. */
-  private async updateMindlaneTags(filePath: string, patterns: ExtractedPattern[]): Promise<void> {
+  private async updateMindlaneTags(
+    filePath: string | undefined,
+    patterns: ExtractedPattern[],
+  ): Promise<void> {
+    if (!filePath) return
     try {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
       const data = JSON.parse(raw) as MindLaneFile
@@ -116,18 +121,27 @@ export class MemoryExtractor {
     }
   }
 
-  private buildExtractionPrompt(messages: ChatMessage[], mindmapSummary: string): string {
-    // Limit to last 20 exchanges to avoid unbounded prompt size
-    const recentMessages = messages.slice(-40)
-    const conversation = recentMessages
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
+  private buildExtractionPrompt(
+    messages: BaseMessage[],
+    editlogEntries: EditLogEntry[],
+    existingTags: string[],
+  ): string {
+    const conversation = messages
+      .filter((m) => m.getType() === 'human' || m.getType() === 'ai')
       .map((m) => {
-        const role = m.role === 'user' ? '用户' : 'AI'
-        return `${role}: ${m.content}`
+        const role = m.getType() === 'human' ? '用户' : 'AI'
+        return `${role}: ${messageContentToString(m.content)}`
       })
       .join('\n')
 
-    return `你是一位认知模式分析师。请分析以下对话和思维导图内容，识别用户的思维模式与偏好。
+    const editlog =
+      editlogEntries.length > 0
+        ? editlogEntries.map((e) => `节点 ${e.nodeId}: 「${e.before}」→「${e.after}」`).join('\n')
+        : '（无）'
+
+    const tagList = existingTags.length > 0 ? existingTags.join('\n') : '（暂无已有标签）'
+
+    return `你是一位认知模式分析师。请分析以下对话和节点编辑历史，识别用户的思维模式与偏好。
 
 任务：
 1. 识别对话涉及的一个或多个学科（从以下6个类别中选择）。
@@ -171,15 +185,19 @@ export class MemoryExtractor {
 - 只输出JSON，不要其他文本
 - 如果没有明显可识别的模式，返回 {"disciplines": []}
 - subTag 使用 kebab-case（例如 modular, timeline, deductive）
+- **subTag 复用优先**：优先从下方「已有标签清单」中选择匹配的 subTag（取 "-" 后的部分）；只有现有标签均不匹配时才允许新建
 - description 是一行摘要（30字以内）
 - observation 是详细描述（包含具体证据和观察）
-- evidence 是对话中支持该观察的具体原文引用
+- evidence 是对话或编辑历史中支持该观察的具体原文引用
+
+已有标签清单（复用优先）：
+${tagList}
 
 对话内容：
 ${conversation}
 
-思维导图摘要：
-${mindmapSummary || '（无）'}
+节点编辑历史（用户手动修改节点文本的前后对比）：
+${editlog}
 
 请输出JSON格式的分析结果。`
   }
@@ -217,6 +235,33 @@ ${mindmapSummary || '（无）'}
         .withContext('memory')
         .warn('Failed to parse LLM response:', e, 'raw:', text.slice(0, 500))
       return []
+    }
+  }
+}
+
+/**
+ * Build the Consolidator `onArchived` callback: reads the file's editlog,
+ * runs extraction on the archived slice, and deletes the editlog only after
+ * a successful extraction (kept on failure so evidence is not lost).
+ */
+export function createExtractionCallback(deps: {
+  extractor: MemoryExtractor
+  editLogStore: EditLogStore
+  provider: LLMProvider
+  workspaceUuid: string
+  fileUuid: string
+  filePath?: string
+}): (messages: BaseMessage[]) => Promise<void> {
+  return async (messages) => {
+    const editlogEntries = await deps.editLogStore.read(deps.workspaceUuid, deps.fileUuid)
+    await deps.extractor.extractAndPersist({
+      provider: deps.provider,
+      messages,
+      editlogEntries,
+      filePath: deps.filePath,
+    })
+    if (editlogEntries.length > 0) {
+      await deps.editLogStore.delete(deps.workspaceUuid, deps.fileUuid)
     }
   }
 }

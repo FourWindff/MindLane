@@ -318,5 +318,14 @@ interface Window {
       ) => Promise<{ ok: true } | { ok: false; error: string }>
       openLogs: () => Promise<{ ok: true }>
     }
+    editlog: {
+      append: (payload: {
+        workspacePath: string
+        fileUuid: string
+        nodeId: string
+        before: string
+        after: string
+      }) => void
+    }
   }
 }

@@ -38,7 +38,6 @@ function createHarness() {
       persisted.set(sessionId, [...(persisted.get(sessionId) ?? []), ...messages])
     }),
   }
-  const extractAndPersist = vi.fn(async () => undefined)
   const events: Array<{
     streamId: string
     sessionId: string
@@ -51,7 +50,6 @@ function createHarness() {
   const manager = new StreamManager({
     aiService: {
       sessionManager,
-      memoryExtractor: { extractAndPersist },
       checkpointer: { getMessages: vi.fn(async () => []) },
     } as never,
     eventSink: (event) => events.push(event),
@@ -63,7 +61,6 @@ function createHarness() {
     sessionManager,
     persisted,
     events,
-    extractAndPersist,
     setRuntimeFactory(factory: typeof runtimeFactory) {
       runtimeFactory = factory
     },
@@ -272,7 +269,7 @@ describe('StreamManager + Runner', () => {
   })
 
   it('persists partial assistant content when stopped', async () => {
-    const { manager, events, persisted, extractAndPersist, setRuntimeFactory } = createHarness()
+    const { manager, events, persisted, setRuntimeFactory } = createHarness()
     const gate = deferred<void>()
     setRuntimeFactory(() =>
       createRuntime({
@@ -299,7 +296,6 @@ describe('StreamManager + Runner', () => {
     ).toBe(true)
     expect(persisted.get('session-a')?.some((message) => message.type === 'tool')).toBe(true)
     expect(events.some((event) => event.streamId === streamId && event.type === 'end')).toBe(true)
-    await waitUntil(() => extractAndPersist.mock.calls.length === 1)
   })
 
   it('emits an error when runner startup fails', async () => {

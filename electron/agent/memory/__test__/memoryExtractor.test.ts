@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import { MemoryExtractor } from '../memoryExtractor.js'
 import { MemoryManager } from '../memoryManager.js'
 import type { LLMProvider } from '../../providers/index.js'
@@ -9,16 +10,30 @@ import type { MindLaneFile } from '../../../../src/shared/lib/fileFormat.js'
 
 // Minimal mock provider for testing
 interface MockProvider {
-  reasoningModel: {
+  chatModel: {
     invoke: (messages: unknown[]) => Promise<{ content: string }>
   }
 }
 
 function createMockProvider(responseContent: string): MockProvider {
   return {
-    reasoningModel: {
+    chatModel: {
       invoke: vi.fn().mockResolvedValue({ content: responseContent }),
     },
+  }
+}
+
+function makeMindlaneFile(): MindLaneFile {
+  return {
+    version: '1.0',
+    metadata: {
+      fileUuid: 'file-uuid-1',
+      title: 'Test',
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
+    },
+    mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
+    documents: [],
   }
 }
 
@@ -58,19 +73,8 @@ describe('MemoryExtractor', () => {
   })
 
   it('extractAndPersist calls LLM, persists patterns, and updates .mindlane tags', async () => {
-    const mindlaneFile: MindLaneFile = {
-      version: '1.0',
-      metadata: {
-        fileUuid: 'file-uuid-1',
-        title: 'Test',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-      mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-      documents: [],
-    }
     const mindlanePath = path.join(tempDir, 'test.mindlane')
-    await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
+    await fs.promises.writeFile(mindlanePath, JSON.stringify(makeMindlaneFile(), null, 2), 'utf-8')
 
     const mockResponse = JSON.stringify({
       disciplines: [
@@ -93,10 +97,10 @@ describe('MemoryExtractor', () => {
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
       messages: [
-        { role: 'user', content: '我们把这个拆成几个模块来做' },
-        { role: 'assistant', content: '好的，我来帮你设计模块结构' },
+        new HumanMessage('我们把这个拆成几个模块来做'),
+        new AIMessage('好的，我来帮你设计模块结构'),
       ],
-      mindmapSummary: '',
+      editlogEntries: [],
       filePath: mindlanePath,
     })
 
@@ -111,27 +115,16 @@ describe('MemoryExtractor', () => {
   })
 
   it('extractAndPersist handles empty LLM response gracefully', async () => {
-    const mindlaneFile: MindLaneFile = {
-      version: '1.0',
-      metadata: {
-        fileUuid: 'file-uuid-1',
-        title: 'Test',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-      },
-      mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-      documents: [],
-    }
     const mindlanePath = path.join(tempDir, 'empty.mindlane')
-    await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
+    await fs.promises.writeFile(mindlanePath, JSON.stringify(makeMindlaneFile(), null, 2), 'utf-8')
 
     const mockProvider = createMockProvider('{"disciplines": []}')
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [{ role: 'user', content: 'hello' }],
-      mindmapSummary: '',
+      messages: [new HumanMessage('hello')],
+      editlogEntries: [],
       filePath: mindlanePath,
     })
 
@@ -141,18 +134,8 @@ describe('MemoryExtractor', () => {
   })
 
   it('extractAndPersist merges new discipline tags with existing ones', async () => {
-    const mindlaneFile: MindLaneFile = {
-      version: '1.0',
-      metadata: {
-        fileUuid: 'file-uuid-1',
-        title: 'Test',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z',
-        tags: ['humanities'],
-      },
-      mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-      documents: [],
-    }
+    const mindlaneFile = makeMindlaneFile()
+    mindlaneFile.metadata.tags = ['humanities']
     const mindlanePath = path.join(tempDir, 'merge.mindlane')
     await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
 
@@ -175,8 +158,8 @@ describe('MemoryExtractor', () => {
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [{ role: 'user', content: '拆模块' }],
-      mindmapSummary: '',
+      messages: [new HumanMessage('拆模块')],
+      editlogEntries: [],
       filePath: mindlanePath,
     })
 
@@ -184,6 +167,29 @@ describe('MemoryExtractor', () => {
     const updated = JSON.parse(updatedRaw) as MindLaneFile
     expect(updated.metadata.tags).toContain('humanities')
     expect(updated.metadata.tags).toContain('engineering')
+  })
+
+  it('extractAndPersist works without filePath (skips tag update)', async () => {
+    const mockResponse = JSON.stringify({
+      disciplines: [
+        {
+          name: 'engineering',
+          patterns: [
+            { subTag: 'modular', description: '用户偏好模块化', observation: '倾向组件化设计' },
+          ],
+        },
+      ],
+    })
+    const mockProvider = createMockProvider(mockResponse)
+
+    const extractor = new MemoryExtractor(manager)
+    await extractor.extractAndPersist({
+      provider: mockProvider as unknown as LLMProvider,
+      messages: [new HumanMessage('拆模块')],
+      editlogEntries: [],
+    })
+
+    expect(await manager.loadIndex()).toContain('engineering-modular')
   })
 
   it('parseExtractionResponse handles markdown code blocks', async () => {
@@ -195,12 +201,27 @@ describe('MemoryExtractor', () => {
 
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [{ role: 'user', content: '先做个最小版本试试' }],
-      mindmapSummary: '',
-      filePath: path.join(tempDir, 'dummy.mindlane'),
+      messages: [new HumanMessage('先做个最小版本试试')],
+      editlogEntries: [],
     })
 
     const index = await manager.loadIndex()
     expect(index).toContain('engineering-mvp')
+  })
+
+  it('parseExtractionResponse skips unknown disciplines', async () => {
+    const extractor = new MemoryExtractor(manager)
+
+    const mockProvider = createMockProvider(
+      '{"disciplines": [{"name": "alchemy", "patterns": [{"subTag": "gold", "description": "点金", "observation": "点石成金"}]}]}',
+    )
+
+    await extractor.extractAndPersist({
+      provider: mockProvider as unknown as LLMProvider,
+      messages: [new HumanMessage('点石成金')],
+      editlogEntries: [],
+    })
+
+    expect(await manager.loadIndex()).toBe('')
   })
 })
