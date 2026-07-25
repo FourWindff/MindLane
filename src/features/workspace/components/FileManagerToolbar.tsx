@@ -28,7 +28,7 @@ export function FileManagerToolbar({
           disabled={busy || !workspacePath}
           title="新建文件"
         >
-          <FilePlus size={15} strokeWidth={2} />
+          <FilePlus size={18} strokeWidth={1.5} />
           <span>文件</span>
         </button>
         <button
@@ -38,7 +38,7 @@ export function FileManagerToolbar({
           disabled={busy || !workspacePath}
           title="新建文件夹"
         >
-          <FolderPlus size={15} strokeWidth={2} />
+          <FolderPlus size={18} strokeWidth={1.5} />
           <span>文件夹</span>
         </button>
       </div>
@@ -55,7 +55,7 @@ export function FileManagerToolbar({
           title="刷新"
           aria-label="刷新"
         >
-          <RefreshCw size={15} strokeWidth={1.5} />
+          <RefreshCw size={22} strokeWidth={1.5} />
         </button>
         <button
           type="button"
@@ -65,7 +65,7 @@ export function FileManagerToolbar({
           title="切换仓库"
           aria-label="切换仓库"
         >
-          <FolderInput size={15} strokeWidth={1.5} />
+          <FolderInput size={22} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -79,7 +79,7 @@ export function FileManagerToolbar({
         title="关闭"
         aria-label="关闭"
       >
-        <X size={18} strokeWidth={2} />
+        <X size={22} strokeWidth={1.5} />
       </button>
     </div>
   )

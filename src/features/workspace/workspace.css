@@ -221,8 +221,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(28, 25, 23, 0.2);
-  backdrop-filter: blur(12px) saturate(1.1);
+  background: var(--ml-overlay-bg);
+  backdrop-filter: var(--ml-overlay-blur);
+  -webkit-backdrop-filter: var(--ml-overlay-blur);
 }
 
 .workspace-modal-backdrop {
@@ -232,8 +233,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(28, 25, 23, 0.2);
-  backdrop-filter: blur(12px) saturate(1.1);
+  background: var(--ml-overlay-bg);
+  backdrop-filter: var(--ml-overlay-blur);
+  -webkit-backdrop-filter: var(--ml-overlay-blur);
 }
 
 .workspace-home__modal,

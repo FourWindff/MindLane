@@ -33,6 +33,17 @@
   --ml-code-text: #e8e6e3;
   --ml-palace-accent-1: #8b6bb0;
   --ml-palace-accent-2: #b85c8e;
+
+  /* Floating glass surfaces (toolbars, overlays, modal panels) */
+  --ml-glass-bg: rgba(255, 255, 255, 0.72);
+  --ml-glass-bg-strong: rgba(255, 255, 255, 0.86);
+  --ml-glass-blur: blur(16px) saturate(1.1);
+  --ml-glass-blur-strong: blur(28px) saturate(1.2);
+  --ml-glass-border: rgba(0, 0, 0, 0.07);
+  --ml-glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --ml-glass-shadow-lifted: 0 8px 32px rgba(28, 25, 23, 0.1), 0 24px 64px rgba(28, 25, 23, 0.12);
+  --ml-overlay-bg: rgba(28, 25, 23, 0.18);
+  --ml-overlay-blur: blur(12px) saturate(1.1);
 }
 
 *,

@@ -6,8 +6,9 @@
   align-items: flex-start;
   justify-content: center;
   padding: 8vh 1rem 2rem;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(6px);
+  background: var(--ml-overlay-bg);
+  backdrop-filter: var(--ml-overlay-blur);
+  -webkit-backdrop-filter: var(--ml-overlay-blur);
 }
 
 .shortcuts-panel {
@@ -16,11 +17,13 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  border: 1px solid var(--ml-border-strong);
-  background: var(--ml-bg-elevated);
+  border-radius: 16px;
+  border: 1px solid var(--ml-glass-border);
+  background: var(--ml-glass-bg-strong);
+  backdrop-filter: var(--ml-glass-blur-strong);
+  -webkit-backdrop-filter: var(--ml-glass-blur-strong);
   color: var(--ml-text);
-  box-shadow: var(--ml-shadow-strong);
+  box-shadow: var(--ml-glass-shadow-lifted);
 }
 
 .shortcuts-panel__header {
@@ -108,8 +111,9 @@
   border-radius: 6px;
   font-size: 0.72rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: var(--ml-bg-subtle);
-  border: 1px solid var(--ml-border);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--ml-border-strong);
+  box-shadow: 0 1.5px 0 rgba(28, 25, 23, 0.08);
   color: var(--ml-text);
   white-space: nowrap;
 }
@@ -136,7 +140,7 @@
 .shortcuts-inline .shortcuts-panel__list {
   border: 1px solid var(--ml-border);
   border-radius: 12px;
-  background: var(--ml-bg-subtle);
+  background: rgba(255, 255, 255, 0.45);
   overflow: hidden;
 }
 
