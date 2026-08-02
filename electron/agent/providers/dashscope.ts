@@ -79,7 +79,7 @@ export class DashScopeProvider extends LLMProvider {
     if (!key) throw new Error('未填写 API Key')
 
     const baseURL = config.baseUrl?.trim() || DASHSCOPE_COMPAT_BASE
-    const chatModelId = config.chatModel.trim() || 'qwen-turbo'
+    const chatModelId = config.chatModel.trim()
     super(
       new ChatOpenAI({
         model: chatModelId,

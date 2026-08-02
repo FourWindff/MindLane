@@ -6,7 +6,6 @@ const HTTP_TIMEOUT_MS = 30_000
 
 const MINIMAX_ANTHROPIC_BASE_URL = 'https://api.minimaxi.com/anthropic'
 const MINIMAX_IMAGE_URL = 'https://api.minimaxi.com/v1/image_generation'
-const DEFAULT_CHAT_MODEL = 'MiniMax-M2.7'
 const DEFAULT_IMAGE_MODEL = 'image-01'
 
 const SUPPORTED_ASPECT_RATIOS = ['1:1', '4:3', '3:4', '3:2', '2:3', '16:9', '9:16'] as const
@@ -101,7 +100,7 @@ export class MiniMaxProvider extends LLMProvider {
     if (!key) throw new Error('未填写 API Key')
 
     const baseURL = config.baseUrl?.trim() || MINIMAX_ANTHROPIC_BASE_URL
-    const chatModelId = config.chatModel.trim() || DEFAULT_CHAT_MODEL
+    const chatModelId = config.chatModel.trim()
 
     super(
       new ChatAnthropic({

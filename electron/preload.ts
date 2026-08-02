@@ -115,11 +115,8 @@ contextBridge.exposeInMainWorld('mindlane', {
     stopStream: (streamId: string) =>
       ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }) as Promise<{ ok: boolean }>,
     onStreamEvent: onChatStreamEvent,
-    nodesToPalace: (payload: {
-      apiKey: string
-      model: string
-      selectedNodes: SelectedNodeContent[]
-    }) => ipcRenderer.invoke(IPC.AiNodesToPalace, payload),
+    nodesToPalace: (payload: { selectedNodes: SelectedNodeContent[] }) =>
+      ipcRenderer.invoke(IPC.AiNodesToPalace, payload),
     listProviders: () => ipcRenderer.invoke(IPC.AiListProviders),
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
     getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),

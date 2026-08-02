@@ -74,11 +74,7 @@ interface Window {
       }) => Promise<{ ok: true; streamId: string } | { ok: false; error: string }>
       stopStream: (streamId: string) => Promise<{ ok: boolean }>
       onStreamEvent: (callback: (event: _ChatStreamEvent) => void) => () => void
-      nodesToPalace: (payload: {
-        apiKey: string
-        model: string
-        selectedNodes: { id: string; label: string }[]
-      }) => Promise<
+      nodesToPalace: (payload: { selectedNodes: { id: string; label: string }[] }) => Promise<
         | {
             ok: true
             label: string

@@ -31,7 +31,6 @@ export interface QuickAction {
 }
 
 export function useChatContext() {
-  const apiKey = useSettingsStore((s) => s.apiKey)
   const capabilities = useSettingsStore((s) => s.capabilities)
 
   const activeInstance = useActiveMindmapInstance()
@@ -105,7 +104,6 @@ export function useChatContext() {
   ]
 
   return {
-    apiKey,
     capabilities,
     selectedNodes,
     buildContext,

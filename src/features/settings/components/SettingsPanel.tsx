@@ -333,6 +333,9 @@ export function SettingsPanel() {
                 value={chatModel}
                 onChange={(e) => setChatModel(e.target.value)}
               >
+                <option value="" disabled>
+                  请选择模型
+                </option>
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.displayName}

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { Edge, Node } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId, CHILD_OFFSET_X } from '@/shared/lib/mindmapTree'
@@ -18,27 +18,20 @@ export function usePalaceGeneration({
   editor: MindmapEditor
 }) {
   const aiBusy = useAiStore((state) => state.busy)
-  const apiKey = useSettingsStore((state) => state.apiKey)
-  const chatModel = useSettingsStore((state) => state.chatModel)
+  const chatReady = useSettingsStore(selectChatReady)
 
   return useCallback(async () => {
     if (aiBusy) return
 
     const ai = useAiStore.getState()
-    const settings = useSettingsStore.getState()
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane) {
       ai.setError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
-    const backendSettings = await mindlane.settings.load()
-    const currentKey = backendSettings?.apiKey || apiKey || settings.apiKey
-    const currentModel =
-      backendSettings?.chatModel || chatModel || settings.chatModel || 'qwen-turbo'
-
-    if (!currentKey) {
-      ai.setError('请先在右侧「设置」面板中填写 API Key')
+    if (!chatReady) {
+      ai.setError('请先在右侧「设置」面板中配置 API Key 并选择模型')
       return
     }
 
@@ -110,7 +103,7 @@ export function usePalaceGeneration({
 
     try {
       const result = await Promise.race([
-        mindlane.ai.nodesToPalace({ apiKey: currentKey, model: currentModel, selectedNodes }),
+        mindlane.ai.nodesToPalace({ selectedNodes }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 120_000)),
       ])
       if (!result) {
@@ -155,5 +148,5 @@ export function usePalaceGeneration({
       rollback()
       ai.setError(`生成异常：${error instanceof Error ? error.message : String(error)}`)
     }
-  }, [aiBusy, apiKey, chatModel, edges, editor, nodes, selectedId])
+  }, [aiBusy, chatReady, edges, editor, nodes, selectedId])
 }

@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 import '../styles/chat-input-bar.css'
@@ -19,7 +20,19 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
 
-  const { apiKey, selectedNodes, buildContext, clearNodeSelection } = useChatContext()
+  const { selectedNodes, buildContext, clearNodeSelection } = useChatContext()
+
+  const chatReady = useSettingsStore(selectChatReady)
+  const settingsLoaded = useSettingsStore((s) => s.loaded)
+  const hasApiKey = useSettingsStore((s) => s.apiKey.trim() !== '')
+  const hasChatModel = useSettingsStore((s) => s.chatModel.trim() !== '')
+
+  let placeholder = attachedDocument ? '输入提示词（可选）...' : '输入消息…'
+  if (!chatReady && settingsLoaded) {
+    if (!hasApiKey && !hasChatModel) placeholder = '请先在设置中配置 API Key 并选择模型'
+    else if (!hasApiKey) placeholder = '请先在设置中配置 API Key'
+    else if (!hasChatModel) placeholder = '请先在设置中选择模型'
+  }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [inputRows, setInputRows] = useState(1)
@@ -53,7 +66,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     const doc = useAiStore.getState().attachedDocument
 
     if ((!text && !doc) || busy) return
-    if (!apiKey) return
+    if (!chatReady) return
 
     const userMsg = {
       role: 'user' as const,
@@ -87,7 +100,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     } else if (originFileUuid) {
       useAiStore.getState().setFileError(originFileUuid, result.error)
     }
-  }, [apiKey, busy, threadId, addMessage, buildContext, setAttachedDocument])
+  }, [chatReady, busy, threadId, addMessage, buildContext, setAttachedDocument])
 
   const stop = useCallback(() => {
     const api = window.mindlane?.ai
@@ -167,14 +180,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             ref={inputRef}
             onKeyDown={handleKeyDown}
             onChange={handleInputChange}
-            placeholder={
-              !apiKey
-                ? '请先在设置中填写 API Key'
-                : attachedDocument
-                  ? '输入提示词（可选）...'
-                  : '输入消息…'
-            }
-            disabled={busy || !apiKey}
+            placeholder={placeholder}
+            disabled={busy || !chatReady}
             rows={inputRows}
             className="chat-input-bar__textarea"
           />
@@ -193,7 +200,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               type="button"
               className="chat-input-bar__send"
               onClick={() => void send()}
-              disabled={!apiKey}
+              disabled={!chatReady}
               title="发送 (Enter)"
               aria-label="发送"
             >
@@ -209,7 +216,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               title="添加附件"
               aria-label="添加附件"
               onClick={() => void handleSelectAttachment()}
-              disabled={busy || !apiKey}
+              disabled={busy || !chatReady}
             >
               <Plus size={14} strokeWidth={2} />
             </button>

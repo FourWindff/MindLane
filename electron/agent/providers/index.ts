@@ -7,4 +7,9 @@ export {
   urlToDataUrl,
 } from './base.js'
 export { MiniMaxProvider } from './minimax.js'
-export { createProvider, getProviderMeta, getRegisteredProviders } from './registry.js'
+export {
+  createProvider,
+  getProviderMeta,
+  getRegisteredProviders,
+  resolveChatProvider,
+} from './registry.js'

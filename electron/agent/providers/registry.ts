@@ -1,5 +1,5 @@
 import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
-import type { ProviderConfig } from '../../fs/types.js'
+import type { AppSettings, ProviderConfig } from '../../fs/types.js'
 
 type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
 
@@ -31,6 +31,33 @@ export function createProvider(
 
 export function getProviderMeta(providerId: string): ProviderMeta | undefined {
   return metaMap.get(providerId)
+}
+
+/**
+ * Single owner of the chat-provider resolution recipe: pick the provider,
+ * resolve the apiKey (per-provider config overrides the global key), and
+ * validate the model against the provider's catalog. Pure function — throws
+ * on missing key, empty model, or a model outside the catalog; no fallbacks.
+ */
+export function resolveChatProvider(settings: AppSettings): LLMProvider {
+  const providerId = settings.activeProviders.chat || 'dashscope'
+  const meta = metaMap.get(providerId)
+  if (!meta) {
+    throw new Error(`未知的 provider: ${providerId}`)
+  }
+  const providerConfig = settings.providerConfigs[providerId]
+  const apiKey = providerConfig?.apiKey?.trim() || settings.apiKey.trim()
+  if (!apiKey) {
+    throw new Error('未填写 API Key')
+  }
+  const chatModel = settings.chatModel.trim()
+  if (!chatModel) {
+    throw new Error('请选择模型')
+  }
+  if (!meta.defaultModels.some((model) => model.id === chatModel)) {
+    throw new Error(`模型 ${chatModel} 不属于当前 provider`)
+  }
+  return createProvider(providerId, { apiKey, chatModel, baseUrl: providerConfig?.baseUrl })
 }
 
 export function getRegisteredProviders(): ProviderMeta[] {

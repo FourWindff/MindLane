@@ -243,6 +243,26 @@
 - `contextWindow` 来自 provider 的 `ChatModelOption`，未填写时回退 32k。
 - 40% 是刻意保留的裕量，同时覆盖 prompt 模板与模型输出开销，不做精确 token 计数。
 
+## AI Provider
+
+### Provider 解析（Provider Resolution）
+
+- 从 settings 得到可用 chat provider 的唯一配方，由主进程 `resolveChatProvider` 拥有；其余调用点不得自行拼装。
+- provider 配置的唯一来源是 settings；不存在请求级的 apiKey/model override。
+- 缺 API Key、chatModel 为空或失效时直接抛错，**不做任何静默兜底**——应用代码中不存在默认模型。
+
+### chatModel 空态
+
+- `chatModel` 记录用户的**显式选择**；空串 `''` 表示"未选择"，不指向任何模型。
+- 模型的合法集合由当前 provider 的目录（`defaultModels`）定义；`qwen-turbo` 等具体型号只是目录中的普通一项，无特殊地位。
+- 切换 provider 时 `chatModel` 重置为空，强制用户重新选择。
+
+### 对话就绪（Chat Ready）
+
+- 前端允许发起对话的前提：settings 已加载、当前 provider 已填 API Key、已显式选择模型，三者同时成立。
+- 未就绪时 `ChatInputBar` 禁用并在 placeholder 提示缺失项；palace 生成入口复用同一判定。
+- 主进程解析时的抛错是最后一道防线，渲染层门控不替代它。
+
 ## 日志
 
 ### 日志上下文（Log Context）

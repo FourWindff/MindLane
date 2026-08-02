@@ -38,12 +38,22 @@ function persistToBackend(partial: Record<string, unknown>) {
   window.mindlane?.settings.update(partial).catch(() => {})
 }
 
+/**
+ * 对话就绪判定：settings 已加载、已填 API Key、已选模型。
+ * ChatInputBar 门控与 palace 生成预检共用这一份判定。
+ */
+export function selectChatReady(
+  state: Pick<SettingsState, 'loaded' | 'apiKey' | 'chatModel'>,
+): boolean {
+  return state.loaded && state.apiKey.trim() !== '' && state.chatModel.trim() !== ''
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   loaded: false,
   activeChatProvider: 'dashscope',
   activeImageProvider: 'dashscope',
   apiKey: '',
-  chatModel: 'qwen-turbo',
+  chatModel: '',
   autoSaveIntervalMs: 30_000,
   providers: [],
   capabilities: [],
@@ -54,15 +64,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setActiveChatProvider: (id) => {
     const state = get()
     const provider = state.providers.find((p) => p.id === id)
-    const defaultModel = provider?.models[0]?.id ?? ''
     const providerKey = state.providerConfigs[id]?.apiKey ?? ''
     set({
       activeChatProvider: id,
-      chatModel: defaultModel,
+      chatModel: '',
       apiKey: providerKey,
       capabilities: provider?.capabilities ?? [],
     })
-    persistToBackend({ activeProviders: { chat: id }, chatModel: defaultModel })
+    persistToBackend({ activeProviders: { chat: id }, chatModel: '' })
     loadCapabilities()
   },
   setActiveImageProvider: (id) => {
@@ -143,7 +152,7 @@ export async function loadSettingsFromBackend(): Promise<void> {
 
   useSettingsStore.getState().hydrate({
     apiKey: displayKey,
-    chatModel: s.chatModel ?? 'qwen-turbo',
+    chatModel: s.chatModel ?? '',
     autoSaveIntervalMs: s.editor?.autoSaveIntervalMs ?? 30_000,
     activeChatProvider: providerId,
     activeImageProvider: s.activeProviders?.image ?? 'dashscope',

@@ -1,9 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
 import {
   urlToDataUrl,
-  createProvider,
   getProviderMeta,
   getRegisteredProviders,
+  resolveChatProvider,
 } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
@@ -288,22 +288,6 @@ function createWindow() {
 }
 
 function registerIpcHandlers(userDataPath: string) {
-  const createProviderForRequest = async (apiKey: string, model: string) => {
-    const settings = await fsService.appState.load()
-    const providerId = settings.activeProviders.chat || 'dashscope'
-    const providerConfig = settings.providerConfigs[providerId]
-    const providerMeta = getProviderMeta(providerId)
-    const requestedModel = model.trim() || settings.chatModel || ''
-    const normalizedModel = providerMeta?.defaultModels.some((item) => item.id === requestedModel)
-      ? requestedModel
-      : providerMeta?.defaultModels[0]?.id || requestedModel || 'qwen-turbo'
-    return createProvider(providerId, {
-      apiKey: apiKey.trim() || providerConfig?.apiKey || settings.apiKey || '',
-      chatModel: normalizedModel,
-      baseUrl: providerConfig?.baseUrl,
-    })
-  }
-
   const resolveMessagePipelineConfig = async () => {
     const settings = await fsService.appState.load()
     const providerId = settings.activeProviders.chat || 'dashscope'
@@ -322,16 +306,12 @@ function registerIpcHandlers(userDataPath: string) {
     },
     createRuntime: async () => {
       const settings = await fsService.appState.load()
-      const providerId = settings.activeProviders.chat || 'dashscope'
-      const providerConfig = settings.providerConfigs[providerId]
-      const apiKey = providerConfig?.apiKey || settings.apiKey || ''
-      if (!apiKey.trim()) throw new Error('未填写 API Key')
-      const provider = createProvider(providerId, {
-        apiKey,
-        chatModel: settings.chatModel || 'qwen-turbo',
-        baseUrl: providerConfig?.baseUrl,
-      })
-      providerLog.info('初始化： %s, model=%s', providerId, settings.chatModel || 'qwen-turbo')
+      const provider = resolveChatProvider(settings)
+      providerLog.info(
+        '初始化： %s, model=%s',
+        settings.activeProviders.chat || 'dashscope',
+        settings.chatModel,
+      )
       const messagePipeline = await resolveMessagePipelineConfig()
       if (chatOrchestrator) chatOrchestrator.updateProvider(provider, messagePipeline)
       else {
@@ -458,19 +438,21 @@ function registerIpcHandlers(userDataPath: string) {
   // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
     IPC.AiNodesToPalace,
-    async (
-      _e,
-      payload: { apiKey: string; model: string; selectedNodes: SelectedNodeContent[] },
-    ) => {
-      const provider = await createProviderForRequest(payload.apiKey, payload.model)
-      const messagePipeline = await resolveMessagePipelineConfig()
-      if (!chatOrchestrator) {
-        chatOrchestrator = new AgentOrchestrator(provider, aiService, {
-          userDataPath,
-          messagePipeline,
-        })
+    async (_e, payload: { selectedNodes: SelectedNodeContent[] }) => {
+      try {
+        const settings = await fsService.appState.load()
+        const provider = resolveChatProvider(settings)
+        const messagePipeline = await resolveMessagePipelineConfig()
+        if (!chatOrchestrator) {
+          chatOrchestrator = new AgentOrchestrator(provider, aiService, {
+            userDataPath,
+            messagePipeline,
+          })
+        }
+        return await chatOrchestrator.runPalaceFromNodes(payload.selectedNodes, provider)
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) }
       }
-      return chatOrchestrator.runPalaceFromNodes(payload.selectedNodes, provider)
     },
   )
 
@@ -1066,19 +1048,6 @@ app.whenReady().then(async () => {
   try {
     const settings = await fsService.appState.load()
     refreshLogSecrets(settings)
-    const providerId = settings.activeProviders.chat || 'dashscope'
-    const providerConfig = settings.providerConfigs[providerId]
-    const apiKey = providerConfig?.apiKey || settings.apiKey || ''
-    if (apiKey) {
-      createProvider(providerId, {
-        apiKey,
-        chatModel: settings.chatModel || 'qwen-turbo',
-        baseUrl: providerConfig?.baseUrl,
-      })
-      providerLog.info('初始化： %s, model=%s', providerId, settings.chatModel || 'qwen-turbo')
-    } else {
-      providerLog.info('未配置 API Key，provider 初始化推迟到首次对话')
-    }
     await aiService.init(userDataPath)
     await cleanupToolResultOffloads(userDataPath)
     aiServiceReady = true

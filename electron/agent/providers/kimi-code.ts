@@ -22,7 +22,7 @@ export class KimiCodeProvider extends LLMProvider {
     if (!key) throw new Error('未填写 API Key')
 
     const baseURL = config.baseUrl?.trim() || KIMI_CODE_BASE_URL
-    const chatModelId = config.chatModel.trim() || 'kimi-k2.5'
+    const chatModelId = config.chatModel.trim()
 
     super(
       new ChatAnthropic({

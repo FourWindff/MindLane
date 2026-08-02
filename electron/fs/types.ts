@@ -76,7 +76,7 @@ export interface ProviderConfig {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
-  chatModel: 'qwen-turbo',
+  chatModel: '',
   activeProviders: { chat: 'dashscope', image: 'dashscope' },
   providerConfigs: {},
   editor: {
