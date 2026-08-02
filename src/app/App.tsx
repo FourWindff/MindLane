@@ -11,7 +11,6 @@ import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
 import { FileManager } from '@/features/workspace/components/FileManager'
 import {
   initializeWorkspaceSession,
-  saveMindmapFileByUuidSilently,
   saveCurrentDocumentSilently,
   useWorkspaceStore,
 } from '@/features/workspace/store'
@@ -27,6 +26,7 @@ import {
   useAiStore,
 } from '@/features/chat/model/aiStore'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
 import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 import './styles/app-shell.css'
@@ -92,7 +92,13 @@ function AppContent() {
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
       getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
       handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor as never),
-      persistFile: (fileUuid) => void saveMindmapFileByUuidSilently(fileUuid),
+      persistFile: (fileUuid) => {
+        const instance = mindmapRegistry.getByFileUuid(fileUuid)
+        if (!instance) return
+        void saveMindmapInstance(instance, {
+          onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
+        })
+      },
       actionToolNames: MINDMAP_ACTION_TOOLS,
     }).start()
     return () => {

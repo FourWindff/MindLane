@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
@@ -186,25 +187,14 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
   const activeInstance = mindmapRegistry.getActive()
   const mindmapState = activeInstance?.store.getState()
 
-  if (!mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) {
+  if (!activeInstance || !mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) {
     return true
   }
 
-  const data = mindmapState.toMindLaneFile()
-
   if (mindmapState.filePath) {
-    const result = await window.mindlane?.file.save({
-      filePath: mindmapState.filePath,
-      data,
+    return saveMindmapInstance(activeInstance, {
+      onError: (message) => useWorkspaceStore.setState({ lastError: message }),
     })
-    if (!result?.ok) {
-      useWorkspaceStore.setState({ lastError: result?.error ?? '自动保存失败' })
-      return false
-    }
-    mindmapState.setFilePath(result.data.filePath)
-    mindmapState.markClean()
-    await workspaceState.syncAfterFileSaved(result.data.filePath)
-    return true
   }
 
   const workspacePath = workspaceState.workspacePath
@@ -213,7 +203,11 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
     return false
   }
 
-  const createResult = await createUniqueWorkspaceFile(workspacePath, mindmapState.fileTitle, data)
+  const createResult = await createUniqueWorkspaceFile(
+    workspacePath,
+    mindmapState.fileTitle,
+    mindmapState.toMindLaneFile(),
+  )
   if (!createResult.ok) {
     useWorkspaceStore.setState({ lastError: createResult.error })
     return false
@@ -222,50 +216,6 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
   loadMindLaneFile(createResult.filePath, createResult.data)
   await workspaceState.syncAfterFileSaved(createResult.filePath)
   return true
-}
-
-export async function saveMindmapFileByUuidSilently(fileUuid: string): Promise<boolean> {
-  const instance = mindmapRegistry.getByFileUuid(fileUuid)
-  if (!instance) return true
-  const mindmapState = instance.store.getState()
-  if (!mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) return true
-  if (!mindmapState.filePath) {
-    useAiStore.getState().setFileError(fileUuid, '后台导图尚未关联文件，无法保存')
-    return false
-  }
-
-  try {
-    const savedNodes = mindmapState.nodes
-    const savedEdges = mindmapState.edges
-    const savedDocumentRefs = mindmapState.documentRefs
-    const result = await window.mindlane?.file.save({
-      filePath: mindmapState.filePath,
-      data: mindmapState.toMindLaneFile(),
-    })
-    if (!result?.ok) {
-      useAiStore.getState().setFileError(fileUuid, result?.error ?? '后台导图保存失败')
-      return false
-    }
-    const latestState = instance.store.getState()
-    latestState.setFilePath(result.data.filePath)
-    if (
-      latestState.nodes === savedNodes &&
-      latestState.edges === savedEdges &&
-      latestState.documentRefs === savedDocumentRefs
-    ) {
-      latestState.markClean()
-    }
-    await useWorkspaceStore.getState().syncAfterFileSaved(result.data.filePath)
-    return true
-  } catch (error) {
-    useAiStore
-      .getState()
-      .setFileError(
-        fileUuid,
-        `后台导图保存失败：${error instanceof Error ? error.message : String(error)}`,
-      )
-    return false
-  }
 }
 
 async function applySessionState(

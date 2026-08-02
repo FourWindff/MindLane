@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { toPng } from 'html-to-image'
 import type { ReactFlowInstance } from '@xyflow/react'
 import { useAiStore } from '@/features/chat/model/aiStore'
+import { saveMindmapInstance } from '../model/saveMindmapInstance'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
@@ -56,24 +57,40 @@ export function useMindmapPersistence() {
 
   const save = useCallback(async () => {
     const store = activeInstance.store.getState()
-    const ai = useAiStore.getState()
-    try {
-      const data = store.toMindLaneFile()
-      const result = await window.mindlane?.file.save({ filePath: store.filePath, data })
-      if (!result?.ok) return
+    if (!store.filePath) {
+      // Unsaved document: the main process turns a null filePath into the
+      // save-as dialog; this flow is outside the save protocol.
+      const ai = useAiStore.getState()
+      try {
+        const data = store.toMindLaneFile()
+        const result = await window.mindlane?.file.save({ filePath: null, data })
+        if (!result?.ok) return
 
-      store.setFilePath(result.data.filePath)
-      store.markClean()
-      await syncAfterFileSaved(result.data.filePath)
+        store.setFilePath(result.data.filePath)
+        store.markClean()
+        await syncAfterFileSaved(result.data.filePath)
 
-      void generateThumbnail(result.data.filePath).then((previewUrl) => {
-        if (previewUrl) updateFilePreviewUrl(result.data.filePath, previewUrl)
-      })
-    } catch (error) {
-      console.error('[MindLane] 保存失败：', error)
-      ai.setError(`保存失败：${error instanceof Error ? error.message : String(error)}`)
+        void generateThumbnail(result.data.filePath).then((previewUrl) => {
+          if (previewUrl) updateFilePreviewUrl(result.data.filePath, previewUrl)
+        })
+      } catch (error) {
+        console.error('[MindLane] 保存失败：', error)
+        ai.setError(`保存失败：${error instanceof Error ? error.message : String(error)}`)
+      }
+      return
     }
-  }, [activeInstance.store, generateThumbnail, syncAfterFileSaved, updateFilePreviewUrl])
+    await saveMindmapInstance(activeInstance, {
+      onError: (message) => {
+        console.error(`[MindLane] ${message}`)
+        useAiStore.getState().setError(message)
+      },
+      afterSave: (savedFilePath) => {
+        void generateThumbnail(savedFilePath).then((previewUrl) => {
+          if (previewUrl) updateFilePreviewUrl(savedFilePath, previewUrl)
+        })
+      },
+    })
+  }, [activeInstance, generateThumbnail, syncAfterFileSaved, updateFilePreviewUrl])
 
   useEffect(() => {
     if (!hasDocumentOpen || !dirty || !filePath || aiBusy || autoSaveIntervalMs <= 0) return

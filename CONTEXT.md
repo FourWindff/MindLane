@@ -154,6 +154,21 @@
 - 若找不到或会话已被删除，则新建对话。
 - 当没有打开文件时，清空聊天状态并显示提示。
 
+## 文件保存
+
+### 保存协议（Save Protocol）
+
+- 所有 mindmap 保存路径共享的唯一保存流程，由 `saveMindmapInstance` 拥有：dirty-check → 守卫快照 → serialize → IPC save → 条件 markClean → `syncAfterFileSaved`。
+- 只覆盖**保存到已知 filePath** 的情形；`filePath` 为 null 时的分支不属于协议，留在调用方：交互保存走另存为对话框，关窗前保存走 workspace 内静默创建，AI 后台保存直接报错。
+- dirty-check 内置：干净文档的保存是 no-op，不重写文件、不重新生成 thumbnail。
+
+### 保存守卫（Save Guard）
+
+- 保存协议内置的竞态防护：在 `toMindLaneFile()` 序列化前捕获 `nodes` / `edges` / `documentRefs` 的引用，IPC 保存完成后重新读取实例状态做引用相等比较，三者均未变才 `markClean`。
+- 比较字段与 `dirty` 的覆盖范围一一对应：`dirty` 只由 `setNodes` / `setEdges` / `addDocumentRef` 置位；`viewport` 与 `fileTitle` 不置 dirty，也不在守卫范围内。
+- 守卫失败即保持 dirty、**不重试**：交互保存路径靠 autosave 兜底，窗口关闭路径接受丢失竞态窗口（毫秒级）内的编辑。
+- 不存在无守卫的保存路径。
+
 ## 文件生命周期与聊天状态
 
 ### rename / move
