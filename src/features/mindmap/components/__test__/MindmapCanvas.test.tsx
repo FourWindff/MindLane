@@ -70,7 +70,7 @@ describe('MindmapCanvas', () => {
     expect(reactFlowProps?.onNodesChange).toBe(onNodesChange)
     expect(reactFlowProps?.onEdgesChange).toBe(onEdgesChange)
     expect(reactFlowProps?.onConnect).toBe(onConnect)
-    expect(reactFlowProps?.nodesDraggable).toBe(true)
+    expect(reactFlowProps?.nodesDraggable).toBe(false)
     expect(reactFlowProps?.nodesConnectable).toBe(true)
     expect(reactFlowProps?.elementsSelectable).toBe(true)
   })

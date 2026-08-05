@@ -67,7 +67,7 @@ export function MindmapCanvas({
       selectionMode={SelectionMode.Partial}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
-      nodesDraggable={!disabled}
+      nodesDraggable={false}
       nodesConnectable={!disabled}
       elementsSelectable={!disabled}
       onMoveEnd={onMoveEnd}
