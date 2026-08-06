@@ -14,13 +14,13 @@ interface ChatInputBarProps {
 }
 
 export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
-  const threadId = useAiStore((s) => s.threadId)
   const busy = useAiStore((s) => s.busy)
-  const addMessage = useAiStore((s) => s.addChatMessage)
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
+  const sendChatMessage = useAiStore((s) => s.sendChatMessage)
+  const stopChatStream = useAiStore((s) => s.stopChatStream)
 
-  const { selectedNodes, buildContext, clearNodeSelection } = useChatContext()
+  const { selectedNodes, clearNodeSelection } = useChatContext()
 
   const chatReady = useSettingsStore(selectChatReady)
   const settingsLoaded = useSettingsStore((s) => s.loaded)
@@ -63,54 +63,12 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
 
   const send = useCallback(async () => {
     const text = inputRef.current?.value.trim() || ''
-    const doc = useAiStore.getState().attachedDocument
-
-    if ((!text && !doc) || busy) return
-    if (!chatReady) return
-
-    const userMsg = {
-      role: 'user' as const,
-      content: text || `请根据「${doc?.filename}」生成思维导图`,
-      ...(doc ? { attachment: { name: doc.filename, type: doc.type } } : {}),
+    const accepted = await sendChatMessage(text)
+    if (accepted && inputRef.current) {
+      inputRef.current.value = ''
+      setInputRows(1)
     }
-    addMessage(userMsg)
-    if (inputRef.current) inputRef.current.value = ''
-    setInputRows(1)
-
-    useAiStore.getState().setBusy(true)
-    useAiStore.getState().setStep('chatting')
-    const api = window.mindlane?.ai
-    if (!api) return
-
-    const context = buildContext()
-    const originFileUuid = useAiStore.getState().currentFileUuid
-    const originSessionId = threadId
-    const originFileName = context.fileTitle
-    setAttachedDocument(null)
-    const result = await api.chatStream({
-      threadId: originSessionId,
-      message: text || `请根据「${doc?.filename}」生成思维导图`,
-      context,
-    })
-    if (result.ok) {
-      const state = useAiStore.getState()
-      if (originFileUuid) {
-        state.registerStream(originFileUuid, originSessionId, result.streamId, originFileName)
-      }
-    } else if (originFileUuid) {
-      useAiStore.getState().setFileError(originFileUuid, result.error)
-    }
-  }, [chatReady, busy, threadId, addMessage, buildContext, setAttachedDocument])
-
-  const stop = useCallback(() => {
-    const api = window.mindlane?.ai
-    if (!api) return
-    const streamId = useAiStore.getState().activeStreamId
-    if (streamId) {
-      useAiStore.getState().markStreamStopping(useAiStore.getState().threadId)
-      void api.stopStream(streamId)
-    }
-  }, [])
+  }, [sendChatMessage])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -189,7 +147,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             <button
               type="button"
               className="chat-input-bar__stop"
-              onClick={stop}
+              onClick={stopChatStream}
               title="停止生成"
               aria-label="停止生成"
             >

@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
+import { buildChatContext } from '@/features/chat/lib/buildChatContext'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { ChatStreamEvent } from '../../../../electron/preload'
 
 function generateSessionId(): string {
@@ -106,6 +108,8 @@ interface AiState {
   updateFileLocation: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string, fileName?: string) => void
   markStreamStopping: (sessionId: string) => void
+  sendChatMessage: (text: string) => Promise<boolean>
+  stopChatStream: () => void
 }
 
 export function createFileChatState(activeSessionId = generateSessionId()): FileChatState {
@@ -449,6 +453,59 @@ export const useAiStore = create<AiState>((set, get) => ({
         },
       }
     })
+  },
+
+  // Owns the send handshake: await chatStream for the streamId first, then
+  // registerStream with the origin ids captured before the await. All guards
+  // read fresh state via get() instead of render-time snapshots.
+  sendChatMessage: async (text) => {
+    const doc = get().attachedDocument
+    if ((!text && !doc) || get().busy) return false
+    if (!selectChatReady(useSettingsStore.getState())) return false
+
+    const message = text || `请根据「${doc?.filename}」生成思维导图`
+    get().addChatMessage({
+      role: 'user',
+      content: message,
+      ...(doc ? { attachment: { name: doc.filename, type: doc.type } } : {}),
+    })
+
+    // Checked before setBusy so a missing IPC bridge cannot wedge the UI in
+    // the busy state.
+    const api = window.mindlane?.ai
+    if (!api) return true
+
+    get().setBusy(true)
+    get().setStep('chatting')
+
+    const context = buildChatContext()
+    const originFileUuid = get().currentFileUuid
+    const originSessionId = get().threadId
+    const originFileName = context.fileTitle
+    get().setAttachedDocument(null)
+
+    const result = await api.chatStream({
+      threadId: originSessionId,
+      message,
+      context,
+    })
+    if (result.ok) {
+      if (originFileUuid) {
+        get().registerStream(originFileUuid, originSessionId, result.streamId, originFileName)
+      }
+    } else if (originFileUuid) {
+      get().setFileError(originFileUuid, result.error)
+    }
+    return true
+  },
+  stopChatStream: () => {
+    const api = window.mindlane?.ai
+    if (!api) return
+    const streamId = get().activeStreamId
+    if (streamId) {
+      get().markStreamStopping(get().threadId)
+      void api.stopStream(streamId)
+    }
   },
 }))
 

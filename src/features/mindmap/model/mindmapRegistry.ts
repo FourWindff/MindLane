@@ -13,7 +13,9 @@ type Listener = () => void
  */
 export class MindmapRegistry {
   private instances = new Map<string, MindmapInstance>()
-  private defaultInstance = new MindmapInstance(DEFAULT_KEY)
+  // Lazily created so module init never constructs a MindmapInstance; eager
+  // construction here closes an import cycle through aiStore -> buildChatContext.
+  private defaultInstance: MindmapInstance | null = null
   private activeKey: string | null = null
   private listeners = new Set<Listener>()
 
@@ -60,6 +62,9 @@ export class MindmapRegistry {
   }
 
   getDefault(): MindmapInstance {
+    if (!this.defaultInstance) {
+      this.defaultInstance = new MindmapInstance(DEFAULT_KEY)
+    }
     return this.defaultInstance
   }
 
@@ -86,7 +91,7 @@ export class MindmapRegistry {
   }
 
   resetDefault(): void {
-    this.defaultInstance.dispose()
+    this.defaultInstance?.dispose()
     this.defaultInstance = new MindmapInstance(DEFAULT_KEY)
     this.emit()
   }

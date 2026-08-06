@@ -1,11 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useWorkspaceStore } from '@/features/workspace/store'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useAiStore } from '@/features/chat/model/aiStore'
-import { extractNodeInfo } from '@/features/chat/lib/chatUtils'
-import type { ChatContext } from '../../../../electron/preload'
 
 function useShallowById<T, U extends { id: string }>(
   selector: (state: T) => U[],
@@ -40,46 +36,6 @@ export function useChatContext() {
 
   const editor = useActiveMindmapEditor()
 
-  const buildContext = useCallback((): ChatContext => {
-    const mindmapState = activeInstance.store.getState()
-    const wsState = useWorkspaceStore.getState()
-    const ctx: ChatContext = { fileUuid: mindmapState.fileUuid ?? '' }
-
-    if (!ctx.fileUuid) return ctx
-    if (mindmapState.filePath) ctx.filePath = mindmapState.filePath
-    if (mindmapState.fileTitle) ctx.fileTitle = mindmapState.fileTitle
-    ctx.hasDocumentOpen = mindmapState.hasDocumentOpen
-
-    if (typeof mindmapState.getContextSummary === 'function') {
-      ctx.mindmapSummary = mindmapState.getContextSummary()
-    }
-
-    if (mindmapState.documentRefs.length > 0) {
-      ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({ ...doc }))
-    }
-
-    const selected = mindmapState.nodes.filter((n) => n.selected)
-    if (selected.length > 0) {
-      ctx.selectedNodes = selected.map(extractNodeInfo)
-    }
-
-    if (wsState.workspacePath) {
-      ctx.workspacePath = wsState.workspacePath
-      ctx.workspaceFiles = wsState.files.map((f) => ({
-        name: f.name,
-        filePath: f.filePath,
-      }))
-    }
-
-    // Include attached document reference
-    const aiState = useAiStore.getState()
-    if (aiState.attachedDocument) {
-      ctx.attachedDocument = aiState.attachedDocument
-    }
-
-    return ctx
-  }, [activeInstance])
-
   const clearNodeSelection = useCallback(() => {
     editor.clearNodeSelection()
   }, [editor])
@@ -106,7 +62,6 @@ export function useChatContext() {
   return {
     capabilities,
     selectedNodes,
-    buildContext,
     clearNodeSelection,
     emptyHint,
     quickActions,

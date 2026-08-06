@@ -120,6 +120,15 @@
 - 维护 `sessionId -> fileUuid` 映射与 `activeStreamIds: Record<sessionId, streamId>`。
 - 收到事件时先通过 `sessionId` 找到 `fileUuid`，再校验 `streamId` 是否仍有效；无效则丢弃。
 - `end`/`error` 事件后从 `activeStreamIds` 中移除对应条目。
+- 注册前到达事件的缓冲与配对冲刷见「发送握手」。
+
+### 发送握手（Send Handshake）
+
+- 发起一次流式对话的固定时序，由 aiStore 的 `sendChatMessage` action 唯一拥有，组件不参与。
+- 顺序即正确性：先 `await chatStream` 拿到 `streamId`，再以发起方身份调用 `registerStream(fileUuid, sessionId, streamId, fileName)`；两步不可对调、不可由不同模块分担。
+- invoke 未 resolve 期间到达的流事件进入 pending-event buffer（按 `sessionId` 暂存）；`registerStream` 注册映射后配对冲刷，只放行 `streamId` 匹配的事件。
+- 握手全程以发起前捕获的 origin ids（`fileUuid` / `sessionId` / `fileName`）为准，不用切换文件后的当前投影。
+- 握手与 buffer 住在同一 module（`aiStore.ts`），时序由单元测试固定。
 
 ### 会话 API
 
