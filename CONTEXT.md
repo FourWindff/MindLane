@@ -243,6 +243,24 @@
 - `contextWindow` 来自 provider 的 `ChatModelOption`，未填写时回退 32k。
 - 40% 是刻意保留的裕量，同时覆盖 prompt 模板与模型输出开销，不做精确 token 计数。
 
+### Leaf 提取（Leaf Extraction）
+
+- 对一个 batch 调用 reasoning model、产出一棵 YAML 结构树的过程，是导图生成的最小工作单元。
+- 多个 leaf 之间**无依赖、可并行**；结果按 `batchIndex` 排序后进入归并，文档叙事顺序不因完成顺序乱序而改变。
+- 单个 leaf 内部有 YAML 校验重试；重试耗尽即整轮 fail-fast，不存在"跳过失败 batch 继续生成"的降级路径。
+
+### Wave（波）
+
+- 导图生成并发调度的唯一机制：路由函数一次发出 ≤ 并发上限（当前为 4）个 `Send` 并行分支，super-step 屏障收齐结果后再发下一波。
+- 并发上限只由波宽控制，代码中不存在无上限的并行 fan-out，也不存在手写 semaphore。
+- 每个分支是 graph 中的独立节点调用，为未来 leaf 粒度 checkpoint/resume 保留结构兼容（resume 本身当前是范围外）。
+
+### 归并轮次（Merge Round）
+
+- 全部 leaf 完成后，把树按 8 棵一组分组、按 wave 机制并行合并的一轮；若一轮产出多棵树，则以产出为输入进入下一轮，直到收敛为单棵 `finalTree`。
+- 两阶段 map-reduce 的 reduce 阶段：leaf 全部完成前**不做**任何穿插式合并（旧的"攒够 8 棵就提前 merge"设计已废弃）。
+- 单个 leaf 的文档跳过整个归并阶段，其结果直接成为 `finalTree`。
+
 ## AI Provider
 
 ### Provider 解析（Provider Resolution）

@@ -27,10 +27,8 @@ describe('MindmapSubgraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
@@ -66,10 +64,8 @@ describe('MindmapSubgraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: {
         id: 'doc-1',
@@ -105,16 +101,14 @@ describe('MindmapSubgraphState', () => {
       mindmapYaml: 'root:\n  label: Test\n',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
   })
 
-  it('replaces leafResults via reducer', async () => {
+  it('appends leafResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addLeaf', async () => {
         return { leafResults: [{ batchIndex: 1, batchId: 'c2', tree: { root: 'b' } }] }
@@ -136,19 +130,49 @@ describe('MindmapSubgraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
     })
 
-    expect(result.leafResults).toHaveLength(1)
-    expect(result.leafResults[0].batchId).toBe('c2')
+    expect(result.leafResults).toHaveLength(2)
+    expect(result.leafResults[0].batchId).toBe('c1')
+    expect(result.leafResults[1].batchId).toBe('c2')
   })
 
-  it('replaces mergeResults via reducer', async () => {
+  it('clears leafResults when a node writes null', async () => {
+    const graph = new StateGraph(MindmapSubgraphState)
+      .addNode('clearLeaves', async () => {
+        return { leafResults: null }
+      })
+      .addEdge('__start__', 'clearLeaves')
+      .addEdge('clearLeaves', '__end__')
+
+    const compiled = graph.compile()
+    const result = await compiled.invoke({
+      messages: [],
+      context: null,
+      pendingSubgraph: 'mindmap',
+      pendingSubgraphToolCallId: '',
+      pendingSubgraphToolName: '',
+      response: '',
+      error: '',
+      mindmapInputSource: null,
+      mindmapInputTitle: '',
+      mindmapYaml: '',
+      mindmapTitle: '',
+      documentBatches: [],
+      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
+      mergeInputs: [],
+      mergeResults: [],
+      documentRef: null,
+    })
+
+    expect(result.leafResults).toHaveLength(0)
+  })
+
+  it('appends mergeResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addMerge', async () => {
         return { mergeResults: [{ groupIndex: 1, tree: { root: 'b' } }] }
@@ -170,16 +194,15 @@ describe('MindmapSubgraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [{ groupIndex: 0, tree: { root: 'a' } }],
       documentRef: null,
     })
 
-    expect(result.mergeResults).toHaveLength(1)
-    expect(result.mergeResults[0].groupIndex).toBe(1)
+    expect(result.mergeResults).toHaveLength(2)
+    expect(result.mergeResults[0].groupIndex).toBe(0)
+    expect(result.mergeResults[1].groupIndex).toBe(1)
   })
 })
 
@@ -209,10 +232,8 @@ describe('MainGraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
       palaceInputText: ' palace text',
@@ -245,10 +266,8 @@ describe('MainGraphState', () => {
       mindmapYaml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafCursor: 0,
       leafResults: [],
       mergeInputs: [],
-      partialMergedTrees: [],
       mergeResults: [],
       documentRef: null,
       palaceInputText: '',

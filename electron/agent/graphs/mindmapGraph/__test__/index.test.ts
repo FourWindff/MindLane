@@ -38,12 +38,11 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     mindmapYaml: '',
     mindmapTitle: '',
     documentBatches: [],
-    leafCursor: 0,
+    batchIndex: -1,
     leafResults: [],
     mergeInputs: [],
-    partialMergedTrees: [],
+    mergeGroup: null,
     mergeResults: [],
-    pendingMergeGroups: [],
     finalTree: null,
     documentRef: null,
     ...overrides,
@@ -128,7 +127,7 @@ describe('mindmapGraph', () => {
       steps.push((event as { step: string }).step)
     }
 
-    expect(steps).toEqual(['reading-doc', 'extracting', 'finalizing'])
+    expect(steps).toEqual(['reading-doc', 'extracting', 'extracting', 'finalizing'])
   })
 
   it('routes a long document through leaf batches and a final merge', async () => {
@@ -174,7 +173,8 @@ describe('mindmapGraph', () => {
     expect(thirdPrompt).toContain(tail)
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
     expect(steps[0]).toBe('reading-doc')
-    expect(steps.filter((step) => step === 'extracting')).toHaveLength(3)
+    // one phase-start event plus one per completed batch
+    expect(steps.filter((step) => step === 'extracting')).toHaveLength(4)
     expect(steps).toContain('merging')
     expect(steps.at(-1)).toBe('finalizing')
   })
@@ -281,12 +281,11 @@ describe('mindmapGraph', () => {
         mindmapYaml: 'Stale Root:\n  - Stale Child\n',
         mindmapTitle: 'Stale Root',
         documentBatches: [[new Document({ pageContent: 'stale text' })]],
-        leafCursor: 99,
+        batchIndex: 99,
         leafResults: [{ batchIndex: 0, batchId: 'stale-batch', tree: { label: 'Stale Leaf' } }],
         mergeInputs: [{ label: 'Stale Merge Input' }],
-        partialMergedTrees: [{ label: 'Stale Partial' }],
+        mergeGroup: { groupIndex: 0, trees: [{ label: 'Stale Group' }] },
         mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge' } }],
-        pendingMergeGroups: [{ groupIndex: 0, trees: [{ label: 'Stale Group' }] }],
         finalTree: { label: 'Stale Final' },
       }),
     )
@@ -370,7 +369,7 @@ describe('mindmapGraph', () => {
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
 
-  it('merges a full analysis queue before dispatching remaining leaf batches', async () => {
+  it('extracts all leaf batches before any merge starts', async () => {
     // 9 paragraphs of ~1900 chars → 9 chunks; small window gives each its own batch
     const paragraphs = Array.from({ length: 9 }, (_, i) => `p${i}${'w'.repeat(1898)}`)
     const longText = paragraphs.join('\n\n')
@@ -398,18 +397,197 @@ describe('mindmapGraph', () => {
 
     expect(result.error).toBe('')
     expect(result.leafResults).toHaveLength(9)
-    expect(events.slice(0, 10)).toEqual([
-      'leaf',
-      'leaf',
-      'leaf',
-      'leaf',
-      'leaf',
-      'leaf',
-      'leaf',
-      'leaf',
-      'merge',
-      'leaf',
-    ])
+    // two-phase map-reduce: all 9 leaves finish before the first merge,
+    // then round 1 (8+1 → 2 merges) and round 2 (2 → 1 merge) converge
+    expect(events.filter((e) => e === 'leaf')).toHaveLength(9)
+    expect(events.filter((e) => e === 'merge')).toHaveLength(3)
+    expect(events.indexOf('merge')).toBeGreaterThan(events.lastIndexOf('leaf'))
+  })
+})
+
+describe('mindmapGraph wave concurrency', () => {
+  /** n paragraphs of ~1900 chars each; with a 512-token window each becomes its own batch. */
+  function manyBatchText(n: number): string {
+    return Array.from({ length: n }, (_, i) => `p${i}${'w'.repeat(1898)}`).join('\n\n')
+  }
+
+  /** Leaf output embeds the paragraph marker (pN) so call sites stay identifiable. */
+  function identifiableLeafProvider(onInvoke?: (messages: Array<{ content: string }>) => void) {
+    return mockProvider((messages) => {
+      onInvoke?.(messages)
+      const systemPrompt = messages[0]?.content ?? ''
+      if (systemPrompt.includes('merging assistant')) {
+        return { content: 'Merged Root:\n  - Combined\n' }
+      }
+      const marker = /p(\d+)/.exec(messages[1]?.content ?? '')?.[1] ?? 'x'
+      return { content: `Root p${marker}:\n  - item${marker}\n` }
+    }, 512)
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    const promise = new Promise<T>((res) => {
+      resolve = res
+    })
+    return { promise, resolve }
+  }
+
+  it('caps concurrent in-flight model calls at 4', async () => {
+    let inFlight = 0
+    let peak = 0
+    const provider = identifiableLeafProvider()
+    invokeMock(provider).mockImplementation(async (messages: Array<{ content: string }>) => {
+      inFlight += 1
+      peak = Math.max(peak, inFlight)
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        const systemPrompt = messages[0]?.content ?? ''
+        if (systemPrompt.includes('merging assistant')) {
+          return { content: 'Merged Root:\n  - Combined\n' }
+        }
+        const marker = /p(\d+)/.exec(messages[1]?.content ?? '')?.[1] ?? 'x'
+        return { content: `Root p${marker}:\n  - item${marker}\n` }
+      } finally {
+        inFlight -= 1
+      }
+    })
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: manyBatchText(10) },
+        mindmapInputTitle: 'Concurrent Doc',
+      }),
+      { recursionLimit: 100 },
+    )
+
+    expect(result.error).toBe('')
+    expect(result.leafResults).toHaveLength(10)
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(4)
+  })
+
+  it('keeps document order in the merge prompt even when batches finish out of order', async () => {
+    const slow = deferred<{ content: string }>()
+    const provider = mockProvider((messages) => {
+      const user = messages[1]?.content ?? ''
+      if (user.includes('p0')) return slow.promise // batch 0 finishes last
+      const marker = /p(\d+)/.exec(user)?.[1]
+      if (marker) return { content: `Root p${marker}:\n  - item${marker}\n` }
+      return { content: 'Merged Root:\n  - Combined\n' }
+    }, 512)
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const resultPromise = app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: manyBatchText(4) },
+        mindmapInputTitle: 'Out Of Order Doc',
+      }),
+      { recursionLimit: 100 },
+    )
+
+    // let batches 1-3 complete, then release batch 0
+    await vi.waitFor(() => expect(invokeMock(provider)).toHaveBeenCalledTimes(4))
+    slow.resolve({ content: 'Root p0:\n  - item0\n' })
+    const result = await resultPromise
+
+    expect(result.error).toBe('')
+    const mergeCall = invokeMock(provider).mock.calls.find((call) =>
+      String(call[0]?.[0]?.content ?? '').includes('merging assistant'),
+    )
+    const mergePrompt = String(mergeCall?.[0]?.[1]?.content ?? '')
+    const p0 = mergePrompt.indexOf('Root p0')
+    const p1 = mergePrompt.indexOf('Root p1')
+    const p2 = mergePrompt.indexOf('Root p2')
+    const p3 = mergePrompt.indexOf('Root p3')
+    expect(p0).toBeGreaterThanOrEqual(0)
+    expect(p0).toBeLessThan(p1)
+    expect(p1).toBeLessThan(p2)
+    expect(p2).toBeLessThan(p3)
+  })
+
+  it('fails the whole run fast when one batch keeps rejecting and dispatches no further waves', async () => {
+    const provider = mockProvider((messages) => {
+      const user = messages[1]?.content ?? ''
+      if (user.includes('p1')) return Promise.reject(new Error('boom p1'))
+      const marker = /p(\d+)/.exec(user)?.[1] ?? 'x'
+      return { content: `Root p${marker}:\n  - item${marker}\n` }
+    }, 512)
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: manyBatchText(6) },
+        mindmapInputTitle: 'Failing Doc',
+      }),
+      { recursionLimit: 100 },
+    )
+
+    expect(result.error).toContain('boom p1')
+    expect(result.mindmapYaml).toBe('')
+    // only the first wave (batches 0-3) ran; batches 4-5 were never dispatched
+    expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
+  })
+
+  it('merges in grouped waves and converges over multiple rounds', async () => {
+    const mergePrompts: string[] = []
+    const provider = identifiableLeafProvider((messages) => {
+      if ((messages[0]?.content ?? '').includes('merging assistant')) {
+        mergePrompts.push(messages[1]?.content ?? '')
+      }
+    })
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: manyBatchText(9) },
+        mindmapInputTitle: 'Huge Doc',
+      }),
+      { recursionLimit: 100 },
+    )
+
+    expect(result.error).toBe('')
+    expect(result.leafResults).toHaveLength(9)
+    // round 1: 9 trees → groups of 8 + 1; round 2: 2 trees → 1 group
+    expect(mergePrompts).toHaveLength(3)
+    expect(mergePrompts[0]).toContain('--- Tree 8 ---')
+    expect(mergePrompts[1]).toContain('--- Tree 1 ---')
+    expect(mergePrompts[1]).not.toContain('--- Tree 2 ---')
+    expect(mergePrompts[2]).toContain('--- Tree 2 ---')
+    expect(result.mindmapYaml).toContain('Merged Root')
+  })
+
+  it('emits quantified progress events with the step enum unchanged', async () => {
+    const provider = identifiableLeafProvider()
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const events: Array<{ step: string; completed?: number; total?: number }> = []
+    const stream = await app.stream(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: manyBatchText(3) },
+        mindmapInputTitle: 'Progress Doc',
+      }),
+      { streamMode: 'custom', recursionLimit: 100 },
+    )
+    for await (const event of stream) {
+      events.push(event as { step: string; completed?: number; total?: number })
+    }
+
+    expect(events[0]?.step).toBe('reading-doc')
+    expect(events.at(-1)?.step).toBe('finalizing')
+
+    // phase-start events carry no counts; per-item events carry completed/total
+    const extracting = events.filter((e) => e.step === 'extracting')
+    const extractingItems = extracting.filter((e) => e.completed !== undefined)
+    expect(extracting).toHaveLength(4)
+    expect(extracting[0]?.completed).toBeUndefined()
+    expect(extractingItems.map((e) => e.completed).sort()).toEqual([1, 2, 3])
+    expect(extractingItems.every((e) => e.total === 3)).toBe(true)
+
+    const merging = events.filter((e) => e.step === 'merging')
+    expect(merging).toHaveLength(2)
+    expect(merging[0]?.completed).toBeUndefined()
+    expect(merging[1]).toMatchObject({ completed: 1, total: 1 })
   })
 })
 

@@ -14,6 +14,14 @@ function replaceReducer<T>(_prev: T, next: T): T {
   return next
 }
 
+/**
+ * 并行分支汇聚型 reducer：分支结果追加到列表尾部;
+ * 写 `null` 清空(新一轮归并开始前、以及 run 重置时使用)。
+ */
+function appendReducer<T>(current: T[], update: T[] | null): T[] {
+  return update === null ? [] : [...current, ...update]
+}
+
 // ===== 基础类型定义 =====
 
 export type SelectedNodeContent = {
@@ -135,6 +143,13 @@ const PalaceStateAnnotations = {
 
 /**
  * 思维导图状态切片
+ *
+ * 波浪式并发（ADR-0008）:
+ * - `batchIndex` / `mergeGroup` 是 Send 分支的输入载体,每个分支只读自己的那份。
+ * - `leafResults` / `mergeResults` 用 append reducer 汇聚并行分支结果;
+ *   写 `null` 可清空(新一轮归并开始前、以及 run 重置时使用)。
+ * - `mergeInputs` 语义收窄为「当前归并轮次的输入树列表」,由 start_merge_round
+ *   节点写入,供波式路由跨 super-step 稳定读取。
  */
 const MindmapStateAnnotations = {
   mindmapInputSource: Annotation<MindmapInputSource | null>({
@@ -157,28 +172,30 @@ const MindmapStateAnnotations = {
     reducer: replaceReducer,
     default: () => [],
   }),
-  leafCursor: Annotation<number>({
+  batchIndex: Annotation<number>({
     reducer: replaceReducer,
-    default: () => 0,
+    default: () => -1,
   }),
-  leafResults: Annotation<Array<{ batchIndex: number; batchId: string; tree: unknown }>>({
-    reducer: replaceReducer,
+  leafResults: Annotation<
+    Array<{ batchIndex: number; batchId: string; tree: unknown }>,
+    Array<{ batchIndex: number; batchId: string; tree: unknown }> | null
+  >({
+    reducer: appendReducer,
     default: () => [],
   }),
   mergeInputs: Annotation<unknown[]>({
     reducer: replaceReducer,
     default: () => [],
   }),
-  partialMergedTrees: Annotation<unknown[]>({
+  mergeGroup: Annotation<{ groupIndex: number; groupCount: number; trees: unknown[] } | null>({
     reducer: replaceReducer,
-    default: () => [],
+    default: () => null,
   }),
-  mergeResults: Annotation<Array<{ groupIndex: number; tree: unknown }>>({
-    reducer: replaceReducer,
-    default: () => [],
-  }),
-  pendingMergeGroups: Annotation<Array<{ groupIndex: number; trees: unknown[] }>>({
-    reducer: replaceReducer,
+  mergeResults: Annotation<
+    Array<{ groupIndex: number; tree: unknown }>,
+    Array<{ groupIndex: number; tree: unknown }> | null
+  >({
+    reducer: appendReducer,
     default: () => [],
   }),
   finalTree: Annotation<unknown | null>({

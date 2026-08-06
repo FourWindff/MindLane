@@ -1,4 +1,4 @@
-import { StateGraph, START, END, getWriter } from '@langchain/langgraph'
+import { StateGraph, START, END, Send, getWriter } from '@langchain/langgraph'
 import path from 'node:path'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
@@ -40,6 +40,8 @@ interface MindmapSubgraphOptions {
 
 const MERGE_GROUP_SIZE = 8
 const YAML_GENERATION_ATTEMPTS = 3
+/** Wave width: max parallel leaf/merge branches per super-step (ADR-0008). */
+const EXTRACT_CONCURRENCY = 4
 
 /** Per-run start times keyed by streamId so summary lines can report total elapsed. */
 const runStarts = new Map<string, number>()
@@ -74,19 +76,39 @@ function emitProgress(step: MindmapProgressStep): void {
   getWriter()?.({ type: 'mindmap-progress', step })
 }
 
-function createMindmapRunReset(): Partial<typeof MindmapSubgraphState.State> {
+/**
+ * Per-run, per-phase completion counters keyed by streamId. Parallel Send
+ * branches can't see each other's results, so the "completed" count lives
+ * here; increment order = actual completion order (single-threaded JS).
+ * Reset at run start and at each merge round; consumed by build_output.
+ */
+const itemProgressCounts = new Map<string, number>()
+
+function resetItemProgress(): void {
+  itemProgressCounts.delete(runKey())
+}
+
+/** Count one finished branch item and emit its quantified progress event. */
+function takeItemProgress(step: MindmapProgressStep, total: number): number {
+  const key = runKey()
+  const completed = (itemProgressCounts.get(key) ?? 0) + 1
+  itemProgressCounts.set(key, completed)
+  getWriter()?.({ type: 'mindmap-progress', step, completed, total })
+  return completed
+}
+
+function createMindmapRunReset(): typeof MindmapSubgraphState.Update {
   return {
     response: '',
     error: '',
     mindmapYaml: '',
     mindmapTitle: '',
     documentBatches: [],
-    leafCursor: 0,
-    leafResults: [],
+    batchIndex: -1,
+    leafResults: null,
     mergeInputs: [],
-    partialMergedTrees: [],
-    mergeResults: [],
-    pendingMergeGroups: [],
+    mergeGroup: null,
+    mergeResults: null,
     finalTree: null,
   }
 }
@@ -202,7 +224,7 @@ function buildYamlRepairPrompt(
 
 async function resolveInputNode(
   state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
+): Promise<typeof MindmapSubgraphState.Update> {
   const reset = createMindmapRunReset()
   const resolution = new MindmapInputResolver().resolve(state)
 
@@ -215,6 +237,7 @@ async function resolveInputNode(
   }
 
   runStarts.set(runKey(), Date.now())
+  resetItemProgress()
   log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
   return {
     ...reset,
@@ -226,7 +249,7 @@ async function resolveInputNode(
 async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
+): Promise<typeof MindmapSubgraphState.Update> {
   emitProgress('reading-doc')
   const source = state.mindmapInputSource
   const reset = createMindmapRunReset()
@@ -331,10 +354,12 @@ async function loadDocumentNode(
       sha256: hash,
     }
 
+    // Phase-start event so the first (possibly long) extraction doesn't look
+    // like the run is still stuck reading the document.
+    emitProgress('extracting')
     return {
       ...reset,
       documentBatches: batches,
-      leafCursor: 0,
       documentRef,
     }
   } catch (error) {
@@ -348,17 +373,22 @@ async function loadDocumentNode(
   }
 }
 
+/**
+ * Leaf branch: invoked via Send with `batchIndex` as its input carrier.
+ * Appends its tree to `leafResults`; completion order does not matter —
+ * start_merge_round sorts by batchIndex before merging.
+ */
 async function leafExtractNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  emitProgress('extracting')
-  const batchIndex = state.leafCursor
+): Promise<typeof MindmapSubgraphState.Update> {
+  const batchIndex = state.batchIndex
   const batch = state.documentBatches[batchIndex]
   if (!batch) {
     return {}
   }
 
+  const total = state.documentBatches.length
   const chunksText = batch.map((doc) => doc.pageContent).join('\n\n---\n\n')
   const batchStart = Date.now()
 
@@ -369,11 +399,13 @@ async function leafExtractNode(
       `Batch ${batchIndex + 1}`,
     )
 
+    const completed = takeItemProgress('extracting', total)
     const branches = (tree as { children?: unknown[] }).children?.length ?? 0
     log.info(
-      'leaf %d/%d, 提取 %d 分支, %ss, 重试 %d 次',
+      'batch-%d 完成，第 %d/%d 个, 提取 %d 分支, %ss, 重试 %d 次',
       batchIndex + 1,
-      state.documentBatches.length,
+      completed,
+      total,
       branches,
       ((Date.now() - batchStart) / 1000).toFixed(1),
       attempts - 1,
@@ -381,23 +413,16 @@ async function leafExtractNode(
 
     return {
       leafResults: [
-        ...state.leafResults,
         {
           batchIndex,
           batchId: `batch-${batchIndex + 1}`,
           tree,
         },
       ],
-      leafCursor: batchIndex + 1,
     }
   } catch (error) {
     const formatted = formatAgentError(error)
-    log.error(
-      'leaf %d/%d 提取失败： %s',
-      batchIndex + 1,
-      state.documentBatches.length,
-      formatted.split('\n')[0],
-    )
+    log.error('batch-%d 提取失败： %s', batchIndex + 1, formatted.split('\n')[0])
     return {
       error: formatted,
       response: `提取结构失败：${formatted.split('\n')[0]}`,
@@ -405,153 +430,112 @@ async function leafExtractNode(
   }
 }
 
-async function collectLeafNode(
-  state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const latestResult = state.leafResults[state.leafResults.length - 1]
-  if (!latestResult) {
-    return {}
-  }
-
-  const mergeInputs = [...state.mergeInputs, latestResult.tree]
-  const leafDone = state.leafCursor >= state.documentBatches.length
-
-  // A single leaf result needs no merge — it becomes the finalTree directly
-  if (leafDone && mergeInputs.length === 1 && state.partialMergedTrees.length === 0) {
-    return {
-      mergeInputs: [],
-      finalTree: mergeInputs[0],
-    }
-  }
-
-  return { mergeInputs }
+/** Barrier node: runs once per leaf wave after all branches of the wave land. */
+async function leafGateNode(): Promise<typeof MindmapSubgraphState.Update> {
+  return {}
 }
 
-async function dispatchMergeNode(
+/** Single-leaf shortcut: the only tree becomes finalTree, skipping merge. */
+async function finalizeSingleLeafNode(
   state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  const leafDone = state.leafCursor >= state.documentBatches.length
-  const inputs = leafDone
-    ? [...state.partialMergedTrees, ...state.mergeInputs]
-    : state.mergeInputs.slice(0, MERGE_GROUP_SIZE)
-  const groups: Array<{ groupIndex: number; trees: unknown[] }> = []
+): Promise<typeof MindmapSubgraphState.Update> {
+  return { finalTree: state.leafResults[0]?.tree ?? null }
+}
 
-  for (let i = 0; i < inputs.length; i += MERGE_GROUP_SIZE) {
-    groups.push({
-      groupIndex: Math.floor(i / MERGE_GROUP_SIZE),
-      trees: inputs.slice(i, i + MERGE_GROUP_SIZE),
-    })
-  }
+/**
+ * Start one merge round: snapshot the round's input trees (document order for
+ * round 1, group order for later rounds) into `mergeInputs` and clear
+ * `mergeResults` so this round's branches append into a fresh list.
+ */
+async function startMergeRoundNode(
+  state: typeof MindmapSubgraphState.State,
+): Promise<typeof MindmapSubgraphState.Update> {
+  const trees =
+    state.mergeInputs.length === 0
+      ? [...state.leafResults].sort((a, b) => a.batchIndex - b.batchIndex).map((r) => r.tree)
+      : [...state.mergeResults].sort((a, b) => a.groupIndex - b.groupIndex).map((r) => r.tree)
 
+  resetItemProgress()
+  emitProgress('merging')
   return {
-    pendingMergeGroups: groups,
-    mergeResults: [],
+    mergeInputs: trees,
+    mergeResults: null,
   }
 }
 
+/**
+ * Merge branch: invoked via Send with `mergeGroup` (one group of trees) as its
+ * input carrier. Appends the merged tree to `mergeResults`.
+ */
 async function mergeTreesNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  emitProgress('merging')
-  const groups = state.pendingMergeGroups
-  if (groups.length === 0) {
+): Promise<typeof MindmapSubgraphState.Update> {
+  const group = state.mergeGroup
+  if (!group || group.trees.length === 0) {
     return {}
   }
 
-  // For simplicity, process groups sequentially
-  const results: Array<{ groupIndex: number; tree: unknown }> = []
+  const totalGroups = group.groupCount
+  const treesYaml = group.trees
+    .map((tree, i) => {
+      const rootTree = extractRootTree(tree, `Tree ${i + 1}`)
+      return `--- Tree ${i + 1} ---\n${rootTree ? serializeMindmapOutline(rootTree) : String(tree)}`
+    })
+    .join('\n\n')
 
-  for (const group of groups) {
-    const treesYaml = group.trees
-      .map((tree, i) => {
-        const rootTree = extractRootTree(tree, `Tree ${i + 1}`)
-        return `--- Tree ${i + 1} ---\n${rootTree ? serializeMindmapOutline(rootTree) : String(tree)}`
-      })
-      .join('\n\n')
+  try {
+    const groupStart = Date.now()
+    const { tree, attempts } = await generateValidMindmapYaml(
+      options.provider,
+      buildMergePrompt(treesYaml),
+      `Merged Tree ${group.groupIndex + 1}`,
+    )
 
-    try {
-      const groupStart = Date.now()
-      const { tree, attempts } = await generateValidMindmapYaml(
-        options.provider,
-        buildMergePrompt(treesYaml),
-        `Merged Tree ${group.groupIndex + 1}`,
-      )
+    const completed = takeItemProgress('merging', totalGroups)
+    log.info(
+      'merge group-%d 完成，第 %d/%d 个, 合并 %d 棵树, %ss, 重试 %d 次',
+      group.groupIndex + 1,
+      completed,
+      totalGroups,
+      group.trees.length,
+      ((Date.now() - groupStart) / 1000).toFixed(1),
+      attempts - 1,
+    )
 
-      log.info(
-        'merge group %d/%d, 合并 %d 棵树, %ss, 重试 %d 次',
-        group.groupIndex + 1,
-        groups.length,
-        group.trees.length,
-        ((Date.now() - groupStart) / 1000).toFixed(1),
-        attempts - 1,
-      )
-
-      results.push({
-        groupIndex: group.groupIndex,
-        tree,
-      })
-    } catch (error) {
-      const formatted = formatAgentError(error)
-      return {
-        error: formatted,
-        response: `合并结构失败：${formatted.split('\n')[0]}`,
-      }
+    return {
+      mergeResults: [{ groupIndex: group.groupIndex, tree }],
     }
-  }
-
-  return {
-    mergeResults: results,
+  } catch (error) {
+    const formatted = formatAgentError(error)
+    log.error('merge group-%d 合并失败： %s', group.groupIndex + 1, formatted.split('\n')[0])
+    return {
+      error: formatted,
+      response: `合并结构失败：${formatted.split('\n')[0]}`,
+    }
   }
 }
 
-async function collectMergeNode(
+/** Barrier node: runs once per merge wave after all branches of the wave land. */
+async function mergeGateNode(): Promise<typeof MindmapSubgraphState.Update> {
+  return {}
+}
+
+/** A converged merge round (exactly one result) yields the final tree. */
+async function finalizeMergeNode(
   state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
-  if (state.finalTree) {
-    return {}
-  }
-
-  const results = state.mergeResults
-  const trees = results.map((r) => r.tree)
-  const leafDone = state.leafCursor >= state.documentBatches.length
-
-  if (!leafDone) {
-    return {
-      partialMergedTrees: [...state.partialMergedTrees, ...trees],
-      mergeInputs: state.mergeInputs.slice(MERGE_GROUP_SIZE),
-      pendingMergeGroups: [],
-      mergeResults: [],
-    }
-  }
-
-  // If only one result, it's the final tree
-  if (results.length === 1) {
-    return {
-      finalTree: results[0]!.tree,
-      mergeInputs: [],
-      partialMergedTrees: [],
-      pendingMergeGroups: [],
-      mergeResults: [],
-    }
-  }
-
-  // Multiple results — need another merge round
-  return {
-    mergeInputs: trees,
-    partialMergedTrees: [],
-    pendingMergeGroups: [],
-    mergeResults: [],
-  }
+): Promise<typeof MindmapSubgraphState.Update> {
+  return { finalTree: state.mergeResults[0]?.tree ?? null }
 }
 
 async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
-): Promise<Partial<typeof MindmapSubgraphState.State>> {
+): Promise<typeof MindmapSubgraphState.Update> {
   emitProgress('finalizing')
-  // build_output always terminates a run — consume the run start here so
-  // failed runs don't leak entries in runStarts.
+  // build_output always terminates a run — consume the run start and the item
+  // progress counter here so failed runs don't leak entries in either map.
   const runStart = takeRunStart()
+  resetItemProgress()
   // Preserve existing error
   if (state.error) {
     return {}
@@ -607,25 +591,74 @@ function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): strin
   return 'load_document'
 }
 
-function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string {
+/** One wave of leaf Sends: at most EXTRACT_CONCURRENCY branches from `fromIndex`. */
+function leafWaveSends(state: typeof MindmapSubgraphState.State, fromIndex: number): Send[] {
+  const end = Math.min(fromIndex + EXTRACT_CONCURRENCY, state.documentBatches.length)
+  const sends: Send[] = []
+  for (let i = fromIndex; i < end; i += 1) {
+    // A Send branch sees only its payload (Pregel PUSH input = packet args),
+    // so the batches it needs must ride along with the batchIndex carrier.
+    sends.push(new Send('leaf_extract', { batchIndex: i, documentBatches: state.documentBatches }))
+  }
+  return sends
+}
+
+/** One wave of merge Sends: at most EXTRACT_CONCURRENCY groups from `fromGroup`. */
+function mergeWaveSends(state: typeof MindmapSubgraphState.State, fromGroup: number): Send[] {
+  const totalGroups = Math.ceil(state.mergeInputs.length / MERGE_GROUP_SIZE)
+  const end = Math.min(fromGroup + EXTRACT_CONCURRENCY, totalGroups)
+  const sends: Send[] = []
+  for (let groupIndex = fromGroup; groupIndex < end; groupIndex += 1) {
+    sends.push(
+      new Send('merge_trees', {
+        mergeGroup: {
+          groupIndex,
+          groupCount: totalGroups,
+          trees: state.mergeInputs.slice(
+            groupIndex * MERGE_GROUP_SIZE,
+            (groupIndex + 1) * MERGE_GROUP_SIZE,
+          ),
+        },
+      }),
+    )
+  }
+  return sends
+}
+
+function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string | Send[] {
   if (state.error) return 'build_output'
-  return 'leaf_extract'
+  return leafWaveSends(state, 0)
 }
 
-function routeAfterCollectLeaf(state: typeof MindmapSubgraphState.State): string {
-  if (state.error || state.finalTree) return 'build_output'
-  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
-  if (state.leafCursor < state.documentBatches.length) return 'leaf_extract'
-  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
-  return 'build_output'
+/**
+ * Leaf wave barrier routing. Fail-fast: any branch error kills the run and no
+ * further waves are dispatched. The next wave starts where the results end —
+ * fail-fast guarantees no holes, so leafResults.length is the next index.
+ */
+function routeAfterLeafGate(state: typeof MindmapSubgraphState.State): string | Send[] {
+  if (state.error) return 'build_output'
+  const done = state.leafResults.length
+  if (done < state.documentBatches.length) return leafWaveSends(state, done)
+  if (done === 1) return 'finalize_single_leaf'
+  return 'start_merge_round'
 }
 
-function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): string {
-  if (state.error || state.finalTree) return 'build_output'
-  if (state.mergeInputs.length >= MERGE_GROUP_SIZE) return 'dispatch_merge'
-  if (state.leafCursor < state.documentBatches.length) return 'leaf_extract'
-  if (state.mergeInputs.length > 0 || state.partialMergedTrees.length > 0) return 'dispatch_merge'
-  return 'build_output'
+function routeAfterStartMergeRound(state: typeof MindmapSubgraphState.State): string | Send[] {
+  if (state.error) return 'build_output'
+  return mergeWaveSends(state, 0)
+}
+
+/**
+ * Merge wave barrier routing: keep waving until the round's groups are done;
+ * one result means convergence, more means another round at reduced width.
+ */
+function routeAfterMergeGate(state: typeof MindmapSubgraphState.State): string | Send[] {
+  if (state.error) return 'build_output'
+  const done = state.mergeResults.length
+  const totalGroups = Math.ceil(state.mergeInputs.length / MERGE_GROUP_SIZE)
+  if (done < totalGroups) return mergeWaveSends(state, done)
+  if (done === 1) return 'finalize_merge'
+  return 'start_merge_round'
 }
 
 // ===== Subgraph 构建器 =====
@@ -635,20 +668,23 @@ function routeAfterCollectMerge(state: typeof MindmapSubgraphState.State): strin
  *
  * Flow:
  * START -> resolve_input -> load_document (load → split → batch, precomputed once)
- *   -> leaf_extract -> collect_leaf -> (loop by batch index, or merge)
- *   -> dispatch_merge -> merge_trees -> collect_merge -> (loop or output)
+ *   -> [wave of ≤ EXTRACT_CONCURRENCY leaf_extract Sends] -> leaf_gate -> (next wave, or merge)
+ *   -> start_merge_round -> [wave of ≤ EXTRACT_CONCURRENCY merge_trees Sends] -> merge_gate
+ *   -> (next wave, next round at reduced width, or finalize_merge)
  *   -> build_output -> END
- * A single leaf result skips merge and goes straight to output.
+ * A single leaf result skips merge and goes straight to finalize_single_leaf.
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
     .addNode('resolve_input', (state) => resolveInputNode(state))
     .addNode('load_document', (state) => loadDocumentNode(state, options))
     .addNode('leaf_extract', (state) => leafExtractNode(state, options))
-    .addNode('collect_leaf', (state) => collectLeafNode(state))
-    .addNode('dispatch_merge', (state) => dispatchMergeNode(state))
+    .addNode('leaf_gate', () => leafGateNode())
+    .addNode('finalize_single_leaf', (state) => finalizeSingleLeafNode(state))
+    .addNode('start_merge_round', (state) => startMergeRoundNode(state))
     .addNode('merge_trees', (state) => mergeTreesNode(state, options))
-    .addNode('collect_merge', (state) => collectMergeNode(state))
+    .addNode('merge_gate', () => mergeGateNode())
+    .addNode('finalize_merge', (state) => finalizeMergeNode(state))
     .addNode('build_output', (state) => buildOutputNode(state))
 
   // START -> resolve_input -> load_document
@@ -658,26 +694,33 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     'build_output',
   ])
 
-  // load_document precomputes batches, then enters the leaf loop directly
+  // load_document precomputes batches, then dispatches the first leaf wave
   graph.addConditionalEdges('load_document', routeAfterLoadDocument, [
     'leaf_extract',
     'build_output',
   ])
 
-  graph.addEdge('leaf_extract', 'collect_leaf')
-  graph.addConditionalEdges('collect_leaf', routeAfterCollectLeaf, [
+  graph.addEdge('leaf_extract', 'leaf_gate')
+  graph.addConditionalEdges('leaf_gate', routeAfterLeafGate, [
     'leaf_extract',
-    'dispatch_merge',
+    'finalize_single_leaf',
+    'start_merge_round',
     'build_output',
   ])
+  graph.addEdge('finalize_single_leaf', 'build_output')
 
-  graph.addEdge('dispatch_merge', 'merge_trees')
-  graph.addEdge('merge_trees', 'collect_merge')
-  graph.addConditionalEdges('collect_merge', routeAfterCollectMerge, [
-    'dispatch_merge',
-    'leaf_extract',
+  graph.addConditionalEdges('start_merge_round', routeAfterStartMergeRound, [
+    'merge_trees',
     'build_output',
   ])
+  graph.addEdge('merge_trees', 'merge_gate')
+  graph.addConditionalEdges('merge_gate', routeAfterMergeGate, [
+    'merge_trees',
+    'start_merge_round',
+    'finalize_merge',
+    'build_output',
+  ])
+  graph.addEdge('finalize_merge', 'build_output')
 
   // Final output
   graph.addEdge('build_output', END)
