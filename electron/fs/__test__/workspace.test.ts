@@ -27,7 +27,6 @@ describe('Workspace', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.lastOpenedFilePath).toBeNull()
-    expect(result.data.expandedFolderPaths).toEqual([])
     expect(result.data.recentFiles).toEqual([])
     expect(result.data.workspaceUuid).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -84,7 +83,6 @@ describe('Workspace', () => {
       statePath,
       JSON.stringify({
         lastOpenedFilePath: docPath,
-        expandedFolderPaths: ['a', 'b'],
         recentFiles: [
           { filePath: docPath, title: 'Doc', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
         ],
@@ -96,7 +94,6 @@ describe('Workspace', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.lastOpenedFilePath).toBe(docPath)
-    expect(result.data.expandedFolderPaths).toEqual(['a', 'b'])
     expect(result.data.recentFiles).toHaveLength(1)
   })
 
@@ -109,7 +106,6 @@ describe('Workspace', () => {
       statePath,
       JSON.stringify({
         lastOpenedFilePath: missingFilePath,
-        expandedFolderPaths: [],
         recentFiles: [],
       }),
     )
@@ -155,7 +151,6 @@ describe('Workspace', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.lastOpenedFilePath).toBeNull()
-    expect(result.data.expandedFolderPaths).toEqual([])
     expect(result.data.recentFiles).toEqual([])
   })
 
@@ -169,7 +164,6 @@ describe('Workspace', () => {
       statePath,
       JSON.stringify({
         lastOpenedFilePath: docPath,
-        expandedFolderPaths: [],
         recentFiles: [],
       }),
     )
@@ -196,7 +190,6 @@ describe('Workspace', () => {
 
     const migrateResult = await workspace.migrateLegacyState(workspacePath, {
       lastOpenedFilePath: existingFile,
-      expandedFolderPaths: ['a', 'b'],
       recentFiles: [
         { filePath: existingFile, title: 'Legacy', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
         { filePath: missingFile, title: 'Missing', lastOpenedAt: '2024-01-01T00:00:00.000Z' },
@@ -208,7 +201,6 @@ describe('Workspace', () => {
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
     expect(loaded.data.lastOpenedFilePath).toBe(existingFile)
-    expect(loaded.data.expandedFolderPaths).toEqual(['a', 'b'])
     expect(loaded.data.recentFiles).toHaveLength(2)
   })
 
@@ -251,14 +243,14 @@ describe('Workspace', () => {
 
     await Promise.all([
       workspace.openFile(workspacePath, fileA, 'A', 10),
-      workspace.updateExpandedFolders(workspacePath, ['x', 'y']),
+      workspace.updateActiveSessionIds(workspacePath, { 'file-a': 'session-a' }),
     ])
 
     const loaded = await workspace.load(workspacePath)
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
     expect(loaded.data.lastOpenedFilePath).toBe(fileA)
-    expect(loaded.data.expandedFolderPaths).toEqual(['x', 'y'])
+    expect(loaded.data.activeSessionIds).toEqual({ 'file-a': 'session-a' })
   })
 
   it('atomically merges concurrent active session updates', async () => {

@@ -64,7 +64,6 @@ export interface WorkspaceState {
   workspaceUuid: string
   activeSessionIds: Record<string, string>
   lastOpenedFilePath: string | null
-  expandedFolderPaths: string[]
   recentFiles: RecentFileEntry[]
 }
 

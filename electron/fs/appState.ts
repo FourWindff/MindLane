@@ -3,7 +3,7 @@ import path from 'node:path'
 import type { AppSettings, FsResult, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
-import { coerceLastOpenedFilePath, coerceExpandedFolderPaths } from './workspace.js'
+import { coerceLastOpenedFilePath } from './workspace.js'
 
 export class AppState {
   private filePath: string
@@ -200,16 +200,11 @@ export class AppState {
         migrated.lastOpenedFilePath = coerceLastOpenedFilePath(raw.lastOpenedFilePath)
         hasLegacy = true
       }
-      if ('expandedFolderPaths' in raw) {
-        migrated.expandedFolderPaths = coerceExpandedFolderPaths(raw.expandedFolderPaths)
-        hasLegacy = true
-      }
 
       if (!hasLegacy) return { ok: true, data: null }
 
       const cleaned = { ...raw }
       delete cleaned.lastOpenedFilePath
-      delete cleaned.expandedFolderPaths
       this.cache = this.merge(cleaned as Partial<AppSettings>)
       await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
       return { ok: true, data: migrated }

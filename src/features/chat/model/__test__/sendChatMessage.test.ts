@@ -41,7 +41,6 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
           activeSessionIds: {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: '/a.mindlane',
-          expandedFolderPaths: [],
           restoreLastWorkspaceOnLaunch: true,
         })),
         updateState: vi.fn(async () => ({ ok: true })),

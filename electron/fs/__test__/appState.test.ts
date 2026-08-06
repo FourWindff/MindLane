@@ -23,7 +23,6 @@ describe('AppState', () => {
       JSON.stringify({
         apiKey: 'key',
         lastOpenedFilePath: '/old/file.mindlane',
-        expandedFolderPaths: ['/a'],
       }),
     )
 
@@ -35,7 +34,6 @@ describe('AppState', () => {
 
     expect(parsed.chatModel).toBe('new-model')
     expect(parsed.lastOpenedFilePath).toBeUndefined()
-    expect(parsed.expandedFolderPaths).toBeUndefined()
   })
 
   it('migrates legacy workspace-scoped keys once when lastWorkspacePath matches', async () => {
@@ -47,7 +45,6 @@ describe('AppState', () => {
         apiKey: 'key',
         lastWorkspacePath: workspacePath,
         lastOpenedFilePath: '/old/file.mindlane',
-        expandedFolderPaths: ['/a', '/b'],
       }),
     )
 
@@ -57,13 +54,11 @@ describe('AppState', () => {
     if (!migrated.ok) return
     expect(migrated.data).toEqual({
       lastOpenedFilePath: '/old/file.mindlane',
-      expandedFolderPaths: ['/a', '/b'],
     })
 
     const raw = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf-8')
     const parsed = JSON.parse(raw)
     expect(parsed.lastOpenedFilePath).toBeUndefined()
-    expect(parsed.expandedFolderPaths).toBeUndefined()
     expect(parsed.lastWorkspacePath).toBe(workspacePath)
     expect(parsed.apiKey).toBe('key')
   })
@@ -77,7 +72,6 @@ describe('AppState', () => {
         apiKey: 'key',
         lastWorkspacePath: '/other/workspace',
         lastOpenedFilePath: '/old/file.mindlane',
-        expandedFolderPaths: ['/a'],
       }),
     )
 
@@ -90,7 +84,6 @@ describe('AppState', () => {
     const raw = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf-8')
     const parsed = JSON.parse(raw)
     expect(parsed.lastOpenedFilePath).toBe('/old/file.mindlane')
-    expect(parsed.expandedFolderPaths).toEqual(['/a'])
   })
 
   it('returns null when no legacy workspace-scoped keys exist', async () => {

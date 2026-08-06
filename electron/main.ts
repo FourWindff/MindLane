@@ -165,14 +165,12 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
       activeSessionIds: {} as Record<string, string>,
       recentWorkspacePaths: [] as string[],
       lastOpenedFilePath: null as string | null,
-      expandedFolderPaths: [] as string[],
       restoreLastWorkspaceOnLaunch: DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
     }
   }
   const { workspacePath, recentWorkspacePaths, restoreLastWorkspaceOnLaunch } = launchResult.data
 
   let lastOpenedFilePath: string | null = null
-  let expandedFolderPaths: string[] = []
   let workspaceUuid: string | null = null
   let activeSessionIds: Record<string, string> = {}
   if (workspacePath) {
@@ -180,7 +178,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     const workspaceState = workspaceResult.ok
       ? workspaceResult.data
       : { ...DEFAULT_WORKSPACE_STATE }
-    expandedFolderPaths = workspaceState.expandedFolderPaths
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
     workspaceUuid = workspaceState.workspaceUuid
     activeSessionIds = workspaceState.activeSessionIds
@@ -193,7 +190,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
         await service.workspace.migrateLegacyState(workspacePath, legacyResult.data)
         const reloaded = await service.workspace.load(workspacePath)
         if (reloaded.ok) {
-          expandedFolderPaths = reloaded.data.expandedFolderPaths
           lastOpenedFilePath = reloaded.data.lastOpenedFilePath
           workspaceUuid = reloaded.data.workspaceUuid
           activeSessionIds = reloaded.data.activeSessionIds
@@ -206,7 +202,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     workspacePath,
     recentWorkspacePaths,
     lastOpenedFilePath,
-    expandedFolderPaths,
     workspaceUuid,
     activeSessionIds,
     restoreLastWorkspaceOnLaunch,
@@ -218,11 +213,7 @@ async function getWorkspaceSession() {
 }
 
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
-  return (
-    state.lastOpenedFilePath === null &&
-    state.expandedFolderPaths.length === 0 &&
-    state.recentFiles.length === 0
-  )
+  return state.lastOpenedFilePath === null && state.recentFiles.length === 0
 }
 
 function setupApplicationMenu() {
@@ -611,9 +602,7 @@ function registerIpcHandlers(userDataPath: string) {
     const switchResult = await fsService.appState.switchWorkspace(workspacePath)
     if (!switchResult.ok) return switchResult
     await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
-    const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
-    if (!filesResult.ok) return filesResult
-    return { ok: true, data: { workspacePath, files: filesResult.data } }
+    return { ok: true, data: { workspacePath } }
   })
 
   ipcMain.handle(IPC.WorkspaceCreateDirectory, async (_e, payload: { name: string }) => {
@@ -635,7 +624,7 @@ function registerIpcHandlers(userDataPath: string) {
     const switchResult = await fsService.appState.switchWorkspace(createResult.data)
     if (!switchResult.ok) return switchResult
     await fsService.workspace.clearLastOpenedFile(createResult.data).catch(() => {})
-    return { ok: true, data: { workspacePath: createResult.data, files: [] } }
+    return { ok: true, data: { workspacePath: createResult.data } }
   })
 
   ipcMain.handle(
@@ -695,13 +684,6 @@ function registerIpcHandlers(userDataPath: string) {
         )
         if (!result.ok) return result
       }
-      if (payload.expandedFolderPaths !== undefined) {
-        const result = await fsService.workspace.updateExpandedFolders(
-          payload.workspacePath,
-          payload.expandedFolderPaths,
-        )
-        if (!result.ok) return result
-      }
       if (payload.activeSessionIds !== undefined) {
         const result = await fsService.workspace.updateActiveSessionIds(
           payload.workspacePath,
@@ -722,12 +704,10 @@ function registerIpcHandlers(userDataPath: string) {
 
   ipcMain.handle(IPC.WorkspaceSwitch, async (_e, payload: { workspacePath: string }) => {
     const workspacePath = path.resolve(payload.workspacePath)
-    const filesResult = await fsService.workspaceTree.listFiles(workspacePath)
-    if (!filesResult.ok) return filesResult
     const switchResult = await fsService.appState.switchWorkspace(workspacePath)
     if (!switchResult.ok) return switchResult
     await fsService.workspace.clearLastOpenedFile(workspacePath).catch(() => {})
-    return { ok: true, data: { workspacePath, files: filesResult.data } }
+    return { ok: true, data: { workspacePath } }
   })
 
   ipcMain.handle(IPC.WorkspaceListTree, async (_e, payload: { workspacePath: string }) => {

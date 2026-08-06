@@ -19,6 +19,5 @@ export interface WorkspaceSessionState {
   activeSessionIds?: Record<string, string>
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
-  expandedFolderPaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
 }

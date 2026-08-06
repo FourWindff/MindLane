@@ -163,6 +163,16 @@
 - 若找不到或会话已被删除，则新建对话。
 - 当没有打开文件时，清空聊天状态并显示提示。
 
+## workspace 切换
+
+### workspace 现场（Workspace Scene）
+
+- 应用当前 workspace 的会话状态到前端 store，并清空上一 workspace 的文件现场。
+- open / create / switch 三个入口在 IPC 成功后收敛到同一条恢复路径；入口间只保留各自 IPC 调用与错误语义差异。
+- 切换后文件列表由恢复路径现取，IPC 响应的 `files` 字段已废弃移除。
+- 展开状态不跨 workspace 保留：`expandedFolderPaths` 随树形 UI 移除，恢复路径不再读写该字段。
+- _Avoid_: switchWorkspaceSession（"switch"只描述其中一个入口，open/create 同样走此路径）
+
 ## 文件保存
 
 ### 保存协议（Save Protocol）

@@ -160,7 +160,6 @@ contextBridge.exposeInMainWorld('mindlane', {
         activeSessionIds: Record<string, string>
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
-        expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>,
     updateState: (
@@ -174,8 +173,7 @@ contextBridge.exposeInMainWorld('mindlane', {
       >,
     switchDirectory: (payload: { workspacePath: string }) =>
       ipcRenderer.invoke(IPC.WorkspaceSwitch, payload) as Promise<
-        | { ok: true; data: { workspacePath: string; files: WorkspaceFileEntry[] } }
-        | { ok: false; error: string }
+        { ok: true; data: { workspacePath: string } } | { ok: false; error: string }
       >,
     listTree: (payload: { workspacePath: string }) =>
       ipcRenderer.invoke(IPC.WorkspaceListTree, payload) as Promise<FsResult<WorkspaceTreeEntry[]>>,

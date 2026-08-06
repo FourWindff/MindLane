@@ -5,6 +5,9 @@ import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstanc
 import { useAiStore } from '@/features/chat/model/aiStore'
 import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
+type WorkspaceSwitchResult =
+  { ok: true; data: { workspacePath: string } } | { ok: false; error?: string }
+
 interface WorkspaceStore {
   initialized: boolean
   initializing: boolean
@@ -12,7 +15,6 @@ interface WorkspaceStore {
   workspacePath: string | null
   files: WorkspaceFileEntry[]
   tree: WorkspaceTreeEntry[]
-  expandedFolders: Set<string>
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
   lastError: string | null
@@ -28,9 +30,6 @@ interface WorkspaceStore {
   syncAfterFileSaved: (filePath: string) => Promise<void>
   updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
   setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => Promise<void>
-  toggleFolder: (folderPath: string) => void
-  expandAllFolders: () => void
-  collapseAllFolders: () => void
   createSubfolder: (parentPath: string, name: string) => Promise<boolean>
   deleteItem: (targetPath: string) => Promise<boolean>
   renameItem: (oldPath: string, newName: string) => Promise<string | null>
@@ -61,30 +60,6 @@ function flattenTreeFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileEntry[] {
   return result
 }
 
-function collectAllFolderPaths(entries: WorkspaceTreeEntry[]): string[] {
-  const result: string[] = []
-  for (const entry of entries) {
-    if (entry.type === 'directory') {
-      result.push(entry.path)
-      if (entry.children) {
-        result.push(...collectAllFolderPaths(entry.children))
-      }
-    }
-  }
-  return result
-}
-
-function saveExpandedFolders(folders: Set<string>) {
-  const workspacePath = useWorkspaceStore.getState().workspacePath
-  if (!workspacePath) return
-  window.mindlane?.workspace
-    .updateState?.({
-      workspacePath,
-      expandedFolderPaths: [...folders],
-    })
-    .catch(() => {})
-}
-
 function updateWorkspaceState(
   session: WorkspaceSessionState,
   files: WorkspaceFileEntry[],
@@ -108,7 +83,6 @@ function makeFallbackSession(
     workspacePath,
     recentWorkspacePaths: [workspacePath],
     lastOpenedFilePath,
-    expandedFolderPaths: [],
     restoreLastWorkspaceOnLaunch: useWorkspaceStore.getState().restoreLastWorkspaceOnLaunch,
   }
 }
@@ -218,20 +192,34 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
   return true
 }
 
-async function applySessionState(
+async function syncWorkspaceState(
   session: WorkspaceSessionState,
   options?: { clearMindmapWhenEmpty?: boolean },
-): Promise<{
-  session: WorkspaceSessionState
-  files: WorkspaceFileEntry[]
-}> {
+): Promise<void> {
   const files = await listWorkspaceFiles(session.workspacePath)
   const tree = await listWorkspaceTree(session.workspacePath)
   useWorkspaceStore.setState({ ...updateWorkspaceState(session, files), tree })
   if (!session.workspacePath && options?.clearMindmapWhenEmpty) {
     clearMindLaneFile()
   }
-  return { session, files }
+}
+
+async function applyWorkspaceSession(
+  result: WorkspaceSwitchResult | undefined,
+  options: { ignoreCancel?: boolean; fallbackError?: string } = {},
+): Promise<boolean> {
+  if (!result?.ok) {
+    const message = result?.error ?? options.fallbackError
+    if (message && !(options.ignoreCancel && message === '已取消')) {
+      useWorkspaceStore.setState({ lastError: message })
+    }
+    return false
+  }
+  const session = await loadSessionFromBackend()
+  const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
+  await syncWorkspaceState(sessionData)
+  clearMindLaneFile()
+  return true
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
@@ -241,7 +229,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   workspacePath: null,
   files: [],
   tree: [],
-  expandedFolders: new Set<string>(),
   recentWorkspacePaths: [],
   restoreLastWorkspaceOnLaunch: true,
   lastError: null,
@@ -255,16 +242,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return
       }
 
-      await applySessionState(session, { clearMindmapWhenEmpty: true })
-
-      if (session.expandedFolderPaths.length) {
-        const tree = get().tree
-        const validPaths = new Set(collectAllFolderPaths(tree))
-        const restored = new Set(
-          session.expandedFolderPaths.filter((p: string) => validPaths.has(p)),
-        )
-        set({ expandedFolders: restored })
-      }
+      await syncWorkspaceState(session, { clearMindmapWhenEmpty: true })
 
       if (session.lastOpenedFilePath) {
         const result = await window.mindlane?.workspace.openFilePath({
@@ -301,25 +279,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const result = await window.mindlane?.workspace.openDirectory()
-      if (!result?.ok) {
-        if (result?.error && result.error !== '已取消') {
-          set({ lastError: result.error })
-        }
-        return false
-      }
-
-      const session = await loadSessionFromBackend()
-      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
-      const tree = await listWorkspaceTree(sessionData.workspacePath)
-      const emptyExpanded = new Set<string>()
-      useWorkspaceStore.setState({
-        ...updateWorkspaceState(sessionData, result.data.files),
-        tree,
-        expandedFolders: emptyExpanded,
-      })
-      saveExpandedFolders(emptyExpanded)
-      clearMindLaneFile()
-      return true
+      return applyWorkspaceSession(result, { ignoreCancel: true })
     } finally {
       set({ busy: false })
     }
@@ -333,25 +293,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const result = await window.mindlane?.workspace.createDirectory({ name })
-      if (!result?.ok) {
-        if (result?.error && result.error !== '已取消') {
-          set({ lastError: result.error })
-        }
-        return false
-      }
-
-      const session = await loadSessionFromBackend()
-      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
-      const tree = await listWorkspaceTree(sessionData.workspacePath)
-      const emptyExpanded = new Set<string>()
-      useWorkspaceStore.setState({
-        ...updateWorkspaceState(sessionData, result.data.files),
-        tree,
-        expandedFolders: emptyExpanded,
-      })
-      saveExpandedFolders(emptyExpanded)
-      clearMindLaneFile()
-      return true
+      return applyWorkspaceSession(result, { ignoreCancel: true })
     } finally {
       set({ busy: false })
     }
@@ -365,23 +307,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const result = await window.mindlane?.workspace.switchDirectory({ workspacePath })
-      if (!result?.ok) {
-        set({ lastError: result?.error ?? '切换仓库失败' })
-        return false
-      }
-
-      const session = await loadSessionFromBackend()
-      const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
-      const tree = await listWorkspaceTree(sessionData.workspacePath)
-      const emptyExpanded = new Set<string>()
-      useWorkspaceStore.setState({
-        ...updateWorkspaceState(sessionData, result.data.files),
-        tree,
-        expandedFolders: emptyExpanded,
-      })
-      saveExpandedFolders(emptyExpanded)
-      clearMindLaneFile()
-      return true
+      return applyWorkspaceSession(result, { fallbackError: '切换仓库失败' })
     } finally {
       set({ busy: false })
     }
@@ -530,30 +456,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     await window.mindlane?.settings.update({ restoreLastWorkspaceOnLaunch: enabled })
   },
 
-  toggleFolder: (folderPath: string) => {
-    const expanded = new Set(get().expandedFolders)
-    if (expanded.has(folderPath)) {
-      expanded.delete(folderPath)
-    } else {
-      expanded.add(folderPath)
-    }
-    set({ expandedFolders: expanded })
-    saveExpandedFolders(expanded)
-  },
-
-  expandAllFolders: () => {
-    const allPaths = collectAllFolderPaths(get().tree)
-    const expanded = new Set(allPaths)
-    set({ expandedFolders: expanded })
-    saveExpandedFolders(expanded)
-  },
-
-  collapseAllFolders: () => {
-    const expanded = new Set<string>()
-    set({ expandedFolders: expanded })
-    saveExpandedFolders(expanded)
-  },
-
   createSubfolder: async (parentPath: string, name: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
@@ -572,11 +474,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         set({ lastError: result?.error ?? '创建文件夹失败' })
         return false
       }
-      const expanded = new Set(get().expandedFolders)
-      expanded.add(parentPath)
       const tree = await listWorkspaceTree(workspacePath)
-      set({ tree, expandedFolders: expanded })
-      saveExpandedFolders(expanded)
+      set({ tree })
       return true
     } finally {
       set({ busy: false })
@@ -644,14 +543,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         renamedInstance.store.getState().setFilePath(result.data.newPath)
         mindmapRegistry.renameKey(oldPath, result.data.newPath)
         useAiStore.getState().updateFileLocation(fileUuid, result.data.newPath)
-      }
-
-      const expanded = new Set(get().expandedFolders)
-      if (expanded.has(oldPath)) {
-        expanded.delete(oldPath)
-        expanded.add(result.data.newPath)
-        set({ expandedFolders: expanded })
-        saveExpandedFolders(expanded)
       }
 
       const tree = await listWorkspaceTree(workspacePath)

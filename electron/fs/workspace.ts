@@ -8,18 +8,12 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   workspaceUuid: '',
   activeSessionIds: {},
   lastOpenedFilePath: null,
-  expandedFolderPaths: [],
   recentFiles: [],
 }
 
 /** Coerce an untrusted value into a valid `lastOpenedFilePath` (string or null). */
 export function coerceLastOpenedFilePath(value: unknown): string | null {
   return typeof value === 'string' ? value : null
-}
-
-/** Coerce an untrusted value into a valid `expandedFolderPaths` (array of strings). */
-export function coerceExpandedFolderPaths(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((p): p is string => typeof p === 'string') : []
 }
 
 /** Coerce an untrusted value into valid recent file entries. */
@@ -83,12 +77,6 @@ export class Workspace {
   async clearLastOpenedFile(workspacePath: string): Promise<FsResult<void>> {
     return this.saveState(workspacePath, async () => ({
       lastOpenedFilePath: null,
-    }))
-  }
-
-  async updateExpandedFolders(workspacePath: string, paths: string[]): Promise<FsResult<void>> {
-    return this.saveState(workspacePath, async () => ({
-      expandedFolderPaths: paths,
     }))
   }
 
@@ -207,7 +195,6 @@ export class Workspace {
                 )
               : {},
           lastOpenedFilePath,
-          expandedFolderPaths: coerceExpandedFolderPaths(parsed.expandedFolderPaths),
           recentFiles: coerceRecentFiles(parsed.recentFiles),
         }
         this.cache.set(workspacePath, merged)

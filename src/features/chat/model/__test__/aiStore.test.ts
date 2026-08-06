@@ -70,7 +70,6 @@ function installApis(options?: {
           activeSessionIds: options?.activeSessionIds ?? {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: '/a.mindlane',
-          expandedFolderPaths: [],
           restoreLastWorkspaceOnLaunch: true,
         })),
         updateState: vi.fn(async () => ({ ok: true })),

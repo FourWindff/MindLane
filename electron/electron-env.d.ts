@@ -153,7 +153,6 @@ interface Window {
             ok: true
             data: {
               workspacePath: string
-              files: { filePath: string; name: string; lastModifiedAt: string }[]
             }
           }
         | { ok: false; error: string }
@@ -163,7 +162,6 @@ interface Window {
             ok: true
             data: {
               workspacePath: string
-              files: { filePath: string; name: string; lastModifiedAt: string }[]
             }
           }
         | { ok: false; error: string }
@@ -192,7 +190,6 @@ interface Window {
         activeSessionIds: Record<string, string>
         recentWorkspacePaths: string[]
         lastOpenedFilePath: string | null
-        expandedFolderPaths: string[]
         restoreLastWorkspaceOnLaunch: boolean
       }>
       updateState: (
@@ -206,7 +203,6 @@ interface Window {
             ok: true
             data: {
               workspacePath: string
-              files: { filePath: string; name: string; lastModifiedAt: string }[]
             }
           }
         | { ok: false; error: string }

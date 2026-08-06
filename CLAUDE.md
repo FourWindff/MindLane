@@ -62,7 +62,7 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
 
 - `.mindlane` files are JSON documents containing `metadata`, `nodes`, `edges`, `viewport`, and `linkedDocuments`.
 - Chat history is persisted per session as JSONL via `SessionManager` / `SessionMessageStore`.
-- Workspace state (last opened file, expanded folders, etc.) is stored in hidden metadata inside the workspace directory.
+- Workspace state (last opened file, recent files, active sessions, etc.) is stored in hidden metadata inside the workspace directory.
 - App settings are stored in `settings.json` in the user data directory.
 
 ## Build and Packaging Notes
@@ -75,7 +75,7 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
 
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **MindLane** (5843 symbols, 12353 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **MindLane** (5911 symbols, 12485 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
