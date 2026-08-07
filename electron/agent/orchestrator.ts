@@ -192,7 +192,6 @@ export class AgentOrchestrator {
       graph: graph.compile(checkpointer ? { checkpointer } : undefined),
       toolRegistry,
       buildResponse: this.buildResponse.bind(this),
-      provider: this.provider,
     }
   }
 

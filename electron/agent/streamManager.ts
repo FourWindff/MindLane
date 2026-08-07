@@ -62,7 +62,6 @@ export interface StreamRuntime {
   graph: StreamGraph
   toolRegistry: ToolRegistry
   buildResponse: (state: MainGraphStateType, streamingContent?: string) => StreamResponse
-  provider?: unknown
 }
 
 interface StreamManagerOptions {
