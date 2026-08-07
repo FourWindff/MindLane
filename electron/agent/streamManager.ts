@@ -50,11 +50,16 @@ export interface StreamResponse {
   palaceData?: unknown
 }
 
-interface StreamGraph {
+/**
+ * 运行时所需的 graph 最小面。stream 的元组对齐 LangGraph 实际输出
+ * （只读元组 [mode, payload]）；编译期无法与 LangGraph 泛型 stream 完全
+ * 结构匹配，由 orchestrator 装配时做一次局部强转并注释原因。
+ */
+export interface StreamGraph {
   stream: (
     input: Partial<MainGraphStateType>,
     config: Record<string, unknown>,
-  ) => Promise<AsyncIterable<[string, unknown]>>
+  ) => Promise<AsyncIterable<readonly [string, unknown]>>
   getState: (config: Record<string, unknown>) => Promise<{ values: MainGraphStateType }>
 }
 

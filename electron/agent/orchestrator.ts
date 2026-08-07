@@ -39,6 +39,7 @@ import { AGENT_LIMITS } from './config.js'
 import { compactContext } from './memory/contextCompact.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
+import type { StreamRuntime } from './streamManager.js'
 import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
 import { createExtractionCallback } from './memory/memoryExtractor.js'
@@ -184,12 +185,17 @@ export class AgentOrchestrator {
     )
   }
 
-  getStreamRuntime() {
+  getStreamRuntime(): StreamRuntime {
     const toolRegistry = this.toolRegistry.snapshot()
     const graph = this.buildGraph(toolRegistry)
     const checkpointer = this.aiService.checkpointer.getAdapter()
+    // LangGraph 的泛型 stream<TStreamMode> 返回类型无法与 StreamGraph 的
+    // 只读元组签名完全结构匹配（实测 TS2322），故在此局部强转并注释原因，
+    // 避免调用侧继续以 as unknown as 向编译器撒谎。
     return {
-      graph: graph.compile(checkpointer ? { checkpointer } : undefined),
+      graph: graph.compile(
+        checkpointer ? { checkpointer } : undefined,
+      ) as unknown as StreamRuntime['graph'],
       toolRegistry,
       buildResponse: this.buildResponse.bind(this),
     }
