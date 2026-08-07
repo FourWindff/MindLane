@@ -13,7 +13,7 @@ export class ContextBuilder {
   private prompt: string = ''
   private messages: BaseMessage[] = []
   private context?: ChatContext
-  private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true }
+  private capabilityFlags: CapabilityFlags = { hasPalace: true }
   private memoryManager?: MemoryManager
   private lastSummary?: string
 
@@ -60,9 +60,6 @@ export class ContextBuilder {
 
   buildSystemPrompt(): this {
     const features = ['思维导图创作']
-    if (this.capabilityFlags.hasEmbeddings) {
-      features.push('知识管理')
-    }
     if (this.capabilityFlags.hasPalace) {
       features.push('记忆训练')
     }

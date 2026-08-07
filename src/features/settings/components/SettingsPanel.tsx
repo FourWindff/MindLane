@@ -137,7 +137,6 @@ export function SettingsPanel() {
   const chatEnabled = capabilities.includes('chat')
   const visionEnabled = capabilities.includes('vision')
   const imageGenEnabled = capabilities.includes('imageGen')
-  const embeddingsEnabled = capabilities.includes('embeddings')
 
   return (
     <div className="settings-page">
@@ -349,10 +348,8 @@ export function SettingsPanel() {
                 {chatEnabled && ' 对话'}
                 {visionEnabled && ' 视觉理解'}
                 {imageGenEnabled && ' 文生图'}
-                {embeddingsEnabled && ' 知识库检索'}
                 {imageGenEnabled && !visionEnabled && ' | 可文生图，但记忆宫殿不可用'}
                 {!imageGenEnabled && ' | 文生图不可用'}
-                {!embeddingsEnabled && ' | 知识库不可用'}
               </div>
             )}
             <div className="settings-card__hint">

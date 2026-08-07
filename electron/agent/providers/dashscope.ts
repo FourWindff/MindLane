@@ -1,5 +1,4 @@
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai'
-import type { EmbeddingsInterface } from '@langchain/core/embeddings'
+import { ChatOpenAI } from '@langchain/openai'
 import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
 import { withRetry, withTimeout, sleepWithAbort, linkSignals } from './middleware/index.js'
 
@@ -47,7 +46,6 @@ const POLL_MAX_TIMES = 60
 
 export class DashScopeProvider extends LLMProvider {
   private readonly apiKey: string
-  private readonly baseURL: string
 
   static readonly defaultChatModels: ChatModelOption[] = [
     { id: 'qwen-turbo', displayName: 'qwen-turbo', contextWindow: 1_000_000 },
@@ -61,7 +59,6 @@ export class DashScopeProvider extends LLMProvider {
       ProviderCapability.Chat,
       ProviderCapability.Vision,
       ProviderCapability.ImageGen,
-      ProviderCapability.Embeddings,
     ])
   }
 
@@ -100,16 +97,6 @@ export class DashScopeProvider extends LLMProvider {
       chatModelId,
     )
     this.apiKey = key
-    this.baseURL = baseURL
-  }
-
-  createEmbeddings(): EmbeddingsInterface {
-    return new OpenAIEmbeddings({
-      model: 'text-embedding-v3',
-      apiKey: this.apiKey,
-      batchSize: 10,
-      configuration: { baseURL: this.baseURL },
-    })
   }
 
   async generateImage(input: {

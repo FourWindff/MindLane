@@ -387,7 +387,7 @@ export class AgentOrchestrator {
     const supervisor = new MindLaneAgent(
       this.provider,
       toolRegistry,
-      { hasEmbeddings: false, hasPalace: this.hasPalace },
+      { hasPalace: this.hasPalace },
       this.aiService.memoryManager,
       {
         userDataPath: this.options.userDataPath,
@@ -410,7 +410,6 @@ export class AgentOrchestrator {
           this.provider,
           this.aiService.memoryManager,
           {
-            hasEmbeddings: false,
             hasPalace: this.hasPalace,
           },
         )
@@ -423,7 +422,7 @@ export class AgentOrchestrator {
         const builder = new ContextBuilder()
           .withMessages(messages)
           .withContext(state.context ?? undefined)
-          .withCapabilityFlags({ hasEmbeddings: false, hasPalace: this.hasPalace })
+          .withCapabilityFlags({ hasPalace: this.hasPalace })
           .withMemory(this.aiService.memoryManager)
           .withLastSummary(lastSummary)
 
@@ -496,7 +495,6 @@ export class AgentOrchestrator {
           this.provider,
           this.aiService.memoryManager,
           {
-            hasEmbeddings: false,
             hasPalace: this.hasPalace,
           },
         )

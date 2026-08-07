@@ -41,9 +41,6 @@ export function useChatContext() {
   }, [editor])
 
   const features = ['生成思维导图']
-  if (capabilities.includes('embeddings')) {
-    features.unshift('检索知识库')
-  }
   if (capabilities.includes('imageGen') && capabilities.includes('vision')) {
     features.push('生成记忆宫殿')
   } else if (capabilities.includes('imageGen')) {

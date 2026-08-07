@@ -1,12 +1,10 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
-import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 import { attachMetering } from './metering.js'
 
 export enum ProviderCapability {
   Chat = 'chat',
   Vision = 'vision',
   ImageGen = 'imageGen',
-  Embeddings = 'embeddings',
 }
 
 class UnsupportedCapabilityError extends Error {
@@ -61,10 +59,6 @@ export abstract class LLMProvider {
       this.chatModels.find((model) => model.id === this.chatModelId)?.contextWindow ??
       DEFAULT_CONTEXT_WINDOW
     )
-  }
-
-  createEmbeddings(): EmbeddingsInterface {
-    throw new UnsupportedCapabilityError('embeddings')
   }
 
   generateImage(_input: {

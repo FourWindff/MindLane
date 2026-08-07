@@ -74,12 +74,7 @@ registerProvider(
   {
     id: 'dashscope',
     displayName: '通义千问 (百炼)',
-    capabilities: [
-      ProviderCapability.Chat,
-      ProviderCapability.Vision,
-      ProviderCapability.ImageGen,
-      ProviderCapability.Embeddings,
-    ],
+    capabilities: [ProviderCapability.Chat, ProviderCapability.Vision, ProviderCapability.ImageGen],
     defaultModels: DashScopeProvider.defaultChatModels,
   },
   (config) =>

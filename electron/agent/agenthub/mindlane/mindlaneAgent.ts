@@ -42,7 +42,6 @@ type AIMessageContent = AIMessage['content']
  * - Accesses workspace, mindmap, selected nodes, and other context through state.context.
  */
 export interface CapabilityFlags {
-  hasEmbeddings: boolean
   hasPalace: boolean
 }
 
@@ -68,7 +67,7 @@ export class MindLaneAgent extends BaseAgent {
   ) {
     super(provider)
     this.toolRegistry = toolRegistry
-    this.capabilityFlags = capabilityFlags ?? { hasEmbeddings: true, hasPalace: true }
+    this.capabilityFlags = capabilityFlags ?? { hasPalace: true }
     this.modelWithTools = this.provider.reasoningModel.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath

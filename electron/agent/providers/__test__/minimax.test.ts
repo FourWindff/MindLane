@@ -17,7 +17,6 @@ describe('MiniMaxProvider', () => {
     expect(provider.capabilities.has(ProviderCapability.Chat)).toBe(true)
     expect(provider.capabilities.has(ProviderCapability.ImageGen)).toBe(true)
     expect(provider.capabilities.has(ProviderCapability.Vision)).toBe(false)
-    expect(provider.capabilities.has(ProviderCapability.Embeddings)).toBe(false)
     expect(provider.visionModel).toBeUndefined()
   })
 

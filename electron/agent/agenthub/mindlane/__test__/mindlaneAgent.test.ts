@@ -358,7 +358,6 @@ describe('MindLaneAgent.route()', () => {
       createMockProvider(vi.fn()),
       createTestRegistry({ hasPalace: false, extraTools: [mockSearchTool] }),
       {
-        hasEmbeddings: true,
         hasPalace: false,
       },
     )
