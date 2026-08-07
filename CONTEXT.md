@@ -375,6 +375,12 @@
 - 类型上为必选（`mindlane: MindlaneBridge`），渲染层现有 `?.` 访问是运行时防御，不代表桥可能缺失。
 - _Avoid_: ipcRenderer、window.ipcRenderer
 
+### Handler 模块（Handler Module）
+
+- 主进程侧按领域服务归组的 IPC handler 注册单元，是桥在主进程一侧的应答实现。
+- 每个模块只委托一个领域模块；分组遵循"一个领域服务对应一个模块"：file+workspace 归 `fs`、ai+editlog 归 `ai`、chat 归 `chat`、settings 归 `settings`、mcp 归 `mcp`、shell 归 `shell`、window 归 `window`。
+- 由 bootstrap（启动编排）唯一装配，模块内部不构造任何服务。
+
 ### 旁路（Bypass）
 
 - 渲染层绕过桥、直接调用主进程能力的通道（历史上曾暴露原始 `ipcRenderer`，可 invoke 任意 channel）。
