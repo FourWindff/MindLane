@@ -1,7 +1,7 @@
 import { BaseEdge, getBezierPath, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
 import { useMemo } from 'react'
 import { computeSiblingCurvature } from './siblingOffset'
-import { mindmapLayout } from '@/features/mindmap/model/mindmapLayout'
+import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getEdgeColor } from '@/features/mindmap/style/colorPalettes'
 
@@ -48,7 +48,7 @@ export function MindmapEdge(props: EdgeProps) {
     const branchIndex = (sourceNode?.data?.branchIndex as number | undefined) ?? 0
     const stroke = getEdgeColor(colorScheme, depth, branchIndex)
 
-    const geometry = mindmapLayout.resolveEdgeGeometry({
+    const geometry = resolveEdgeGeometry({
       sourceNode,
       targetNode,
       fallback: { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition },
