@@ -8,10 +8,7 @@ import type { MainGraphStateType, PalaceSubgraphStateType } from '../state.js'
  * - 只有 MindLaneAgent 拥有记忆、上下文管理、工具绑定
  * - 其他 Agent (Analyze, ImageGen, Vision) 不涉及持久化记忆
  * - 所有 Agent 通过统一的 invoke(state) 接口执行任务
- *
- * 路由支持（可选）：
- * - 只有 MindLaneAgent 需要实现 route
- * - 其他 Agent 只需实现 invoke
+ * - MindLaneAgent 自行声明 route(state) 路由方法（基类不声明，也不调用）
  *
  * 状态类型对应：
  * - MindLaneAgent: MainGraphStateType
@@ -26,13 +23,6 @@ export abstract class BaseAgent {
    * @returns 部分状态更新
    */
   abstract invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>>
-
-  /**
-   * 路由决策（可选，只有 MindLaneAgent 需要）
-   * @param state - 当前 Agent 状态
-   * @returns 目标节点名称
-   */
-  route?(state: MainGraphStateType): string
 }
 
 /**
