@@ -42,6 +42,18 @@ function collectChannels(files: string[]): Array<{ file: string; token: string }
   return channels
 }
 
+/** Collect IPC member names passed to a specific channel API across `files`. */
+function collectApiMembers(files: string[], re: RegExp): string[] {
+  const members: string[] = []
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf-8')
+    for (const match of source.matchAll(re)) {
+      members.push(match[1]!)
+    }
+  }
+  return members
+}
+
 function collectEnumUsages(files: string[]): Set<string> {
   const usages = new Set<string>()
   const re = /IPC\.([A-Za-z0-9_]+)/g
@@ -53,6 +65,17 @@ function collectEnumUsages(files: string[]): Set<string> {
   }
   return usages
 }
+
+/** 7 个 handler 模块的文件清单（注册完整性的守卫对象）。 */
+const handlerModuleFiles = [
+  'electron/main/handlers/fs.ts',
+  'electron/main/handlers/ai.ts',
+  'electron/main/handlers/chat.ts',
+  'electron/main/handlers/settings.ts',
+  'electron/main/handlers/mcp.ts',
+  'electron/main/handlers/shell.ts',
+  'electron/main/handlers/window.ts',
+].map((f) => path.join(repoRoot, f))
 
 describe('IPC seam contract', () => {
   const mainProcessFiles = walkSourceFiles(path.join(repoRoot, 'electron')).filter(
@@ -98,6 +121,50 @@ describe('IPC seam contract', () => {
     const usages = collectEnumUsages(mainProcessFiles)
     const orphans = [...enumMembers].filter((m) => !usages.has(m))
     expect(orphans).toEqual([])
+  })
+
+  it('registers each IPC channel exactly once across the 7 handler modules', () => {
+    const registered = collectApiMembers(
+      handlerModuleFiles,
+      /ipcMain\.(?:handle|on)\(\s*IPC\.([A-Za-z0-9_]+)/g,
+    )
+    expect(registered.length).toBeGreaterThan(0)
+    const duplicates = registered.filter((m, i) => registered.indexOf(m) !== i)
+    expect(duplicates).toEqual([])
+  })
+
+  it('maps handler-registered channels one-to-one with preload request channels', () => {
+    // 预加载桥实际使用的主→渲 channel（invoke/send 请求侧）必须全部在主进程注册，且每个恰好一次。
+    const registered = new Set(
+      collectApiMembers(handlerModuleFiles, /ipcMain\.(?:handle|on)\(\s*IPC\.([A-Za-z0-9_]+)/g),
+    )
+    const preload = fs.readFileSync(path.join(repoRoot, 'electron', 'preload.ts'), 'utf-8')
+    const requested = new Set(
+      [...preload.matchAll(/ipcRenderer\.(?:invoke|send)\(\s*IPC\.([A-Za-z0-9_]+)/g)].map(
+        (m) => m[1]!,
+      ),
+    )
+
+    // 防漏注册：渲染层调用的 channel 必须有主进程 handler。
+    const missing = [...requested].filter((m) => !registered.has(m))
+    expect(missing).toEqual([])
+
+    // 防幽灵注册：主进程注册的 channel 必须被 preload 请求使用，
+    // 唯一例外是历史遗留的主进程独占 channel（渲染层从不调用）。
+    const mainOnly = [...registered].filter((m) => !requested.has(m))
+    expect(mainOnly).toEqual(['WindowOpenDevtools'])
+  })
+
+  it('pairs webContents.send push channels with preload on-channels', () => {
+    const pushed = collectApiMembers(
+      mainProcessFiles,
+      /webContents\.send\(\s*IPC\.([A-Za-z0-9_]+)/g,
+    )
+    const preload = fs.readFileSync(path.join(repoRoot, 'electron', 'preload.ts'), 'utf-8')
+    const listened = [...preload.matchAll(/ipcRenderer\.on\(\s*IPC\.([A-Za-z0-9_]+)/g)].map(
+      (m) => m[1]!,
+    )
+    expect(pushed.sort()).toEqual(listened.sort())
   })
 
   it('declares Window.mindlane as the same type as MindlaneBridge', () => {
