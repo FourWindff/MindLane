@@ -94,7 +94,6 @@ interface PalaceFromNodesError {
 type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError
 
 export class AgentOrchestrator {
-  private compiledMainGraph: CompiledStateGraph<MainGraphStateType, unknown, string> | null = null
   private compiledMindmapSubgraph: CompiledStateGraph<
     MindmapSubgraphStateType,
     unknown,
@@ -125,7 +124,6 @@ export class AgentOrchestrator {
     this.hasPalace =
       provider.capabilities.has(ProviderCapability.ImageGen) &&
       provider.capabilities.has(ProviderCapability.Vision)
-    this.compiledMainGraph = null
     this.compiledMindmapSubgraph = null
     this.compiledPalaceSubgraph = null
     this.rebuildToolRegistry()
@@ -138,7 +136,6 @@ export class AgentOrchestrator {
    */
   setMcpTools(tools: StructuredToolInterface[]): void {
     this.mcpTools = [...tools]
-    this.compiledMainGraph = null
     this.rebuildToolRegistry()
   }
 
@@ -185,15 +182,6 @@ export class AgentOrchestrator {
       options.hasPalace,
       this.toolRegistry.allTools.map((t) => t.name),
     )
-  }
-
-  getCompiledMainGraph() {
-    if (!this.compiledMainGraph) {
-      const graph = this.buildGraph()
-      const checkpointer = this.aiService.checkpointer.getAdapter()
-      this.compiledMainGraph = graph.compile(checkpointer ? { checkpointer } : undefined)
-    }
-    return this.compiledMainGraph
   }
 
   getStreamRuntime() {

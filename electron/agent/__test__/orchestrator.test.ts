@@ -28,7 +28,6 @@ function createMockAiService(checkpointer?: unknown): AiService {
   return {
     checkpointer: {
       getAdapter: vi.fn().mockReturnValue(checkpointer),
-      get: vi.fn().mockReturnValue(null),
     },
   } as unknown as AiService
 }
@@ -44,13 +43,6 @@ describe('AgentOrchestrator 编译缓存', () => {
     provider = createMockProvider()
     aiService = createMockAiService()
     orchestrator = new AgentOrchestrator(provider, aiService)
-  })
-
-  it('getCompiledMainGraph() 多次调用返回同一实例', () => {
-    const getCompiledMainGraph = (orchestrator as unknown as Record<string, () => unknown>)[
-      'getCompiledMainGraph'
-    ].bind(orchestrator)
-    expect(getCompiledMainGraph()).toBe(getCompiledMainGraph())
   })
 
   it('getCompiledMindmapSubgraph() 多次调用返回同一实例', () => {
@@ -69,38 +61,6 @@ describe('AgentOrchestrator 编译缓存', () => {
       'getCompiledPalaceSubgraph'
     ].bind(orchestrator)
     expect(getCompiledPalaceSubgraph()).toBe(getCompiledPalaceSubgraph())
-  })
-})
-
-describe('AgentOrchestrator checkpointer 注入', () => {
-  it('getCompiledMainGraph() 优先使用 aiService.checkpointer.getAdapter() 返回的 checkpointer', () => {
-    const mockCheckpointer = { put: vi.fn(), get: vi.fn() }
-    const provider = createMockProvider()
-    const aiService = createMockAiService(mockCheckpointer)
-    const orchestrator = new AgentOrchestrator(provider, aiService)
-
-    const getCompiledMainGraph = (orchestrator as unknown as Record<string, () => unknown>)[
-      'getCompiledMainGraph'
-    ].bind(orchestrator)
-
-    getCompiledMainGraph()
-
-    expect(aiService.checkpointer.getAdapter).toHaveBeenCalled()
-  })
-
-  it('getCompiledMainGraph() 在 checkpointer 为 undefined 时不报错', () => {
-    const provider = createMockProvider()
-    const aiService = createMockAiService(undefined)
-    const orchestrator = new AgentOrchestrator(provider, aiService)
-
-    const getCompiledMainGraph = (orchestrator as unknown as Record<string, () => unknown>)[
-      'getCompiledMainGraph'
-    ].bind(orchestrator)
-
-    expect(() => getCompiledMainGraph()).not.toThrow()
-
-    const instance = getCompiledMainGraph()
-    expect(instance).toBeDefined()
   })
 })
 
