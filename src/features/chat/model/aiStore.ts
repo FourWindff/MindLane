@@ -76,6 +76,7 @@ interface AiState {
 
   showSessionList: boolean
   attachedDocument: DocumentRef | null
+  inputDraft: string
 
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
@@ -93,6 +94,7 @@ interface AiState {
   loadSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   setAttachedDocument: (document: DocumentRef | null) => void
+  setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
   updateFileLocation: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string, fileName?: string) => void
@@ -192,6 +194,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   workspacePath: null,
   showSessionList: false,
   attachedDocument: null,
+  inputDraft: '',
 
   setBusy: (busy) =>
     set((state) => {
@@ -294,6 +297,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     }),
   setShowSessionList: (showSessionList) => set({ showSessionList }),
   setAttachedDocument: (attachedDocument) => set({ attachedDocument }),
+  setInputDraft: (inputDraft) => set({ inputDraft }),
 
   loadSession: async (sessionId) => {
     const state = get()

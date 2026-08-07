@@ -508,4 +508,15 @@ describe('activeSessionsBar projection', () => {
     useAiStore.getState().setShowSessionList(true)
     expect(useAiStore.getState().showSessionList).toBe(true)
   })
+
+  it('stores a quick action prompt as the input draft', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+    })
+
+    useAiStore.getState().setInputDraft('请帮我生成一个思维导图')
+
+    expect(useAiStore.getState().inputDraft).toBe('请帮我生成一个思维导图')
+  })
 })

@@ -73,14 +73,3 @@ export function toolDisplayName(name: string): string {
   } as const
   return map[name as keyof typeof map] ?? name
 }
-
-/**
- * Dispatch a quick-action prompt into the active chat. Extracted as a free
- * function so the click-to-send wiring is unit-testable without a DOM.
- */
-export function sendQuickActionPrompt(
-  sendChatMessage: (prompt: string) => Promise<boolean>,
-  prompt: string,
-): void {
-  void sendChatMessage(prompt)
-}

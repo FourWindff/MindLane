@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
 import { useAiStore, selectCurrentChatBusy } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
@@ -37,6 +37,23 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [inputRows, setInputRows] = useState(1)
   const [recording, setRecording] = useState(false)
+
+  const inputDraft = useAiStore((s) => s.inputDraft)
+  const setInputDraft = useAiStore((s) => s.setInputDraft)
+
+  // Consume the one-shot draft written by quick-action buttons: fill the
+  // textarea and clear the draft so it cannot be re-applied on re-render.
+  useEffect(() => {
+    if (!inputDraft) return
+    const textarea = inputRef.current
+    if (textarea) {
+      textarea.value = inputDraft
+      const lineHeight = 20
+      const rows = Math.min(MAX_ROWS, Math.max(1, Math.round(textarea.scrollHeight / lineHeight)))
+      setInputRows(rows)
+    }
+    setInputDraft('')
+  }, [inputDraft, setInputDraft])
 
   const handleSelectAttachment = useCallback(async () => {
     const api = window.mindlane?.file

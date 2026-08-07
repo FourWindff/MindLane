@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatMessageList } from '../ChatMessageList'
-import { sendQuickActionPrompt } from '@/features/chat/lib/chatUtils'
 
 type MockChatMessage = {
   role: 'user' | 'assistant'
@@ -36,6 +35,7 @@ type MockState = {
   loadSession: ReturnType<typeof vi.fn>
   deleteSession: ReturnType<typeof vi.fn>
   setShowSessionList: ReturnType<typeof vi.fn>
+  setInputDraft: ReturnType<typeof vi.fn>
 }
 
 const mockAiState = vi.hoisted(() => ({
@@ -55,6 +55,7 @@ const mockAiState = vi.hoisted(() => ({
     loadSession: vi.fn(),
     deleteSession: vi.fn(),
     setShowSessionList: vi.fn(),
+    setInputDraft: vi.fn(),
   } as MockState,
 }))
 
@@ -107,6 +108,7 @@ describe('ChatMessageList', () => {
       loadSession: vi.fn(),
       deleteSession: vi.fn(),
       setShowSessionList: vi.fn(),
+      setInputDraft: vi.fn(),
     }
   })
 
@@ -153,13 +155,12 @@ describe('ChatMessageList', () => {
     expect(html).toContain('chat-message-list--session-mode')
   })
 
-  it('dispatches a quick action prompt to sendChatMessage', () => {
-    const sendChatMessage = vi.fn().mockResolvedValue(true)
-    const prompt = '请帮我进行头脑风暴，生成一些创意想法'
+  it('renders the empty-state quick actions with their prompts', () => {
+    const html = renderMessageList({})
 
-    sendQuickActionPrompt(sendChatMessage, prompt)
-
-    expect(sendChatMessage).toHaveBeenCalledOnce()
-    expect(sendChatMessage).toHaveBeenCalledWith(prompt)
+    expect(html).toContain('生成思维导图')
+    expect(html).toContain('总结内容')
+    expect(html).toContain('头脑风暴')
+    expect(html).toContain('优化结构')
   })
 })

@@ -12,7 +12,7 @@ import {
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
-import { sendQuickActionPrompt, toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { toolDisplayName } from '@/features/chat/lib/chatUtils'
 
 import '../styles/chat-message-list.css'
 
@@ -32,7 +32,7 @@ export function ChatMessageList() {
 
   const streamingText = useAiStore(selectCurrentChatStreamText)
   const activeTools = useAiStore(selectCurrentChatActiveTools)
-  const sendChatMessage = useAiStore((s) => s.sendChatMessage)
+  const setInputDraft = useAiStore((s) => s.setInputDraft)
   const { emptyHint, quickActions } = useChatContext()
 
   const handleLoadSession = useCallback(
@@ -52,9 +52,9 @@ export function ChatMessageList() {
 
   const handleQuickAction = useCallback(
     (prompt: string) => {
-      sendQuickActionPrompt(sendChatMessage, prompt)
+      setInputDraft(prompt)
     },
-    [sendChatMessage],
+    [setInputDraft],
   )
 
   if (showSessionList) {
