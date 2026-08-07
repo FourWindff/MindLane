@@ -11,10 +11,6 @@
  *
  * - recursionLimit: LangGraph `StateGraph` 单次 invoke/stream 允许的最大节点
  *   迭代次数（防止 supervisor ↔ tools 无限循环），单位：步数。
- * - maxTokens: 上下文 `trimMessages` 保留的真实 token 上限，单位：token。
- *   使用 js-tiktoken (cl100k_base) 精确计数。
- * - summaryTriggerTokens: 历史消息总 token 数超过此阈值后切换为"摘要 + 最近若干条"
- *   策略，单位：token。
  * - contextWindowTokens: 模型上下文窗口总 token 数，用于计算输入预算。
  * - maxCompletionTokens: 为模型响应预留的 token 数。
  * - contextSafetyBufferTokens: 输入预算安全缓冲，防止估算误差导致超限。
@@ -33,8 +29,6 @@
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
-  maxTokens: 4000,
-  summaryTriggerTokens: 6000,
   contextWindowTokens: 64_000,
   maxCompletionTokens: 8_000,
   contextSafetyBufferTokens: 1_024,
