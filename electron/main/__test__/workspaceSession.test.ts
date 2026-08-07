@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { FileSystemService } from '../../fs/index.js'
-import { getWorkspaceSessionForService } from '../../main.js'
+import { getWorkspaceSessionForService } from '../workspaceSession.js'
 
 vi.mock('electron', () => ({
   app: {
