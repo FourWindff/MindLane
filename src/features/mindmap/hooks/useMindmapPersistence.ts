@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { toPng } from 'html-to-image'
 import type { ReactFlowInstance } from '@xyflow/react'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { saveMindmapInstance } from '../model/saveMindmapInstance'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
@@ -10,7 +10,7 @@ import { useWorkspaceStore } from '@/features/workspace/store'
 
 export function useMindmapPersistence() {
   const activeInstance = useActiveMindmapInstance()
-  const aiBusy = useAiStore((state) => state.busy)
+  const aiBusy = useAiStore(selectCurrentChatBusy)
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)
   const dirty = useActiveMindmapStore((state) => state.dirty)
   const filePath = useActiveMindmapStore((state) => state.filePath)

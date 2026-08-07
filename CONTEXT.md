@@ -29,6 +29,11 @@
 - 同一 `fileUuid` 在同一时刻在内存中只有一个 `activeSessionId`。
 - 新建对话会生成新 `sessionId`，旧 `sessionId` 成为该文件的历史会话。
 
+### threadId
+
+- 仅存在于跨进程契约中的 `sessionId` 别名，如 `chatStream({ threadId })` 与主进程 langgraph 的 `thread_id`。
+- 渲染层不使用这个名字：当前会话一律叫 `activeSessionId`。
+
 ### streamId
 
 - 单次流式请求的临时身份，由主进程 `StreamManager` 在请求开始时生成。
@@ -105,9 +110,17 @@
 
 ### FileChatState
 
-- 每个 `fileUuid` 独立的聊天状态。
+- 每个 `fileUuid` 独立的聊天状态，是聊天状态的**唯一事实源**。
 - 包含：`activeSessionId`、`chatMessages`、`sessions`、`busy`、`step`、`streamText`、`errorMessage`、`activeTools`。
 - 所有流相关状态都按文件隔离，确保文件 A 生成时切换到文件 B 不会互相干扰。
+- store 顶层**不存在**这组字段的镜像副本；组件经只读 selector 投影读取当前文件的 `FileChatState`，写入只打到 `fileChats`。
+
+### 当前聊天投影（Current Chat Projection）
+
+- 渲染层读取"当前文件聊天状态"的唯一通道：按字段的只读 selector，把 `fileChats[currentFileUuid]` 的某个标量字段投影给组件。
+- 缺省值（`busy ?? false`、`step ?? 'idle'` 等）收在 selector 内部，组件不感知。
+- 无 `currentFileUuid` 时投影返回缺省值；写侧 action 在此情形一律 no-op。
+- `activeStreamId` 不投影：它只是 `fileChats[currentFileUuid].activeSessionId` 与 `activeStreamIds` 的连接，仅由 store 内部的停止逻辑按需计算。
 
 ### AiStore 订阅
 

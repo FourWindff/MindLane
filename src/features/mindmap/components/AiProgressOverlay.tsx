@@ -1,5 +1,11 @@
 import { AlertCircle } from 'lucide-react'
-import { useAiStore, type AiPipelineStep } from '@/features/chat/model/aiStore'
+import {
+  selectCurrentChatBusy,
+  selectCurrentChatErrorMessage,
+  selectCurrentChatStep,
+  useAiStore,
+  type AiPipelineStep,
+} from '@/features/chat/model/aiStore'
 
 function stepDisplayName(step: AiPipelineStep): string {
   switch (step) {
@@ -31,9 +37,9 @@ function stepDisplayName(step: AiPipelineStep): string {
 }
 
 export function AiProgressOverlay() {
-  const busy = useAiStore((s) => s.busy)
-  const step = useAiStore((s) => s.step)
-  const errorMessage = useAiStore((s) => s.errorMessage)
+  const busy = useAiStore(selectCurrentChatBusy)
+  const step = useAiStore(selectCurrentChatStep)
+  const errorMessage = useAiStore(selectCurrentChatErrorMessage)
   const clearError = useAiStore((s) => s.clearError)
 
   if (errorMessage) {

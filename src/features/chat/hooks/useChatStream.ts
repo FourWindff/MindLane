@@ -1,8 +1,12 @@
-import { useAiStore } from '@/features/chat/model/aiStore'
+import {
+  selectCurrentChatActiveTools,
+  selectCurrentChatStreamText,
+  useAiStore,
+} from '@/features/chat/model/aiStore'
 
 export function useChatStream() {
   return {
-    streamingText: useAiStore((state) => state.streamText),
-    activeTools: useAiStore((state) => state.activeTools),
+    streamingText: useAiStore(selectCurrentChatStreamText),
+    activeTools: useAiStore(selectCurrentChatActiveTools),
   }
 }

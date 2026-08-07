@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
 import type { TextNodeData } from './types'
@@ -13,7 +13,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const instance = useActiveMindmapInstance()
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const aiBusy = useAiStore((s) => s.busy)
+  const aiBusy = useAiStore(selectCurrentChatBusy)
   const { visualVariant, colorScheme } = useMapStyle()
 
   const editing = !!data.editing

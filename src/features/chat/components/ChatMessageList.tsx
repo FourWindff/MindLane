@@ -1,6 +1,13 @@
 import { useCallback } from 'react'
 import { Sparkles, Check, FileText, Trash2 } from 'lucide-react'
-import { useAiStore, type ChatSession } from '@/features/chat/model/aiStore'
+import {
+  selectCurrentChatActiveSessionId,
+  selectCurrentChatBusy,
+  selectCurrentChatChatMessages,
+  selectCurrentChatSessions,
+  useAiStore,
+  type ChatSession,
+} from '@/features/chat/model/aiStore'
 import { useChatStream } from '@/features/chat/hooks/useChatStream'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
@@ -13,10 +20,10 @@ function cx(...classes: (string | false | undefined)[]) {
 }
 
 export function ChatMessageList() {
-  const threadId = useAiStore((s) => s.threadId)
-  const messages = useAiStore((s) => s.chatMessages)
-  const sessions = useAiStore((s) => s.sessions)
-  const busy = useAiStore((s) => s.busy)
+  const activeSessionId = useAiStore(selectCurrentChatActiveSessionId)
+  const messages = useAiStore(selectCurrentChatChatMessages)
+  const sessions = useAiStore(selectCurrentChatSessions)
+  const busy = useAiStore(selectCurrentChatBusy)
   const showSessionList = useAiStore((s) => s.showSessionList)
   const setShowSessionList = useAiStore((s) => s.setShowSessionList)
   const loadSession = useAiStore((s) => s.loadSession)
@@ -67,7 +74,7 @@ export function ChatMessageList() {
               <SessionListItem
                 key={session.id}
                 session={session}
-                active={session.id === threadId}
+                active={session.id === activeSessionId}
                 onLoad={handleLoadSession}
                 onDelete={handleDeleteSession}
               />

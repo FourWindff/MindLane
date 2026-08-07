@@ -14,7 +14,7 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useStyleStore } from '@/features/mindmap/style/styleStore'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
@@ -43,7 +43,7 @@ export function useMindmapOperationController() {
   const edges = useActiveMindmapStore((state) => state.edges)
   const canUndo = useActiveMindmapStore((state) => state.canUndo)
   const canRedo = useActiveMindmapStore((state) => state.canRedo)
-  const aiBusy = useAiStore((state) => state.busy)
+  const aiBusy = useAiStore(selectCurrentChatBusy)
   const capabilities = useSettingsStore((state) => state.capabilities)
   const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
   const structureType = useStyleStore((state) => state.mapStyle).startsWith('mindmap')

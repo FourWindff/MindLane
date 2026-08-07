@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import type { Edge, Node } from '@xyflow/react'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
@@ -17,7 +17,7 @@ export function usePalaceGeneration({
   selectedId: string | null
   editor: MindmapEditor
 }) {
-  const aiBusy = useAiStore((state) => state.busy)
+  const aiBusy = useAiStore(selectCurrentChatBusy)
   const chatReady = useSettingsStore(selectChatReady)
 
   return useCallback(async () => {

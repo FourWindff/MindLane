@@ -77,8 +77,6 @@ function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
     currentFilePath: `/${fileUuid}.mindlane`,
     fileChats: { [fileUuid]: { ...createFileChatState('session-a'), ...overrides } },
     sessionFileUuids: { 'session-a': fileUuid },
-    threadId: 'session-a',
-    busy: overrides?.busy ?? false,
   })
 }
 
@@ -94,15 +92,6 @@ describe('sendChatMessage handshake', () => {
       activeStreamIds: {},
       activeSessionsBar: {},
       workspacePath: '/workspace',
-      busy: false,
-      step: 'idle',
-      streamText: '',
-      errorMessage: null,
-      threadId: '',
-      chatMessages: [],
-      sessions: [],
-      activeTools: [],
-      activeStreamId: null,
       showSessionList: false,
       attachedDocument: null,
     })
@@ -123,7 +112,7 @@ describe('sendChatMessage handshake', () => {
     expect(await useAiStore.getState().sendChatMessage('')).toBe(false)
 
     expect(chatStream).not.toHaveBeenCalled()
-    expect(useAiStore.getState().chatMessages).toEqual([])
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([])
   })
 
   it('registers the stream with origin ids only after chatStream resolves', async () => {
@@ -184,9 +173,10 @@ describe('sendChatMessage handshake', () => {
     const accepted = await useAiStore.getState().sendChatMessage('hello')
 
     expect(accepted).toBe(true)
-    expect(useAiStore.getState().busy).toBe(false)
-    expect(useAiStore.getState().step).toBe('idle')
-    expect(useAiStore.getState().chatMessages).toEqual([
+    const chat = useAiStore.getState().fileChats['file-a']
+    expect(chat?.busy).toBe(false)
+    expect(chat?.step).toBe('idle')
+    expect(chat?.chatMessages).toEqual([
       expect.objectContaining({ role: 'user', content: 'hello' }),
     ])
   })

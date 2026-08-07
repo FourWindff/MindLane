@@ -2,48 +2,71 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatMessageList } from '../ChatMessageList'
 
+type MockChatMessage = {
+  role: 'user' | 'assistant'
+  content: string
+  attachment?: { name: string; type: string }
+  toolCalls?: { name: string }[]
+  timestamp?: number
+}
+
+type MockChatSession = {
+  id: string
+  fileUuid: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+}
+
+type MockFileChat = {
+  activeSessionId: string
+  chatMessages: MockChatMessage[]
+  sessions: MockChatSession[]
+  busy: boolean
+  streamText: string
+  activeTools: string[]
+}
+
+type MockState = {
+  currentFileUuid: string | null
+  fileChats: Record<string, MockFileChat>
+  showSessionList: boolean
+  loadSession: ReturnType<typeof vi.fn>
+  deleteSession: ReturnType<typeof vi.fn>
+  setShowSessionList: ReturnType<typeof vi.fn>
+}
+
 const mockAiState = vi.hoisted(() => ({
   current: {
-    threadId: '',
-    chatMessages: [] as Array<{
-      role: 'user' | 'assistant'
-      content: string
-      attachment?: { name: string; type: string }
-      toolCalls?: { name: string }[]
-      timestamp?: number
-    }>,
-    sessions: [] as Array<{
-      id: string
-      fileUuid: string
-      title: string
-      createdAt: string
-      updatedAt: string
-      messageCount: number
-    }>,
-    busy: false,
+    currentFileUuid: 'file-a',
+    fileChats: {
+      'file-a': {
+        activeSessionId: '',
+        chatMessages: [],
+        sessions: [],
+        busy: false,
+        streamText: '',
+        activeTools: [],
+      },
+    },
     showSessionList: false,
-    streamText: '',
-    activeTools: [] as string[],
     loadSession: vi.fn(),
     deleteSession: vi.fn(),
     setShowSessionList: vi.fn(),
-  },
+  } as MockState,
 }))
 
-vi.mock('@/features/chat/model/aiStore', () => ({
-  useAiStore: (selector?: (state: typeof mockAiState.current) => unknown) =>
-    selector ? selector(mockAiState.current) : mockAiState.current,
-  createFileChatState: () => ({
-    activeSessionId: '',
-    chatMessages: [],
-    sessions: [],
-    busy: false,
-    step: 'idle',
-    streamText: '',
-    errorMessage: null,
-    activeTools: [],
-  }),
-}))
+vi.mock('@/features/chat/model/aiStore', async () => {
+  const actual = await vi.importActual<typeof import('@/features/chat/model/aiStore')>(
+    '@/features/chat/model/aiStore',
+  )
+  return {
+    ...actual,
+    useAiStore: (selector?: (state: unknown) => unknown) =>
+      selector ? selector(mockAiState.current) : mockAiState.current,
+  }
+})
 
 vi.mock('@/features/chat/hooks/useChatContext', () => ({
   useChatContext: () => ({
@@ -61,7 +84,19 @@ vi.mock('@/features/chat/hooks/useChatStream', () => ({
   useChatStream: () => ({ streamingText: '', activeTools: [] }),
 }))
 
-function renderMessageList(patch: Partial<typeof mockAiState.current>) {
+function fileChat(patch: Partial<MockFileChat>): MockFileChat {
+  return {
+    activeSessionId: '',
+    chatMessages: [],
+    sessions: [],
+    busy: false,
+    streamText: '',
+    activeTools: [],
+    ...patch,
+  }
+}
+
+function renderMessageList(patch: Partial<MockState>) {
   mockAiState.current = { ...mockAiState.current, ...patch }
   return ReactDOMServer.renderToString(<ChatMessageList />)
 }
@@ -69,13 +104,9 @@ function renderMessageList(patch: Partial<typeof mockAiState.current>) {
 describe('ChatMessageList', () => {
   beforeEach(() => {
     mockAiState.current = {
-      threadId: '',
-      chatMessages: [],
-      sessions: [],
-      busy: false,
+      currentFileUuid: 'file-a',
+      fileChats: { 'file-a': fileChat({}) },
       showSessionList: false,
-      streamText: '',
-      activeTools: [],
       loadSession: vi.fn(),
       deleteSession: vi.fn(),
       setShowSessionList: vi.fn(),
@@ -84,11 +115,15 @@ describe('ChatMessageList', () => {
 
   it('renders messages in message mode', () => {
     const html = renderMessageList({
-      threadId: 'session-a',
-      chatMessages: [
-        { role: 'user', content: 'hello' },
-        { role: 'assistant', content: 'world' },
-      ],
+      fileChats: {
+        'file-a': fileChat({
+          activeSessionId: 'session-a',
+          chatMessages: [
+            { role: 'user', content: 'hello' },
+            { role: 'assistant', content: 'world' },
+          ],
+        }),
+      },
     })
 
     expect(html).toContain('hello')
@@ -100,16 +135,21 @@ describe('ChatMessageList', () => {
   it('renders the session list when showSessionList is true', () => {
     const html = renderMessageList({
       showSessionList: true,
-      sessions: [
-        {
-          id: 'session-a',
-          fileUuid: 'file-a',
-          title: 'Earlier chat',
-          createdAt: '2026-07-15T00:00:00.000Z',
-          updatedAt: '2026-07-15T12:00:00.000Z',
-          messageCount: 3,
-        },
-      ],
+      fileChats: {
+        'file-a': fileChat({
+          activeSessionId: 'session-a',
+          sessions: [
+            {
+              id: 'session-a',
+              fileUuid: 'file-a',
+              title: 'Earlier chat',
+              createdAt: '2026-07-15T00:00:00.000Z',
+              updatedAt: '2026-07-15T12:00:00.000Z',
+              messageCount: 3,
+            },
+          ],
+        }),
+      },
     })
 
     expect(html).toContain('Earlier chat')

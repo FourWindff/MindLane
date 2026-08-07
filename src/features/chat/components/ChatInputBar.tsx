@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
-import { useAiStore } from '@/features/chat/model/aiStore'
+import { useAiStore, selectCurrentChatBusy } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
@@ -14,7 +14,7 @@ interface ChatInputBarProps {
 }
 
 export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
-  const busy = useAiStore((s) => s.busy)
+  const busy = useAiStore(selectCurrentChatBusy)
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
   const sendChatMessage = useAiStore((s) => s.sendChatMessage)
