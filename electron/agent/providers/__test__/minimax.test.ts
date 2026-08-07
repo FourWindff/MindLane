@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import {
-  MiniMaxProvider,
-  ProviderCapability,
-  createProvider,
-  getRegisteredProviders,
-} from '../index.js'
+import { MiniMaxProvider } from '../minimax.js'
+import { ProviderCapability, createProvider, getRegisteredProviders } from '../index.js'
 
 describe('MiniMaxProvider', () => {
   afterEach(() => {
