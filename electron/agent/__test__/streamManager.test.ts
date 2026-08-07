@@ -50,7 +50,6 @@ function createHarness() {
   const manager = new StreamManager({
     aiService: {
       sessionManager,
-      checkpointer: { getMessages: vi.fn(async () => []) },
     } as never,
     eventSink: (event) => events.push(event),
     createRuntime: (request) => runtimeFactory(request),
