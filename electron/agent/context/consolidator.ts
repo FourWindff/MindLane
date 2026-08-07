@@ -81,13 +81,6 @@ export class Consolidator {
     }
   }
 
-  /**
-   * 获取指定会话的异步锁，保证同一会话串行执行。
-   */
-  getLock(sessionId: string): Promise<void> {
-    return (Consolidator.locks.get(sessionId) as Promise<void> | undefined) ?? Promise.resolve()
-  }
-
   private async withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
     const previous = Consolidator.locks.get(sessionId) ?? Promise.resolve()
     const current = previous.catch(() => {}).then(() => fn())
