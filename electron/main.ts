@@ -31,7 +31,7 @@ import type { SelectedNodeContent } from './agent/state.js'
 import { mergeMessagePipelineConfig } from './agent/context/pipeline.js'
 import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
 import { StreamManager, type StreamRequest, type StreamRuntime } from './agent/streamManager.js'
-import type { ChatContext, ChatStreamEvent } from './preload.js'
+import type { ChatContext, ChatStreamEvent } from './ipc.js'
 import { McpManager } from './mcp/mcpManager.js'
 import { createMcpClient } from './mcp/clientFactory.js'
 import type { McpServerStatus } from './mcp/types.js'
@@ -239,6 +239,9 @@ function createWindow() {
     icon: path.join(process.env.VITE_PUBLIC, 'assets', 'mindlane-logo.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
     },
   })
 
@@ -864,7 +867,7 @@ function registerIpcHandlers(userDataPath: string) {
   )
 
   // -- Shell: open linked document refs --
-  ipcMain.handle('shell:open-document-ref', async (_e, doc: DocumentRef) => {
+  ipcMain.handle(IPC.ShellOpenDocumentRef, async (_e, doc: DocumentRef) => {
     const resolved = resolveDocumentRef(doc, userDataPath)
     if (!resolved.ok) {
       return { ok: false, error: resolved.error }

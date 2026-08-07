@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
-import type { FsResult, RecentFileEntry, WorkspaceState } from './types.js'
+import type { IpcResult, RecentFileEntry, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
@@ -42,7 +42,7 @@ export class Workspace {
     return path.join(workspacePath, MINDLANE_DIR, STATE_FILE)
   }
 
-  async load(workspacePath: string): Promise<FsResult<WorkspaceState>> {
+  async load(workspacePath: string): Promise<IpcResult<WorkspaceState>> {
     const pending = this.writeQueue.get(workspacePath)
     if (pending) await pending
 
@@ -57,7 +57,7 @@ export class Workspace {
     filePath: string,
     title: string,
     maxEntries: number,
-  ): Promise<FsResult<void>> {
+  ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => {
       const current = await this.loadFromDisk(workspacePath)
       const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
@@ -74,7 +74,7 @@ export class Workspace {
     })
   }
 
-  async clearLastOpenedFile(workspacePath: string): Promise<FsResult<void>> {
+  async clearLastOpenedFile(workspacePath: string): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => ({
       lastOpenedFilePath: null,
     }))
@@ -83,7 +83,7 @@ export class Workspace {
   async updateActiveSessionIds(
     workspacePath: string,
     activeSessionIds: Record<string, string>,
-  ): Promise<FsResult<void>> {
+  ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => ({ activeSessionIds }))
   }
 
@@ -92,7 +92,7 @@ export class Workspace {
     fileUuid: string,
     sessionId: string | null,
     expectedSessionId?: string,
-  ): Promise<FsResult<void>> {
+  ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => {
       const current = await this.loadFromDisk(workspacePath)
       const activeSessionIds = {
@@ -115,17 +115,17 @@ export class Workspace {
   async migrateLegacyState(
     workspacePath: string,
     partial: Partial<WorkspaceState>,
-  ): Promise<FsResult<void>> {
+  ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => partial)
   }
 
-  async getRecentFiles(workspacePath: string): Promise<FsResult<RecentFileEntry[]>> {
+  async getRecentFiles(workspacePath: string): Promise<IpcResult<RecentFileEntry[]>> {
     const result = await this.load(workspacePath)
     if (!result.ok) return result
     return { ok: true, data: result.data.recentFiles }
   }
 
-  async pruneRecentFiles(workspacePath: string): Promise<FsResult<void>> {
+  async pruneRecentFiles(workspacePath: string): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => {
       const current = await this.loadFromDisk(workspacePath)
       const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
@@ -143,7 +143,7 @@ export class Workspace {
   private async saveState(
     workspacePath: string,
     updater: () => Promise<Partial<WorkspaceState>>,
-  ): Promise<FsResult<void>> {
+  ): Promise<IpcResult<void>> {
     const previous = this.writeQueue.get(workspacePath) ?? Promise.resolve()
     const operation = previous
       .catch(() => {})
@@ -172,7 +172,7 @@ export class Workspace {
     }
   }
 
-  private async loadFromDisk(workspacePath: string): Promise<FsResult<WorkspaceState>> {
+  private async loadFromDisk(workspacePath: string): Promise<IpcResult<WorkspaceState>> {
     const statePath = this.statePath(workspacePath)
     try {
       if (fs.existsSync(statePath)) {
@@ -212,7 +212,7 @@ export class Workspace {
   private async initializeIdentity(
     workspacePath: string,
     state: WorkspaceState,
-  ): Promise<FsResult<WorkspaceState>> {
+  ): Promise<IpcResult<WorkspaceState>> {
     try {
       const statePath = this.statePath(workspacePath)
       const candidateUuid = state.workspaceUuid || undefined

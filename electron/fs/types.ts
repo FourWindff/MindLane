@@ -1,28 +1,9 @@
 import type { MessagePipelineConfig } from '../agent/context/pipelineTypes.js'
 import type { McpServerUserState } from '../mcp/types.js'
+import type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry } from '../ipc.js'
 
-export type FsResult<T> = { ok: true; data: T } | { ok: false; error: string }
-
-export interface RecentFileEntry {
-  filePath: string
-  title: string
-  lastOpenedAt: string
-}
-
-export interface WorkspaceFileEntry {
-  filePath: string
-  name: string
-  lastModifiedAt: string
-}
-
-export interface WorkspaceTreeEntry {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  lastModifiedAt: string
-  children?: WorkspaceTreeEntry[]
-  previewUrl?: string
-}
+// 边界 DTO 与结果信封由契约模块单一声明，主进程 fs 域经 re-export 复用同一类型。
+export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry }
 
 export interface MindmapStyleSettings {
   mapStyle:

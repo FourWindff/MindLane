@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { shell } from 'electron'
 import { ThumbnailManager } from './thumbnailManager.js'
-import type { FsResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
+import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
 const SUPPORTED_EXTENSIONS = new Set(['.mindlane'])
 const IGNORED_NAMES = new Set(['.git', '.DS_Store', 'node_modules', 'Thumbs.db'])
@@ -18,7 +18,7 @@ export class WorkspaceTree {
     return SUPPORTED_EXTENSIONS.has(path.extname(filePath).toLowerCase())
   }
 
-  async listFiles(workspacePath: string): Promise<FsResult<WorkspaceFileEntry[]>> {
+  async listFiles(workspacePath: string): Promise<IpcResult<WorkspaceFileEntry[]>> {
     return this.guard(async () => {
       const resolvedPath = path.resolve(workspacePath)
       if (!fs.existsSync(resolvedPath)) {
@@ -48,7 +48,7 @@ export class WorkspaceTree {
     })
   }
 
-  async listTree(workspacePath: string): Promise<FsResult<WorkspaceTreeEntry[]>> {
+  async listTree(workspacePath: string): Promise<IpcResult<WorkspaceTreeEntry[]>> {
     return this.guard(async () => {
       const resolvedPath = path.resolve(workspacePath)
       return this.readDirectoryRecursive(resolvedPath)
@@ -96,7 +96,7 @@ export class WorkspaceTree {
     return results
   }
 
-  async createDirectory(parentPath: string, name: string): Promise<FsResult<string>> {
+  async createDirectory(parentPath: string, name: string): Promise<IpcResult<string>> {
     return this.guard(() => {
       const trimmedName = name.trim()
       if (!trimmedName) {
@@ -124,7 +124,7 @@ export class WorkspaceTree {
     parentPath: string,
     name: string,
     workspacePath: string,
-  ): Promise<FsResult<string>> {
+  ): Promise<IpcResult<string>> {
     return this.guard(() => {
       const trimmedName = name.trim()
       if (!trimmedName) {
@@ -151,7 +151,7 @@ export class WorkspaceTree {
     })
   }
 
-  async deleteItem(targetPath: string, workspacePath: string): Promise<FsResult<void>> {
+  async deleteItem(targetPath: string, workspacePath: string): Promise<IpcResult<void>> {
     return this.guard(async () => {
       const resolved = path.resolve(targetPath)
       if (!this.isWithinWorkspace(resolved, workspacePath)) {
@@ -164,7 +164,11 @@ export class WorkspaceTree {
     })
   }
 
-  async rename(oldPath: string, newName: string, workspacePath: string): Promise<FsResult<string>> {
+  async rename(
+    oldPath: string,
+    newName: string,
+    workspacePath: string,
+  ): Promise<IpcResult<string>> {
     return this.guard(async () => {
       const trimmedName = newName.trim()
       if (!trimmedName) {
@@ -203,7 +207,7 @@ export class WorkspaceTree {
     sourcePath: string,
     targetDirPath: string,
     workspacePath: string,
-  ): Promise<FsResult<string>> {
+  ): Promise<IpcResult<string>> {
     return this.guard(async () => {
       const resolvedSource = path.resolve(sourcePath)
       const resolvedTarget = path.resolve(targetDirPath)
@@ -257,7 +261,7 @@ export class WorkspaceTree {
     return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
   }
 
-  private async guard<T>(action: () => Promise<T>): Promise<FsResult<T>> {
+  private async guard<T>(action: () => Promise<T>): Promise<IpcResult<T>> {
     try {
       const data = await action()
       return { ok: true, data }

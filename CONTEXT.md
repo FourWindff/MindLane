@@ -353,6 +353,28 @@
 - 环形封顶 200 条，超出丢最旧（防止永不压缩的会话无限累积）。
 - 提取时被拼入提取 prompt，提取成功后删除该文件。
 
+## 进程边界（Seam）
+
+### 桥（Bridge）
+
+- 渲染层访问主进程能力的**唯一门户**：`window.mindlane`，按命名空间组织（ai / file / workspace / chat / settings / window / shell / editlog）。
+- 类型由契约模块 `ipc.ts` 的 `MindlaneBridge` 声明，preload 实现与渲染层引用同一份，编译器看守。
+- 类型上为必选（`mindlane: MindlaneBridge`），渲染层现有 `?.` 访问是运行时防御，不代表桥可能缺失。
+- _Avoid_: ipcRenderer、window.ipcRenderer
+
+### 旁路（Bypass）
+
+- 渲染层绕过桥、直接调用主进程能力的通道（历史上曾暴露原始 `ipcRenderer`，可 invoke 任意 channel）。
+- 当前代码中**不存在，也不允许存在**；渲染层不得出现任何对 `electron` 的直接 import。
+- 防复发：显式 `contextIsolation`/`sandbox`/`nodeIntegration` 配置 + 编译期 `MindlaneBridge` 守卫 + grep 断言（渲染层 `ipcRenderer` 引用数 = 0）。
+
+### IpcResult
+
+- 跨进程边界的结果信封：`{ ok: true; data: T } | { ok: false; error: string }`。
+- 用于所有**可失败**的桥接方法；**必然成功**的读取（如最近文件列表、workspace 会话、设置）直接裸返回，不包信封。
+- 定义在契约模块 `ipc.ts`，主进程 fs 服务经 re-export 复用同一类型。
+- _Avoid_: FsResult（旧名，误导性地暗示仅文件系统用途，实际覆盖 ai / mcp / settings 等所有跨界调用）
+
 ## 本次范围外
 
 ### MemoryExtractor

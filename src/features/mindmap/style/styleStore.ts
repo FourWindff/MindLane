@@ -35,8 +35,7 @@ export const useStyleStore = create<StyleStore>((set) => ({
 export async function loadMindmapStyleFromBackend(): Promise<void> {
   try {
     const raw = await window.mindlane?.settings.load()
-    const saved = (raw as Record<string, unknown> | undefined)?.mindmapStyle as
-      Partial<MindmapStyleState> | undefined
+    const saved = raw?.mindmapStyle
     if (!saved) return
 
     useStyleStore.setState({

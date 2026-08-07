@@ -9,7 +9,7 @@ import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
-import type { ChatStreamEvent } from '../preload.js'
+import type { ChatStreamEvent } from '../ipc.js'
 
 type ChatStreamEventType = ChatStreamEvent['type']
 

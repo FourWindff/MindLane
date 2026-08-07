@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { dialog, type BrowserWindow } from 'electron'
-import type { FsResult } from './types.js'
+import type { IpcResult } from './types.js'
 import type { MindLaneFile } from '../../src/shared/lib/fileFormat'
 import { atomicWrite } from './atomicWrite.js'
 import type { AppState } from './appState.js'
@@ -28,7 +28,7 @@ export class ProjectFileManager {
   async open(
     win: BrowserWindow,
     options?: { defaultPath?: string },
-  ): Promise<FsResult<{ filePath: string; data: MindLaneFile }>> {
+  ): Promise<IpcResult<{ filePath: string; data: MindLaneFile }>> {
     const result = await dialog.showOpenDialog(win, {
       title: '打开 MindLane 文件',
       defaultPath: options?.defaultPath,
@@ -47,7 +47,7 @@ export class ProjectFileManager {
 
   async loadFromPath(
     filePath: string,
-  ): Promise<FsResult<{ filePath: string; data: MindLaneFile }>> {
+  ): Promise<IpcResult<{ filePath: string; data: MindLaneFile }>> {
     try {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
       const data = JSON.parse(raw) as MindLaneFile
@@ -71,7 +71,7 @@ export class ProjectFileManager {
     filePath: string | null,
     data: MindLaneFile,
     win: BrowserWindow,
-  ): Promise<FsResult<SavedProject>> {
+  ): Promise<IpcResult<SavedProject>> {
     if (!filePath) {
       return this.saveAs(data, win)
     }
@@ -82,7 +82,7 @@ export class ProjectFileManager {
     filePath: string,
     data: MindLaneFile,
     options?: { createBackup?: boolean; overwrite?: boolean },
-  ): Promise<FsResult<SavedProject>> {
+  ): Promise<IpcResult<SavedProject>> {
     try {
       if (options?.overwrite === false && fs.existsSync(filePath)) {
         return { ok: false, error: '文件已存在' }
@@ -108,7 +108,7 @@ export class ProjectFileManager {
     directoryPath: string,
     name: string,
     data: MindLaneFile,
-  ): Promise<FsResult<SavedProject>> {
+  ): Promise<IpcResult<SavedProject>> {
     const trimmedName = name.trim()
     if (!trimmedName) {
       return { ok: false, error: '文件名不能为空' }
@@ -125,7 +125,7 @@ export class ProjectFileManager {
     data: MindLaneFile,
     win: BrowserWindow,
     options?: { defaultDirectory?: string | null },
-  ): Promise<FsResult<SavedProject>> {
+  ): Promise<IpcResult<SavedProject>> {
     const defaultFilename = `${data.metadata.title || '未命名'}.mindlane`
     const defaultPath = options?.defaultDirectory
       ? path.join(options.defaultDirectory, defaultFilename)

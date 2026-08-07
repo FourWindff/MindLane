@@ -1,3 +1,3 @@
-import type { ChatContext } from '../../preload.js'
+import type { ChatContext } from '../../ipc.js'
 
 export type MindmapContextData = ChatContext

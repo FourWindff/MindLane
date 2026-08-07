@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type { AppSettings, FsResult, WorkspaceState } from './types.js'
+import type { AppSettings, IpcResult, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
 import { coerceLastOpenedFilePath } from './workspace.js'
@@ -29,7 +29,7 @@ export class AppState {
     return this.cache
   }
 
-  async update(partial: Partial<AppSettings>): Promise<FsResult<void>> {
+  async update(partial: Partial<AppSettings>): Promise<IpcResult<void>> {
     try {
       const current = await this.load()
       const merged = { ...current, ...partial }
@@ -56,7 +56,7 @@ export class AppState {
     }
   }
 
-  async reset(): Promise<FsResult<void>> {
+  async reset(): Promise<IpcResult<void>> {
     try {
       this.cache = { ...DEFAULT_SETTINGS }
       await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
@@ -77,7 +77,7 @@ export class AppState {
    * lastWorkspacePath, and persists any corrections.
    */
   async getLaunchSession(): Promise<
-    FsResult<{
+    IpcResult<{
       workspacePath: string | null
       recentWorkspacePaths: string[]
       restoreLastWorkspaceOnLaunch: boolean
@@ -126,7 +126,7 @@ export class AppState {
    * Switch to a workspace: update lastWorkspacePath and deduplicate
    * recentWorkspacePaths.
    */
-  async switchWorkspace(workspacePath: string): Promise<FsResult<void>> {
+  async switchWorkspace(workspacePath: string): Promise<IpcResult<void>> {
     try {
       const settings = await this.load()
       const recentWorkspacePaths = this.dedupeWorkspacePaths(
@@ -182,7 +182,7 @@ export class AppState {
    */
   async migrateLegacyWorkspaceState(
     workspacePath: string,
-  ): Promise<FsResult<Partial<WorkspaceState> | null>> {
+  ): Promise<IpcResult<Partial<WorkspaceState> | null>> {
     try {
       const current = await this.load()
       if (

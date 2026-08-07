@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
-import type { ChatStreamEvent } from '../../../../electron/preload'
+import type { ChatStreamEvent } from '../../../../electron/ipc'
 
 function generateSessionId(): string {
   return crypto.randomUUID()
