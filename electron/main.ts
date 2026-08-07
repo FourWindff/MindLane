@@ -22,7 +22,7 @@ import { DEFAULT_SETTINGS } from './fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from './fs/workspace.js'
 import type { DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat.js'
 import { IPC } from './ipc.js'
-import { resolveDocumentRef } from '../src/shared/lib/documentRef.js'
+import { resolveDocumentRef } from './main/documentRef.js'
 import { detectDocumentType } from './main/documentType.js'
 
 import { AiService } from './agent/service.js'

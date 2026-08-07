@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveDocumentRef } from '../documentRef'
+import { resolveDocumentRef } from '../documentRef.js'
 
 const userDataPath = '/home/user/.config/MindLane'
 
