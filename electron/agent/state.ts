@@ -4,7 +4,7 @@ import type { Document } from '@langchain/core/documents'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { DetectedAnchor } from './providers/index.js'
-import type { MindmapContextData } from './tools/mindmapContext.js'
+import type { ChatContext } from '../ipc.js'
 
 export type { DocumentRef }
 export type { MindmapInputSource }
@@ -73,7 +73,7 @@ const BaseStateAnnotations = {
     reducer: messagesStateReducer,
     default: () => [],
   }),
-  context: Annotation<MindmapContextData | null>({
+  context: Annotation<ChatContext | null>({
     reducer: replaceReducer,
     default: () => null,
   }),

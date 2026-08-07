@@ -3,7 +3,7 @@ import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import type { AiService } from './service.js'
 import type { MainGraphStateType } from './state.js'
 import type { ToolRegistry } from './tools/registry.js'
-import type { MindmapContextData } from './tools/mindmapContext.js'
+import type { ChatContext } from '../ipc.js'
 import type { DocumentRef } from '../../src/shared/lib/fileFormat.js'
 import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
@@ -38,7 +38,7 @@ export interface StreamRequest {
   sessionId: string
   message: string
   workspaceUuid: string
-  context: MindmapContextData
+  context: ChatContext
   documentRef?: DocumentRef
 }
 

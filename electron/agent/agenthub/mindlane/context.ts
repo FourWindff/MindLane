@@ -1,5 +1,5 @@
 import { BaseMessage } from '@langchain/core/messages'
-import type { MindmapContextData } from '../../tools/mindmapContext.js'
+import type { ChatContext } from '../../../ipc.js'
 import type { CapabilityFlags } from './mindlaneAgent.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
 
@@ -12,7 +12,7 @@ const RELEVANT_MEMORIES_TAG = 'RELEVANT_MEMORIES'
 export class ContextBuilder {
   private prompt: string = ''
   private messages: BaseMessage[] = []
-  private context?: MindmapContextData
+  private context?: ChatContext
   private capabilityFlags: CapabilityFlags = { hasEmbeddings: true, hasPalace: true }
   private memoryManager?: MemoryManager
   private lastSummary?: string
@@ -22,7 +22,7 @@ export class ContextBuilder {
     return this
   }
 
-  withContext(context?: MindmapContextData): this {
+  withContext(context?: ChatContext): this {
     this.context = context
     return this
   }
