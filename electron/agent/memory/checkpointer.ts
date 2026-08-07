@@ -94,26 +94,8 @@ export class CheckpointerManager {
     this.saver = SqliteSaver.fromConnString(dbPath)
   }
 
-  get(): SqliteSaver | null {
-    return this.saver
-  }
-
   getAdapter(): BaseCheckpointSaver | undefined {
     return this.saver ?? undefined
-  }
-
-  async getMessages(threadId: string): Promise<ChatMessage[]> {
-    if (!this.saver) return []
-    const tuple = await this.saver.getTuple({ configurable: { thread_id: threadId } })
-    if (!tuple) return []
-    const messages = tuple.checkpoint.channel_values?.messages as BaseMessage[] | undefined
-    if (!messages || !Array.isArray(messages)) return []
-    return checkpointMessagesToSessionMessages(messages)
-  }
-
-  async getMessageCount(threadId: string): Promise<number> {
-    const messages = await this.getMessages(threadId)
-    return messages.length
   }
 
   async deleteThread(threadId: string): Promise<void> {
