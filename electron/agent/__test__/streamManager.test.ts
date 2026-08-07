@@ -124,7 +124,6 @@ function createRuntime(options?: {
     graph,
     toolRegistry: registry,
     buildResponse: (_state, content) => ({ content: content ?? '' }),
-    provider: {},
   }
 }
 
