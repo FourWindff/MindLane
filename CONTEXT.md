@@ -167,7 +167,7 @@
 
 - 全局工具调用路由器，负责把流结束时的 mindmap action tool calls 与 `mindmapData` 应用到正确的文件 editor。
 - 通过 `sessionId` 找到 `fileUuid`，再通过 `mindmapRegistry.getByFileUuid(fileUuid)` 拿到对应 `MindmapEditor`。
-- `useChatStream` 不再执行工具调用或 `insertMindmapData`，只负责当前文件的流式 UI。
+- 流式 UI 状态（`streamText`、`activeTools`）由组件直接按字段 selector 读取，不再经 `useChatStream` 包装层（该 wrapper 已随删除 pass 移除）。
 
 ### loadFileChat
 

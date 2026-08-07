@@ -80,10 +80,6 @@ vi.mock('@/features/chat/hooks/useChatContext', () => ({
   }),
 }))
 
-vi.mock('@/features/chat/hooks/useChatStream', () => ({
-  useChatStream: () => ({ streamingText: '', activeTools: [] }),
-}))
-
 function fileChat(patch: Partial<MockFileChat>): MockFileChat {
   return {
     activeSessionId: '',

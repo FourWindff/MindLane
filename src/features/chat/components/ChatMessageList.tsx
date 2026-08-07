@@ -2,13 +2,14 @@ import { useCallback } from 'react'
 import { Sparkles, Check, FileText, Trash2 } from 'lucide-react'
 import {
   selectCurrentChatActiveSessionId,
+  selectCurrentChatActiveTools,
   selectCurrentChatBusy,
   selectCurrentChatChatMessages,
   selectCurrentChatSessions,
+  selectCurrentChatStreamText,
   useAiStore,
   type ChatSession,
 } from '@/features/chat/model/aiStore'
-import { useChatStream } from '@/features/chat/hooks/useChatStream'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
 import { toolDisplayName } from '@/features/chat/lib/chatUtils'
@@ -29,7 +30,8 @@ export function ChatMessageList() {
   const loadSession = useAiStore((s) => s.loadSession)
   const deleteSession = useAiStore((s) => s.deleteSession)
 
-  const { streamingText, activeTools } = useChatStream()
+  const streamingText = useAiStore(selectCurrentChatStreamText)
+  const activeTools = useAiStore(selectCurrentChatActiveTools)
   const { emptyHint, quickActions } = useChatContext()
 
   const handleLoadSession = useCallback(
