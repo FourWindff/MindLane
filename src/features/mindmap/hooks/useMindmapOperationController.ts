@@ -30,8 +30,6 @@ import { createMindmapOperationController } from '@/features/mindmap/model/mindm
 import type { ContextMenuState } from '@/features/mindmap/components/MindMapContextMenu'
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 
-type FlowContextEvent = ReactMouseEvent | globalThis.MouseEvent
-
 export function useMindmapOperationController() {
   const nodeTypes = useMemo(() => nodeRegistry.toReactFlowNodeTypes(), [])
   const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
@@ -171,13 +169,6 @@ export function useMindmapOperationController() {
   }, [contextMenu.scope])
 
   const openContextMenu = useCallback((menu: ContextMenuState) => setContextMenu(menu), [])
-  const onPaneContextMenu = useCallback(
-    (event: FlowContextEvent) => {
-      event.preventDefault()
-      openContextMenu({ clientX: event.clientX, clientY: event.clientY, scope: 'pane' })
-    },
-    [openContextMenu],
-  )
   const onNodeContextMenu = useCallback(
     (event: ReactMouseEvent, node: Node) => {
       event.preventDefault()
@@ -380,7 +371,6 @@ export function useMindmapOperationController() {
       onEdgesChange: controller.handleEdgesChange,
       onConnect: controller.handleConnect,
       onNodeClick,
-      onPaneContextMenu,
       onNodeContextMenu,
       onSelectionContextMenu,
       onEdgeContextMenu,

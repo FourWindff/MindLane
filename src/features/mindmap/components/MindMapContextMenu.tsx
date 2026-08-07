@@ -1,9 +1,7 @@
 import type { RefObject } from 'react'
 
 export type ContextMenuState =
-  | { scope: 'closed' }
-  | { clientX: number; clientY: number; scope: 'pane' }
-  | { clientX: number; clientY: number; scope: 'node'; nodeId: string }
+  { scope: 'closed' } | { clientX: number; clientY: number; scope: 'node'; nodeId: string }
 
 type ContextMenuProps = {
   menu: ContextMenuState

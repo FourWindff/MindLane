@@ -22,7 +22,6 @@ export interface MindmapCanvasProps {
   onEdgesChange?: ReactFlowProps['onEdgesChange']
   onConnect?: ReactFlowProps['onConnect']
   onNodeClick?: ReactFlowProps['onNodeClick']
-  onPaneContextMenu?: ReactFlowProps['onPaneContextMenu']
   onNodeContextMenu?: ReactFlowProps['onNodeContextMenu']
   onSelectionContextMenu?: ReactFlowProps['onSelectionContextMenu']
   onEdgeContextMenu?: ReactFlowProps['onEdgeContextMenu']
