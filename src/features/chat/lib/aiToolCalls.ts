@@ -49,7 +49,8 @@ export function handleMindmapToolCall(toolCall: ToolCallResult, editor: MindmapE
       case 'updateNode': {
         const data = result.data as UpdateNodeAction
         const { nodeId, nodeType, changes } = data
-        editor.updateNodeData(nodeId, nodeType, changes)
+        void nodeType
+        editor.updateNodeData(nodeId, changes)
         return true
       }
 

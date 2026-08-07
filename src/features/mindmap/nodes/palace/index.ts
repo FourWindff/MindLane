@@ -16,10 +16,6 @@ class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
       sourceNodeIds: data.sourceNodeIds,
     }
   }
-
-  deserialize(raw: unknown): PalaceNodeData {
-    return raw as PalaceNodeData
-  }
 }
 
 const palaceDescriptor = new PalaceDescriptor()

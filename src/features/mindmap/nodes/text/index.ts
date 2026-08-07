@@ -17,10 +17,6 @@ class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
       ...(data.branchIndex != null && { branchIndex: data.branchIndex }),
     }
   }
-
-  deserialize(raw: unknown): TextNodeData {
-    return raw as TextNodeData
-  }
 }
 
 const textDescriptor = new TextDescriptor()

@@ -2,12 +2,10 @@ import type { Connection, Edge, Node, NodeChange, EdgeChange } from '@xyflow/rea
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { type MindLaneFile, type MindLaneNode } from '@/shared/lib/fileFormat'
 import { parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
-import { nodeRegistry } from '@/features/mindmap/nodes'
 import {
   collectSubtreeIds,
   createInitialEdges,
   createInitialNodes,
-  deserializeNode,
   findParentId,
   findRootNode,
   newId,
@@ -140,8 +138,7 @@ export class MindmapEditor {
         ? { x: parentNode.position.x + CHILD_OFFSET_X, y: parentNode.position.y }
         : { x: 0, y: 0 })
 
-    const descriptor = nodeRegistry.get(options.type)
-    const data = descriptor ? descriptor.deserialize(options.data) : options.data
+    const data = options.data
 
     const nodeId = newId()
     const node: Node = {
@@ -187,13 +184,12 @@ export class MindmapEditor {
     this.execute({ type: 'updateNode', nodeId, patch })
   }
 
-  updateNodeData(nodeId: string, nodeType: string, changes: Record<string, unknown>): void {
-    const descriptor = nodeRegistry.get(nodeType)
+  updateNodeData(nodeId: string, changes: Record<string, unknown>): void {
     this.updateNode(nodeId, (n) => {
       const merged = { ...n.data, ...changes }
       return {
         ...n,
-        data: descriptor ? descriptor.deserialize(merged) : merged,
+        data: merged,
       }
     })
   }
@@ -319,7 +315,7 @@ export class MindmapEditor {
         },
         data: { ...n.data, justAdded: true },
       }
-      const node: Node = deserializeNode(shifted as Node)
+      const node: Node = shifted as Node
       commands.push({ type: 'addNode', node })
     }
 
@@ -367,8 +363,6 @@ export class MindmapEditor {
     const commands: MindmapCommand[] = []
 
     for (const n of data.nodes) {
-      const descriptor = nodeRegistry.get(n.type)
-      const deserializedData = descriptor ? descriptor.deserialize(n.data) : n.data
       const isRoot = !newTargets.has(n.id)
       commands.push({
         type: 'addNode',
@@ -376,7 +370,7 @@ export class MindmapEditor {
           id: n.id,
           type: n.type,
           position: { x: offsetX, y: isRoot ? 0 : 50 },
-          data: deserializedData,
+          data: n.data,
         },
       })
     }

@@ -8,7 +8,7 @@ import {
   withNewChild,
 } from '../mindmapTree'
 
-// registry 副作用注册 text 节点类型（deserializeNode 依赖）
+// registry 副作用注册 text 节点类型
 import '@/features/mindmap/nodes'
 
 type Tree = { nodes: Node[]; edges: Edge[] }

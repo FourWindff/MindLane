@@ -7,5 +7,4 @@ export abstract class NodeTypeDescriptor<
   abstract readonly typeId: string
   abstract readonly component: ComponentType<NodeProps>
   abstract serialize(data: TData): unknown
-  abstract deserialize(raw: unknown): TData
 }

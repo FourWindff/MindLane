@@ -112,7 +112,7 @@ export function createMindmapStore(): MindmapStore {
     loadFile: (filePath, data) => {
       const hydratedNodes = data.mindmap.nodes.map((n) => ({
         ...n,
-        data: nodeRegistry.get(n.type)!.deserialize(n.data),
+        data: n.data,
       }))
       set({
         nodes: hydratedNodes as Node[],

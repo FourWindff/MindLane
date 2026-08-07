@@ -1,5 +1,4 @@
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
-import { nodeRegistry } from '@/features/mindmap/nodes'
 import { Position, type Edge, type Node } from '@xyflow/react'
 
 export const CHILD_OFFSET_X = 260
@@ -466,9 +465,4 @@ export function withNewSibling(
     structureType,
   )
   return { nodes: n2, edges: e2 }
-}
-
-export function deserializeNode(node: Node): Node {
-  const descriptor = nodeRegistry.get(node.type!)
-  return descriptor ? { ...node, data: descriptor.deserialize(node.data) } : node
 }
