@@ -12,7 +12,7 @@ import {
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
-import { toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { sendQuickActionPrompt, toolDisplayName } from '@/features/chat/lib/chatUtils'
 
 import '../styles/chat-message-list.css'
 
@@ -32,6 +32,7 @@ export function ChatMessageList() {
 
   const streamingText = useAiStore(selectCurrentChatStreamText)
   const activeTools = useAiStore(selectCurrentChatActiveTools)
+  const sendChatMessage = useAiStore((s) => s.sendChatMessage)
   const { emptyHint, quickActions } = useChatContext()
 
   const handleLoadSession = useCallback(
@@ -49,10 +50,12 @@ export function ChatMessageList() {
     [deleteSession],
   )
 
-  const handleQuickAction = useCallback((prompt: string) => {
-    // Quick actions are surfaced in the input bar in the new layout.
-    void prompt
-  }, [])
+  const handleQuickAction = useCallback(
+    (prompt: string) => {
+      sendQuickActionPrompt(sendChatMessage, prompt)
+    },
+    [sendChatMessage],
+  )
 
   if (showSessionList) {
     return (

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatMessageList } from '../ChatMessageList'
+import { sendQuickActionPrompt } from '@/features/chat/lib/chatUtils'
 
 type MockChatMessage = {
   role: 'user' | 'assistant'
@@ -150,5 +151,15 @@ describe('ChatMessageList', () => {
 
     expect(html).toContain('Earlier chat')
     expect(html).toContain('chat-message-list--session-mode')
+  })
+
+  it('dispatches a quick action prompt to sendChatMessage', () => {
+    const sendChatMessage = vi.fn().mockResolvedValue(true)
+    const prompt = '请帮我进行头脑风暴，生成一些创意想法'
+
+    sendQuickActionPrompt(sendChatMessage, prompt)
+
+    expect(sendChatMessage).toHaveBeenCalledOnce()
+    expect(sendChatMessage).toHaveBeenCalledWith(prompt)
   })
 })
