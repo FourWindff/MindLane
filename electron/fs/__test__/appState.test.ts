@@ -3,6 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { AppState } from '../appState.js'
+import { DEFAULT_SETTINGS } from '../types.js'
+import type { AppSettings } from '../types.js'
 
 describe('AppState', () => {
   let tmpDir: string
@@ -15,6 +17,90 @@ describe('AppState', () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('preserves mindmapStyle when updating other settings fields', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        mindmapStyle: { mapStyle: 'logic-card', colorScheme: 'ocean' },
+        chatModel: 'old-model',
+      }),
+    )
+
+    const result = await appState.update({ chatModel: 'new-model' })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.chatModel).toBe('new-model')
+    expect(settings.mindmapStyle).toEqual({ mapStyle: 'logic-card', colorScheme: 'ocean' })
+  })
+
+  it('keeps non-enumerated setting fields when updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ someFutureField: { enabled: true } }),
+    )
+
+    const result = await appState.update({ chatModel: 'new-model' })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect((settings as unknown as Record<string, unknown>).someFutureField).toEqual({
+      enabled: true,
+    })
+  })
+
+  it('deep merges activeProviders and editor while updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        activeProviders: { chat: 'openai', image: 'dashscope' },
+      }),
+    )
+
+    const result = await appState.update({
+      activeProviders: { chat: 'anthropic' } as unknown as AppSettings['activeProviders'],
+      editor: { autoSaveIntervalMs: 10000 } as unknown as AppSettings['editor'],
+    })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.activeProviders).toEqual({ chat: 'anthropic', image: 'dashscope' })
+    expect(settings.editor).toEqual({
+      autoSaveIntervalMs: 10000,
+      maxBackups: DEFAULT_SETTINGS.editor.maxBackups,
+      cachePruneDays: DEFAULT_SETTINGS.editor.cachePruneDays,
+    })
+  })
+
+  it('deep merges providerConfigs while updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        providerConfigs: {
+          anthropic: {
+            apiKey: 'key',
+            baseUrl: 'https://api.anthropic.com',
+            messagePipeline: { maxContextTokens: 3000 },
+          },
+        },
+      }),
+    )
+
+    const result = await appState.update({
+      providerConfigs: {
+        anthropic: { messagePipeline: { maxContextTokens: 5000 } },
+      } as unknown as AppSettings['providerConfigs'],
+    })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.providerConfigs.anthropic).toEqual({
+      apiKey: 'key',
+      baseUrl: 'https://api.anthropic.com',
+      messagePipeline: { maxContextTokens: 5000 },
+    })
   })
 
   it('drops legacy workspace-scoped keys when saving', async () => {

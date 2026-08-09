@@ -5,6 +5,10 @@ import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
 import { coerceLastOpenedFilePath } from './workspace.js'
 
+// Keys that lived in settings.json before the workspace-state migration.
+// Dropped on merge so they do not resurrect when any setting is updated.
+const LEGACY_SETTINGS_KEYS = ['expandedFolderPaths', 'lastOpenedFilePath'] as const
+
 export class AppState {
   private filePath: string
   private cache: AppSettings | null = null
@@ -33,7 +37,13 @@ export class AppState {
     try {
       const current = await this.load()
       const merged = { ...current, ...partial }
-      // Deep merge providerConfigs to preserve existing provider configurations
+      // Deep merge nested settings to preserve existing values on partial updates
+      if (partial.activeProviders) {
+        merged.activeProviders = { ...current.activeProviders, ...partial.activeProviders }
+      }
+      if (partial.editor) {
+        merged.editor = { ...current.editor, ...partial.editor }
+      }
       if (partial.providerConfigs) {
         const mergedConfigs = { ...current.providerConfigs }
         for (const [key, value] of Object.entries(partial.providerConfigs)) {
@@ -239,9 +249,11 @@ export class AppState {
   }
 
   private merge(partial: Partial<AppSettings>): AppSettings {
+    const rest = { ...partial } as Record<string, unknown>
+    for (const key of LEGACY_SETTINGS_KEYS) delete rest[key]
     return {
-      apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
-      chatModel: partial.chatModel ?? DEFAULT_SETTINGS.chatModel,
+      ...DEFAULT_SETTINGS,
+      ...(rest as Partial<AppSettings>),
       activeProviders: {
         ...DEFAULT_SETTINGS.activeProviders,
         ...partial.activeProviders,
@@ -251,6 +263,8 @@ export class AppState {
         ...DEFAULT_SETTINGS.editor,
         ...partial.editor,
       },
+      apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
+      chatModel: partial.chatModel ?? DEFAULT_SETTINGS.chatModel,
       recentFilesMax: partial.recentFilesMax ?? DEFAULT_SETTINGS.recentFilesMax,
       lastWorkspacePath: partial.lastWorkspacePath ?? DEFAULT_SETTINGS.lastWorkspacePath,
       recentWorkspacePaths: partial.recentWorkspacePaths ?? DEFAULT_SETTINGS.recentWorkspacePaths,
@@ -258,7 +272,6 @@ export class AppState {
         partial.restoreLastWorkspaceOnLaunch ?? DEFAULT_SETTINGS.restoreLastWorkspaceOnLaunch,
       workspacePathsByUuid: partial.workspacePathsByUuid ?? DEFAULT_SETTINGS.workspacePathsByUuid,
       filePathsByUuid: partial.filePathsByUuid ?? DEFAULT_SETTINGS.filePathsByUuid,
-      messagePipeline: partial.messagePipeline,
       mcpServers: partial.mcpServers ?? DEFAULT_SETTINGS.mcpServers,
     }
   }
