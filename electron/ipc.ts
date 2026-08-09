@@ -1,4 +1,11 @@
-import type { ChatMessage, DocumentRef, MindLaneFile } from '../src/shared/lib/fileFormat'
+import type {
+  ChatMessage,
+  ChatToolCall,
+  DocumentRef,
+  MindLaneEdge,
+  MindLaneFile,
+  MindLaneNode,
+} from '../src/shared/lib/fileFormat'
 import type { AppSettings, WorkspaceState } from './fs/types'
 import type { McpServerStatusInfo } from './mcp/types'
 
@@ -150,12 +157,47 @@ export interface ChatContext {
   fileTags?: string[]
 }
 
-export interface ChatStreamEvent {
-  streamId: string
-  sessionId: string
-  type: 'token' | 'message-start' | 'tool-start' | 'tool-end' | 'step' | 'end' | 'error'
-  payload: unknown
+/** 主进程经 `step` 事件可发出的步骤词表；渲染层 `AiPipelineStep` 是其超集。 */
+export const STREAM_STEPS = [
+  'generating-map',
+  'reading-doc',
+  'extracting',
+  'merging',
+  'finalizing',
+] as const
+export type StreamStep = (typeof STREAM_STEPS)[number]
+
+export function isStreamStep(value: unknown): value is StreamStep {
+  return typeof value === 'string' && STREAM_STEPS.some((step) => step === value)
 }
+
+export interface StreamResponse {
+  content: string
+  messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
+  toolCalls?: ChatToolCall[]
+  mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[]; title: string }
+  /** 渲染层不消费，保持 unknown，不提前类型化。 */
+  palaceData?: unknown
+}
+
+export type ChatStreamEvent =
+  | { streamId: string; sessionId: string; type: 'message-start'; payload: null }
+  | { streamId: string; sessionId: string; type: 'token'; payload: string }
+  | { streamId: string; sessionId: string; type: 'step'; payload: StreamStep }
+  | {
+      streamId: string
+      sessionId: string
+      type: 'tool-start'
+      payload: { name: string; input: Record<string, unknown> }
+    }
+  | {
+      streamId: string
+      sessionId: string
+      type: 'tool-end'
+      payload: { name: string; output: string }
+    }
+  | { streamId: string; sessionId: string; type: 'end'; payload: StreamResponse }
+  | { streamId: string; sessionId: string; type: 'error'; payload: string }
 
 export type NodesToPalaceResult =
   | {

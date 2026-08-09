@@ -27,10 +27,7 @@ export function createMindmapToolCallRouter(dependencies: RouterDependencies) {
         if (!fileUuid) return
         const editor = dependencies.getEditor(fileUuid)
         if (!editor) return
-        const response = event.payload as {
-          mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[] }
-          toolCalls?: ChatToolCall[]
-        }
+        const response = event.payload
         if (response.mindmapData) editor.insertMindmapData(response.mindmapData)
         let appliedMindmapChange = Boolean(response.mindmapData)
         let generatedDocumentRef: DocumentRef | null = null

@@ -19,6 +19,7 @@ import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
+import type { StreamStep } from '../../../ipc.js'
 
 import {
   hashText,
@@ -70,7 +71,8 @@ function countTreeNodes(node: { children?: unknown[] }): number {
 
 type PromptMessage = { role: string; content: string }
 
-type MindmapProgressStep = 'reading-doc' | 'extracting' | 'merging' | 'finalizing'
+/** 导图进度词表是共享 StreamStep 的子集（不含 generating-map，它由工具事件触发）。 */
+type MindmapProgressStep = Exclude<StreamStep, 'generating-map'>
 
 function emitProgress(step: MindmapProgressStep): void {
   getWriter()?.({ type: 'mindmap-progress', step })

@@ -2,24 +2,20 @@ import { create } from 'zustand'
 import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
-import type { ChatStreamEvent } from '../../../../electron/ipc'
+import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
 
 function generateSessionId(): string {
   return crypto.randomUUID()
 }
 
 export type AiPipelineStep =
+  | StreamStep
   | 'idle'
   | 'preparing'
   | 'analyzing'
   | 'planning'
   | 'generating-image'
   | 'building'
-  | 'reading-doc'
-  | 'extracting'
-  | 'merging'
-  | 'finalizing'
-  | 'generating-map'
   | 'chatting'
 
 export type { ChatMessage }
@@ -604,7 +600,7 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
 
     switch (event.type) {
       case 'token':
-        chat = { ...chat, streamText: chat.streamText + String(event.payload) }
+        chat = { ...chat, streamText: chat.streamText + event.payload }
         break
       case 'message-start':
         if (chat.streamText.trim()) {
@@ -616,24 +612,20 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
         }
         break
       case 'tool-start': {
-        const name = (event.payload as { name?: string })?.name
+        const name = event.payload.name
         chat = { ...chat, activeTools: name ? [...chat.activeTools, name] : chat.activeTools }
         break
       }
       case 'tool-end': {
-        const name = (event.payload as { name?: string })?.name
+        const name = event.payload.name
         chat = { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
         break
       }
       case 'step':
-        chat = { ...chat, step: event.payload as AiPipelineStep }
+        chat = { ...chat, step: event.payload }
         break
       case 'end': {
-        const response = event.payload as {
-          content?: string
-          messages?: Array<{ role: 'assistant'; content: string; toolCalls?: never[] }>
-          toolCalls?: never[]
-        }
+        const response = event.payload
         const messages = response.messages?.length
           ? response.messages
           : response.content || chat.streamText
@@ -671,7 +663,7 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
           step: 'idle',
           streamText: '',
           activeTools: [],
-          errorMessage: String(event.payload),
+          errorMessage: event.payload,
         }
         activeStreamIds = { ...activeStreamIds }
         delete activeStreamIds[event.sessionId]

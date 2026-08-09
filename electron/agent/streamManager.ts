@@ -9,9 +9,13 @@ import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
-import type { ChatStreamEvent } from '../ipc.js'
+import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
+import { isStreamStep } from '../ipc.js'
 
-type ChatStreamEventType = ChatStreamEvent['type']
+type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
+  ChatStreamEvent,
+  { type: T }
+>['payload']
 
 const runnerLog = logger.withContext('runner')
 
@@ -40,14 +44,6 @@ export interface StreamRequest {
   workspaceUuid: string
   context: ChatContext
   documentRef?: DocumentRef
-}
-
-export interface StreamResponse {
-  content: string
-  messages?: Array<{ role: 'assistant'; content: string; toolCalls?: unknown[] }>
-  toolCalls?: unknown[]
-  mindmapData?: unknown
-  palaceData?: unknown
 }
 
 /**
@@ -184,7 +180,9 @@ export class Runner {
           }
         } else if (mode === 'custom') {
           const event = payload as { type?: string; step?: string }
-          if (event.type === 'mindmap-progress' && event.step) this.emit('step', event.step)
+          if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
+            this.emit('step', event.step)
+          }
         }
       }
 
@@ -283,13 +281,16 @@ export class Runner {
     if (!contentAlreadyPersisted) await this.persistPartialContent(content)
   }
 
-  private emit(type: ChatStreamEventType, payload: unknown): void {
+  private emit<T extends ChatStreamEvent['type']>(
+    type: T,
+    payload: ChatStreamEventPayload<T>,
+  ): void {
     this.options.eventSink({
       streamId: this.options.streamId,
       sessionId: this.options.request.sessionId,
       type,
       payload,
-    })
+    } as ChatStreamEvent)
   }
 }
 
