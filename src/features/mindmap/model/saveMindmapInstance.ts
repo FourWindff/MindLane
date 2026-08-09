@@ -1,7 +1,7 @@
 import type { MindmapInstance } from './mindmapInstance'
-import { useWorkspaceStore } from '@/features/workspace/store'
 
 export interface SaveMindmapInstanceOptions {
+  syncAfterFileSaved: (filePath: string) => Promise<void>
   onError?: (message: string) => void
   afterSave?: (filePath: string) => void
 }
@@ -21,7 +21,7 @@ function formatError(error: unknown): string {
  */
 export async function saveMindmapInstance(
   instance: Pick<MindmapInstance, 'store'>,
-  options?: SaveMindmapInstanceOptions,
+  options: SaveMindmapInstanceOptions,
 ): Promise<boolean> {
   const onError = options?.onError ?? ((message: string) => console.error(message))
   const state = instance.store.getState()
@@ -54,7 +54,7 @@ export async function saveMindmapInstance(
     ) {
       latest.markClean()
     }
-    await useWorkspaceStore.getState().syncAfterFileSaved(result.data.filePath)
+    await options.syncAfterFileSaved(result.data.filePath)
     options?.afterSave?.(result.data.filePath)
     return true
   } catch (error) {

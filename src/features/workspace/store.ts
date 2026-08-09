@@ -167,6 +167,7 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
 
   if (mindmapState.filePath) {
     return saveMindmapInstance(activeInstance, {
+      syncAfterFileSaved: workspaceState.syncAfterFileSaved,
       onError: (message) => useWorkspaceStore.setState({ lastError: message }),
     })
   }

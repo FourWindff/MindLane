@@ -96,6 +96,7 @@ function AppContent() {
         const instance = mindmapRegistry.getByFileUuid(fileUuid)
         if (!instance) return
         void saveMindmapInstance(instance, {
+          syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
           onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
         })
       },

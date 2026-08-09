@@ -80,6 +80,7 @@ export function useMindmapPersistence() {
       return
     }
     await saveMindmapInstance(activeInstance, {
+      syncAfterFileSaved,
       onError: (message) => {
         console.error(`[MindLane] ${message}`)
         useAiStore.getState().setError(message)
