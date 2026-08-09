@@ -38,15 +38,17 @@ export interface FileChatState {
   streamText: string
   errorMessage: string | null
   activeTools: string[]
+  stopRequested: boolean
+  lastUserMessageAt: number
 }
 
 export type { ChatStreamEvent }
 
-export interface ActiveSessionBarEntry {
+export interface ChatCapsuleEntry {
   fileUuid: string
   fileName: string
   status: 'generating' | 'stopping' | 'idle'
-  lastInputAt: number
+  lastUserMessageAt: number
 }
 
 interface ActiveFileInfo {
@@ -64,10 +66,10 @@ interface AiState {
   currentFileUuid: string | null
   currentFilePath: string | null
   fileChats: Record<string, FileChatState>
+  filePaths: Record<string, string>
   loadedFileChats: Record<string, boolean>
   sessionFileUuids: Record<string, string>
   activeStreamIds: Record<string, string>
-  activeSessionsBar: Record<string, ActiveSessionBarEntry>
   workspacePath: string | null
 
   showSessionList: boolean
@@ -93,7 +95,7 @@ interface AiState {
   setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
   updateFileLocation: (fileUuid: string, filePath: string) => void
-  registerStream: (fileUuid: string, sessionId: string, streamId: string, fileName?: string) => void
+  registerStream: (fileUuid: string, sessionId: string, streamId: string) => void
   markStreamStopping: (sessionId: string) => void
   sendChatMessage: (text: string) => Promise<boolean>
   stopChatStream: () => void
@@ -109,6 +111,8 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
     streamText: '',
     errorMessage: null,
     activeTools: [],
+    stopRequested: false,
+    lastUserMessageAt: 0,
   }
 }
 
@@ -147,24 +151,46 @@ export function selectCurrentChatActiveTools(state: AiState): string[] {
   return currentChat(state)?.activeTools ?? EMPTY_CHAT_ACTIVE_TOOLS
 }
 
-export function getActiveSessionBarEntries(
-  activeSessionsBar: Record<string, ActiveSessionBarEntry>,
+function pathBasename(filePath: string | null | undefined): string | null {
+  const name = filePath?.split(/[\\/]/).pop()
+  return name ? name : null
+}
+
+export function deriveChatCapsuleEntries(
+  fileChats: Record<string, FileChatState>,
+  filePaths: Record<string, string>,
   currentFileUuid: string | null,
   currentFilePath: string | null,
-): ActiveSessionBarEntry[] {
-  const entries = Object.values(activeSessionsBar)
-  if (currentFileUuid && !activeSessionsBar[currentFileUuid]) {
+): ChatCapsuleEntry[] {
+  const entries: ChatCapsuleEntry[] = []
+  const candidateKeys = new Set(Object.keys(fileChats))
+  if (currentFileUuid) candidateKeys.add(currentFileUuid)
+  for (const fileUuid of candidateKeys) {
+    const chat = fileChats[fileUuid]
+    const isCurrent = fileUuid === currentFileUuid
+    if (!chat) {
+      if (!isCurrent) continue
+      entries.push({
+        fileUuid,
+        fileName: pathBasename(currentFilePath) ?? fileUuid,
+        status: 'idle',
+        lastUserMessageAt: 0,
+      })
+      continue
+    }
+    if (!(chat.lastUserMessageAt > 0 || chat.busy || isCurrent)) continue
+    const filePath = filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null)
     entries.push({
-      fileUuid: currentFileUuid,
-      fileName: currentFilePath?.split(/[\\/]/).pop() ?? currentFileUuid,
-      status: 'idle',
-      lastInputAt: 0,
+      fileUuid,
+      fileName: pathBasename(filePath) ?? fileUuid,
+      status: chat.stopRequested ? 'stopping' : chat.busy ? 'generating' : 'idle',
+      lastUserMessageAt: chat.lastUserMessageAt,
     })
   }
   return entries.sort((a, b) => {
     if (a.fileUuid === currentFileUuid) return -1
     if (b.fileUuid === currentFileUuid) return 1
-    return b.lastInputAt - a.lastInputAt
+    return b.lastUserMessageAt - a.lastUserMessageAt
   })
 }
 
@@ -183,10 +209,10 @@ export const useAiStore = create<AiState>((set, get) => ({
   currentFileUuid: null,
   currentFilePath: null,
   fileChats: {},
+  filePaths: {},
   loadedFileChats: {},
   sessionFileUuids: {},
   activeStreamIds: {},
-  activeSessionsBar: {},
   workspacePath: null,
   showSessionList: false,
   attachedDocument: null,
@@ -248,23 +274,10 @@ export const useAiStore = create<AiState>((set, get) => ({
       const fileUuid = state.currentFileUuid
       if (!fileUuid) return {}
       const current = state.fileChats[fileUuid]
-      const patch = patchFileChat(state, fileUuid, {
+      return patchFileChat(state, fileUuid, {
         chatMessages: [...(current?.chatMessages ?? []), message],
+        lastUserMessageAt: Date.now(),
       })
-      const existing = state.activeSessionsBar[fileUuid]
-      const fileName = existing?.fileName ?? state.currentFilePath?.split(/[\\/]/).pop() ?? fileUuid
-      return {
-        ...patch,
-        activeSessionsBar: {
-          ...state.activeSessionsBar,
-          [fileUuid]: {
-            fileUuid,
-            fileName,
-            status: existing?.status ?? 'idle',
-            lastInputAt: Date.now(),
-          },
-        },
-      }
     }),
   setChatMessages: (chatMessages) =>
     set((state) => {
@@ -390,25 +403,12 @@ export const useAiStore = create<AiState>((set, get) => ({
     return load
   },
   updateFileLocation: (fileUuid, filePath) =>
-    set((state) => {
-      const entry = state.activeSessionsBar[fileUuid]
-      return {
-        ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
-        ...(entry
-          ? {
-              activeSessionsBar: {
-                ...state.activeSessionsBar,
-                [fileUuid]: {
-                  ...entry,
-                  fileName: filePath.split(/[\\/]/).pop() ?? entry.fileName,
-                },
-              },
-            }
-          : {}),
-      }
-    }),
+    set((state) => ({
+      ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
+      filePaths: { ...state.filePaths, [fileUuid]: filePath },
+    })),
 
-  registerStream: (fileUuid, sessionId, streamId, fileName) => {
+  registerStream: (fileUuid, sessionId, streamId) => {
     set((state) => {
       const current = state.fileChats[fileUuid] ?? createFileChatState(sessionId)
       const fileChats = {
@@ -418,21 +418,13 @@ export const useAiStore = create<AiState>((set, get) => ({
           activeSessionId: sessionId,
           busy: true,
           step: 'chatting' as const,
+          lastUserMessageAt: Date.now(),
         },
       }
       return {
         fileChats,
         sessionFileUuids: { ...state.sessionFileUuids, [sessionId]: fileUuid },
         activeStreamIds: { ...state.activeStreamIds, [sessionId]: streamId },
-        activeSessionsBar: {
-          ...state.activeSessionsBar,
-          [fileUuid]: {
-            fileUuid,
-            fileName: fileName ?? state.currentFilePath?.split(/[\\/]/).pop() ?? fileUuid,
-            status: 'generating' as const,
-            lastInputAt: Date.now(),
-          },
-        },
       }
     })
     const pending = pendingStreamEvents.get(sessionId) ?? []
@@ -444,14 +436,8 @@ export const useAiStore = create<AiState>((set, get) => ({
   markStreamStopping: (sessionId) => {
     set((state) => {
       const fileUuid = state.sessionFileUuids[sessionId]
-      const entry = fileUuid ? state.activeSessionsBar[fileUuid] : undefined
-      if (!fileUuid || !entry) return state
-      return {
-        activeSessionsBar: {
-          ...state.activeSessionsBar,
-          [fileUuid]: { ...entry, status: 'stopping' },
-        },
-      }
+      if (!fileUuid || !state.fileChats[fileUuid]) return state
+      return patchFileChat(state, fileUuid, { stopRequested: true })
     })
   },
 
@@ -483,7 +469,6 @@ export const useAiStore = create<AiState>((set, get) => ({
     const context = buildChatContext()
     const originFileUuid = get().currentFileUuid
     const originSessionId = currentChat(get())?.activeSessionId ?? ''
-    const originFileName = context.fileTitle
     get().setAttachedDocument(null)
 
     const result = await api.chatStream({
@@ -493,7 +478,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
     if (result.ok) {
       if (originFileUuid) {
-        get().registerStream(originFileUuid, originSessionId, result.streamId, originFileName)
+        get().registerStream(originFileUuid, originSessionId, result.streamId)
       }
     } else if (originFileUuid) {
       get().setFileError(originFileUuid, result.error)
@@ -596,7 +581,6 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
     accepted = true
     let chat = current
     let activeStreamIds = state.activeStreamIds
-    let activeSessionsBar = state.activeSessionsBar
 
     switch (event.type) {
       case 'token':
@@ -644,22 +628,20 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
           ...chat,
           chatMessages: [...messagesBeforeCurrentResponse, ...messages],
           busy: false,
+          stopRequested: false,
           step: 'idle',
           streamText: '',
           activeTools: [],
         }
         activeStreamIds = { ...activeStreamIds }
         delete activeStreamIds[event.sessionId]
-        activeSessionsBar = {
-          ...activeSessionsBar,
-          [fileUuid]: { ...activeSessionsBar[fileUuid]!, status: 'idle' },
-        }
         break
       }
       case 'error':
         chat = {
           ...chat,
           busy: false,
+          stopRequested: false,
           step: 'idle',
           streamText: '',
           activeTools: [],
@@ -667,15 +649,11 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
         }
         activeStreamIds = { ...activeStreamIds }
         delete activeStreamIds[event.sessionId]
-        activeSessionsBar = {
-          ...activeSessionsBar,
-          [fileUuid]: { ...activeSessionsBar[fileUuid]!, status: 'idle' },
-        }
         break
     }
 
     const fileChats = { ...state.fileChats, [fileUuid]: chat }
-    return { fileChats, activeStreamIds, activeSessionsBar }
+    return { fileChats, activeStreamIds }
   })
   return accepted
 }
@@ -716,6 +694,7 @@ export function connectAiStore(registry: AiStoreRegistry): () => void {
       currentFileUuid: active.fileUuid,
       currentFilePath: active.filePath,
       fileChats,
+      filePaths: { ...state.filePaths, [active.fileUuid]: active.filePath },
       sessionFileUuids: {
         ...state.sessionFileUuids,
         [activeSessionId]: active.fileUuid,

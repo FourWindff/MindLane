@@ -2,19 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatCapsuleBar } from '../ChatCapsuleBar'
 
+interface MockFileChat {
+  lastUserMessageAt: number
+  busy: boolean
+  stopRequested: boolean
+}
+
 const mockAiState = vi.hoisted(() => ({
   current: {
     currentFileUuid: null as string | null,
     currentFilePath: null as string | null,
-    activeSessionsBar: {} as Record<
-      string,
-      {
-        fileUuid: string
-        fileName: string
-        status: 'generating' | 'stopping' | 'idle'
-        lastInputAt: number
-      }
-    >,
+    fileChats: {} as Record<string, MockFileChat>,
+    filePaths: {} as Record<string, string>,
     showSessionList: false,
     setShowSessionList: () => {},
   },
@@ -23,24 +22,47 @@ const mockAiState = vi.hoisted(() => ({
 vi.mock('@/features/chat/model/aiStore', () => ({
   useAiStore: (selector?: (state: typeof mockAiState.current) => unknown) =>
     selector ? selector(mockAiState.current) : mockAiState.current,
-  getActiveSessionBarEntries: (
-    activeSessionsBar: typeof mockAiState.current.activeSessionsBar,
+  deriveChatCapsuleEntries: (
+    fileChats: typeof mockAiState.current.fileChats,
+    filePaths: typeof mockAiState.current.filePaths,
     currentFileUuid: typeof mockAiState.current.currentFileUuid,
     currentFilePath: typeof mockAiState.current.currentFilePath,
   ) => {
-    const entries = Object.values(activeSessionsBar)
-    if (currentFileUuid && !activeSessionsBar[currentFileUuid]) {
+    const entries: {
+      fileUuid: string
+      fileName: string
+      status: 'generating' | 'stopping' | 'idle'
+      lastUserMessageAt: number
+    }[] = []
+    const keys = new Set([...Object.keys(fileChats)])
+    if (currentFileUuid) keys.add(currentFileUuid)
+    for (const fileUuid of keys) {
+      const chat = fileChats[fileUuid]
+      const isCurrent = fileUuid === currentFileUuid
+      if (!chat) {
+        if (!isCurrent) continue
+        entries.push({
+          fileUuid,
+          fileName: currentFilePath?.split(/[\\/]/).pop() ?? fileUuid,
+          status: 'idle',
+          lastUserMessageAt: 0,
+        })
+        continue
+      }
+      if (!(chat.lastUserMessageAt > 0 || chat.busy || isCurrent)) continue
       entries.push({
-        fileUuid: currentFileUuid,
-        fileName: currentFilePath?.split(/[\\/]/).pop() ?? currentFileUuid,
-        status: 'idle',
-        lastInputAt: 0,
+        fileUuid,
+        fileName:
+          (filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null))?.split(/[\\/]/).pop() ??
+          fileUuid,
+        status: chat.stopRequested ? 'stopping' : chat.busy ? 'generating' : 'idle',
+        lastUserMessageAt: chat.lastUserMessageAt,
       })
     }
     return entries.sort((a, b) => {
       if (a.fileUuid === currentFileUuid) return -1
       if (b.fileUuid === currentFileUuid) return 1
-      return b.lastInputAt - a.lastInputAt
+      return b.lastUserMessageAt - a.lastUserMessageAt
     })
   },
 }))
@@ -54,7 +76,7 @@ function renderCapsuleBar(
     fileUuid: string
     fileName: string
     status: 'generating' | 'stopping' | 'idle'
-    lastInputAt: number
+    lastUserMessageAt: number
   }[],
   currentFileUuid: string | null,
 ) {
@@ -62,7 +84,17 @@ function renderCapsuleBar(
     ...mockAiState.current,
     currentFileUuid,
     currentFilePath: currentFileUuid ? `/${currentFileUuid}.mindlane` : null,
-    activeSessionsBar: Object.fromEntries(entries.map((e) => [e.fileUuid, e])),
+    fileChats: Object.fromEntries(
+      entries.map((entry) => [
+        entry.fileUuid,
+        {
+          lastUserMessageAt: entry.lastUserMessageAt,
+          busy: entry.status === 'generating',
+          stopRequested: entry.status === 'stopping',
+        },
+      ]),
+    ),
+    filePaths: Object.fromEntries(entries.map((entry) => [entry.fileUuid, entry.fileName])),
   }
   return ReactDOMServer.renderToString(
     <ChatCapsuleBar expanded={false} onToggleExpand={() => {}} />,
@@ -74,7 +106,8 @@ describe('ChatCapsuleBar', () => {
     mockAiState.current = {
       currentFileUuid: null,
       currentFilePath: null,
-      activeSessionsBar: {},
+      fileChats: {},
+      filePaths: {},
       showSessionList: false,
       setShowSessionList: () => {},
     }
@@ -83,9 +116,9 @@ describe('ChatCapsuleBar', () => {
   it('renders status classes for generating, stopping and idle capsules', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'A', status: 'generating', lastInputAt: 100 },
-        { fileUuid: 'file-b', fileName: 'B', status: 'stopping', lastInputAt: 200 },
-        { fileUuid: 'file-c', fileName: 'C', status: 'idle', lastInputAt: 300 },
+        { fileUuid: 'file-a', fileName: 'A', status: 'generating', lastUserMessageAt: 100 },
+        { fileUuid: 'file-b', fileName: 'B', status: 'stopping', lastUserMessageAt: 200 },
+        { fileUuid: 'file-c', fileName: 'C', status: 'idle', lastUserMessageAt: 300 },
       ],
       null,
     )
@@ -98,8 +131,8 @@ describe('ChatCapsuleBar', () => {
   it('places the current file first and marks it larger', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastInputAt: 100 },
-        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastInputAt: 200 },
+        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastUserMessageAt: 100 },
+        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastUserMessageAt: 200 },
       ],
       'file-b',
     )
@@ -111,12 +144,12 @@ describe('ChatCapsuleBar', () => {
     expect(currentIndex).toBeLessThan(otherIndex)
   })
 
-  it('sorts non-current capsules by lastInputAt descending', () => {
+  it('sorts non-current capsules by lastUserMessageAt descending', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastInputAt: 100 },
-        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastInputAt: 300 },
-        { fileUuid: 'file-c', fileName: 'Gamma', status: 'idle', lastInputAt: 200 },
+        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastUserMessageAt: 100 },
+        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastUserMessageAt: 300 },
+        { fileUuid: 'file-c', fileName: 'Gamma', status: 'idle', lastUserMessageAt: 200 },
       ],
       'file-current',
     )

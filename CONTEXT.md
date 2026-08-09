@@ -102,16 +102,25 @@
 
 ### ChatStreamEvent
 
-- 统一的流事件 IPC 结构：`{ streamId, sessionId, type, payload }`。
-- `type` 包括 `token`、`message-start`、`tool-start`、`tool-end`、`end`、`error`。
+- 统一的流事件 IPC 结构，判别联合（discriminated union）：每个 `type` 成员自带 `payload` 的精确类型。
+- `type` 包括 `token`、`message-start`、`tool-start`、`tool-end`、`step`、`end`、`error`。
+- `token` / `error` 的 payload 为 `string`；`message-start` 为 `null`；`tool-start` / `tool-end` 为 `{ name, ... }`；`step` 的 payload 使用共享词表 `StreamStep`；`end` 的 payload 为 `StreamResponse`。
+- `type` 与 `payload` 形状的对应关系由类型守卫，消费方按 `type` 收窄即得类型化 payload，不做强转。
 - 渲染层通过单一监听器接收，再按 `sessionId` 路由到对应 `fileUuid` 的会话状态。
+
+### StreamStep（步骤发射词表）
+
+- 主进程可经 `step` 事件发出的步骤值集合：`generating-map`、`reading-doc`、`extracting`、`merging`、`finalizing`。
+- 定义在共享契约 `ipc.ts`；主进程 emits 与渲染层消费同一份词表，两侧由编译器同时看守。
+- 渲染层 `AiPipelineStep` 是其超集：`StreamStep` 之外还有 `idle`、`chatting`、`preparing` 等纯渲染层状态，不属于发射词表。
 
 ## 渲染层状态
 
 ### FileChatState
 
 - 每个 `fileUuid` 独立的聊天状态，是聊天状态的**唯一事实源**。
-- 包含：`activeSessionId`、`chatMessages`、`sessions`、`busy`、`step`、`streamText`、`errorMessage`、`activeTools`。
+- 包含：`activeSessionId`、`chatMessages`、`sessions`、`busy`、`step`、`streamText`、`errorMessage`、`activeTools`、`stopRequested`、`lastUserMessageAt`。
+- `stopRequested` 为流停止标记（`markStreamStopping` 置位，`end`/`error` 复位）；`lastUserMessageAt` 为最近一次用户输入时间，二者是胶囊投影的事实源。
 - 所有流相关状态都按文件隔离，确保文件 A 生成时切换到文件 B 不会互相干扰。
 - store 顶层**不存在**这组字段的镜像副本；组件经只读 selector 投影读取当前文件的 `FileChatState`，写入只打到 `fileChats`。
 
@@ -138,9 +147,9 @@
 ### 发送握手（Send Handshake）
 
 - 发起一次流式对话的固定时序，由 aiStore 的 `sendChatMessage` action 唯一拥有，组件不参与。
-- 顺序即正确性：先 `await chatStream` 拿到 `streamId`，再以发起方身份调用 `registerStream(fileUuid, sessionId, streamId, fileName)`；两步不可对调、不可由不同模块分担。
+- 顺序即正确性：先 `await chatStream` 拿到 `streamId`，再以发起方身份调用 `registerStream(fileUuid, sessionId, streamId)`；两步不可对调、不可由不同模块分担。
 - invoke 未 resolve 期间到达的流事件进入 pending-event buffer（按 `sessionId` 暂存）；`registerStream` 注册映射后配对冲刷，只放行 `streamId` 匹配的事件。
-- 握手全程以发起前捕获的 origin ids（`fileUuid` / `sessionId` / `fileName`）为准，不用切换文件后的当前投影。
+- 握手全程以发起前捕获的 origin ids（`fileUuid` / `sessionId`）为准，不用切换文件后的当前投影。
 - 握手与 buffer 住在同一 module（`aiStore.ts`），时序由单元测试固定。
 
 ### 会话 API
@@ -157,11 +166,11 @@
 
 ### ChatCapsuleBar 状态
 
-- 维护“最近对话过的文件”列表，key 为 `fileUuid`。
-- 每个条目包含：`fileUuid`、`fileName`、`status`、最近一次用户输入时间 `lastInputAt`。
-- 用户发送消息时更新 `lastInputAt`，并把该文件移到最前。
-- 开始流时 `status` 为 `generating`；调用停止时改为 `stopping`；收到 `end`/`error` 后改为 `idle`。
-- 当前 `fileUuid` 的条目不会被过滤，而是排在首位并放大显示。
+- 最近对话文件列表的**读时投影**，由 `deriveChatCapsuleEntries` 从 `fileChats` + `filePaths` + `currentFileUuid` 派生，不是独立维护的镜像。
+- 每个条目包含：`fileUuid`、`fileName`（来自 `filePaths` 的路径基名）、`status`、最近一次用户输入时间 `lastInputAt`。
+- `status` 派生：`stopRequested` → `stopping`；`busy` → `generating`；否则 `idle`。
+- 成员判定：`lastUserMessageAt > 0`，或流进行中，或是当前文件。
+- 当前 `fileUuid` 的条目排在首位并放大显示，其余按 `lastInputAt` 降序。
 
 ### Mindmap Tool Call Router
 

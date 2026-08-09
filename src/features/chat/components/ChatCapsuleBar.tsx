@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, SwitchCamera } from 'lucide-react'
 import {
-  getActiveSessionBarEntries,
+  deriveChatCapsuleEntries,
   useAiStore,
-  type ActiveSessionBarEntry,
+  type ChatCapsuleEntry,
 } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
@@ -19,12 +19,13 @@ export function ChatCapsuleBar({ expanded, onToggleExpand }: ChatCapsuleBarProps
   const openWorkspaceFile = useWorkspaceStore((s) => s.openWorkspaceFile)
   const currentFileUuid = useAiStore((s) => s.currentFileUuid)
   const setShowSessionList = useAiStore((s) => s.setShowSessionList)
-  const activeSessionsBar = useAiStore((s) => s.activeSessionsBar)
+  const fileChats = useAiStore((s) => s.fileChats)
+  const filePaths = useAiStore((s) => s.filePaths)
   const currentFilePath = useAiStore((s) => s.currentFilePath)
 
   const entries = useMemo(
-    () => getActiveSessionBarEntries(activeSessionsBar, currentFileUuid, currentFilePath),
-    [activeSessionsBar, currentFileUuid, currentFilePath],
+    () => deriveChatCapsuleEntries(fileChats, filePaths, currentFileUuid, currentFilePath),
+    [fileChats, filePaths, currentFileUuid, currentFilePath],
   )
 
   const handleSelect = useCallback(
@@ -74,7 +75,7 @@ function Capsule({
   onSelect,
   onSwitchSession,
 }: {
-  entry: ActiveSessionBarEntry
+  entry: ChatCapsuleEntry
   current: boolean
   onSelect: (fileUuid: string) => void
   onSwitchSession: () => void

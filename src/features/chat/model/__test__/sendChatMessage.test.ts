@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
   createFileChatState,
+  deriveChatCapsuleEntries,
   useAiStore,
   type ChatStreamEvent,
   type FileChatState,
@@ -87,10 +88,10 @@ describe('sendChatMessage handshake', () => {
       currentFileUuid: null,
       currentFilePath: null,
       fileChats: {},
+      filePaths: {},
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
-      activeSessionsBar: {},
       workspacePath: '/workspace',
       showSessionList: false,
       attachedDocument: null,
@@ -137,7 +138,14 @@ describe('sendChatMessage handshake', () => {
 
     expect(useAiStore.getState().activeStreamIds['session-a']).toBe('stream-1')
     expect(useAiStore.getState().sessionFileUuids['session-a']).toBe('file-a')
-    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('generating')
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+    expect(entries[0]?.status).toBe('generating')
+    expect(entries[0]?.fileName).toBe('file-a.mindlane')
   })
 
   it('buffers stream events during the handshake and flushes only matching stream ids', async () => {

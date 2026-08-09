@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
   createFileChatState,
-  getActiveSessionBarEntries,
+  deriveChatCapsuleEntries,
   useAiStore,
   type ChatSession,
   type ChatStreamEvent,
@@ -107,10 +107,10 @@ describe('aiStore per-file chat state', () => {
       currentFileUuid: null,
       currentFilePath: null,
       fileChats: {},
+      filePaths: {},
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
-      activeSessionsBar: {},
       workspacePath: '/workspace',
       showSessionList: false,
       attachedDocument: null,
@@ -160,14 +160,12 @@ describe('aiStore per-file chat state', () => {
     useAiStore.setState({
       currentFileUuid: 'file-b',
       currentFilePath: '/b.mindlane',
-      activeSessionsBar: {
-        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 0 },
-      },
+      filePaths: { 'file-a': '/a.mindlane' },
     })
 
     useAiStore.getState().updateFileLocation('file-a', '/folder/renamed.mindlane')
 
-    expect(useAiStore.getState().activeSessionsBar['file-a']?.fileName).toBe('renamed.mindlane')
+    expect(useAiStore.getState().filePaths['file-a']).toBe('/folder/renamed.mindlane')
     expect(useAiStore.getState().currentFilePath).toBe('/b.mindlane')
   })
 
@@ -235,7 +233,7 @@ describe('aiStore per-file chat state', () => {
     })
 
     emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'token', payload: 'early' })
-    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a', 'A')
+    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a')
 
     expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('early')
   })
@@ -393,15 +391,25 @@ describe('aiStore per-file chat state', () => {
     const harness = createRegistryHarness()
     connectAiStore(harness.registry)
     useAiStore.setState({
+      currentFileUuid: 'file-a',
+      currentFilePath: '/file-a.mindlane',
       fileChats: { 'file-a': createFileChatState('session-a') },
       sessionFileUuids: { 'session-a': 'file-a' },
     })
 
-    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a', 'File A')
-    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('generating')
+    const derive = () =>
+      deriveChatCapsuleEntries(
+        useAiStore.getState().fileChats,
+        useAiStore.getState().filePaths,
+        useAiStore.getState().currentFileUuid,
+        useAiStore.getState().currentFilePath,
+      )
+
+    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a')
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')?.status).toBe('generating')
 
     useAiStore.getState().markStreamStopping('session-a')
-    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('stopping')
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')?.status).toBe('stopping')
 
     emit({
       streamId: 'stream-a',
@@ -409,7 +417,7 @@ describe('aiStore per-file chat state', () => {
       type: 'end',
       payload: { content: 'done' },
     })
-    expect(useAiStore.getState().activeSessionsBar['file-a']?.status).toBe('idle')
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')?.status).toBe('idle')
   })
 
   it('writes a stream startup error to its originating background file', () => {
@@ -430,55 +438,65 @@ describe('aiStore per-file chat state', () => {
   })
 })
 
-describe('activeSessionsBar projection', () => {
+describe('deriveChatCapsuleEntries projection', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,
       fileChats: {},
+      filePaths: {},
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
-      activeSessionsBar: {},
       workspacePath: '/workspace',
       showSessionList: false,
       attachedDocument: null,
     })
   })
 
-  it('includes the current file first even when it has no active session entry', () => {
+  it('includes the current file first even when it has no file chat entry', () => {
     useAiStore.setState({
       currentFileUuid: 'file-current',
       currentFilePath: '/current.mindlane',
-      activeSessionsBar: {
-        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 100 },
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), lastUserMessageAt: 100 },
       },
+      filePaths: { 'file-a': '/a.mindlane' },
     })
 
-    const entries = getActiveSessionBarEntries(
-      useAiStore.getState().activeSessionsBar,
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
       useAiStore.getState().currentFileUuid,
       useAiStore.getState().currentFilePath,
     )
 
     expect(entries[0]?.fileUuid).toBe('file-current')
+    expect(entries[0]?.fileName).toBe('current.mindlane')
+    expect(entries[0]?.status).toBe('idle')
     expect(entries).toHaveLength(2)
   })
 
-  it('sorts non-current files by lastInputAt descending', () => {
+  it('sorts non-current files by lastUserMessageAt descending', () => {
     useAiStore.setState({
       currentFileUuid: 'file-current',
       currentFilePath: '/current.mindlane',
-      activeSessionsBar: {
-        'file-a': { fileUuid: 'file-a', fileName: 'a.mindlane', status: 'idle', lastInputAt: 100 },
-        'file-b': { fileUuid: 'file-b', fileName: 'b.mindlane', status: 'idle', lastInputAt: 300 },
-        'file-c': { fileUuid: 'file-c', fileName: 'c.mindlane', status: 'idle', lastInputAt: 200 },
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), lastUserMessageAt: 100 },
+        'file-b': { ...createFileChatState('session-b'), lastUserMessageAt: 300 },
+        'file-c': { ...createFileChatState('session-c'), lastUserMessageAt: 200 },
+      },
+      filePaths: {
+        'file-a': '/a.mindlane',
+        'file-b': '/b.mindlane',
+        'file-c': '/c.mindlane',
       },
     })
 
-    const entries = getActiveSessionBarEntries(
-      useAiStore.getState().activeSessionsBar,
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
       useAiStore.getState().currentFileUuid,
       useAiStore.getState().currentFilePath,
     )
@@ -487,20 +505,67 @@ describe('activeSessionsBar projection', () => {
     expect(nonCurrent).toEqual(['file-b', 'file-c', 'file-a'])
   })
 
-  it('updates lastInputAt when a message is added for the current file', () => {
+  it('excludes idle files that never received a message', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-current',
+      currentFilePath: '/current.mindlane',
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), lastUserMessageAt: 100 },
+        'file-dormant': { ...createFileChatState('session-dormant'), lastUserMessageAt: 0 },
+      },
+      filePaths: { 'file-a': '/a.mindlane', 'file-dormant': '/dormant.mindlane' },
+    })
+
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+
+    expect(entries.map((e) => e.fileUuid)).toEqual(['file-current', 'file-a'])
+  })
+
+  it('derives the capsule name from the file path basename', () => {
+    useAiStore.setState({
+      currentFileUuid: null,
+      currentFilePath: null,
+      fileChats: {
+        'file-a': { ...createFileChatState('session-a'), lastUserMessageAt: 100 },
+      },
+      filePaths: { 'file-a': '/folder/renamed.mindlane' },
+    })
+
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+
+    expect(entries[0]?.fileName).toBe('renamed.mindlane')
+  })
+
+  it('updates lastUserMessageAt when a message is added for the current file', () => {
     const before = Date.now()
     useAiStore.setState({
       currentFileUuid: 'file-a',
       currentFilePath: '/a.mindlane',
       fileChats: { 'file-a': createFileChatState('session-a') },
+      filePaths: { 'file-a': '/a.mindlane' },
     })
 
     useAiStore.getState().addChatMessage({ role: 'user', content: 'hello' })
 
-    const entry = useAiStore.getState().activeSessionsBar['file-a']
-    expect(entry).toBeDefined()
-    expect(entry!.lastInputAt).toBeGreaterThanOrEqual(before)
-    expect(entry!.fileName).toBe('a.mindlane')
+    const chat = useAiStore.getState().fileChats['file-a']
+    expect(chat?.lastUserMessageAt).toBeGreaterThanOrEqual(before)
+    const entries = deriveChatCapsuleEntries(
+      useAiStore.getState().fileChats,
+      useAiStore.getState().filePaths,
+      useAiStore.getState().currentFileUuid,
+      useAiStore.getState().currentFilePath,
+    )
+    expect(entries[0]?.fileName).toBe('a.mindlane')
   })
 
   it('keeps showSessionList as the single mode switch source', () => {
