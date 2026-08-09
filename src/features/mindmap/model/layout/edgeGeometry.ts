@@ -1,9 +1,8 @@
 import { Position } from '@xyflow/react'
-
-const DEFAULT_NODE_WIDTH = 160
-const DEFAULT_NODE_HEIGHT = 40
+import { defaultNodeSize } from '@/shared/lib/nodeSize'
 
 export interface EdgeNodeLike {
+  type?: string
   position: { x: number; y: number }
   measured?: { width?: number; height?: number }
   sourcePosition?: Position
@@ -26,17 +25,17 @@ export interface EdgeGeometryParams {
 }
 
 function resolveHandleX(node: EdgeNodeLike, handlePosition: Position): number {
-  const width = node.measured?.width ?? DEFAULT_NODE_WIDTH
+  const width = node.measured?.width ?? defaultNodeSize(node.type).width
   return handlePosition === Position.Left ? node.position.x : node.position.x + width
 }
 
 function resolveHandleY(node: EdgeNodeLike): number {
-  const height = node.measured?.height ?? DEFAULT_NODE_HEIGHT
+  const height = node.measured?.height ?? defaultNodeSize(node.type).height
   return node.position.y + height / 2
 }
 
 function nodeCenterX(node: EdgeNodeLike): number {
-  return node.position.x + (node.measured?.width ?? DEFAULT_NODE_WIDTH) / 2
+  return node.position.x + (node.measured?.width ?? defaultNodeSize(node.type).width) / 2
 }
 
 export function resolveEdgeGeometry({

@@ -1,5 +1,6 @@
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import { Position, type Edge, type Node } from '@xyflow/react'
+import { defaultNodeSize } from './nodeSize'
 
 export const CHILD_OFFSET_X = 260
 export const CHILD_GAP_Y = 24
@@ -54,25 +55,18 @@ export function findRootNode(nodes: Node[], edges: Edge[]): Node | undefined {
   return nodes.find((n) => !parentSet.has(n.id))
 }
 
-const DEFAULT_NODE_HEIGHT = 40
-const DEFAULT_NODE_WIDTH = 160
-const PALACE_NODE_HEIGHT = 200
-const PALACE_NODE_WIDTH = 260
-
 function nodeHeight(nodeId: string, nodes: Node[]): number {
   const node = nodes.find((n) => n.id === nodeId)
-  if (!node) return DEFAULT_NODE_HEIGHT
+  if (!node) return defaultNodeSize('text').height
   if (node.measured?.height) return node.measured.height
-  if (node.type === 'palace') return PALACE_NODE_HEIGHT
-  return DEFAULT_NODE_HEIGHT
+  return defaultNodeSize(node.type).height
 }
 
 function nodeWidth(nodeId: string, nodes: Node[]): number {
   const node = nodes.find((n) => n.id === nodeId)
-  if (!node) return DEFAULT_NODE_WIDTH
+  if (!node) return defaultNodeSize('text').width
   if (node.measured?.width) return node.measured.width
-  if (node.type === 'palace') return PALACE_NODE_WIDTH
-  return DEFAULT_NODE_WIDTH
+  return defaultNodeSize(node.type).width
 }
 
 function subtreeHeight(nodeId: string, edges: Edge[], nodes: Node[], gapY: number): number {
@@ -356,7 +350,7 @@ export function reflowChildren(
   const handleMap = new Map<string, { source: Position; target: Position }>()
   const metaMap = new Map<string, MindmapNodeMeta>()
 
-  const gapX = offsetX - DEFAULT_NODE_WIDTH
+  const gapX = offsetX - defaultNodeSize('text').width
 
   if (structureType === 'mindmap') {
     layoutMindmap(rootId, nodes, edges, gapX, gapY, positions, handleMap, metaMap)

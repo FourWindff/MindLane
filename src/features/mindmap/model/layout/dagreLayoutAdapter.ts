@@ -1,6 +1,7 @@
 import dagre from 'dagre'
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapLayoutAdapter } from './layoutAdapter'
+import { defaultNodeSize } from '@/shared/lib/nodeSize'
 
 export interface InitialLayoutOptions {
   horizontalGap?: number
@@ -17,8 +18,6 @@ const DEFAULT_OPTIONS = {
   rootY: 0,
   direction: 'LR' as const,
 }
-const DEFAULT_NODE_WIDTH = 160
-const DEFAULT_NODE_HEIGHT = 48
 
 export class DagreLayoutAdapter implements MindmapLayoutAdapter<InitialLayoutOptions> {
   layout(nodes: Node[], edges: Edge[], options: InitialLayoutOptions = {}): Node[] {
@@ -36,9 +35,10 @@ export class DagreLayoutAdapter implements MindmapLayoutAdapter<InitialLayoutOpt
     })
 
     for (const node of nodes) {
+      const size = defaultNodeSize(node.type)
       graph.setNode(node.id, {
-        width: node.measured?.width ?? DEFAULT_NODE_WIDTH,
-        height: node.measured?.height ?? DEFAULT_NODE_HEIGHT,
+        width: node.measured?.width ?? size.width,
+        height: node.measured?.height ?? size.height,
       })
     }
     for (const edge of edges) {
