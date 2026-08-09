@@ -91,7 +91,7 @@ function AppContent() {
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
       getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
-      handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor as never),
+      handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor),
       persistFile: (fileUuid) => {
         const instance = mindmapRegistry.getByFileUuid(fileUuid)
         if (!instance) return

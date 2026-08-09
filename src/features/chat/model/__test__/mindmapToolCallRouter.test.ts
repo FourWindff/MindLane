@@ -1,17 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMindmapToolCallRouter } from '../mindmapToolCallRouter'
+import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+
+function stubEditor() {
+  return {
+    insertMindmapData: vi.fn(),
+    addDocumentRef: vi.fn(),
+  } as unknown as MindmapEditor
+}
 
 describe('MindmapToolCallRouter', () => {
   it('applies end-event mindmap effects to the editor owning the session file', () => {
     let listener: ((event: never) => void) | undefined
-    const editorA = {
-      insertMindmapData: vi.fn(),
-      addDocumentRef: vi.fn(),
-    }
-    const editorB = {
-      insertMindmapData: vi.fn(),
-      addDocumentRef: vi.fn(),
-    }
+    const editorA = stubEditor()
+    const editorB = stubEditor()
     const handleToolCall = vi.fn(() => true)
     const router = createMindmapToolCallRouter({
       subscribe: (next) => {
@@ -68,7 +70,7 @@ describe('MindmapToolCallRouter', () => {
     const router = createMindmapToolCallRouter({
       subscribe: () => () => undefined,
       resolveFileUuid: () => 'file-a',
-      getEditor: () => ({ insertMindmapData: vi.fn(), addDocumentRef: vi.fn() }),
+      getEditor: () => stubEditor(),
       handleToolCall,
       persistFile: vi.fn(),
       actionToolNames: ['batchAddMindmapNodes'],
@@ -81,14 +83,8 @@ describe('MindmapToolCallRouter', () => {
 
   it('persists changes applied to a background file before it is reopened', () => {
     let listener: ((event: never) => void) | undefined
-    const activeEditor = {
-      insertMindmapData: vi.fn(),
-      addDocumentRef: vi.fn(),
-    }
-    const backgroundEditor = {
-      insertMindmapData: vi.fn(),
-      addDocumentRef: vi.fn(),
-    }
+    const activeEditor = stubEditor()
+    const backgroundEditor = stubEditor()
     const persistFile = vi.fn()
     const router = createMindmapToolCallRouter({
       subscribe: (next) => {

@@ -1,16 +1,12 @@
 import type { ChatStreamEvent } from './aiStore'
-import type { ChatToolCall, DocumentRef, MindLaneEdge, MindLaneNode } from '@/shared/lib/fileFormat'
-
-interface ToolCallEditor {
-  insertMindmapData(data: { nodes: MindLaneNode[]; edges: MindLaneEdge[] }): void
-  addDocumentRef(document: DocumentRef): void
-}
+import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
+import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 
 interface RouterDependencies {
   subscribe: (listener: (event: ChatStreamEvent) => void) => () => void
   resolveFileUuid: (sessionId: string) => string | undefined
-  getEditor: (fileUuid: string) => ToolCallEditor | undefined
-  handleToolCall: (toolCall: ChatToolCall, editor: ToolCallEditor) => boolean
+  getEditor: (fileUuid: string) => MindmapEditor | undefined
+  handleToolCall: (toolCall: ChatToolCall, editor: MindmapEditor) => boolean
   persistFile: (fileUuid: string) => void
   actionToolNames: readonly string[]
 }
