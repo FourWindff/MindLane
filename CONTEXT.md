@@ -201,6 +201,7 @@
 
 - 所有 mindmap 保存路径共享的唯一保存流程，由 `saveMindmapInstance` 拥有：dirty-check → 守卫快照 → serialize → IPC save → 条件 markClean → `syncAfterFileSaved`。
 - 只覆盖**保存到已知 filePath** 的情形；`filePath` 为 null 时的分支不属于协议，留在调用方：交互保存走另存为对话框，关窗前保存走 workspace 内静默创建，AI 后台保存直接报错。
+- `syncAfterFileSaved` 由调用方注入，`saveMindmapInstance` 不依赖 workspace UI store。
 - dirty-check 内置：干净文档的保存是 no-op，不重写文件、不重新生成 thumbnail。
 
 ### 保存守卫（Save Guard）
@@ -366,6 +367,13 @@
 - 思维模式记忆在学科分类下的细分标签，kebab-case，一个 subTag 对应记忆目录下的一个 `.md` 文件。
 - 开放词表但**复用优先**：提取时把现有 subTag 清单喂给 LLM，只有现有 tag 均不匹配时才允许新建。
 - 提取使用 chatModel（非 reasoningModel）。
+
+### 工作区内文档（Workspace Document）
+
+- 归属于某个 workspace 的 `.mindlane` 文件，「文件属于哪个 workspace」以**加载/保存时的归属**为准，不以读取时的全局 workspace 为准。
+- workspace 内打开（open / 恢复 / 新建 / 静默创建）时记录 workspacePath；`file.open` 打开的 workspace 外独立文件不记录。
+- 另存为成功后同样按新位置更新归属，不等待重开。
+- 归属是「节点编辑历史是工作区内文档的证据」这一领域含义的前提：非工作区内文档的手动编辑不进入 editlog。
 
 ### 节点编辑历史（Node Edit Log）
 
