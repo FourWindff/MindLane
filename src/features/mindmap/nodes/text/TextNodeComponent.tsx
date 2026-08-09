@@ -31,23 +31,18 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       data: { ...n.data, label: next, editing: undefined },
     }))
     // Report manual text edits as memory evidence (fire-and-forget). AI edits
-    // never pass through this commit point, so they are never reported.
-    // workspace/store is dynamically imported to avoid an import cycle
-    // (workspace/store -> mindmapRegistry -> this component).
+    // never pass through this commit point, so they are never reported. Only
+    // documents owned by a workspace qualify: the instance records its
+    // workspace at load time (workspace-external file.open stays null).
     if (next !== before) {
-      const fileUuid = instance.store.getState().fileUuid
-      if (fileUuid) {
-        void import('@/features/workspace/store').then(({ useWorkspaceStore }) => {
-          const workspacePath = useWorkspaceStore.getState().workspacePath
-          if (workspacePath) {
-            window.mindlane?.editlog?.append({
-              workspacePath,
-              fileUuid,
-              nodeId: id,
-              before,
-              after: next,
-            })
-          }
+      const { fileUuid, workspacePath } = instance.store.getState()
+      if (fileUuid && workspacePath) {
+        window.mindlane?.editlog?.append({
+          workspacePath,
+          fileUuid,
+          nodeId: id,
+          before,
+          after: next,
         })
       }
     }

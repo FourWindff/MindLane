@@ -49,7 +49,7 @@ function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
 function activateLegacyFile(filePath = '/old.mindlane') {
   const data = createEmptyFile('Old')
   const instance = mindmapRegistry.getOrCreate(filePath)
-  instance.load(filePath, data)
+  instance.load(filePath, data, null)
   mindmapRegistry.setActive(filePath)
 }
 
@@ -63,9 +63,9 @@ describe('workspace file switching', () => {
     const fileAData = createEmptyFile('A')
     const staleFileBData = createEmptyFile('B')
     const fileA = mindmapRegistry.getOrCreate('/a.mindlane')
-    fileA.load('/a.mindlane', fileAData)
+    fileA.load('/a.mindlane', fileAData, '/ws')
     const fileB = mindmapRegistry.getOrCreate('/b.mindlane')
-    fileB.load('/b.mindlane', staleFileBData)
+    fileB.load('/b.mindlane', staleFileBData, '/ws')
     fileB.editor.addChild('root', { label: '后台新增节点' })
     mindmapRegistry.setActive('/a.mindlane')
 

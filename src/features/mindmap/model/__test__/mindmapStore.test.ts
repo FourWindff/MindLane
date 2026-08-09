@@ -14,7 +14,7 @@ describe('mindmapStore.viewport', () => {
     const file = createEmptyFile('测试文件')
     file.mindmap.viewport = { x: 100, y: 200, zoom: 0.8 }
 
-    store.getState().loadFile('/test/path.mindlane', file)
+    store.getState().loadFile('/test/path.mindlane', file, null)
 
     expect(store.getState().viewport).toEqual({ x: 100, y: 200, zoom: 0.8 })
   })
@@ -44,12 +44,31 @@ describe('mindmapStore.viewport', () => {
   })
 })
 
+describe('mindmapStore.workspacePath', () => {
+  it('records workspacePath on loadFile and clears it on newFile/clearDocument', () => {
+    const store = createMindmapStore()
+    const file = createEmptyFile('WS')
+
+    expect(store.getState().workspacePath).toBeNull()
+
+    store.getState().loadFile('/ws/a.mindlane', file, '/ws')
+    expect(store.getState().workspacePath).toBe('/ws')
+
+    store.getState().newFile('Fresh')
+    expect(store.getState().workspacePath).toBeNull()
+
+    store.getState().loadFile('/ws/b.mindlane', file, '/ws')
+    store.getState().clearDocument()
+    expect(store.getState().workspacePath).toBeNull()
+  })
+})
+
 describe('mindmapStore.fileUuid', () => {
   it('preserves the loaded file UUID when serializing changes', () => {
     const store = createMindmapStore()
     const file = createEmptyFile('Identity')
 
-    store.getState().loadFile('/test/identity.mindlane', file)
+    store.getState().loadFile('/test/identity.mindlane', file, null)
 
     expect(store.getState().toMindLaneFile().metadata.fileUuid).toBe(file.metadata.fileUuid)
   })
@@ -106,7 +125,7 @@ describe('mindmapStore.documentRefs', () => {
       } as never,
     ]
 
-    store.getState().loadFile('/test/legacy.mindlane', file)
+    store.getState().loadFile('/test/legacy.mindlane', file, null)
 
     const loaded = store.getState().documentRefs[0]!
     expect(loaded.sha256).toBe('legacy-hash')

@@ -6,7 +6,7 @@ import { createEmptyFile } from '@/shared/lib/fileFormat'
 function createDirtyInstance(filePath: string | null): MindmapInstance {
   const instance = new MindmapInstance('test')
   if (filePath) {
-    instance.load(filePath, createEmptyFile('B'))
+    instance.load(filePath, createEmptyFile('B'), '/ws')
   } else {
     instance.newFile('B')
   }
@@ -66,7 +66,7 @@ describe('saveMindmapInstance', () => {
 
   it('is a no-op for a clean instance', async () => {
     const instance = new MindmapInstance('test')
-    instance.load('/b.mindlane', createEmptyFile('B'))
+    instance.load('/b.mindlane', createEmptyFile('B'), '/ws')
     const save = vi.fn()
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 

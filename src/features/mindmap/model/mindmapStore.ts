@@ -19,6 +19,7 @@ export interface MindmapState {
   fileUuid: string
   fileTitle: string
   fileCreatedAt: string
+  workspacePath: string | null
   editingNodeId: string | null
   viewport: Viewport
   documentRefs: DocumentRef[]
@@ -43,7 +44,7 @@ export interface MindmapState {
   /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void
 
-  loadFile: (filePath: string, data: MindLaneFile) => void
+  loadFile: (filePath: string, data: MindLaneFile, workspacePath: string | null) => void
   newFile: (title?: string) => void
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
@@ -65,6 +66,7 @@ export function createMindmapStore(): MindmapStore {
     fileUuid: initialFile.metadata.fileUuid,
     fileTitle: initialFile.metadata.title,
     fileCreatedAt: initialFile.metadata.createdAt,
+    workspacePath: null,
     viewport: initialFile.mindmap.viewport,
     editingNodeId: null,
     documentRefs: [],
@@ -109,7 +111,7 @@ export function createMindmapStore(): MindmapStore {
 
     markClean: () => set({ dirty: false }),
 
-    loadFile: (filePath, data) => {
+    loadFile: (filePath, data, workspacePath) => {
       const hydratedNodes = data.mindmap.nodes.map((n) => ({
         ...n,
         data: n.data,
@@ -123,6 +125,7 @@ export function createMindmapStore(): MindmapStore {
         fileUuid: data.metadata.fileUuid,
         fileTitle: data.metadata.title,
         fileCreatedAt: data.metadata.createdAt,
+        workspacePath,
         dirty: false,
         viewport: data.mindmap.viewport,
         canUndo: false,
@@ -141,6 +144,7 @@ export function createMindmapStore(): MindmapStore {
         fileUuid: f.metadata.fileUuid,
         fileTitle: f.metadata.title,
         fileCreatedAt: f.metadata.createdAt,
+        workspacePath: null,
         dirty: false,
         viewport: f.mindmap.viewport,
         canUndo: false,
@@ -158,6 +162,7 @@ export function createMindmapStore(): MindmapStore {
         fileUuid: f.metadata.fileUuid,
         fileTitle: f.metadata.title,
         fileCreatedAt: f.metadata.createdAt,
+        workspacePath: null,
         dirty: false,
         editingNodeId: null,
         viewport: f.mindmap.viewport,

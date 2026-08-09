@@ -115,10 +115,10 @@ async function listWorkspaceTree(workspacePath: string | null): Promise<Workspac
   return result.data
 }
 
-function loadMindLaneFile(filePath: string, data: unknown) {
+function loadMindLaneFile(filePath: string, data: unknown, workspacePath: string | null) {
   const instance = mindmapRegistry.getOrCreate(filePath)
   if (!instance.store.getState().dirty) {
-    instance.load(filePath, data as MindLaneFile)
+    instance.load(filePath, data as MindLaneFile, workspacePath)
   }
   mindmapRegistry.setActive(filePath)
 }
@@ -188,7 +188,7 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
     return false
   }
 
-  loadMindLaneFile(createResult.filePath, createResult.data)
+  loadMindLaneFile(createResult.filePath, createResult.data, workspacePath)
   await workspaceState.syncAfterFileSaved(createResult.filePath)
   return true
 }
@@ -250,7 +250,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
           filePath: session.lastOpenedFilePath,
         })
         if (result?.ok) {
-          loadMindLaneFile(result.data.filePath, result.data.data)
+          loadMindLaneFile(result.data.filePath, result.data.data, session.workspacePath)
         } else {
           clearMindLaneFile()
         }
@@ -330,7 +330,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return false
       }
 
-      loadMindLaneFile(result.data.filePath, result.data.data)
+      loadMindLaneFile(result.data.filePath, result.data.data, get().workspacePath)
       return true
     } finally {
       set({ busy: false })
@@ -362,7 +362,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return false
       }
 
-      loadMindLaneFile(result.data.filePath, result.data.data)
+      loadMindLaneFile(result.data.filePath, result.data.data, workspacePath)
       const session = await loadSessionFromBackend()
       const files = await listWorkspaceFiles(workspacePath)
       const tree = await listWorkspaceTree(workspacePath)

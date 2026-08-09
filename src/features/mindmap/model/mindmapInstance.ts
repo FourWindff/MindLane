@@ -20,8 +20,8 @@ export class MindmapInstance {
     this.editor = new MindmapEditor(this.store, this.history)
   }
 
-  load(filePath: string, data: MindLaneFile): void {
-    this.store.getState().loadFile(filePath, data)
+  load(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
+    this.store.getState().loadFile(filePath, data, workspacePath)
     this.history.clear()
   }
 

@@ -546,8 +546,8 @@ export class MindmapEditor {
     this.syncHistoryState()
   }
 
-  loadFile(filePath: string, data: MindLaneFile): void {
-    this.state.loadFile(filePath, data)
+  loadFile(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
+    this.state.loadFile(filePath, data, workspacePath)
     this.history.clear()
     this.syncHistoryState()
   }

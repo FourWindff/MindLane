@@ -239,7 +239,7 @@ export function SettingsPanel() {
                   const result = await window.mindlane?.file.open()
                   if (result?.ok) {
                     const instance = mindmapRegistry.getOrCreate(result.data.filePath)
-                    instance.load(result.data.filePath, result.data.data as MindLaneFile)
+                    instance.load(result.data.filePath, result.data.data as MindLaneFile, null)
                     mindmapRegistry.setActive(result.data.filePath)
                     await syncAfterFileSaved(result.data.filePath)
                   }
@@ -275,7 +275,11 @@ export function SettingsPanel() {
                   const result = await window.mindlane?.file.saveAs({ data })
                   if (result?.ok) {
                     const instance = mindmapRegistry.getOrCreate(result.data.filePath)
-                    instance.load(result.data.filePath, result.data.data as MindLaneFile)
+                    instance.load(
+                      result.data.filePath,
+                      result.data.data as MindLaneFile,
+                      workspacePath,
+                    )
                     mindmapRegistry.setActive(result.data.filePath)
                     await syncAfterFileSaved(result.data.filePath)
                   }
