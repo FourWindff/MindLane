@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { splitCurrentTurn } from '../../../../electron/ipc'
 import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
 
 function generateSessionId(): string {
@@ -621,12 +622,10 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
                 },
               ]
             : []
-        const lastUserIndex = chat.chatMessages.findLastIndex((message) => message.role === 'user')
-        const messagesBeforeCurrentResponse =
-          lastUserIndex >= 0 ? chat.chatMessages.slice(0, lastUserIndex + 1) : chat.chatMessages
+        const { previous } = splitCurrentTurn(chat.chatMessages)
         chat = {
           ...chat,
-          chatMessages: [...messagesBeforeCurrentResponse, ...messages],
+          chatMessages: [...previous, ...messages],
           busy: false,
           stopRequested: false,
           step: 'idle',

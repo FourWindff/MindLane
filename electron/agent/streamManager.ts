@@ -10,7 +10,7 @@ import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
-import { isStreamStep } from '../ipc.js'
+import { isStreamStep, splitCurrentTurn } from '../ipc.js'
 
 type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
   ChatStreamEvent,
@@ -242,13 +242,11 @@ export class Runner {
   private async persistResult(result: MainGraphStateType): Promise<void> {
     const { aiService, request } = this.options
     if (!aiService.sessionManager?.isReady()) return
-    const lastHumanIndex = result.messages.findLastIndex((message) => message.type === 'human')
-    const messages =
-      lastHumanIndex >= 0 ? result.messages.slice(lastHumanIndex + 1) : result.messages
-    if (messages.length > 0) {
+    const { current } = splitCurrentTurn(result.messages)
+    if (current.length > 0) {
       await aiService.sessionManager.saveMessages(
         request.sessionId,
-        messages,
+        current,
         request.context.fileUuid,
       )
     }
@@ -272,10 +270,8 @@ export class Runner {
       return
     }
     await this.persistResult(result)
-    const lastHumanIndex = result.messages.findLastIndex((message) => message.type === 'human')
-    const currentTurn =
-      lastHumanIndex >= 0 ? result.messages.slice(lastHumanIndex + 1) : result.messages
-    const contentAlreadyPersisted = currentTurn.some(
+    const { current } = splitCurrentTurn(result.messages)
+    const contentAlreadyPersisted = current.some(
       (message) => message.type === 'ai' && extractTextContent(message.content) === content,
     )
     if (!contentAlreadyPersisted) await this.persistPartialContent(content)

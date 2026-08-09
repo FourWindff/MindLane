@@ -171,6 +171,25 @@ export function isStreamStep(value: unknown): value is StreamStep {
   return typeof value === 'string' && STREAM_STEPS.some((step) => step === value)
 }
 
+/**
+ * 把"当前轮"切片语义收敛为跨进程共享的唯一实现。
+ * 边界 = 最后一条 `type === 'human' || role === 'user'` 的消息；
+ * `previous` 含边界消息，`current` 不含；无边界时 `previous` = 全部、`current` = 空。
+ * 两种消息模型（`BaseMessage.type` 与 `ChatMessage.role`）共用同一份语义。
+ */
+export function splitCurrentTurn<T extends { type?: string; role?: string }>(
+  messages: readonly T[],
+): { previous: T[]; current: T[] } {
+  const boundaryIndex = messages.findLastIndex(
+    (message) => message.type === 'human' || message.role === 'user',
+  )
+  if (boundaryIndex < 0) return { previous: [...messages], current: [] }
+  return {
+    previous: messages.slice(0, boundaryIndex + 1),
+    current: messages.slice(boundaryIndex + 1),
+  }
+}
+
 export interface StreamResponse {
   content: string
   messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>

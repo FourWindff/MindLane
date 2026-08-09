@@ -40,6 +40,7 @@ import { compactContext } from './memory/contextCompact.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import type { StreamRuntime } from './streamManager.js'
+import { splitCurrentTurn } from '../ipc.js'
 import { ContextBuilder } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
 import { createExtractionCallback } from './memory/memoryExtractor.js'
@@ -540,7 +541,10 @@ export class AgentOrchestrator {
    */
   buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
     const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
-    const messages = this.extractCurrentTurnAssistantMessages(result.messages)
+    const assistantMessages = checkpointMessagesToSessionMessages(
+      splitCurrentTurn(result.messages).current,
+    ).filter((msg): msg is AssistantMessage => msg.role === 'assistant')
+    const messages = assistantMessages.length > 0 ? assistantMessages : undefined
 
     const response: ChatResponse = {
       content: rawContent,
@@ -560,16 +564,6 @@ export class AgentOrchestrator {
     }
 
     return response
-  }
-
-  private extractCurrentTurnAssistantMessages(messages: BaseMessage[]): ChatResponse['messages'] {
-    const lastHumanIndex = messages.findLastIndex((m: BaseMessage) => m.type === 'human')
-    const currentTurnMessages = lastHumanIndex >= 0 ? messages.slice(lastHumanIndex + 1) : messages
-    const sessionMessages = checkpointMessagesToSessionMessages(currentTurnMessages)
-    const assistantMessages = sessionMessages.filter(
-      (msg): msg is AssistantMessage => msg.role === 'assistant',
-    )
-    return assistantMessages.length > 0 ? assistantMessages : undefined
   }
 
   private extractToolCalls(messages: BaseMessage[]): ChatResponse['toolCalls'] {
