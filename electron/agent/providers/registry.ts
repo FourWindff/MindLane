@@ -1,21 +1,38 @@
-import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
+import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
 import type { AppSettings, ProviderConfig } from '../../fs/types.js'
 
-type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
-
-type ProviderMeta = {
+export type ProviderMeta = {
   id: string
   displayName: string
   capabilities: ProviderCapability[]
-  defaultModels: ChatModelOption[]
+  defaultModels: ModelOption[]
 }
+
+/**
+ * Provider 类须自声明全部 meta（id/displayName/capabilities/defaultModels），
+ * 注册处与实例 getter 共用同一份声明，不再双写目录。
+ */
+type ProviderConstructor = (new (config: ProviderConfig & { chatModel: string }) => LLMProvider) & {
+  id: string
+  displayName: string
+  capabilities: ProviderCapability[]
+  defaultModels: ModelOption[]
+}
+
+type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
 
 const factories = new Map<string, ProviderFactory>()
 const metaMap = new Map<string, ProviderMeta>()
 
-function registerProvider(meta: ProviderMeta, factory: ProviderFactory): void {
-  factories.set(meta.id, factory)
-  metaMap.set(meta.id, meta)
+function registerProvider(ctor: ProviderConstructor): void {
+  const meta: ProviderMeta = {
+    id: ctor.id,
+    displayName: ctor.displayName,
+    capabilities: [...ctor.capabilities],
+    defaultModels: ctor.defaultModels,
+  }
+  factories.set(ctor.id, (config) => new ctor(config))
+  metaMap.set(ctor.id, meta)
 }
 
 export function createProvider(
@@ -69,48 +86,9 @@ export function getRegisteredProviders(): ProviderMeta[] {
 import { DashScopeProvider } from './dashscope.js'
 import { KimiCodeProvider } from './kimi-code.js'
 import { MiniMaxProvider } from './minimax.js'
+import { DeepSeekProvider } from './deepseek.js'
 
-registerProvider(
-  {
-    id: 'dashscope',
-    displayName: '通义千问 (百炼)',
-    capabilities: [ProviderCapability.Chat, ProviderCapability.Vision, ProviderCapability.ImageGen],
-    defaultModels: DashScopeProvider.defaultChatModels,
-  },
-  (config) =>
-    new DashScopeProvider({
-      apiKey: config.apiKey,
-      chatModel: config.chatModel,
-      baseUrl: config.baseUrl,
-    }),
-)
-
-registerProvider(
-  {
-    id: 'kimi-code',
-    displayName: 'Kimi Code',
-    capabilities: [ProviderCapability.Chat],
-    defaultModels: KimiCodeProvider.defaultChatModels,
-  },
-  (config) =>
-    new KimiCodeProvider({
-      apiKey: config.apiKey,
-      chatModel: config.chatModel,
-      baseUrl: config.baseUrl,
-    }),
-)
-
-registerProvider(
-  {
-    id: 'minimax',
-    displayName: 'MiniMax',
-    capabilities: [ProviderCapability.Chat, ProviderCapability.ImageGen],
-    defaultModels: MiniMaxProvider.defaultChatModels,
-  },
-  (config) =>
-    new MiniMaxProvider({
-      apiKey: config.apiKey,
-      chatModel: config.chatModel,
-      baseUrl: config.baseUrl,
-    }),
-)
+registerProvider(DashScopeProvider)
+registerProvider(KimiCodeProvider)
+registerProvider(MiniMaxProvider)
+registerProvider(DeepSeekProvider)

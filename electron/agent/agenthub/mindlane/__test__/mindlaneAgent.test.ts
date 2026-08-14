@@ -17,11 +17,11 @@ import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 
 function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
   return {
-    reasoningModel: {
+    model: {
       bindTools: () => ({ invoke: mockInvoke }),
     },
     capabilities: new Set(),
-    chatModels: [],
+    models: [],
   } as unknown as LLMProvider
 }
 

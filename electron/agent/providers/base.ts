@@ -14,7 +14,7 @@ class UnsupportedCapabilityError extends Error {
   }
 }
 
-export type ChatModelOption = { id: string; displayName: string; contextWindow?: number }
+export type ModelOption = { id: string; displayName: string; contextWindow?: number }
 
 /** Conservative fallback window (32k tokens) for models without a declared contextWindow */
 export const DEFAULT_CONTEXT_WINDOW = 32_768
@@ -27,36 +27,42 @@ export type DetectedAnchor = {
 }
 
 export abstract class LLMProvider {
-  readonly reasoningModel: BaseChatModel
-  readonly visionModel: BaseChatModel | undefined
-  /** Id of the current reasoning model, used to look up contextWindow in chatModels */
-  protected readonly chatModelId: string
+  /**
+   * Provider 目录与能力的**单一声明源**（静态）：registry 注册与实例 getter
+   * 都从这里读，不再在注册处重复维护第二份 defaultModels/capabilities。
+   */
+  static readonly id: string = ''
+  static readonly displayName: string = ''
+  static readonly capabilities: readonly ProviderCapability[] = []
+  static readonly defaultModels: readonly ModelOption[] = []
 
-  constructor(reasoningModel: BaseChatModel, visionModel?: BaseChatModel, chatModelId?: string) {
-    this.reasoningModel = reasoningModel
+  /** 聊天模型：单模型档位，不区分"聊天/推理"模型（见 ADR-0014 附注） */
+  readonly model: BaseChatModel
+  /** 视觉模型槽位（如 DashScope 的 qwen-vl-max）；无视觉能力的 provider 为 undefined */
+  readonly visionModel: BaseChatModel | undefined
+  /** 当前所选模型 id，用于在 models 目录中查 contextWindow */
+  protected readonly modelId: string
+
+  constructor(model: BaseChatModel, visionModel?: BaseChatModel, modelId?: string) {
+    this.model = model
     this.visionModel = visionModel
-    this.chatModelId = chatModelId ?? ''
-    attachMetering(reasoningModel)
+    this.modelId = modelId ?? ''
+    attachMetering(model)
     if (visionModel) attachMetering(visionModel)
   }
 
-  abstract get capabilities(): Set<ProviderCapability>
-
-  abstract get chatModels(): ChatModelOption[]
-
-  /**
-   * Chat-tier model for light tasks (e.g. memory extraction), as opposed to
-   * deep-reasoning work. Providers currently configure a single model, so this
-   * aliases `reasoningModel` until a separate cheap tier is introduced.
-   */
-  get chatModel(): BaseChatModel {
-    return this.reasoningModel
+  get capabilities(): Set<ProviderCapability> {
+    return new Set((this.constructor as typeof LLMProvider).capabilities)
   }
 
-  /** Context window (tokens) of the current reasoning model; falls back to 32k when undeclared */
+  get models(): ModelOption[] {
+    return [...(this.constructor as typeof LLMProvider).defaultModels]
+  }
+
+  /** Context window (tokens) of the current model; falls back to 32k when undeclared */
   get contextWindow(): number {
     return (
-      this.chatModels.find((model) => model.id === this.chatModelId)?.contextWindow ??
+      this.models.find((model) => model.id === this.modelId)?.contextWindow ??
       DEFAULT_CONTEXT_WINDOW
     )
   }

@@ -1,5 +1,5 @@
 import { ChatOpenAI } from '@langchain/openai'
-import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
+import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
 import { withRetry, withTimeout, sleepWithAbort, linkSignals } from './middleware/index.js'
 
 const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
@@ -45,26 +45,21 @@ const POLL_INTERVAL_MS = 1500
 const POLL_MAX_TIMES = 60
 
 export class DashScopeProvider extends LLMProvider {
-  private readonly apiKey: string
-
-  static readonly defaultChatModels: ChatModelOption[] = [
+  static readonly id = 'dashscope'
+  static readonly displayName = '通义千问 (百炼)'
+  static readonly capabilities: ProviderCapability[] = [
+    ProviderCapability.Chat,
+    ProviderCapability.Vision,
+    ProviderCapability.ImageGen,
+  ]
+  static readonly defaultModels: ModelOption[] = [
     { id: 'qwen-turbo', displayName: 'qwen-turbo', contextWindow: 1_000_000 },
     { id: 'qwen-plus', displayName: 'qwen-plus', contextWindow: 131_072 },
     { id: 'qwen-max', displayName: 'qwen-max', contextWindow: 32_768 },
     { id: 'qwen-long', displayName: 'qwen-long', contextWindow: 10_000_000 },
   ]
 
-  get capabilities(): Set<ProviderCapability> {
-    return new Set([
-      ProviderCapability.Chat,
-      ProviderCapability.Vision,
-      ProviderCapability.ImageGen,
-    ])
-  }
-
-  get chatModels() {
-    return DashScopeProvider.defaultChatModels
-  }
+  private readonly apiKey: string
 
   constructor(config: {
     apiKey: string

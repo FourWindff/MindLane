@@ -16,7 +16,7 @@ describe('AnalyzeAgent error logging', () => {
 
   it('logs error with stack when analyzeFromText fails', async () => {
     const mockProvider = {
-      reasoningModel: {
+      model: {
         withStructuredOutput: vi.fn().mockReturnValue({
           invoke: vi.fn().mockRejectedValue(new Error('structured output failed')),
         }),
@@ -38,7 +38,7 @@ describe('AnalyzeAgent error logging', () => {
 
   it('logs error with stack when analyzeFromNodes fails', async () => {
     const mockProvider = {
-      reasoningModel: {
+      model: {
         withStructuredOutput: vi.fn(),
         invoke: vi.fn().mockRejectedValue(new Error('model invocation failed')),
       },

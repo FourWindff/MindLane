@@ -80,7 +80,7 @@ export class MemoryExtractor {
   ): Promise<ExtractedPattern[]> {
     const existingTags = await this.manager.listTags()
     const prompt = this.buildExtractionPrompt(messages, editlogEntries, existingTags)
-    const response = await provider.chatModel.invoke([new SystemMessage(prompt)])
+    const response = await provider.model.invoke([new SystemMessage(prompt)])
     return this.parseExtractionResponse(response.content)
   }
 

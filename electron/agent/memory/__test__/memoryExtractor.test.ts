@@ -10,14 +10,14 @@ import type { MindLaneFile } from '../../../../src/shared/lib/fileFormat.js'
 
 // Minimal mock provider for testing
 interface MockProvider {
-  chatModel: {
+  model: {
     invoke: (messages: unknown[]) => Promise<{ content: string }>
   }
 }
 
 function createMockProvider(responseContent: string): MockProvider {
   return {
-    chatModel: {
+    model: {
       invoke: vi.fn().mockResolvedValue({ content: responseContent }),
     },
   }
@@ -180,7 +180,7 @@ describe('MemoryExtractor', () => {
       editlogEntries: [],
     })
 
-    const invokeSpy = mockProvider.chatModel.invoke as unknown as ReturnType<typeof vi.fn>
+    const invokeSpy = mockProvider.model.invoke as unknown as ReturnType<typeof vi.fn>
     const prompt = String(invokeSpy.mock.calls[0]![0][0].content)
     expect(prompt).toContain('我们把导图拆成模块')
     expect(prompt).not.toContain('<EDITOR_STATE')

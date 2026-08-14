@@ -136,8 +136,8 @@ export class AnalyzeAgent extends PalaceAgent {
 
   constructor(provider: LLMProvider) {
     super(provider)
-    this.analyzeModel = this.provider.reasoningModel.withStructuredOutput(analyzeSchema)
-    this.designModel = this.provider.reasoningModel.withStructuredOutput(designSchema)
+    this.analyzeModel = this.provider.model.withStructuredOutput(analyzeSchema)
+    this.designModel = this.provider.model.withStructuredOutput(designSchema)
   }
 
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
@@ -229,7 +229,7 @@ export class AnalyzeAgent extends PalaceAgent {
   private async analyzeFromNodes(
     selectedNodes: SelectedNodeContent[],
   ): Promise<Partial<PalaceSubgraphStateType>> {
-    const model = this.provider.reasoningModel
+    const model = this.provider.model
     try {
       const response = await model.invoke(buildAnalyzeAndPlanMessages(selectedNodes))
       const text = typeof response.content === 'string' ? response.content : ''

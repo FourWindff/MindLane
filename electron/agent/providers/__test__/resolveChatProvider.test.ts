@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS, type AppSettings } from '../../../fs/types.js'
 import { DashScopeProvider } from '../dashscope.js'
 import { KimiCodeProvider } from '../kimi-code.js'
+import { DeepSeekProvider } from '../deepseek.js'
 import { resolveChatProvider } from '../index.js'
 
 function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -25,7 +26,7 @@ describe('resolveChatProvider', () => {
 
     expect(provider).toBeInstanceOf(DashScopeProvider)
     expect(provider.contextWindow).toBe(131_072) // qwen-plus declared window
-    expect(provider.reasoningModel.lc_kwargs.configuration.baseURL).toBe('https://example.com')
+    expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://example.com')
   })
 
   it('prefers the per-provider apiKey over the global key', () => {
@@ -33,13 +34,13 @@ describe('resolveChatProvider', () => {
       makeSettings({ providerConfigs: { dashscope: { apiKey: 'provider-key' } } }),
     )
 
-    expect(provider.reasoningModel.lc_kwargs.apiKey).toBe('provider-key')
+    expect(provider.model.lc_kwargs.apiKey).toBe('provider-key')
   })
 
   it('falls back to the global apiKey when the provider config has none', () => {
     const provider = resolveChatProvider(makeSettings())
 
-    expect(provider.reasoningModel.lc_kwargs.apiKey).toBe('global-key')
+    expect(provider.model.lc_kwargs.apiKey).toBe('global-key')
   })
 
   it('ignores a whitespace-only provider key and falls back to the global key', () => {
@@ -47,7 +48,7 @@ describe('resolveChatProvider', () => {
       makeSettings({ providerConfigs: { dashscope: { apiKey: '   ' } } }),
     )
 
-    expect(provider.reasoningModel.lc_kwargs.apiKey).toBe('global-key')
+    expect(provider.model.lc_kwargs.apiKey).toBe('global-key')
   })
 
   it('throws when no apiKey is configured', () => {
@@ -73,7 +74,7 @@ describe('resolveChatProvider', () => {
   })
 
   it('resolves a different provider against its own catalog', () => {
-    const kimi = KimiCodeProvider.defaultChatModels[0]!
+    const kimi = KimiCodeProvider.defaultModels[0]!
     const provider = resolveChatProvider(
       makeSettings({
         activeProviders: { chat: 'kimi-code', image: 'dashscope' },
@@ -82,5 +83,19 @@ describe('resolveChatProvider', () => {
     )
 
     expect(provider).toBeInstanceOf(KimiCodeProvider)
+  })
+
+  it('resolves DeepSeek and pins the chat model to the non-thinking (chatDeepSeek) mode', () => {
+    const provider = resolveChatProvider(
+      makeSettings({
+        activeProviders: { chat: 'deepseek', image: 'dashscope' },
+        chatModel: 'deepseek-v4-flash',
+        providerConfigs: { deepseek: { apiKey: 'ds-key' } },
+      }),
+    )
+
+    expect(provider).toBeInstanceOf(DeepSeekProvider)
+    expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://api.deepseek.com')
+    expect(provider.model.lc_kwargs.modelKwargs).toEqual({ thinking: { type: 'disabled' } })
   })
 })

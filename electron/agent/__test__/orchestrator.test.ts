@@ -17,10 +17,10 @@ function createMockProvider(
   }
 
   return {
-    reasoningModel: mockModel,
+    model: mockModel,
     visionModel: undefined,
     capabilities,
-    chatModels: [],
+    models: [],
   } as unknown as LLMProvider
 }
 

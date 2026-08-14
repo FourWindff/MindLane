@@ -16,7 +16,7 @@ describe('ImageGenAgent error logging', () => {
 
   it('logs error when image generation fails', async () => {
     const mockProvider = {
-      reasoningModel: {
+      model: {
         invoke: vi.fn().mockResolvedValue({ content: 'a prompt' }),
       },
       generateImage: vi.fn().mockRejectedValue(new Error('API rate limit exceeded')),

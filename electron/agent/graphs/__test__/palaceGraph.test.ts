@@ -4,7 +4,7 @@ import { ProviderCapability, type LLMProvider } from '../../providers/index.js'
 
 function createMockProvider(): LLMProvider {
   return {
-    reasoningModel: {
+    model: {
       invoke: vi.fn(),
       bindTools: vi.fn().mockReturnValue({ invoke: vi.fn() }),
       withStructuredOutput: vi.fn().mockReturnValue({ invoke: vi.fn() }),
@@ -19,7 +19,7 @@ function createMockProvider(): LLMProvider {
       ProviderCapability.ImageGen,
       ProviderCapability.Vision,
     ]),
-    chatModels: [],
+    models: [],
     generateImage: vi.fn().mockResolvedValue({ urls: ['https://example.com/image.png'] }),
   } as unknown as LLMProvider
 }

@@ -3,7 +3,7 @@ export {
   ProviderCapability,
   DEFAULT_CONTEXT_WINDOW,
   type DetectedAnchor,
-  type ChatModelOption,
+  type ModelOption,
   urlToDataUrl,
 } from './base.js'
 export {

@@ -19,7 +19,7 @@ describe('AnchorAgent error logging', () => {
       visionModel: {
         invoke: vi.fn().mockRejectedValue(new Error('vision model unavailable')),
       },
-      reasoningModel: {
+      model: {
         invoke: vi.fn().mockResolvedValue({ content: 'summary text' }),
       },
     } as unknown as LLMProvider
@@ -53,7 +53,7 @@ describe('AnchorAgent error logging', () => {
       visionModel: {
         invoke: vi.fn().mockResolvedValue({ content: '[{"order":1,"x":0.5,"y":0.5}]' }),
       },
-      reasoningModel: {
+      model: {
         invoke: vi.fn().mockRejectedValue(new Error('summary generation failed')),
       },
     } as unknown as LLMProvider

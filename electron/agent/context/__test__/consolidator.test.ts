@@ -21,7 +21,7 @@ class FakeProvider extends LLMProvider {
     return new Set([ProviderCapability.Chat])
   }
 
-  get chatModels() {
+  get models() {
     return []
   }
 }

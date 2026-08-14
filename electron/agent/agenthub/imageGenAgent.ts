@@ -35,7 +35,7 @@ export class ImageGenAgent extends PalaceAgent {
         })
       } else {
         // 否则使用 LLM 生成提示词
-        const promptResponse = await this.provider.reasoningModel.invoke(
+        const promptResponse = await this.provider.model.invoke(
           buildImagePromptGeneratorMessages(state.palace),
         )
         imagePrompt =

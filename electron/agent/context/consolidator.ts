@@ -291,7 +291,7 @@ export class Consolidator {
   }
 
   private summarizerModel(): string {
-    return (this.provider.reasoningModel as { model?: string }).model ?? 'unknown'
+    return (this.provider.model as { model?: string }).model ?? 'unknown'
   }
 
   /**
@@ -338,7 +338,7 @@ export class Consolidator {
       ),
     )
 
-    const response = await this.provider.reasoningModel.invoke(inputs)
+    const response = await this.provider.model.invoke(inputs)
     return extractTextContent(response.content)
   }
 }

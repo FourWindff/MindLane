@@ -1,5 +1,5 @@
 import { ChatAnthropic } from '@langchain/anthropic'
-import { LLMProvider, ProviderCapability, type ChatModelOption } from './base.js'
+import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
 import { withRetry, withTimeout } from './middleware/index.js'
 
 const HTTP_TIMEOUT_MS = 30_000
@@ -78,7 +78,13 @@ function extractImageUrls(body: MiniMaxImageResponse | null): string[] {
 }
 
 export class MiniMaxProvider extends LLMProvider {
-  static readonly defaultChatModels: ChatModelOption[] = [
+  static readonly id = 'minimax'
+  static readonly displayName = 'MiniMax'
+  static readonly capabilities: ProviderCapability[] = [
+    ProviderCapability.Chat,
+    ProviderCapability.ImageGen,
+  ]
+  static readonly defaultModels: ModelOption[] = [
     { id: 'MiniMax-M2.7', displayName: 'MiniMax M2.7', contextWindow: 204_800 },
     { id: 'MiniMax-M2.5', displayName: 'MiniMax M2.5', contextWindow: 204_800 },
     { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', contextWindow: 204_800 },
@@ -86,14 +92,6 @@ export class MiniMaxProvider extends LLMProvider {
   ]
 
   private readonly apiKey: string
-
-  get capabilities(): Set<ProviderCapability> {
-    return new Set([ProviderCapability.Chat, ProviderCapability.ImageGen])
-  }
-
-  get chatModels() {
-    return MiniMaxProvider.defaultChatModels
-  }
 
   constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()

@@ -169,7 +169,7 @@ async function generateValidMindmapYaml(
   let lastReason = 'YAML 校验失败'
 
   for (let attempt = 1; attempt <= YAML_GENERATION_ATTEMPTS; attempt += 1) {
-    const response = await provider.reasoningModel.invoke(messages)
+    const response = await provider.model.invoke(messages)
     const content = extractTextContent(response.content)
     const validation = validateMindmapYaml(content, {
       mode: 'tree',

@@ -291,7 +291,7 @@ export class AnchorAgent extends PalaceAgent {
 
     let summary: string
     try {
-      const summaryResponse = await this.provider.reasoningModel.invoke(
+      const summaryResponse = await this.provider.model.invoke(
         buildSummaryMessages({
           theme: state.palace.theme,
           hasImage,

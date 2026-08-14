@@ -107,7 +107,7 @@
 - 摘要经 graph state 的 `summary` 字段注入 supervisor 的 system prompt `## 历史摘要` 段——归档的消息由摘要替代，不是静默截断。
 - 会话文件只有 `{sessionId}.jsonl`（首行 meta + 消息，append-only 永不物理裁剪）；不再有 `{sessionId}.history.jsonl`。
 - LLM 摘要失败**不推进游标**（下轮 run 自愈重试），本轮由预算裁剪兜底；I/O 故障跳过压缩，由 supervisor 的非 LLM 裁剪重试兜底。
-- 摘要使用 `reasoningModel`；记忆提取（fire-and-forget）挂在压缩切片上，`lastConsolidated` 兼作提取游标。
+- 摘要与记忆提取共用当前选定的聊天模型（模型层不设独立的"推理/对话"档位）；记忆提取（fire-and-forget）挂在压缩切片上，`lastConsolidated` 兼作提取游标。
 
 ### 监督器（Supervisor）
 
@@ -313,12 +313,12 @@
 ### 上下文预算（Context Budget）
 
 - 单个 batch 允许容纳的最大文本量 = 当前模型 `contextWindow` × 40%，以 2 字符 ≈ 1 token 折算为字符数。
-- `contextWindow` 来自 provider 的 `ChatModelOption`，未填写时回退 32k。
+- `contextWindow` 来自 provider 目录中的模型条目（`ModelOption`），未填写时回退 32k。
 - 40% 是刻意保留的裕量，同时覆盖 prompt 模板与模型输出开销，不做精确 token 计数。
 
 ### Leaf 提取（Leaf Extraction）
 
-- 对一个 batch 调用 reasoning model、产出一棵 YAML 结构树的过程，是导图生成的最小工作单元。
+- 对一个 batch 调用聊天模型、产出一棵 YAML 结构树的过程，是导图生成的最小工作单元。
 - 多个 leaf 之间**无依赖、可并行**；结果按 `batchIndex` 排序后进入归并，文档叙事顺序不因完成顺序乱序而改变。
 - 单个 leaf 内部有 YAML 校验重试；重试耗尽即整轮 fail-fast，不存在"跳过失败 batch 继续生成"的降级路径。
 
@@ -353,6 +353,22 @@
 - 前端允许发起对话的前提：settings 已加载、当前 provider 已填 API Key、已显式选择模型，三者同时成立。
 - 未就绪时 `ChatInputBar` 禁用并在 placeholder 提示缺失项；palace 生成入口复用同一判定。
 - 主进程解析时的抛错是最后一道防线，渲染层门控不替代它。
+
+### 模型（Model）
+
+- provider 暴露的**单一聊天模型**实例（基类字段 `model`）；模型层不区分"聊天模型/推理模型"档位——旧 `reasoningModel` 与 `chatModel` 别名是同一实例的重复命名，已收敛。
+- 记忆提取、会话摘要、导图生成等所有模型调用共用它；不同任务的成本差异由模型自身能力或请求参数（如 DeepSeek 的思考模式开关）表达，不靠第二个模型实例。
+
+### ModelOption
+
+- provider 目录中的单个模型条目：`id`（调用名）、`displayName`（展示名）、`contextWindow?`（上下文窗口，未声明回退 32k）。
+- 目录与 provider 能力是**单一声明源**：provider 类静态声明 `id`/`displayName`/`capabilities`/`defaultModels`，registry 注册与设置面板都从这里读，不存在第二份副本。
+
+### Provider 能力（Capability）
+
+- provider 自声明的能力集合：`chat`（对话）、`vision`（视觉理解）、`imageGen`（文生图）。
+- 记忆宫殿功能要求 chat provider 同时具备 `vision` + `imageGen`；不具备时（如 Kimi Code、MiniMax、DeepSeek）入口返回友好错误，不降级尝试。
+- 视觉与文生图**未设独立 provider 槽位**：`activeProviders.image` 仅存在于 settings 形状中，主进程始终使用 chat provider 承载 palace 子图（已知遗留，见 ADR-0014 附注）。
 
 ## 日志
 

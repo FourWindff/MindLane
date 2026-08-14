@@ -58,7 +58,7 @@ export class MindLaneAgent extends BaseAgent {
     super(provider)
     this.toolRegistry = toolRegistry
     this.capabilityFlags = capabilityFlags ?? { hasPalace: true }
-    this.modelWithTools = this.provider.reasoningModel.bindTools!(this.toolRegistry.allTools)
+    this.modelWithTools = this.provider.model.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
     this.messagePipelineConfig = mergeMessagePipelineConfig(options?.messagePipeline)

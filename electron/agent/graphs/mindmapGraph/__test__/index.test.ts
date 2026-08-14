@@ -13,7 +13,7 @@ function mockProvider(
   contextWindow = 32_768,
 ) {
   return {
-    reasoningModel: {
+    model: {
       invoke: impl ? vi.fn(impl) : vi.fn(),
     },
     contextWindow,
@@ -21,7 +21,7 @@ function mockProvider(
 }
 
 function invokeMock(provider: LLMProvider): InvokeMock {
-  return provider.reasoningModel.invoke as unknown as InvokeMock
+  return provider.model.invoke as unknown as InvokeMock
 }
 
 function baseInput(overrides: Record<string, unknown> = {}) {
