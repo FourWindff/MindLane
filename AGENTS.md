@@ -43,17 +43,17 @@ This project is indexed by GitNexus as **MindLane** (5961 symbols, 12152 relatio
 
 <!-- gitnexus:end -->
 
-## pi（pi-coding-agent）
+## pi (pi-coding-agent)
 
-仅 pi 会话适用：pi 无 MCP 客户端，上方 `gitnexus_*` 工具名在 pi 中不存在；每条指令换成等价 CLI 子命令执行，语法以 `npx gitnexus <子命令> --help` 为准（本机索引了多个仓库，命令需带 `-r MindLane`）：
+Pi-only: pi has no MCP client — the `gitnexus_*` tool names above do not exist in pi. Run each directive as its CLI equivalent instead (syntax per `npx gitnexus <subcommand> --help`). This host indexes multiple repos, so every command needs `-r MindLane`:
 
-- `gitnexus_impact` → `npx gitnexus impact -r MindLane <symbol>`（默认 upstream）
+- `gitnexus_impact` → `npx gitnexus impact -r MindLane <symbol>` (upstream by default)
 - `gitnexus_detect_changes` → `npx gitnexus detect-changes -r MindLane -s staged`
-- `gitnexus_query` → `npx gitnexus query -r MindLane "<概念>"`
-- `gitnexus_context` → `npx gitnexus context -r MindLane <symbol>`（重名加 `-f <file>` 消歧）
-- `gitnexus_rename` 无 CLI 等价 → 读 `context`/`impact` 调用图后手工重构
+- `gitnexus_query` → `npx gitnexus query -r MindLane "<concept>"`
+- `gitnexus_context` → `npx gitnexus context -r MindLane <symbol>` (add `-f <file>` to disambiguate)
+- `gitnexus_rename` has no CLI equivalent → read the call graph via `context`/`impact` and refactor by hand
 
-已知缺口（gitnexus 1.6.4，上游待修）：调用图对部分生产调用点漏建边（如 `trimToRecentWindow` / `maybe_consolidate_by_tokens` 的调用方缺失）。`impact`/`context` 显示调用方为 0 或 LOW 时，先 `grep -rn "<符号名>" electron/ src/` 交叉核对，确认无漏边再下结论。
+Known gap (gitnexus 1.6.4, upstream pending): the call graph misses edges for some production call sites (e.g., callers of `trimToRecentWindow` / `maybe_consolidate_by_tokens`). When `impact`/`context` report 0 callers or LOW risk, cross-check with `grep -rn "<symbol>" electron/ src/` before concluding.
 
 ## Agent skills
 
