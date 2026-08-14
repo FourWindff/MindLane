@@ -55,8 +55,6 @@ This project is indexed by GitNexus as **MindLane** (5961 symbols, 12152 relatio
 
 已知缺口（gitnexus 1.6.4，上游待修）：调用图对部分生产调用点漏建边（如 `trimToRecentWindow` / `maybe_consolidate_by_tokens` 的调用方缺失）。`impact`/`context` 显示调用方为 0 或 LOW 时，先 `grep -rn "<符号名>" electron/ src/` 交叉核对，确认无漏边再下结论。
 
-索引：大改动后 `npx gitnexus analyze`；`npx gitnexus status` 查新鲜度。
-
 ## Agent skills
 
 ### Issue tracker
