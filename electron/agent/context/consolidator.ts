@@ -1,13 +1,11 @@
-import fs from 'node:fs'
 import { HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { AGENT_LIMITS } from '../config.js'
-import { atomicWrite } from '../../fs/atomicWrite.js'
 import { logger } from '../../shared/logger.js'
 import { estimateMessageTokens } from '../lib/tokenCounter.js'
 import type { LLMProvider } from '../providers/index.js'
 import { estimateToolsSchemaTokens } from '../memory/contextCompact.js'
-import { extractTextContent, messageContentToString } from '../utils.js'
+import { extractTextContent } from '../utils.js'
 import { SessionManager } from './sessionManager.js'
 
 const log = logger.withContext('consolidator')
@@ -18,9 +16,9 @@ interface ConsolidatorDependencies {
   buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   getToolDefinitions: () => StructuredToolInterface[]
   /**
-   * Optional memory-extraction hook. Fired fire-and-forget after an archive
+   * Optional memory-extraction hook. Fired fire-and-forget after a compression
    * round with the archived message slice; rejections are swallowed and
-   * logged, never affecting consolidation.
+   * logged, never affecting compression.
    */
   onArchived?: (archived: BaseMessage[]) => void | Promise<void>
 }
@@ -42,17 +40,17 @@ interface GetMessagesForContextOptions {
   budget?: number
 }
 
-interface HistoryRecord {
-  timestamp: string
-  summary: string
-}
-
 /**
- * 会话历史归档器。
+ * 会话上下文压缩器。
  *
- * 负责将 `session.jsonl` 中的旧消息按 prompt token 预算压缩、摘要并写入
- * `{sessionId}.history.jsonl`，维护 `lastConsolidated` 游标，并把摘要注入
- * 系统提示词。
+ * 负责按 prompt token 预算将 `session.jsonl` 中游标（`lastConsolidated`）之后的
+ * 旧消息滚动摘要：每轮用 LLM 把「上一轮滚动摘要 + 新切片」合并为一份累积摘要，
+ * 写入会话 meta 的 `_lastSummary` 并推进游标。摘要由 contextCompact 节点读入
+ * `state.summary`，经 system prompt 的 `## 历史摘要` 段注入实际模型调用——
+ * 归档的消息因此被摘要替代，而不是静默截断。
+ *
+ * LLM 摘要失败时不推进游标（下轮 run 自愈重试），本轮由 `getMessagesForContext`
+ * 按预算裁剪兜底，保证模型调用继续。
  */
 export class Consolidator {
   private readonly sessionManager: SessionManager
@@ -95,9 +93,9 @@ export class Consolidator {
   }
 
   /**
-   * 按 token 预算判断并执行归档。
+   * 按 token 预算判断并执行压缩。
    *
-   * @returns 是否发生了归档。
+   * @returns 是否发生了压缩（游标是否推进）。
    */
   async maybe_consolidate_by_tokens(
     sessionId: string,
@@ -141,24 +139,26 @@ export class Consolidator {
 
         const messagesToArchive = remaining.slice(0, boundaryIdx + 1)
         try {
-          currentSummary = await this.archive(messagesToArchive, sessionId)
+          currentSummary = await this.summarize(messagesToArchive, currentSummary)
           const remainingAfter = allMessages.slice(currentLast + boundaryIdx + 1)
           log.info(
-            'compact: 归档 %d 条（剩余 %d 条），估算 tokens ~%d → 目标 ~%d, summarizer=%s',
+            'compact: 压缩 %d 条（剩余 %d 条），估算 tokens ~%d → 目标 ~%d, summarizer=%s',
             messagesToArchive.length,
             remainingAfter.length,
             estimated,
             target,
             this.summarizerModel(),
           )
-          log.debug('compact 摘要全文：\n%s', currentSummary)
+          log.debug('compact 滚动摘要全文：\n%s', currentSummary)
         } catch (err) {
+          // 摘要失败：不推进游标，本轮交给 getMessagesForContext 预算裁剪兜底，
+          // 下轮 run 重试同一切片（自愈）。失败切片不进 onArchived，证据不丢。
           log.warn(
-            'LLM summary failed, falling back to raw archive for session %s:',
+            'LLM summary failed for session %s, cursor not advanced (retry next run):',
             sessionId,
             err,
           )
-          await this.rawArchive(messagesToArchive, sessionId)
+          break
         }
         archivedSlices.push(...messagesToArchive)
 
@@ -178,7 +178,7 @@ export class Consolidator {
         })
       }
 
-      // Memory extraction rides on consolidation: the archived slice is the
+      // Memory extraction rides on compression: the archived slice is the
       // extraction input and lastConsolidated doubles as the extraction cursor.
       // Fire-and-forget — failures are logged, never propagated.
       const onArchived = this.onArchived
@@ -195,7 +195,7 @@ export class Consolidator {
   }
 
   /**
-   * 从 `session.jsonl` 读取未归档消息，按条数与 token 预算裁剪后返回。
+   * 从 `session.jsonl` 读取未压缩消息，按条数与 token 预算裁剪后返回。
    */
   async getMessagesForContext(
     sessionId: string,
@@ -254,9 +254,9 @@ export class Consolidator {
   }
 
   /**
-   * 在 `user` 消息边界选择归档终点。
+   * 在 `user` 消息边界选择压缩终点。
    *
-   * @returns 归档 chunk 的结束索引（包含），-1 表示无合适边界。
+   * @returns 压缩 chunk 的结束索引（包含），-1 表示无合适边界。
    */
   pickConsolidationBoundary(messages: BaseMessage[], tokensToRemove: number): number {
     let accumulated = 0
@@ -293,75 +293,32 @@ export class Consolidator {
     return (this.provider.reasoningModel as { model?: string }).model ?? 'unknown'
   }
 
-  private async archive(messages: BaseMessage[], sessionId: string): Promise<string> {
+  /**
+   * 滚动摘要：把「已有摘要 + 新切片」合并为一份累积摘要。
+   * 不写任何独立文件——结果只落在会话 meta 的 `_lastSummary`。
+   */
+  private async summarize(
+    messages: BaseMessage[],
+    previousSummary: string | undefined,
+  ): Promise<string> {
     const summaryPrompt = new SystemMessage(
-      '请用中文简要总结以下对话的关键信息。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续执行的任务，4）重要文件、节点或工具结果的高层结论。保持简短具体。',
+      '请用中文维护对话的滚动摘要。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续执行的任务，4）重要文件、节点或工具结果的高层结论。保持简短具体。',
     )
 
-    const response = await this.provider.reasoningModel.invoke([
-      summaryPrompt,
-      ...messages,
-      new HumanMessage('请总结以上对话。'),
-    ])
-
-    const summary = extractTextContent(response.content)
-    await this.appendHistoryRecord(sessionId, {
-      timestamp: new Date().toISOString(),
-      summary,
-    })
-    return summary
-  }
-
-  private async rawArchive(messages: BaseMessage[], sessionId: string): Promise<void> {
-    const rawText = messages
-      .map((m) => `[${m.getType()}]: ${messageContentToString(m.content)}`)
-      .join('\n')
-
-    await this.appendHistoryRecord(sessionId, {
-      timestamp: new Date().toISOString(),
-      summary: `[RAW]\n${rawText}`,
-    })
-  }
-
-  private async appendHistoryRecord(sessionId: string, record: HistoryRecord): Promise<void> {
-    const records = this.readHistoryRecords(sessionId)
-    records.push(record)
-
-    const createdAt = records[0]?.timestamp ?? new Date().toISOString()
-    const meta = {
-      sessionId,
-      createdAt,
-      updatedAt: new Date().toISOString(),
+    const inputs: BaseMessage[] = [summaryPrompt]
+    if (previousSummary) {
+      inputs.push(new SystemMessage(`已有摘要：\n${previousSummary}`))
     }
+    inputs.push(...messages)
+    inputs.push(
+      new HumanMessage(
+        previousSummary
+          ? '请把以上新对话合并进已有摘要，输出更新后的完整摘要。'
+          : '请总结以上对话。',
+      ),
+    )
 
-    const lines = [JSON.stringify(meta), ...records.map((r) => JSON.stringify(r))]
-
-    const historyPath = this.sessionManager.resolveHistoryPath(sessionId)
-    await atomicWrite(historyPath, lines.join('\n') + '\n')
-  }
-
-  private readHistoryRecords(sessionId: string): HistoryRecord[] {
-    const historyPath = this.sessionManager.resolveHistoryPath(sessionId)
-    if (!fs.existsSync(historyPath)) return []
-
-    const content = fs.readFileSync(historyPath, 'utf-8')
-    if (!content) return []
-
-    const lines = content.split(/\r?\n/)
-    const result: HistoryRecord[] = []
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]
-      if (!line) continue
-      try {
-        const parsed = JSON.parse(line) as HistoryRecord & { sessionId?: string }
-        // 首行是元数据（含 sessionId），其余为历史摘要记录。
-        if (parsed.summary && !parsed.sessionId) {
-          result.push(parsed)
-        }
-      } catch {
-        // 跳过损坏行
-      }
-    }
-    return result
+    const response = await this.provider.reasoningModel.invoke(inputs)
+    return extractTextContent(response.content)
   }
 }

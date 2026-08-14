@@ -95,8 +95,9 @@ describe('Consolidator integration', () => {
     expect(meta?.lastConsolidated).toBeGreaterThan(0)
     expect(meta?._lastSummary).toContain('AI 助手项目')
 
-    const historyPath = manager.resolveHistoryPath(sessionId)
-    expect(fs.existsSync(historyPath)).toBe(true)
+    // 不再写 {sessionId}.history.jsonl：摘要只存在会话 meta 中
+    const sessionsDir = path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1')
+    expect(fs.readdirSync(sessionsDir).some((f) => f.endsWith('.history.jsonl'))).toBe(false)
 
     const contextMessages = await consolidator.getMessagesForContext(sessionId, {
       maxMessages: 120,

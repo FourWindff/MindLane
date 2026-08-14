@@ -110,7 +110,7 @@ describe('Consolidator', () => {
     expect(boundary).toBe(2)
   })
 
-  it('多轮归档后推进 lastConsolidated 并写入 history.jsonl', async () => {
+  it('多轮压缩后推进 lastConsolidated 并写入滚动摘要', async () => {
     const sessionId = 'archive'
     const messages = makeMessages(20)
     await manager.saveMessages(sessionId, messages, fileUuid)
@@ -136,16 +136,11 @@ describe('Consolidator', () => {
 
     const meta = manager.getSessionMeta(sessionId)
     expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
-
-    const historyPath = manager.resolveHistoryPath(sessionId)
-    expect(fs.existsSync(historyPath)).toBe(true)
-
-    const historyContent = fs.readFileSync(historyPath, 'utf-8')
-    expect(historyContent).toContain('summary one')
-    expect(meta?._lastSummary).toContain('summary')
+    // 滚动摘要：最新一轮摘要写入 meta，不再写 history 文件
+    expect(meta?._lastSummary).toContain('summary one')
   })
 
-  it('LLM 失败时降级为 rawArchive 并仍推进游标', async () => {
+  it('LLM 失败时不推进游标（下轮 run 自愈）', async () => {
     const sessionId = 'raw'
     const messages = makeMessages(20)
     await manager.saveMessages(sessionId, messages, fileUuid)
@@ -169,14 +164,11 @@ describe('Consolidator', () => {
     )
 
     const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
-
-    const historyPath = manager.resolveHistoryPath(sessionId)
-    const historyContent = fs.readFileSync(historyPath, 'utf-8')
-    expect(historyContent).toContain('[RAW]')
+    expect(changed).toBe(false)
 
     const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
+    expect(meta?.lastConsolidated).toBeUndefined()
+    expect(meta?._lastSummary).toBeUndefined()
   })
 
   it('getMessagesForContext 限制条数与 token 预算', async () => {
@@ -270,13 +262,9 @@ describe('Consolidator', () => {
       consolidator.maybe_consolidate_by_tokens(sessionId),
     ])
 
-    const historyPath = manager.resolveHistoryPath(sessionId)
-    const historyContent = fs.readFileSync(historyPath, 'utf-8')
-    const lines = historyContent.split(/\r?\n/).filter(Boolean)
-    expect(lines.length).toBeGreaterThanOrEqual(2)
-
     const meta = manager.getSessionMeta(sessionId)
     expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
+    expect(meta?._lastSummary).toBeDefined()
   })
 })
 
@@ -470,8 +458,8 @@ describe('Consolidator 提取回调接缝', () => {
     await vi.waitFor(() => expect(failingExtractor.extractAndPersist).toHaveBeenCalled())
 
     // 压缩主流程产物完好
-    const historyContent = fs.readFileSync(manager.resolveHistoryPath(sessionId), 'utf-8')
-    expect(historyContent).toContain('summary')
+    const meta = manager.getSessionMeta(sessionId)
+    expect(meta?._lastSummary).toBe('summary')
     // 提取失败：editlog 证据保留
     expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
   })

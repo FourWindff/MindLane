@@ -1,4 +1,3 @@
-import { BaseMessage } from '@langchain/core/messages'
 import type { ChatContext } from '../../../ipc.js'
 import type { CapabilityFlags } from './mindlaneAgent.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
@@ -11,16 +10,10 @@ const RELEVANT_MEMORIES_TAG = 'RELEVANT_MEMORIES'
  */
 export class ContextBuilder {
   private prompt: string = ''
-  private messages: BaseMessage[] = []
   private context?: ChatContext
   private capabilityFlags: CapabilityFlags = { hasPalace: true }
   private memoryManager?: MemoryManager
   private lastSummary?: string
-
-  withMessages(messages: BaseMessage[]): this {
-    this.messages = messages
-    return this
-  }
 
   withContext(context?: ChatContext): this {
     this.context = context
@@ -143,30 +136,6 @@ generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要�
 `
     }
 
-    return this
-  }
-
-  buildHistory(): this {
-    // 过滤掉 system 消息，只保留用户和 AI 的对话
-    const historyMessages = this.messages.filter((m) => {
-      const type = m.type
-      return type === 'human' || type === 'ai'
-    })
-
-    if (historyMessages.length > 0) {
-      const historyText = historyMessages
-        .map((m) => {
-          const type = m.type
-          const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
-          return `[${type}]: ${content}`
-        })
-        .join('\n')
-
-      this.prompt += `<HISTORY>
-${historyText}
-</HISTORY>
-`
-    }
     return this
   }
 

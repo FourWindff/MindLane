@@ -1,11 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { RemoveMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages'
 import { REMOVE_ALL_MESSAGES, messagesStateReducer } from '@langchain/langgraph'
 import { AGENT_LIMITS } from '../../config.js'
-import { compactContext, isPromptTooLongError, trimToRecentWindow } from '../contextCompact.js'
-import type { MainGraphStateType } from '../../state.js'
-import type { LLMProvider } from '../../providers/index.js'
-import type { StructuredToolInterface } from '@langchain/core/tools'
+import { isPromptTooLongError, trimToRecentWindow } from '../contextCompact.js'
 
 describe('messagesStateReducer', () => {
   it('replaces all messages when RemoveMessage(REMOVE_ALL_MESSAGES) is passed', () => {
@@ -43,8 +40,11 @@ describe('AGENT_LIMITS context compact config', () => {
     expect(AGENT_LIMITS).toHaveProperty('maxCompletionTokens')
     expect(AGENT_LIMITS).toHaveProperty('contextSafetyBufferTokens')
     expect(AGENT_LIMITS).toHaveProperty('contextCompactRecentMessages')
-    expect(AGENT_LIMITS).toHaveProperty('reactiveCompactTailMessages')
-    expect(AGENT_LIMITS).toHaveProperty('reactiveCompactMaxRetries')
+    expect(AGENT_LIMITS).toHaveProperty('consolidationRatio')
+    expect(AGENT_LIMITS).toHaveProperty('consolidationSafetyBuffer')
+    expect(AGENT_LIMITS).toHaveProperty('maxContextMessages')
+    expect(AGENT_LIMITS).toHaveProperty('maxMessagesBeforeTokenCheck')
+    expect(AGENT_LIMITS).toHaveProperty('maxConsolidationRounds')
   })
 
   it('computes inputBudget correctly from defaults', () => {
@@ -55,55 +55,6 @@ describe('AGENT_LIMITS context compact config', () => {
     expect(inputBudget).toBe(54976)
   })
 })
-
-function createMockProvider(mockInvoke = vi.fn()): LLMProvider {
-  return {
-    reasoningModel: {
-      invoke: mockInvoke,
-      bindTools: vi.fn().mockReturnValue({ invoke: mockInvoke }),
-    },
-    capabilities: new Set(),
-    chatModels: [],
-  } as unknown as LLMProvider
-}
-
-function createMockTool(name: string): StructuredToolInterface {
-  return {
-    name,
-    lc_kwargs: { schema: { type: 'object', properties: {} } },
-  } as unknown as StructuredToolInterface
-}
-
-function createState(
-  messages: Array<InstanceType<typeof HumanMessage | typeof AIMessage>>,
-): MainGraphStateType {
-  return {
-    messages,
-    context: null,
-    pendingSubgraph: null,
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
-    response: '',
-    error: '',
-    mindmapInputSource: null,
-    mindmapInputTitle: '',
-    mindmapYaml: '',
-    mindmapTitle: '',
-    documentBatches: [],
-    batchIndex: -1,
-    leafResults: [],
-    mergeInputs: [],
-    mergeGroup: null,
-    mergeResults: [],
-    finalTree: null,
-    documentRef: null,
-    palaceInputText: '',
-    palaceInputNodes: [],
-    palace: null,
-    imageUrls: [],
-    memoryRoute: [],
-  } as MainGraphStateType
-}
 
 describe('isPromptTooLongError', () => {
   it('detects prompt_too_long', () => {
@@ -159,36 +110,5 @@ describe('trimToRecentWindow', () => {
     expect(result[0].content).toBe('msg3')
     expect(result[1].content).toBe('reply3')
     expect(result[2].content).toBe('current')
-  })
-})
-
-describe('compactContext', () => {
-  it('returns empty update when under budget', async () => {
-    const provider = createMockProvider()
-    const state = createState([new HumanMessage('hello')])
-
-    const result = await compactContext(state, [], provider)
-
-    expect(result.messages).toEqual([])
-  })
-
-  it('returns RemoveMessage + compacted messages when over budget', async () => {
-    const longText = '这是一个很长的中文测试文本，'.repeat(500)
-    const messages: Array<InstanceType<typeof HumanMessage | typeof AIMessage>> = []
-    for (let i = 0; i < 50; i++) {
-      messages.push(new HumanMessage(`${longText} ${i}`))
-      messages.push(new AIMessage(`回复 ${i} ${longText}`))
-    }
-
-    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage('对话摘要内容。'))
-    const provider = createMockProvider(mockInvoke)
-    const state = createState(messages)
-
-    const result = await compactContext(state, [createMockTool('testTool')], provider)
-
-    expect(result.messages).toBeDefined()
-    expect(result.messages!.length).toBeGreaterThan(0)
-    expect(result.messages![0]).toBeInstanceOf(RemoveMessage)
-    expect((result.messages![0] as RemoveMessage).id).toBe(REMOVE_ALL_MESSAGES)
   })
 })

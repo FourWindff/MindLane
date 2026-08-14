@@ -85,6 +85,7 @@ function createInitialState() {
     palace: null,
     imageUrls: [],
     memoryRoute: [],
+    summary: '',
   }
 }
 
@@ -370,8 +371,8 @@ describe('MindLaneAgent.route()', () => {
   })
 })
 
-describe('MindLaneAgent reactive compact', () => {
-  it('triggers reactive compact on prompt-too-long error', async () => {
+describe('MindLaneAgent trim retry', () => {
+  it('trims to recent window and retries once on prompt-too-long error', async () => {
     const error = new Error('prompt_too_long')
     const mockInvoke = vi
       .fn()
@@ -382,25 +383,26 @@ describe('MindLaneAgent reactive compact', () => {
     const agent = new MindLaneAgent(provider, createTestRegistry({ extraTools: [mockSearchTool] }))
 
     const state = createInitialState()
-    // Fill state with enough messages to make compact believable
-    state.messages = [
-      new HumanMessage('msg1'),
-      new AIMessage('reply1'),
-      new HumanMessage('msg2'),
-      new AIMessage('reply2'),
-      new HumanMessage('msg3'),
-      new AIMessage('reply3'),
-      new HumanMessage('current'),
-    ]
+    // 超过 contextCompactRecentMessages(10) 的消息，让裁剪窗口真实生效
+    state.messages = Array.from({ length: 7 }, (_, i) => [
+      new HumanMessage(`msg${i}`),
+      new AIMessage(`reply${i}`),
+    ]).flat()
+    state.messages.push(new HumanMessage('current'))
 
     const result = await agent.invoke(state)
 
-    // Should have retried: first call fails, second succeeds
+    // 第一次调用失败，第二次裁剪后重试成功
     expect(mockInvoke).toHaveBeenCalledTimes(2)
     expect(result.response).toBe('Compacted response')
+
+    // 重试输入的消息数应少于首次（窗口裁剪生效）
+    const firstCallMessages = mockInvoke.mock.calls[0][0]
+    const retryCallMessages = mockInvoke.mock.calls[1][0]
+    expect(retryCallMessages.length).toBeLessThan(firstCallMessages.length)
   })
 
-  it('returns RemoveMessage + compacted + response after reactive compact', async () => {
+  it('returns RemoveMessage + trimmed + response after trim retry', async () => {
     const error = new Error('prompt_too_long')
     const mockInvoke = vi
       .fn()
@@ -427,7 +429,7 @@ describe('MindLaneAgent reactive compact', () => {
     expect((result.messages![0] as RemoveMessage).id).toBe(REMOVE_ALL_MESSAGES)
   })
 
-  it('retries at most once for reactive compact', async () => {
+  it('gives up after the single trim retry also fails', async () => {
     const error = new Error('prompt_too_long')
     const mockInvoke = vi.fn().mockRejectedValue(error)
 
@@ -443,13 +445,13 @@ describe('MindLaneAgent reactive compact', () => {
 
     const result = await agent.invoke(state)
 
-    // First call fails, retry once, then gives up -> 2 calls total
+    // 首次失败 + 裁剪重试失败 -> 共 2 次调用后放弃
     expect(mockInvoke).toHaveBeenCalledTimes(2)
     expect(result.error).toBeDefined()
     expect(result.response).toContain('处理请求时出错')
   })
 
-  it('does not trigger reactive compact on non-context errors', async () => {
+  it('does not trigger trim retry on non-context errors', async () => {
     const error = new Error('model connection refused')
     const mockInvoke = vi.fn().mockRejectedValue(error)
 
@@ -463,5 +465,22 @@ describe('MindLaneAgent reactive compact', () => {
     expect(result.error).toContain('model connection refused')
     expect(result.error).toContain('at')
     expect(result.response).toContain('处理请求时出错')
+  })
+
+  it('injects the rolling summary into the system prompt as 历史摘要', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: 'ok' }))
+
+    const provider = createMockProvider(mockInvoke)
+    const agent = new MindLaneAgent(provider, createTestRegistry({ extraTools: [mockSearchTool] }))
+
+    const state = createInitialState()
+    state.summary = '用户正在整理一份关于知识管理的思维导图。'
+
+    const result = await agent.invoke(state)
+    expect(result.response).toBe('ok')
+
+    const systemPrompt = mockInvoke.mock.calls[0][0][0].content as string
+    expect(systemPrompt).toContain('## 历史摘要')
+    expect(systemPrompt).toContain('用户正在整理一份关于知识管理的思维导图。')
   })
 })

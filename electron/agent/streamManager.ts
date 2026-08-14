@@ -95,10 +95,8 @@ export class Runner {
   async run(): Promise<void> {
     const { sessionManager } = this.options.aiService
     const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
-    if (sessionManager?.isReady()) {
-      return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
-    }
-    return execute()
+    // 契约：SessionManager 在应用启动时初始化完成，无需 isReady 守卫。
+    return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
   }
 
   private async execute(): Promise<void> {
@@ -218,8 +216,6 @@ export class Runner {
         : {},
     })
     const sessionManager = aiService.sessionManager
-    if (!sessionManager?.isReady()) return [humanMessage]
-
     await sessionManager.saveMessage(request.sessionId, humanMessage, request.context.fileUuid)
     const existingMessages = await sessionManager.loadSessionBaseMessages(request.sessionId, {
       includeSystem: false,
@@ -241,7 +237,6 @@ export class Runner {
 
   private async persistResult(result: MainGraphStateType): Promise<void> {
     const { aiService, request } = this.options
-    if (!aiService.sessionManager?.isReady()) return
     const { current } = splitCurrentTurn(result.messages)
     if (current.length > 0) {
       await aiService.sessionManager.saveMessages(
@@ -253,7 +248,7 @@ export class Runner {
   }
 
   private async persistPartialContent(content: string): Promise<void> {
-    if (!content || !this.options.aiService.sessionManager?.isReady()) return
+    if (!content) return
     await this.options.aiService.sessionManager.saveMessage(
       this.options.request.sessionId,
       new AIMessage(content),

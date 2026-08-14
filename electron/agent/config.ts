@@ -14,9 +14,8 @@
  * - contextWindowTokens: 模型上下文窗口总 token 数，用于计算输入预算。
  * - maxCompletionTokens: 为模型响应预留的 token 数。
  * - contextSafetyBufferTokens: 输入预算安全缓冲，防止估算误差导致超限。
- * - contextCompactRecentMessages: 主动压缩时保留的最近消息条数。
- * - reactiveCompactTailMessages: 被动压缩时保留的历史尾部消息条数。
- * - reactiveCompactMaxRetries: 被动压缩最大重试次数。
+ * - contextCompactRecentMessages: 压缩时保留的最近消息条数（滚动摘要尾部窗口，
+ *   也用作调用前超限时的非 LLM 裁剪重试窗口）。
  * - consolidationRatio: 归档目标占输入预算的比例。
  * - consolidationSafetyBuffer: 归档时预留的安全缓冲 token 数。
  * - maxContextMessages: 归档后进入 LLM 的最大消息条数。
@@ -33,8 +32,6 @@ export const AGENT_LIMITS = {
   maxCompletionTokens: 8_000,
   contextSafetyBufferTokens: 1_024,
   contextCompactRecentMessages: 10,
-  reactiveCompactTailMessages: 5,
-  reactiveCompactMaxRetries: 1,
   consolidationRatio: 0.5,
   consolidationSafetyBuffer: 1_024,
   maxContextMessages: 120,

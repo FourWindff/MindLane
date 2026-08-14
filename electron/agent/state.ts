@@ -97,6 +97,16 @@ const BaseStateAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
+  /**
+   * 滚动摘要（running summary）：由 contextCompact 节点从会话 meta 的
+   * `_lastSummary` 读入，supervisor 构建 system prompt 时经
+   * `ContextBuilder.withLastSummary` 注入 `## 历史摘要` 段。
+   * 非压缩路径（I/O 失败降级）下为空字符串。
+   */
+  summary: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
 }
 
 /**

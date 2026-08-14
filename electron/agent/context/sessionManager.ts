@@ -108,15 +108,6 @@ export class SessionManager {
   }
 
   /**
-   * 获取会话历史文件路径（{sessionId}.history.jsonl）。
-   */
-  resolveHistoryPath(sessionId: string): string {
-    if (!this.store) throw new Error('SessionManager not initialized')
-    const sessionPath = this.store.resolveSessionPath(sessionId)
-    return sessionPath.replace(/\.jsonl$/, '.history.jsonl')
-  }
-
-  /**
    * 加载指定会话的消息并转换为 LangChain Message 格式
    */
   async loadSessionBaseMessages(

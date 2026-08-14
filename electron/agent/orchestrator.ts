@@ -36,7 +36,6 @@ import {
   packageResult,
 } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
-import { compactContext } from './memory/contextCompact.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import type { StreamRuntime } from './streamManager.js'
@@ -402,46 +401,35 @@ export class AgentOrchestrator {
       },
     )
 
-    // Proactive compaction node: archive to persistence first, then read unarchived messages by budget, finally fall back in memory.
+    // Proactive compaction node: compress to persistence (rolling summary), then
+    // read unarchived messages by budget. The running summary flows to the
+    // supervisor via state.summary (injected as `## 历史摘要`).
     const contextCompactNode = async (
       state: MainGraphStateType,
       config?: { configurable?: Record<string, unknown> },
     ) => {
       const sessionManager = this.aiService.sessionManager
-      const threadId = config?.configurable?.thread_id as string | undefined
-
-      if (!sessionManager?.isReady() || !threadId) {
-        return compactContext(
-          state,
-          toolRegistry.allTools,
-          this.provider,
-          this.aiService.memoryManager,
-          {
-            hasPalace: this.hasPalace,
-          },
-        )
-      }
+      const threadId = config?.configurable?.thread_id as string
 
       const buildMessages = async (
         messages: BaseMessage[],
         lastSummary?: string,
       ): Promise<BaseMessage[]> => {
         const builder = new ContextBuilder()
-          .withMessages(messages)
           .withContext(state.context ?? undefined)
           .withCapabilityFlags({ hasPalace: this.hasPalace })
           .withMemory(this.aiService.memoryManager)
           .withLastSummary(lastSummary)
 
         await builder.buildMemoryContext()
-        builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext().buildHistory()
+        builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext()
 
         return [new SystemMessage(builder.build()), ...messages]
       }
 
       const getToolDefinitions = () => toolRegistry.allTools
 
-      // Memory extraction hooks into consolidation: the archived slice plus
+      // Memory extraction hooks into compression: the archived slice plus
       // the file's editlog are the extraction input (fire-and-forget).
       const fileUuid = state.context?.fileUuid
       const memoryExtractor = this.aiService.memoryExtractor
@@ -485,26 +473,20 @@ export class AgentOrchestrator {
             AGENT_LIMITS.consolidationSafetyBuffer,
         })
 
+        const meta = sessionManager.getSessionMeta(threadId)
+
         return {
+          summary: meta?._lastSummary ?? '',
           messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...contextMessages],
         }
       } catch (err) {
+        // I/O 级故障（LLM 失败已在 Consolidator 内部吞掉并自愈）：
+        // 跳过本次压缩，消息原样交给 supervisor；超预算由 supervisor 的
+        // 非 LLM 裁剪重试兜底。
         logger
           .withContext('compact')
-          .warn(
-            'Consolidator failed for session %s, falling back to compactContext:',
-            threadId,
-            err,
-          )
-        return compactContext(
-          state,
-          toolRegistry.allTools,
-          this.provider,
-          this.aiService.memoryManager,
-          {
-            hasPalace: this.hasPalace,
-          },
-        )
+          .warn('Consolidator failed for session %s, skipping compaction:', threadId, err)
+        return {}
       }
     }
 

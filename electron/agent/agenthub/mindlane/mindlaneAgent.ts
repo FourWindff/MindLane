@@ -1,10 +1,4 @@
-import {
-  AIMessage,
-  SystemMessage,
-  RemoveMessage,
-  HumanMessage,
-  type BaseMessage,
-} from '@langchain/core/messages'
+import { AIMessage, SystemMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider } from '../../providers/index.js'
 import type { MainGraphStateType } from '../../state.js'
@@ -16,7 +10,7 @@ import { logger } from '../../../shared/logger.js'
 import { ToolRegistry } from '../../tools/registry.js'
 import { detect as detectSubgraphCall, isSubgraphCall } from '../../subgraphRouter.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
-import { isPromptTooLongError } from '../../memory/contextCompact.js'
+import { isPromptTooLongError, trimToRecentWindow } from '../../memory/contextCompact.js'
 import { AGENT_LIMITS } from '../../config.js'
 import {
   preprocessMessages,
@@ -94,17 +88,17 @@ export class MindLaneAgent extends BaseAgent {
       )
 
       const builder = new ContextBuilder()
-        .withMessages(preprocessedMessages)
         .withContext(state.context ?? undefined)
         .withCapabilityFlags(this.capabilityFlags)
         .withMemory(this.memoryManager)
+        .withLastSummary(state.summary || undefined)
 
       await builder.buildMemoryContext()
       builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext()
 
       const systemPrompt = builder.build()
 
-      return await this.invokeModel(state, systemPrompt, preprocessedMessages, 0)
+      return await this.invokeModel(state, systemPrompt, preprocessedMessages)
     } catch (err) {
       const formatted = formatAgentError(err)
       log.error('invoke failed:\n', formatted)
@@ -139,7 +133,6 @@ export class MindLaneAgent extends BaseAgent {
     state: MainGraphStateType,
     systemPrompt: string,
     preprocessedMessages: BaseMessage[],
-    retryCount: number,
   ): Promise<Partial<MainGraphStateType>> {
     log.info('invokeModel called with %d messages', state.messages.length)
     const messagesWithSystem = [new SystemMessage(systemPrompt), ...preprocessedMessages]
@@ -151,7 +144,8 @@ export class MindLaneAgent extends BaseAgent {
     )
 
     let response: AIMessage
-    let didReactiveCompact = false
+    let didTrim = false
+    let trimmedMessages: BaseMessage[] = []
 
     try {
       response = (await this.modelWithTools.invoke(messagesWithSystem)) as AIMessage
@@ -162,22 +156,22 @@ export class MindLaneAgent extends BaseAgent {
         'invoke error messages:',
         JSON.stringify(messagesWithSystem.map(summarizeMessageForLog), null, 2),
       )
-      if (!isPromptTooLongError(err) || retryCount >= AGENT_LIMITS.reactiveCompactMaxRetries) {
+      if (!isPromptTooLongError(err)) {
         throw err
       }
 
-      log.warn(
-        'Prompt too long, performing reactive compact (retry %d/%d)',
-        retryCount + 1,
-        AGENT_LIMITS.reactiveCompactMaxRetries,
+      log.warn('Prompt too long, trimming to recent window and retrying once')
+
+      // 非 LLM 裁剪重试：唯一的摘要调用是调用前的滚动压缩，这里只裁窗口、不再生成摘要。
+      trimmedMessages = trimToRecentWindow(
+        preprocessedMessages,
+        AGENT_LIMITS.contextCompactRecentMessages,
       )
+      didTrim = true
 
-      const compactedMessages = await this.performReactiveCompact(preprocessedMessages)
-      didReactiveCompact = true
+      const trimmedWithSystem = [new SystemMessage(systemPrompt), ...trimmedMessages]
 
-      const compactedWithSystem = [new SystemMessage(systemPrompt), ...compactedMessages]
-
-      response = (await this.modelWithTools.invoke(compactedWithSystem)) as AIMessage
+      response = (await this.modelWithTools.invoke(trimmedWithSystem)) as AIMessage
       response.content = sanitizeAIMessageContent(response.content) as AIMessageContent
     }
 
@@ -206,11 +200,10 @@ export class MindLaneAgent extends BaseAgent {
     })
 
     let resultMessages: BaseMessage[]
-    if (didReactiveCompact) {
-      const compactedMessages = await this.performReactiveCompact(state.messages)
+    if (didTrim) {
       resultMessages = [
         new RemoveMessage({ id: REMOVE_ALL_MESSAGES }),
-        ...compactedMessages,
+        ...trimmedMessages,
         response,
       ]
     } else {
@@ -230,7 +223,7 @@ export class MindLaneAgent extends BaseAgent {
         pendingSubgraphToolName: virtualRoute.toolName,
         response: content,
       }
-      if (didReactiveCompact) {
+      if (didTrim) {
         return { ...routeState, messages: resultMessages }
       }
       return routeState
@@ -240,29 +233,6 @@ export class MindLaneAgent extends BaseAgent {
       messages: resultMessages,
       pendingSubgraph: null,
       response: content,
-    }
-  }
-
-  private async performReactiveCompact(messages: BaseMessage[]): Promise<BaseMessage[]> {
-    try {
-      const summaryPrompt = new SystemMessage(
-        '请用中文简要总结以下对话的关键信息。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续的任务。保持简短具体。',
-      )
-
-      const summaryResponse = await this.provider.reasoningModel.invoke([
-        summaryPrompt,
-        ...messages,
-        new HumanMessage('请总结以上对话。'),
-      ])
-
-      const summary = extractTextContent(summaryResponse.content)
-      const summaryMsg = new AIMessage({ content: `[Reactive compact] ${summary}` })
-      const tailMessages = messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
-
-      return [summaryMsg, ...tailMessages]
-    } catch (err) {
-      log.warn('Reactive summary failed, trimming to tail:', err)
-      return messages.slice(-AGENT_LIMITS.reactiveCompactTailMessages)
     }
   }
 }

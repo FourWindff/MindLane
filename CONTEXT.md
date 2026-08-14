@@ -100,6 +100,15 @@
 - 提供 `startStream(request)` 返回 `streamId`，`stopStream(streamId)` 精确停止目标 runner。
 - 不限制并发 runner 数量；暴露 `getActiveStreamCount()` 供 UI 观测。
 
+### 会话压缩（Consolidation）
+
+- 全系统**唯一**的 LLM 摘要机制，在每次 run 开始时由 `contextCompact` 节点执行（调用模型之前，无被动/无兜底摘要）。
+- **滚动摘要**：每轮用 LLM 把「上一轮 `_lastSummary` + 新切片」合并为一份累积摘要，写入会话 meta 的 `_lastSummary` 并推进 `lastConsolidated` 游标；`_lastSummary` 的语义是**整段已压缩对话的累积**，不是最近切片。
+- 摘要经 graph state 的 `summary` 字段注入 supervisor 的 system prompt `## 历史摘要` 段——归档的消息由摘要替代，不是静默截断。
+- 会话文件只有 `{sessionId}.jsonl`（首行 meta + 消息，append-only 永不物理裁剪）；不再有 `{sessionId}.history.jsonl`。
+- LLM 摘要失败**不推进游标**（下轮 run 自愈重试），本轮由预算裁剪兜底；I/O 故障跳过压缩，由 supervisor 的非 LLM 裁剪重试兜底。
+- 摘要使用 `reasoningModel`；记忆提取（fire-and-forget）挂在压缩切片上，`lastConsolidated` 兼作提取游标。
+
 ### ChatStreamEvent
 
 - 统一的流事件 IPC 结构，判别联合（discriminated union）：每个 `type` 成员自带 `payload` 的精确类型。
@@ -359,8 +368,9 @@
 
 ### 记忆提取时机
 
-- 记忆提取**挂钩在会话压缩（consolidation）上**：`Consolidator` 归档旧消息时，被归档的消息切片即为提取输入，`lastConsolidated` 游标复用为提取游标。
+- 记忆提取**挂钩在会话压缩（consolidation）上**：`Consolidator` 压缩旧消息时，被压缩的消息切片即为提取输入，`lastConsolidated` 游标复用为提取游标。
 - 从不触发压缩的会话不做提取——这是有意接受的盲区（短会话信号不足）；节点编辑历史随该会话的下一次压缩一起提取，不做独立兜底。
+- 摘要 LLM 失败时不推进游标，提取随之下轮顺延，证据不丢。
 
 ### subTag
 
