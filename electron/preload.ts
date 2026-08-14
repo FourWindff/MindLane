@@ -1,6 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import { IPC, type MindlaneBridge } from './ipc.js'
-import type { ChatStreamEvent } from './ipc.js'
+import type { ChatStreamEvent, MindmapReadRequest, MindmapReadResponse } from './ipc.js'
 
 const api: MindlaneBridge = {
   ai: {
@@ -12,6 +12,9 @@ const api: MindlaneBridge = {
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
     getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),
     isReady: () => ipcRenderer.invoke(IPC.AiIsReady),
+    onMindmapReadRequest: onMindmapReadRequest,
+    respondMindmapRead: (payload: MindmapReadResponse) =>
+      ipcRenderer.invoke(IPC.AiMindmapReadRespond, payload),
     urlToDataUrl: (payload) => ipcRenderer.invoke(IPC.ImageUrlToDataUrl, payload),
   },
   file: {
@@ -82,6 +85,12 @@ function onChatStreamEvent(callback: (event: ChatStreamEvent) => void): () => vo
   const handler = (_event: unknown, event: ChatStreamEvent) => callback(event)
   ipcRenderer.on(IPC.AiChatStreamEvent, handler)
   return () => ipcRenderer.off(IPC.AiChatStreamEvent, handler)
+}
+
+function onMindmapReadRequest(callback: (request: MindmapReadRequest) => void): () => void {
+  const handler = (_event: unknown, request: MindmapReadRequest) => callback(request)
+  ipcRenderer.on(IPC.AiMindmapReadRequest, handler)
+  return () => ipcRenderer.off(IPC.AiMindmapReadRequest, handler)
 }
 
 contextBridge.exposeInMainWorld('mindlane', api)

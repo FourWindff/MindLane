@@ -169,6 +169,25 @@ describe('MemoryExtractor', () => {
     expect(updated.metadata.tags).toContain('engineering')
   })
 
+  it('extractAndPersist 剥离证据消息末尾的 EDITOR_STATE 块', async () => {
+    const turnStateSuffix =
+      '\n<EDITOR_STATE file_uuid="f" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+    const mockProvider = createMockProvider('{"disciplines": []}')
+    const extractor = new MemoryExtractor(manager)
+    await extractor.extractAndPersist({
+      provider: mockProvider as unknown as LLMProvider,
+      messages: [new HumanMessage(`我们把导图拆成模块${turnStateSuffix}`)],
+      editlogEntries: [],
+    })
+
+    const invokeSpy = mockProvider.chatModel.invoke as unknown as ReturnType<typeof vi.fn>
+    const prompt = String(invokeSpy.mock.calls[0]![0][0].content)
+    expect(prompt).toContain('我们把导图拆成模块')
+    expect(prompt).not.toContain('<EDITOR_STATE')
+    expect(prompt).not.toContain('<SELECTED_NODES')
+    expect(prompt).not.toContain('旧节点')
+  })
+
   it('extractAndPersist works without filePath (skips tag update)', async () => {
     const mockResponse = JSON.stringify({
       disciplines: [

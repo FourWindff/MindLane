@@ -26,6 +26,7 @@ import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
+import { createGetMindmapContextTool } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { logger } from '../shared/logger.js'
@@ -69,6 +70,8 @@ interface ChatResponse {
 interface AgentOrchestratorOptions {
   userDataPath?: string
   messagePipeline?: MessagePipelineConfig
+  /** 按需读导图快照提供者：主进程装配时注入（经反向 IPC 向渲染层拉取）。 */
+  mindmapReadProvider?: (fileUuid: string) => Promise<string>
 }
 
 interface PalaceFromNodesResult {
@@ -168,6 +171,12 @@ export class AgentOrchestrator {
     this.toolRegistry.registerTool(
       createReadFileTool(() => this.services.sessionManager.workspacePath),
     )
+
+    // 按需读导图：模型需要整图结构（超出选中范围）时实时拉取。
+    const mindmapReadProvider = this.options.mindmapReadProvider
+    if (mindmapReadProvider) {
+      this.toolRegistry.registerTool(createGetMindmapContextTool(mindmapReadProvider))
+    }
 
     for (const tool of getToolSchemas()) {
       if (tool.name === GENERATE_PALACE_TOOL && !options.hasPalace) {

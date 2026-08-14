@@ -8,7 +8,7 @@ import {
 } from '../../agent/providers/index.js'
 import type { SelectedNodeContent } from '../../agent/state.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
-import type { ChatContext } from '../../ipc.js'
+import type { ChatContext, MindmapReadResponse } from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { readFileTags } from '../fileTags.js'
@@ -43,8 +43,10 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         }
 
         const workspacePath = payload.context.workspacePath
-        if (!workspacePath || !payload.context.fileUuid) {
-          return { ok: false, error: '聊天上下文缺少文件身份或工作区路径' }
+        // 源头不变量：发送必有活动文件（fileUuid 创建即存在），下游不做存在性检查。
+        // 工作区路径仍是持久化前提（workspaceUuid 解析），此处保留。
+        if (!workspacePath) {
+          return { ok: false, error: '聊天上下文缺少工作区路径' }
         }
         let workspaceUuid: string
         {
@@ -83,6 +85,13 @@ export function registerAiHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(IPC.AiChatStreamStop, (_e, payload: { streamId: string }) => {
     return { ok: ctx.getStreamManager()?.stopStream(payload.streamId) ?? false }
+  })
+
+  // 渲染层 → 主进程：读导图应答（反向通道的 invoke 侧）。
+  // requestId 由渲染层原样带回，请求器据此解析挂起的请求；
+  // 未知 requestId（已超时/已应答）是 no-op。
+  ipcMain.handle(IPC.AiMindmapReadRespond, (_e, payload: MindmapReadResponse) => {
+    ctx.mindmapReadRequester.respond(payload)
   })
 
   // One-way (send, not invoke): renderer never awaits. Resolve workspaceUuid

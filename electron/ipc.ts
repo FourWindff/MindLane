@@ -16,6 +16,8 @@ export enum IPC {
   AiChatStream = 'ai:chat-stream',
   AiChatStreamStop = 'ai:chat-stream-stop',
   AiChatStreamEvent = 'ai:chat-stream-event',
+  AiMindmapReadRequest = 'ai:mindmap-read-request',
+  AiMindmapReadRespond = 'ai:mindmap-read-respond',
   AiNodesToPalace = 'ai:nodes-to-palace',
   AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
@@ -146,7 +148,6 @@ export interface WorkspaceFileInfo {
 
 export interface ChatContext {
   fileUuid: string
-  mindmapSummary?: string
   selectedNodes?: ContextNodeInfo[]
   filePath?: string
   fileTitle?: string
@@ -157,6 +158,101 @@ export interface ChatContext {
   linkedDocuments?: DocumentRef[]
   fileTags?: string[]
 }
+
+// ---- 轮次状态（Turn State）契约 ----
+// 序列化与剥离的单一实现：主进程持久化、UI 展示、滚动摘要、记忆提取
+// 四个消费方共享同一份代码，避免各写一份导致漂移。
+
+/** 轮次状态 XML 块的根标签名。 */
+export const EDITOR_STATE_TAG = 'EDITOR_STATE'
+
+/** XML 属性值转义：`<` `>` `&` `"` 不破坏结构。 */
+export function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * 把 `ChatContext` 序列化为 `<EDITOR_STATE>` XML 块（轮次状态）。
+ *
+ * 结构约定：根标签携带文件身份属性（file_uuid / file_path / file_title）；
+ * `<SELECTED_NODES count>` 恒发（空选 count="0" 且无子节点）；
+ * `<ATTACHED_DOCUMENT>` / `<LINKED_DOCUMENTS>` 存在时才发。
+ * 不含导图树摘要——模型需要完整结构时按需调用 `getMindmapContext` 读工具。
+ */
+export function serializeTurnState(context: ChatContext): string {
+  let xml = `<${EDITOR_STATE_TAG} file_uuid="${xmlEscape(context.fileUuid)}" file_path="${xmlEscape(context.filePath ?? '')}" file_title="${xmlEscape(context.fileTitle ?? '')}">
+`
+
+  const selectedNodes = context.selectedNodes ?? []
+  xml += `<SELECTED_NODES count="${selectedNodes.length}">
+`
+  for (const node of selectedNodes) {
+    xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" label="${xmlEscape(node.label || '')}"/>
+`
+  }
+  xml += `</SELECTED_NODES>
+`
+
+  if (context.attachedDocument) {
+    const doc = context.attachedDocument
+    xml += `<ATTACHED_DOCUMENT type="${xmlEscape(doc.type)}" filename="${xmlEscape(doc.filename)}" path="${xmlEscape(doc.source)}">
+用户已附加文档「${xmlEscape(doc.filename)}」，请根据此文档内容生成思维导图。
+</ATTACHED_DOCUMENT>
+`
+  }
+
+  if (context.linkedDocuments && context.linkedDocuments.length > 0) {
+    xml += `<LINKED_DOCUMENTS count="${context.linkedDocuments.length}">
+`
+    for (const doc of context.linkedDocuments) {
+      xml += `  <document id="${xmlEscape(doc.id)}" type="${xmlEscape(doc.type)}" filename="${xmlEscape(doc.filename)}" text_cache_key="${xmlEscape(doc.id)}"/>
+`
+    }
+    xml += `</LINKED_DOCUMENTS>
+`
+  }
+
+  xml += `</${EDITOR_STATE_TAG}>`
+  return xml
+}
+
+/**
+ * 从消息文本末尾剥离 `<EDITOR_STATE>` 块（展示、滚动摘要、记忆提取共用）。
+ *
+ * 末尾锚定：只剥**末尾**的完整块（含其前的换行分隔），
+ * 无块时 no-op，中间内容永不触碰。旧会话消息无块 → 原样返回。
+ */
+export function stripTurnState(text: string): string {
+  const closeTag = `</${EDITOR_STATE_TAG}>`
+  const closeIndex = text.lastIndexOf(closeTag)
+  if (closeIndex < 0) return text
+  // 块必须是文本末尾（允许尾随空白），否则视为普通内容。
+  if (text.slice(closeIndex + closeTag.length).trim() !== '') return text
+
+  const openTag = `<${EDITOR_STATE_TAG}`
+  const openIndex = text.lastIndexOf(openTag, closeIndex)
+  if (openIndex < 0) return text
+  // 防止误剥 `<EDITOR_STATE_EXTRA>` 之类的前缀同名标签。
+  const afterOpen = text[openIndex + openTag.length]
+  if (afterOpen !== ' ' && afterOpen !== '>' && afterOpen !== '\n') return text
+
+  // 剥掉开标签到末尾的整段，并去掉其前的换行分隔。
+  return text.slice(0, openIndex).replace(/\r?\n+$/, '')
+}
+
+/** 主进程 → 渲染层：按需读导图请求（requestId 关联并发 runner）。 */
+export interface MindmapReadRequest {
+  requestId: string
+  fileUuid: string
+}
+
+/** 渲染层 → 主进程：读导图应答。 */
+export type MindmapReadResponse =
+  { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
 
 /** 主进程经 `step` 事件可发出的步骤词表；渲染层 `AiPipelineStep` 是其超集。 */
 export const STREAM_STEPS = [
@@ -279,6 +375,10 @@ export interface MindlaneBridge {
     >
     /** 只读裸布尔：AI 服务就绪状态（装配成功与否），不包 IpcResult 信封。 */
     isReady: () => Promise<boolean>
+    /** 主进程 → 渲染层：按需读导图请求（requestId 关联）。 */
+    onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
+    /** 渲染层 → 主进程：读导图应答。 */
+    respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
     urlToDataUrl: (payload: { url: string }) => Promise<IpcResult<{ dataUrl: string }>>
   }
   file: {

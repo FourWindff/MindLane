@@ -268,6 +268,92 @@ describe('Consolidator', () => {
   })
 })
 
+describe('Consolidator 轮次状态剥离', () => {
+  let tmpDir: string
+  let manager: SessionManager
+  let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
+  const fileUuid = 'file-uuid-1'
+
+  const STRIP_LIMITS = {
+    contextWindowTokens: 30,
+    maxCompletionTokens: 0,
+    safetyBuffer: 0,
+    consolidationRatio: 0.5,
+    maxContextMessages: 120,
+    maxMessagesBeforeTokenCheck: 3,
+    maxConsolidationRounds: 5,
+  }
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-strip-'))
+    manager = new SessionManager()
+    await manager.init(tmpDir)
+    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
+
+    buildMessages = async (messages, lastSummary) => [
+      new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
+      ...messages,
+    ]
+  })
+
+  afterEach(() => {
+    manager.close()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('归档消息喂给滚动摘要前剥离末尾 EDITOR_STATE 块', async () => {
+    const sessionId = 'strip'
+    const turnStateSuffix =
+      '\n<EDITOR_STATE file_uuid="file-uuid-1" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+    const messages = [
+      new HumanMessage(`第一轮问题${turnStateSuffix}`),
+      new AIMessage('第一轮回复'),
+      ...makeMessages(18),
+    ]
+    await manager.saveMessages(sessionId, messages, fileUuid)
+
+    const model = new FakeListChatModel({ responses: ['summary'] })
+    const invokeSpy = vi.spyOn(model, 'invoke')
+    const provider = new FakeProvider(model)
+    const consolidator = new Consolidator(
+      { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
+      STRIP_LIMITS,
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+    expect(changed).toBe(true)
+
+    const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
+    // 块被剥离：任何输入都不含 <EDITOR_STATE，且剥离后的问题文本在。
+    expect(summaryInputs.some((m) => String(m.content).includes('<EDITOR_STATE'))).toBe(false)
+    expect(summaryInputs.some((m) => m.content === '第一轮问题')).toBe(true)
+  })
+
+  it('无块消息原样进入摘要输入（no-op）', async () => {
+    const sessionId = 'noop'
+    const messages = [
+      new HumanMessage('纯文本问题'),
+      new AIMessage('纯文本回复'),
+      ...makeMessages(18),
+    ]
+    await manager.saveMessages(sessionId, messages, fileUuid)
+
+    const model = new FakeListChatModel({ responses: ['summary'] })
+    const invokeSpy = vi.spyOn(model, 'invoke')
+    const provider = new FakeProvider(model)
+    const consolidator = new Consolidator(
+      { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
+      STRIP_LIMITS,
+    )
+
+    await consolidator.maybe_consolidate_by_tokens(sessionId)
+
+    const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
+    expect(summaryInputs.some((m) => m.content === '纯文本问题')).toBe(true)
+    expect(summaryInputs.some((m) => m.content === '纯文本回复')).toBe(true)
+  })
+})
+
 describe('Consolidator 提取回调接缝', () => {
   let tmpDir: string
   let manager: SessionManager

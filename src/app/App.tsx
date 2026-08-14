@@ -25,6 +25,7 @@ import {
   subscribeToChatStreamEvents,
   useAiStore,
 } from '@/features/chat/model/aiStore'
+import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
@@ -90,6 +91,8 @@ function AppContent() {
     void loadMindmapStyleFromBackend()
     void window.mindlane?.ai.isReady().then(setAiReady)
     const disconnectAiStore = connectAiStore(mindmapRegistry)
+    // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
+    const disconnectMindmapReadResponder = connectMindmapReadResponder()
     const stopToolRouter = createMindmapToolCallRouter({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
@@ -108,6 +111,7 @@ function AppContent() {
     return () => {
       stopToolRouter()
       disconnectAiStore()
+      disconnectMindmapReadResponder()
     }
   }, [])
 

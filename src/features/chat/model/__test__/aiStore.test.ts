@@ -3,6 +3,7 @@ import {
   connectAiStore,
   createFileChatState,
   deriveChatCapsuleEntries,
+  selectCurrentChatHasFile,
   useAiStore,
   type ChatSession,
   type ChatStreamEvent,
@@ -435,6 +436,108 @@ describe('aiStore per-file chat state', () => {
     expect(useAiStore.getState().fileChats['file-a']?.errorMessage).toBe('startup failed')
     expect(useAiStore.getState().fileChats['file-a']?.busy).toBe(false)
     expect(useAiStore.getState().fileChats['file-b']?.errorMessage).toBeNull()
+  })
+})
+
+describe('turn-state display stripping and gating', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    useAiStore.setState({
+      currentFileUuid: null,
+      currentFilePath: null,
+      fileChats: {},
+      filePaths: {},
+      loadedFileChats: {},
+      sessionFileUuids: {},
+      activeStreamIds: {},
+      workspacePath: '/workspace',
+      showSessionList: false,
+      attachedDocument: null,
+    })
+  })
+
+  it('strips the trailing EDITOR_STATE block from user messages when a session is loaded for display', async () => {
+    const stateBlock =
+      '\n<EDITOR_STATE file_uuid="file-a" file_path="/a.mindlane" file_title="A">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+    installApis({
+      loadSession: async () => ({
+        ok: true as const,
+        data: {
+          sessionId: 'session-restored',
+          messages: [
+            { role: 'user', content: `请整理导图${stateBlock}` } satisfies ChatMessage,
+            { role: 'assistant', content: '好的' },
+          ],
+        },
+      }),
+    })
+    useAiStore.setState({
+      workspacePath: '/workspace',
+      currentFileUuid: 'file-a',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+    })
+
+    await useAiStore.getState().loadSession('session-restored')
+
+    const messages = useAiStore.getState().fileChats['file-a']?.chatMessages
+    expect(messages?.[0]).toEqual({ role: 'user', content: '请整理导图' })
+    expect(messages?.[1]).toEqual({ role: 'assistant', content: '好的' })
+    expect(JSON.stringify(messages)).not.toContain('<EDITOR_STATE')
+  })
+
+  it('leaves old messages without a block unchanged (no-op)', async () => {
+    installApis({
+      loadSession: async () => ({
+        ok: true as const,
+        data: {
+          sessionId: 'session-restored',
+          messages: [{ role: 'user', content: '旧消息' } satisfies ChatMessage],
+        },
+      }),
+    })
+    useAiStore.setState({
+      workspacePath: '/workspace',
+      currentFileUuid: 'file-a',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+    })
+
+    await useAiStore.getState().loadSession('session-restored')
+
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      { role: 'user', content: '旧消息' },
+    ])
+  })
+
+  it('strips the block also on the initial file load path (loadFileChat)', async () => {
+    const stateBlock =
+      '\n<EDITOR_STATE file_uuid="file-a" file_path="/a.mindlane" file_title="A">\n<SELECTED_NODES count="0">\n</SELECTED_NODES>\n</EDITOR_STATE>'
+    installApis({
+      activeSessionIds: { 'file-a': 'session-restored' },
+      loadSession: async () => ({
+        ok: true as const,
+        data: {
+          sessionId: 'session-restored',
+          messages: [{ role: 'user', content: `恢复的消息${stateBlock}` } satisfies ChatMessage],
+        },
+      }),
+    })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    harness.activate('file-a', '/a.mindlane', 'A')
+
+    await vi.waitFor(() => expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true))
+
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      { role: 'user', content: '恢复的消息' },
+    ])
+  })
+
+  it('gates chat availability on an active file (source invariant)', () => {
+    useAiStore.setState({ currentFileUuid: null, currentFilePath: null })
+    expect(selectCurrentChatHasFile(useAiStore.getState())).toBe(false)
+
+    useAiStore.setState({ currentFileUuid: 'file-a', currentFilePath: '/a.mindlane' })
+    expect(selectCurrentChatHasFile(useAiStore.getState())).toBe(true)
   })
 })
 

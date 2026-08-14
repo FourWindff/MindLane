@@ -8,21 +8,23 @@ import type { ChatContext } from '../../../../electron/ipc'
  * Build the ChatContext for a chat send with no React hook dependencies.
  * Reads the active mindmap instance, workspace state, and aiStore directly so
  * the sendChatMessage store action can call it outside any component.
+ *
+ * 源头不变量：发送必有活动文件（输入组件门控），因此这里不兜底默认实例、
+ * 不做空 uuid 早退——调用时必有活动实例，其 fileUuid 创建即存在。
+ * 导图树摘要（mindmapSummary）已删除：模型需要结构时按需调用读工具。
  */
 export function buildChatContext(): ChatContext {
-  const instance = mindmapRegistry.getActive() ?? mindmapRegistry.getDefault()
+  const instance = mindmapRegistry.getActive()
+  if (!instance) {
+    throw new Error('没有打开的文件，无法发起对话')
+  }
   const mindmapState = instance.store.getState()
   const wsState = useWorkspaceStore.getState()
-  const ctx: ChatContext = { fileUuid: mindmapState.fileUuid ?? '' }
+  const ctx: ChatContext = { fileUuid: mindmapState.fileUuid }
 
-  if (!ctx.fileUuid) return ctx
   if (mindmapState.filePath) ctx.filePath = mindmapState.filePath
   if (mindmapState.fileTitle) ctx.fileTitle = mindmapState.fileTitle
   ctx.hasDocumentOpen = mindmapState.hasDocumentOpen
-
-  if (typeof mindmapState.getContextSummary === 'function') {
-    ctx.mindmapSummary = mindmapState.getContextSummary()
-  }
 
   if (mindmapState.documentRefs.length > 0) {
     ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({ ...doc }))

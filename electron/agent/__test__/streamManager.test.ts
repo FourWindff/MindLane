@@ -72,6 +72,7 @@ function createRuntime(options?: {
   tokensBySession?: Record<string, string>
   fail?: Error
   capturedToolNames?: string[][]
+  capturedInputs?: Array<{ messages: BaseMessage[] }>
   omitAssistantState?: boolean
   includeToolState?: boolean
   progressStep?: string
@@ -81,9 +82,10 @@ function createRuntime(options?: {
   registry.registerTool({ name: 'initial-tool' } as never)
   const graph = {
     stream: vi.fn().mockImplementation(async function* (
-      _input: unknown,
+      input: { messages: BaseMessage[] },
       config: { configurable?: { thread_id?: string; tool_names?: string[] } },
     ) {
+      options?.capturedInputs?.push({ messages: input.messages })
       const sessionId = config.configurable?.thread_id ?? ''
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
@@ -157,6 +159,58 @@ describe('StreamManager + Runner', () => {
         expect.objectContaining({ streamId, sessionId: 'session-a', type: 'end' }),
       ]),
     )
+  })
+
+  it('persists the user message with a trailing EDITOR_STATE turn-state block', async () => {
+    const { manager, persisted, setRuntimeFactory } = createHarness()
+    const capturedInputs: Array<{ messages: BaseMessage[] }> = []
+    setRuntimeFactory(() => createRuntime({ capturedInputs }))
+
+    manager.startStream({
+      sessionId: 'session-a',
+      message: '请整理我的导图',
+      workspaceUuid: 'workspace-a',
+      context: {
+        fileUuid: 'file-a',
+        filePath: '/a.mindlane',
+        fileTitle: 'A 导图',
+        selectedNodes: [{ id: 'n1', type: 'text', label: '选中节点' }],
+      },
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    // 持久化格式：`问题\n<EDITOR_STATE>…</EDITOR_STATE>`
+    const userMessage = persisted.get('session-a')?.find((m) => m.getType() === 'human')
+    expect(userMessage).toBeDefined()
+    const content = String(userMessage!.content)
+    expect(content.startsWith('请整理我的导图\n<EDITOR_STATE')).toBe(true)
+    expect(content.endsWith('</EDITOR_STATE>')).toBe(true)
+    expect(content).toContain('file_uuid="file-a"')
+    expect(content).toContain('<SELECTED_NODES count="1">')
+    expect(content).toContain('label="选中节点"')
+    // 导图树不进轮次状态（无 <MINDMAP 外壳）。
+    expect(content).not.toContain('<MINDMAP')
+
+    // 重载会话重建模型输入：该块仍在（模型输入不过滤）。
+    const modelInput = capturedInputs[0]?.messages
+    expect(modelInput).toBeDefined()
+    expect(modelInput!.some((m) => String(m.content).endsWith('</EDITOR_STATE>'))).toBe(true)
+  })
+
+  it('persists an explicit empty selection as count="0"', async () => {
+    const { manager, persisted, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() => createRuntime())
+
+    manager.startStream({
+      sessionId: 'session-empty',
+      message: '没有选中任何节点',
+      workspaceUuid: 'workspace-a',
+      context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: 'A' },
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    const userMessage = persisted.get('session-empty')?.find((m) => m.getType() === 'human')
+    expect(String(userMessage!.content)).toContain('<SELECTED_NODES count="0">')
   })
 
   it('emits mindmap pipeline progress', async () => {

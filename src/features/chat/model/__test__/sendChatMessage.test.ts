@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
   createFileChatState,
@@ -8,6 +8,8 @@ import {
   type FileChatState,
 } from '../aiStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { createEmptyFile } from '@/shared/lib/fileFormat'
 
 type ChatStreamResult = { ok: true; streamId: string } | { ok: false; error: string }
 
@@ -72,7 +74,19 @@ function createRegistryHarness() {
   }
 }
 
+function activateMindmap(fileUuid: string): void {
+  // 源头不变量：发送必有活动文件。buildChatContext 不再兜底默认实例，
+  // 测试在此建立不变量（注册活动导图实例，uuid/path/title 创建即存在）。
+  const key = `test-${fileUuid}`
+  const instance = mindmapRegistry.getOrCreate(key)
+  const file = createEmptyFile('Test 导图')
+  file.metadata.fileUuid = fileUuid
+  instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
+  mindmapRegistry.setActive(key)
+}
+
 function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
+  activateMindmap(fileUuid)
   useAiStore.setState({
     currentFileUuid: fileUuid,
     currentFilePath: `/${fileUuid}.mindlane`,
@@ -97,6 +111,10 @@ describe('sendChatMessage handshake', () => {
       attachedDocument: null,
     })
     useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+  })
+
+  afterEach(() => {
+    mindmapRegistry.releaseAll()
   })
 
   it('rejects the send when busy, not chat-ready, or input is empty', async () => {
@@ -187,6 +205,21 @@ describe('sendChatMessage handshake', () => {
     expect(chat?.chatMessages).toEqual([
       expect.objectContaining({ role: 'user', content: 'hello' }),
     ])
+  })
+
+  it('sends a chat context with file identity and without the mindmap tree', async () => {
+    const { chatStream } = installApis()
+    activateFile('file-a')
+
+    await useAiStore.getState().sendChatMessage('hello')
+
+    const context = chatStream.mock.calls[0]![0].context
+    expect(context.fileUuid).toBe('file-a')
+    expect(context.filePath).toBe('/file-a.mindlane')
+    expect(context.fileTitle).toBe('Test 导图')
+    // 导图树摘要不再随 ChatContext 发送（模型按需调用读工具）。
+    expect(context.mindmapSummary).toBeUndefined()
+    expect(context).not.toHaveProperty('mindmapSummary')
   })
 
   it('surfaces a failed chatStream invoke as a file error on the origin file', async () => {

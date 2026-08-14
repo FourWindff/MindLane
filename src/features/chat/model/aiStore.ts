@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
-import { splitCurrentTurn } from '../../../../electron/ipc'
+import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
 import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
 
 function generateSessionId(): string {
@@ -130,6 +130,9 @@ function currentChat(state: AiState): FileChatState | undefined {
 export function selectCurrentChatActiveSessionId(state: AiState): string {
   return currentChat(state)?.activeSessionId ?? ''
 }
+export function selectCurrentChatHasFile(state: AiState): boolean {
+  return state.currentFileUuid !== null
+}
 export function selectCurrentChatBusy(state: AiState): boolean {
   return currentChat(state)?.busy ?? false
 }
@@ -155,6 +158,18 @@ export function selectCurrentChatActiveTools(state: AiState): string[] {
 function pathBasename(filePath: string | null | undefined): string | null {
   const name = filePath?.split(/[\\/]/).pop()
   return name ? name : null
+}
+
+/**
+ * 展示剥离：会话加载到 UI 时去掉用户消息末尾的 `<EDITOR_STATE>` 块，
+ * 让重载后的聊天历史干净可读。旧消息无块时原样返回（no-op）。
+ */
+function stripTurnStateFromMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) => {
+    if (message.role !== 'user') return message
+    const content = stripTurnState(message.content)
+    return content === message.content ? message : { ...message, content }
+  })
 }
 
 export function deriveChatCapsuleEntries(
@@ -329,7 +344,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       return {
         ...patchFileChat(current, fileUuid, {
           activeSessionId: result.data.sessionId,
-          chatMessages: result.data.messages,
+          chatMessages: stripTurnStateFromMessages(result.data.messages),
           busy: false,
           step: 'idle',
           streamText: '',
@@ -525,7 +540,7 @@ async function loadFileChat(fileUuid: string): Promise<void> {
       workspacePath,
       sessionId: activeSessionId,
     })
-    if (loaded?.ok) chatMessages = loaded.data.messages
+    if (loaded?.ok) chatMessages = stripTurnStateFromMessages(loaded.data.messages)
   }
   useAiStore.setState((state) => {
     const fileChats = {

@@ -4,6 +4,10 @@ import { MemoryManager } from '../../memory/memoryManager.js'
 const MEMORY_INDEX_TAG = 'USER_MEMORY_INDEX'
 const RELEVANT_MEMORIES_TAG = 'RELEVANT_MEMORIES'
 
+// 系统提示只包含跨轮次逐字节稳定的前缀：记忆段 + 核心规则 + 环境策略 + `## 历史摘要`。
+// 易变编辑器状态（选中节点、附件、文件身份）不进 system prompt，改由主进程序列化为
+// `<EDITOR_STATE>` 块附加到用户消息末尾（轮次状态），保住前缀缓存命中。
+
 export interface CapabilityFlags {
   hasPalace: boolean
 }
@@ -48,7 +52,8 @@ export async function loadMemoryContext(
  * 构建监督器的 system message 全文（系统提示）。
  *
  * 调用方只提供输入，从不编排段落；段落顺序固定：
- * 记忆 → SYSTEM_PROMPT → ENV → MINDMAP/附件。
+ * 记忆 → SYSTEM_PROMPT → ENV。
+ * 易变编辑器状态不在此处渲染（见文件顶部注释）。
  * 新增或调整段落只有一个入口。
  */
 export async function buildSystemPrompt(input: SystemPromptInput): Promise<string> {
@@ -59,9 +64,6 @@ export async function buildSystemPrompt(input: SystemPromptInput): Promise<strin
 
   parts.push(buildCorePrompt(input.capabilityFlags, input.lastSummary))
   parts.push(buildEnvironmentPrompt())
-
-  const mindmapSection = buildMindmapContext(input.context)
-  if (mindmapSection) parts.push(mindmapSection)
 
   return parts.join('').trim()
 }
@@ -141,53 +143,4 @@ function buildEnvironmentPrompt(): string {
 # platform_policy: ${platformPolicy}
 </ENV>
 `
-}
-
-function buildMindmapContext(context: ChatContext | undefined): string {
-  if (!context) return ''
-
-  let section = ''
-
-  if (context.hasDocumentOpen) {
-    section += `<MINDMAP file_path="${context.filePath || ''}">
-# ${context.fileTitle || '未命名思维导图'}
-`
-
-    if (context.mindmapSummary) {
-      section += `${context.mindmapSummary}\n`
-    }
-
-    if (context.selectedNodes && context.selectedNodes.length > 0) {
-      section += `<SELECTED_NODES count="${context.selectedNodes.length}">\n`
-      for (const node of context.selectedNodes) {
-        section += `  <node id="${node.id}" type="${node.type}" label="${node.label || ''}"/>\n`
-      }
-      section += `</SELECTED_NODES>\n`
-    }
-
-    section += `</MINDMAP>
-`
-  }
-
-  if (context.attachedDocument) {
-    const doc = context.attachedDocument
-    section += `<ATTACHED_DOCUMENT type="${doc.type}" filename="${doc.filename}" path="${doc.source}">
-用户已附加文档「${doc.filename}」，请根据此文档内容生成思维导图。
-</ATTACHED_DOCUMENT>
-`
-  }
-
-  if (context.linkedDocuments && context.linkedDocuments.length > 0) {
-    section += `<LINKED_DOCUMENTS count="${context.linkedDocuments.length}">
-`
-    for (const doc of context.linkedDocuments) {
-      const textCacheKey = doc.id
-      section += `  <document id="${doc.id}" type="${doc.type}" filename="${doc.filename}" text_cache_key="${textCacheKey}"/>
-`
-    }
-    section += `</LINKED_DOCUMENTS>
-`
-  }
-
-  return section
 }

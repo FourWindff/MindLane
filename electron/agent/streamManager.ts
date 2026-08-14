@@ -10,7 +10,7 @@ import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
-import { isStreamStep, splitCurrentTurn } from '../ipc.js'
+import { isStreamStep, serializeTurnState, splitCurrentTurn } from '../ipc.js'
 
 type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
   ChatStreamEvent,
@@ -209,8 +209,13 @@ export class Runner {
 
   private async prepareHistory(): Promise<BaseMessage[]> {
     const { request, sessionManager } = this.options
+    // 轮次状态：主进程在持久化时把编辑器状态序列化为 `<EDITOR_STATE>` 块，
+    // 附加到该轮用户消息末尾（`问题\n<EDITOR_STATE>…</EDITOR_STATE>`）再保存。
+    // 模型输入、checkpointer 不过滤；展示 / 滚动摘要 / 记忆提取在各自入口剥离。
+    const turnState = serializeTurnState(request.context)
+    const persistedContent = request.message ? `${request.message}\n${turnState}` : turnState
     const humanMessage = new HumanMessage({
-      content: request.message,
+      content: persistedContent,
       additional_kwargs: request.documentRef
         ? { attachment: { name: request.documentRef.filename, type: request.documentRef.type } }
         : {},

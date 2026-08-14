@@ -30,6 +30,7 @@ import { registerMcpHandlers, persistMcpStatus } from './main/handlers/mcp.js'
 import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
 import { resolveMessagePipelineConfig } from './main/messagePipeline.js'
+import { MindmapReadRequester } from './main/mindmapRead.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -247,6 +248,10 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
+  // 主进程 → 渲染层读导图请求器：`win` 是模块级可变引用（窗口可重建），
+  // 经 getter 注入，窗口销毁时请求立即报错而非挂起。
+  const mindmapReadRequester = new MindmapReadRequester(() => win)
+
   // 唯一装配点：惰性创建（或复用）当前 orchestrator。createRuntime 与
   // getChatOrchestrator 都从这里取，避免两条构造路径漂移。
   const ensureChatOrchestrator = async (): Promise<AgentOrchestrator> => {
@@ -258,6 +263,7 @@ app.whenReady().then(async () => {
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
         messagePipeline,
+        mindmapReadProvider: (fileUuid) => mindmapReadRequester.request(fileUuid),
       })
     }
     return chatOrchestrator
@@ -292,6 +298,7 @@ app.whenReady().then(async () => {
     sessionManager: services?.sessionManager ?? null,
     editLogStore: services?.editLogStore ?? null,
     getWindow: () => win,
+    mindmapReadRequester,
     getStreamManager: () => streamManager,
     getChatOrchestrator: async () => {
       if (!aiServiceReady) return null

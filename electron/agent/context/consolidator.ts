@@ -6,6 +6,7 @@ import { estimateMessageTokens } from '../lib/tokenCounter.js'
 import type { LLMProvider } from '../providers/index.js'
 import { estimateToolsSchemaTokens } from '../memory/contextCompact.js'
 import { extractTextContent } from '../utils.js'
+import { stripTurnState } from '../../ipc.js'
 import { SessionManager } from './sessionManager.js'
 
 const log = logger.withContext('consolidator')
@@ -294,6 +295,25 @@ export class Consolidator {
   }
 
   /**
+   * 滚动摘要输入剥离：归档消息喂给摘要调用前去掉末尾 `<EDITOR_STATE>` 块，
+   * 避免过时的节点列表混入每轮重注入的 `## 历史摘要`。
+   * 复用共享契约的单一 strip 实现；只处理 human 消息（块只出现在用户消息末尾）。
+   */
+  private stripTurnStateFromMessages(messages: BaseMessage[]): BaseMessage[] {
+    return messages.map((message) => {
+      if (message.getType() !== 'human') return message
+      const content = message.content
+      if (typeof content !== 'string') return message
+      const stripped = stripTurnState(content)
+      if (stripped === content) return message
+      return new HumanMessage({
+        content: stripped,
+        additional_kwargs: message.additional_kwargs,
+      })
+    })
+  }
+
+  /**
    * 滚动摘要：把「已有摘要 + 新切片」合并为一份累积摘要。
    * 不写任何独立文件——结果只落在会话 meta 的 `_lastSummary`。
    */
@@ -309,7 +329,7 @@ export class Consolidator {
     if (previousSummary) {
       inputs.push(new SystemMessage(`已有摘要：\n${previousSummary}`))
     }
-    inputs.push(...messages)
+    inputs.push(...this.stripTurnStateFromMessages(messages))
     inputs.push(
       new HumanMessage(
         previousSummary

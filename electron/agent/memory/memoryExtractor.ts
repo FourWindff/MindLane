@@ -6,6 +6,7 @@ import fs from 'node:fs'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { logger } from '../../shared/logger.js'
 import { messageContentToString } from '../utils.js'
+import { stripTurnState } from '../../ipc.js'
 
 const DISCIPLINES = [
   'formal-sciences',
@@ -130,7 +131,10 @@ export class MemoryExtractor {
       .filter((m) => m.getType() === 'human' || m.getType() === 'ai')
       .map((m) => {
         const role = m.getType() === 'human' ? '用户' : 'AI'
-        return `${role}: ${messageContentToString(m.content)}`
+        // 提取证据剥离：去掉用户消息末尾的 `<EDITOR_STATE>` 块，
+        // 避免 XML 状态噪声混入思维模式提取。复用共享契约的单一 strip 实现。
+        const text = stripTurnState(messageContentToString(m.content))
+        return `${role}: ${text}`
       })
       .join('\n')
 

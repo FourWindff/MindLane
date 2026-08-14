@@ -87,22 +87,48 @@ describe('buildSystemPrompt sections', () => {
       ...baseInput,
       context: {
         ...ctx,
-        mindmapSummary: '核心概念：AI',
         selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }],
       },
     })
 
     expect(prompt).toContain('<SYSTEM_PROMPT>')
     expect(prompt).toContain('<ENV>')
-    expect(prompt).toContain('<MINDMAP')
-    expect(prompt).toContain('<SELECTED_NODES')
-    expect(prompt).toContain('</MINDMAP>')
 
     const iSystem = prompt.indexOf('<SYSTEM_PROMPT>')
     const iEnv = prompt.indexOf('<ENV>')
-    const iMindmap = prompt.indexOf('<MINDMAP')
     expect(iSystem).toBeGreaterThanOrEqual(0)
     expect(iSystem).toBeLessThan(iEnv)
-    expect(iEnv).toBeLessThan(iMindmap)
+  })
+
+  it('omits the mindmap context section entirely (byte-stable prefix)', async () => {
+    const prompt = await buildSystemPrompt({
+      ...baseInput,
+      context: {
+        ...ctx,
+        hasDocumentOpen: true,
+        selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }],
+      },
+    })
+
+    // 选中节点、导图树、附件、MINDMAP 外壳都不进 system prompt。
+    expect(prompt).not.toContain('<MINDMAP')
+    expect(prompt).not.toContain('<SELECTED_NODES')
+    expect(prompt).not.toContain('mindmapSummary')
+    expect(prompt).not.toContain('getContextSummary')
+    expect(prompt).not.toContain('节点一')
+  })
+
+  it('is byte-identical across turns when memory and summary are unchanged', async () => {
+    const promptA = await buildSystemPrompt({
+      ...baseInput,
+      context: { ...ctx, selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }] },
+    })
+    const promptB = await buildSystemPrompt({
+      ...baseInput,
+      context: { ...ctx, selectedNodes: [{ id: 'n2', type: 'text', label: '另一个节点' }] },
+    })
+
+    // 易变编辑器状态（选中节点变化）不影响 system prompt。
+    expect(promptB).toBe(promptA)
   })
 })
