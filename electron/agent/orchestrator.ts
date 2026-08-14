@@ -40,7 +40,7 @@ import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import type { StreamRuntime } from './streamManager.js'
 import { splitCurrentTurn } from '../ipc.js'
-import { ContextBuilder } from './agenthub/mindlane/context.js'
+import { buildSystemPrompt, loadMemoryContext } from './agenthub/mindlane/context.js'
 import { Consolidator } from './context/consolidator.js'
 import { createExtractionCallback } from './memory/memoryExtractor.js'
 
@@ -411,20 +411,25 @@ export class AgentOrchestrator {
       const sessionManager = this.aiService.sessionManager
       const threadId = config?.configurable?.thread_id as string
 
+      // 预载记忆一次，供预算估算的每次 buildMessages 复用（避免每轮重复读盘）；
+      // supervisor 的真实调用仍现读现用（记忆提取可能在 run 中途写入新证据）。
+      const memory = await loadMemoryContext(
+        state.context ?? undefined,
+        this.aiService.memoryManager,
+      )
+
       const buildMessages = async (
         messages: BaseMessage[],
         lastSummary?: string,
       ): Promise<BaseMessage[]> => {
-        const builder = new ContextBuilder()
-          .withContext(state.context ?? undefined)
-          .withCapabilityFlags({ hasPalace: this.hasPalace })
-          .withMemory(this.aiService.memoryManager)
-          .withLastSummary(lastSummary)
+        const systemPrompt = await buildSystemPrompt({
+          context: state.context ?? undefined,
+          capabilityFlags: { hasPalace: this.hasPalace },
+          lastSummary,
+          memory,
+        })
 
-        await builder.buildMemoryContext()
-        builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext()
-
-        return [new SystemMessage(builder.build()), ...messages]
+        return [new SystemMessage(systemPrompt), ...messages]
       }
 
       const getToolDefinitions = () => toolRegistry.allTools

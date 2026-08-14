@@ -109,6 +109,17 @@
 - LLM 摘要失败**不推进游标**（下轮 run 自愈重试），本轮由预算裁剪兜底；I/O 故障跳过压缩，由 supervisor 的非 LLM 裁剪重试兜底。
 - 摘要使用 `reasoningModel`；记忆提取（fire-and-forget）挂在压缩切片上，`lastConsolidated` 兼作提取游标。
 
+### 监督器（Supervisor）
+
+- 主图中负责路由决策与上下文管理的智能体（`MindLaneAgent`，图中 `supervisor` 节点）。
+- 相对子图（导图子图、记忆宫殿子图）：子图做专项生成，监督器决定进入哪个子图、调用哪些工具、或直接作答。
+
+### 系统提示（System Prompt）
+
+- 监督器每轮模型调用的 system message 全文：助手角色与工具规则、环境与平台策略、当前导图上下文（含选中节点与附件）、相关记忆、滚动摘要（`## 历史摘要`）。
+- 由 `buildSystemPrompt` 唯一构建：调用方只提供输入（上下文、能力开关、记忆管理器、滚动摘要），不编排段落。
+- 新增或调整段落只有一个入口。
+
 ### ChatStreamEvent
 
 - 统一的流事件 IPC 结构，判别联合（discriminated union）：每个 `type` 成员自带 `payload` 的精确类型。

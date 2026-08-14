@@ -3,7 +3,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider } from '../../providers/index.js'
 import type { MainGraphStateType } from '../../state.js'
 import { BaseAgent } from '../base.js'
-import { ContextBuilder } from './context.js'
+import { buildSystemPrompt, type CapabilityFlags } from './context.js'
 import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '../../utils.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
 import { logger } from '../../../shared/logger.js'
@@ -35,10 +35,6 @@ type AIMessageContent = AIMessage['content']
  * - The only agent with access to persistent memory.
  * - Accesses workspace, mindmap, selected nodes, and other context through state.context.
  */
-export interface CapabilityFlags {
-  hasPalace: boolean
-}
-
 interface MindLaneAgentOptions {
   userDataPath?: string
   messagePipeline?: MessagePipelineConfig
@@ -87,16 +83,12 @@ export class MindLaneAgent extends BaseAgent {
         this.userDataPath,
       )
 
-      const builder = new ContextBuilder()
-        .withContext(state.context ?? undefined)
-        .withCapabilityFlags(this.capabilityFlags)
-        .withMemory(this.memoryManager)
-        .withLastSummary(state.summary || undefined)
-
-      await builder.buildMemoryContext()
-      builder.buildSystemPrompt().buildEnvironmentPrompt().buildMindmapContext()
-
-      const systemPrompt = builder.build()
+      const systemPrompt = await buildSystemPrompt({
+        context: state.context ?? undefined,
+        capabilityFlags: this.capabilityFlags,
+        memoryManager: this.memoryManager,
+        lastSummary: state.summary || undefined,
+      })
 
       return await this.invokeModel(state, systemPrompt, preprocessedMessages)
     } catch (err) {
