@@ -10,13 +10,16 @@ import {
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
+import type { ChatContext } from '../../../../../electron/ipc'
+
+type ChatStreamPayload = { threadId: string; message: string; context: ChatContext }
 
 type ChatStreamResult = { ok: true; streamId: string } | { ok: false; error: string }
 
 function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> }) {
   let streamListener: ((event: ChatStreamEvent) => void) | undefined
-  const chatStream = vi.fn(
-    options?.chatStream ?? (async () => ({ ok: true as const, streamId: 'stream-1' })),
+  const chatStream = vi.fn<(_payload: ChatStreamPayload) => Promise<ChatStreamResult>>(async () =>
+    (options?.chatStream ?? (async () => ({ ok: true as const, streamId: 'stream-1' })))(),
   )
   const stopStream = vi.fn(async () => ({ ok: true as const }))
 
@@ -218,7 +221,6 @@ describe('sendChatMessage handshake', () => {
     expect(context.filePath).toBe('/file-a.mindlane')
     expect(context.fileTitle).toBe('Test 导图')
     // 导图树摘要不再随 ChatContext 发送（模型按需调用读工具）。
-    expect(context.mindmapSummary).toBeUndefined()
     expect(context).not.toHaveProperty('mindmapSummary')
   })
 
