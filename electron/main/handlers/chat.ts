@@ -5,7 +5,6 @@ import type { HandlerContext } from './context.js'
 
 export function registerChatHandlers(ctx: HandlerContext): void {
   const fsService = ctx.fsService
-  const sessionManager = ctx.aiService.sessionManager
 
   ipcMain.handle(
     IPC.ChatListSessions,
@@ -14,6 +13,8 @@ export function registerChatHandlers(ctx: HandlerContext): void {
       payload: { workspacePath: string; fileUuid: string; limit?: number; offset?: number },
     ) => {
       if (!ctx.isAiServiceReady()) return aiNotReadyResponse()
+      const sessionManager = ctx.sessionManager
+      if (!sessionManager) return aiNotReadyResponse()
       try {
         const workspaceState = await fsService.workspace.load(payload.workspacePath)
         if (!workspaceState.ok) return workspaceState
@@ -37,6 +38,16 @@ export function registerChatHandlers(ctx: HandlerContext): void {
     IPC.ChatLoadSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
       if (!ctx.isAiServiceReady()) {
+        return {
+          ok: true,
+          data: {
+            sessionId: payload.sessionId,
+            messages: [],
+          },
+        }
+      }
+      const sessionManager = ctx.sessionManager
+      if (!sessionManager) {
         return {
           ok: true,
           data: {
@@ -75,6 +86,8 @@ export function registerChatHandlers(ctx: HandlerContext): void {
     IPC.ChatDeleteSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
       if (!ctx.isAiServiceReady()) return aiNotReadyResponse()
+      const sessionManager = ctx.sessionManager
+      if (!sessionManager) return aiNotReadyResponse()
       try {
         const workspaceState = await fsService.workspace.load(payload.workspacePath)
         if (!workspaceState.ok) return workspaceState

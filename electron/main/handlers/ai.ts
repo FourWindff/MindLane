@@ -20,6 +20,11 @@ const appLog = logger.withContext('app')
 export function registerAiHandlers(ctx: HandlerContext): void {
   const fsService = ctx.fsService
 
+  // 只读裸布尔返回（不包 IpcResult 信封）：必然成功的读取，符合桥约定。
+  ipcMain.handle(IPC.AiIsReady, () => {
+    return ctx.isAiServiceReady()
+  })
+
   ipcMain.handle(
     IPC.AiChatStream,
     async (_e, payload: { threadId: string; message: string; context: ChatContext }) => {
@@ -96,14 +101,16 @@ export function registerAiHandlers(ctx: HandlerContext): void {
     ) => {
       void (async () => {
         try {
-          if (!ctx.isAiServiceReady() || !ctx.aiService.editLogStore) return
+          if (!ctx.isAiServiceReady()) return
+          const editLogStore = ctx.editLogStore
+          if (!editLogStore) return
           const { workspacePath, fileUuid, nodeId, before, after } = payload ?? {}
           if (!workspacePath || !fileUuid || !nodeId || before == null || after == null) return
           const workspaceState = await fsService.workspace.load(workspacePath)
           if (!workspaceState.ok) return
           const workspaceUuid = workspaceState.data.workspaceUuid
           if (!workspaceUuid) return
-          await ctx.aiService.editLogStore.append(workspaceUuid, fileUuid, {
+          await editLogStore.append(workspaceUuid, fileUuid, {
             ts: Date.now(),
             nodeId,
             before,

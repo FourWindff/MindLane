@@ -136,6 +136,20 @@
   cursor: not-allowed;
 }
 
+/* AI 服务不可用：保持禁用但红色背景明确提示（覆盖普通 disabled 的淡出）。 */
+.float-toolbar__btn--unavailable {
+  background: rgba(201, 55, 61, 0.16);
+  color: var(--ml-danger);
+}
+
+.float-toolbar__btn--unavailable:disabled {
+  opacity: 1;
+}
+
+.float-toolbar__btn--unavailable:hover:not(:disabled) {
+  background: rgba(201, 55, 61, 0.16);
+}
+
 .float-toolbar__btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(32, 32, 32, 0.25);

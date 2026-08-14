@@ -18,7 +18,7 @@ import { createProvider, getProviderMeta } from './providers/registry.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { AgentOrchestrator } from './orchestrator.js'
-import { AiService } from './service.js'
+import type { AgentServices } from './service.js'
 import type { AppSettings } from '../fs/types.js'
 
 // ===== 配置读取 =====
@@ -117,4 +117,8 @@ const provider = createProviderFromSettings()
 
 export const mindmapGraph = buildMindmapSubgraph({ provider })
 export const palaceGraph = buildPalaceSubgraph({ provider })
-export const mainGraph = new AgentOrchestrator(provider, new AiService()).buildGraph()
+// 导出工具只构建 graph 结构，从不运行提取回调路径：以 cast 边界代替真实装配。
+export const mainGraph = new AgentOrchestrator(
+  provider,
+  {} as unknown as AgentServices,
+).buildGraph()

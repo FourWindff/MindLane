@@ -33,7 +33,7 @@ export class SessionManager {
   }
 
   /**
-   * 注入 CheckpointerManager（由 AiService 统一创建）
+   * 注入 CheckpointerManager（由 initAgentServices 装配时创建并完成交叉接线）
    */
   setCheckpointer(cp: CheckpointerManager): void {
     this.checkpointer = cp

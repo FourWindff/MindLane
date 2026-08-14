@@ -10,7 +10,7 @@ import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from '@langchain/langgrap
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
-import type { AiService } from './service.js'
+import type { AgentServices } from './service.js'
 import type {
   SelectedNodeContent,
   MemoryPalaceStation,
@@ -111,7 +111,7 @@ export class AgentOrchestrator {
 
   constructor(
     private provider: LLMProvider,
-    private aiService: AiService,
+    private services: AgentServices,
     private options: AgentOrchestratorOptions = {},
   ) {
     const caps = this.provider.capabilities
@@ -166,7 +166,7 @@ export class AgentOrchestrator {
 
     // Read-only workspace file access for the mindlane chat agent.
     this.toolRegistry.registerTool(
-      createReadFileTool(() => this.aiService.sessionManager?.workspacePath ?? ''),
+      createReadFileTool(() => this.services.sessionManager.workspacePath),
     )
 
     for (const tool of getToolSchemas()) {
@@ -188,7 +188,7 @@ export class AgentOrchestrator {
   getStreamRuntime(): StreamRuntime {
     const toolRegistry = this.toolRegistry.snapshot()
     const graph = this.buildGraph(toolRegistry)
-    const checkpointer = this.aiService.checkpointer.getAdapter()
+    const checkpointer = this.services.checkpointer.getAdapter()
     // LangGraph 的泛型 stream<TStreamMode> 返回类型无法与 StreamGraph 的
     // 只读元组签名完全结构匹配（实测 TS2322），故在此局部强转并注释原因，
     // 避免调用侧继续以 as unknown as 向编译器撒谎。
@@ -394,7 +394,7 @@ export class AgentOrchestrator {
       this.provider,
       toolRegistry,
       { hasPalace: this.hasPalace },
-      this.aiService.memoryManager,
+      this.services.memoryManager,
       {
         userDataPath: this.options.userDataPath,
         messagePipeline: this.options.messagePipeline,
@@ -408,14 +408,14 @@ export class AgentOrchestrator {
       state: MainGraphStateType,
       config?: { configurable?: Record<string, unknown> },
     ) => {
-      const sessionManager = this.aiService.sessionManager
+      const sessionManager = this.services.sessionManager
       const threadId = config?.configurable?.thread_id as string
 
       // 预载记忆一次，供预算估算的每次 buildMessages 复用（避免每轮重复读盘）；
       // supervisor 的真实调用仍现读现用（记忆提取可能在 run 中途写入新证据）。
       const memory = await loadMemoryContext(
         state.context ?? undefined,
-        this.aiService.memoryManager,
+        this.services.memoryManager,
       )
 
       const buildMessages = async (
@@ -436,20 +436,20 @@ export class AgentOrchestrator {
 
       // Memory extraction hooks into compression: the archived slice plus
       // the file's editlog are the extraction input (fire-and-forget).
+      // 装配后必全：memoryExtractor / editLogStore 非可选，仅凭 fileUuid 判断是否触发。
       const fileUuid = state.context?.fileUuid
-      const memoryExtractor = this.aiService.memoryExtractor
-      const editLogStore = this.aiService.editLogStore
-      const onArchived =
-        fileUuid && memoryExtractor && editLogStore
-          ? createExtractionCallback({
-              extractor: memoryExtractor,
-              editLogStore,
-              provider: this.provider,
-              workspaceUuid: sessionManager.workspaceUuid,
-              fileUuid,
-              filePath: state.context?.filePath,
-            })
-          : undefined
+      const memoryExtractor = this.services.memoryExtractor
+      const editLogStore = this.services.editLogStore
+      const onArchived = fileUuid
+        ? createExtractionCallback({
+            extractor: memoryExtractor,
+            editLogStore,
+            provider: this.provider,
+            workspaceUuid: sessionManager.workspaceUuid,
+            fileUuid,
+            filePath: state.context?.filePath,
+          })
+        : undefined
 
       const consolidator = new Consolidator(
         {

@@ -20,6 +20,7 @@ export enum IPC {
   AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
   AiGetCapabilities = 'ai:get-capabilities',
+  AiIsReady = 'ai:is-ready',
 
   ImageUrlToDataUrl = 'image:url-to-data-url',
 
@@ -276,6 +277,8 @@ export interface MindlaneBridge {
     getCapabilities: () => Promise<
       { ok: true; capabilities: string[] } | { ok: false; error: string }
     >
+    /** 只读裸布尔：AI 服务就绪状态（装配成功与否），不包 IpcResult 信封。 */
+    isReady: () => Promise<boolean>
     urlToDataUrl: (payload: { url: string }) => Promise<IpcResult<{ dataUrl: string }>>
   }
   file: {

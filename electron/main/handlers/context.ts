@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import type { AgentOrchestrator } from '../../agent/orchestrator.js'
-import type { AiService } from '../../agent/service.js'
+import type { SessionManager } from '../../agent/context/sessionManager.js'
+import type { EditLogStore } from '../../agent/memory/editLogStore.js'
 import type { StreamManager } from '../../agent/streamManager.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { AppSettings } from '../../fs/types.js'
@@ -13,7 +14,10 @@ import type { McpManager } from '../../mcp/mcpManager.js'
  */
 export interface HandlerContext {
   fsService: FileSystemService
-  aiService: AiService
+  /** 可空窄字段：AI 服务装配失败时为 null，消费方在就绪门控后自行防御。 */
+  sessionManager: SessionManager | null
+  /** 可空窄字段：AI 服务装配失败时为 null。 */
+  editLogStore: EditLogStore | null
   getWindow: () => BrowserWindow | null
   getStreamManager: () => StreamManager | null
   /** 可空、惰性创建：主进程负责在首次需要时装配 AgentOrchestrator。 */

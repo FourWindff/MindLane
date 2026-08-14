@@ -38,6 +38,8 @@ type Props = {
   hasDocumentRefs?: boolean
   chatOpen?: boolean
   capsuleExpanded?: boolean
+  /** AI 服务就绪门控：不可用时聊天入口禁用并红色背景提示。 */
+  aiReady?: boolean
   /** 样式面板内容，打开时渲染在工具栏下方。 */
   stylePanel?: React.ReactNode
   /** 关联文件面板内容，打开时渲染在工具栏下方。 */
@@ -52,6 +54,7 @@ function ToolbarButton({
   icon,
   variant = 'default',
   active,
+  unavailable,
 }: {
   onClick: () => void
   disabled?: boolean
@@ -60,6 +63,8 @@ function ToolbarButton({
   icon: React.ReactNode
   variant?: 'default' | 'danger'
   active?: boolean
+  /** 服务不可用：保持禁用且红色背景提示（区别于普通 disabled 的淡出）。 */
+  unavailable?: boolean
 }) {
   return (
     <div className="float-toolbar__btn-wrap">
@@ -69,6 +74,7 @@ function ToolbarButton({
           'float-toolbar__btn',
           variant === 'danger' ? 'float-toolbar__btn--danger' : '',
           active ? 'float-toolbar__btn--active' : '',
+          unavailable ? 'float-toolbar__btn--unavailable' : '',
         ]
           .filter(Boolean)
           .join(' ')}
@@ -107,6 +113,7 @@ export function MindMapHeader({
   hasDocumentRefs,
   chatOpen,
   capsuleExpanded,
+  aiReady = true,
   stylePanel,
   documentRefsPanel,
 }: Props) {
@@ -248,9 +255,11 @@ export function MindMapHeader({
               {onToggleChat && (
                 <ToolbarButton
                   onClick={onToggleChat}
+                  disabled={!aiReady}
+                  unavailable={!aiReady}
                   ariaLabel={chatOpen ? '隐藏聊天' : '显示聊天'}
-                  tooltip={chatOpen ? '隐藏聊天' : '显示聊天'}
-                  active={!chatOpen}
+                  tooltip={aiReady ? (chatOpen ? '隐藏聊天' : '显示聊天') : '聊天服务不可用'}
+                  active={aiReady && !chatOpen}
                   icon={
                     chatOpen ? (
                       <MessageCircle size={22} strokeWidth={1.5} />

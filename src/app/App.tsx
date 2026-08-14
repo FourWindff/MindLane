@@ -75,6 +75,8 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(true)
   const [capsuleExpanded, setCapsuleExpanded] = useState(false)
+  // AI 服务就绪：启动时经桥读取一次，只读向下传递（不建状态机）。
+  const [aiReady, setAiReady] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
   const workspaceInitialized = useWorkspaceStore((s) => s.initialized)
   const workspaceInitializing = useWorkspaceStore((s) => s.initializing)
@@ -86,6 +88,7 @@ function AppContent() {
   useEffect(() => {
     void loadSettingsFromBackend()
     void loadMindmapStyleFromBackend()
+    void window.mindlane?.ai.isReady().then(setAiReady)
     const disconnectAiStore = connectAiStore(mindmapRegistry)
     const stopToolRouter = createMindmapToolCallRouter({
       subscribe: subscribeToChatStreamEvents,
@@ -170,6 +173,7 @@ function AppContent() {
                   chatOpen={chatOpen}
                   capsuleExpanded={capsuleExpanded}
                   onToggleChat={() => setChatOpen((open) => !open)}
+                  aiReady={aiReady}
                 />
               ) : (
                 <WorkspaceEmptyState />

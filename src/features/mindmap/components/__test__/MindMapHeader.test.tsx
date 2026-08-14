@@ -112,4 +112,23 @@ describe('MindMapHeader style panel dismissal', () => {
     expect(html).not.toContain('mindmap-header--capsule-expanded')
     expect(html).toContain('aria-label="显示聊天"')
   })
+
+  it('disables the chat entry with a red unavailable state when AI is not ready', () => {
+    const html = ReactDOMServer.renderToString(
+      <MindMapHeader {...defaultProps} chatOpen onToggleChat={vi.fn()} aiReady={false} />,
+    )
+
+    expect(html).toContain('float-toolbar__btn--unavailable')
+    expect(html).toContain('disabled')
+    expect(html).toContain('聊天服务不可用')
+  })
+
+  it('keeps the chat entry usable when AI is ready', () => {
+    const html = ReactDOMServer.renderToString(
+      <MindMapHeader {...defaultProps} chatOpen onToggleChat={vi.fn()} aiReady />,
+    )
+
+    expect(html).not.toContain('float-toolbar__btn--unavailable')
+    expect(html).toContain('aria-label="隐藏聊天"')
+  })
 })

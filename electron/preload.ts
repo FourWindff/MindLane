@@ -11,6 +11,7 @@ const api: MindlaneBridge = {
     listProviders: () => ipcRenderer.invoke(IPC.AiListProviders),
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
     getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),
+    isReady: () => ipcRenderer.invoke(IPC.AiIsReady),
     urlToDataUrl: (payload) => ipcRenderer.invoke(IPC.ImageUrlToDataUrl, payload),
   },
   file: {

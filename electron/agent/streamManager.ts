@@ -1,6 +1,6 @@
 import { AIMessage, HumanMessage, RemoveMessage, type BaseMessage } from '@langchain/core/messages'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
-import type { AiService } from './service.js'
+import type { SessionManager } from './context/sessionManager.js'
 import type { MainGraphStateType } from './state.js'
 import type { ToolRegistry } from './tools/registry.js'
 import type { ChatContext } from '../ipc.js'
@@ -66,7 +66,7 @@ export interface StreamRuntime {
 }
 
 interface StreamManagerOptions {
-  aiService: AiService
+  sessionManager: SessionManager
   eventSink: (event: ChatStreamEvent) => void
   createRuntime: (request: StreamRequest) => StreamRuntime | Promise<StreamRuntime>
 }
@@ -93,9 +93,9 @@ export class Runner {
   }
 
   async run(): Promise<void> {
-    const { sessionManager } = this.options.aiService
+    const { sessionManager } = this.options
     const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
-    // 契约：SessionManager 在应用启动时初始化完成，无需 isReady 守卫。
+    // 契约：SessionManager 在应用启动时装配完成，无需 isReady 守卫。
     return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
   }
 
@@ -208,14 +208,13 @@ export class Runner {
   }
 
   private async prepareHistory(): Promise<BaseMessage[]> {
-    const { request, aiService } = this.options
+    const { request, sessionManager } = this.options
     const humanMessage = new HumanMessage({
       content: request.message,
       additional_kwargs: request.documentRef
         ? { attachment: { name: request.documentRef.filename, type: request.documentRef.type } }
         : {},
     })
-    const sessionManager = aiService.sessionManager
     await sessionManager.saveMessage(request.sessionId, humanMessage, request.context.fileUuid)
     const existingMessages = await sessionManager.loadSessionBaseMessages(request.sessionId, {
       includeSystem: false,
@@ -236,20 +235,16 @@ export class Runner {
   }
 
   private async persistResult(result: MainGraphStateType): Promise<void> {
-    const { aiService, request } = this.options
+    const { sessionManager, request } = this.options
     const { current } = splitCurrentTurn(result.messages)
     if (current.length > 0) {
-      await aiService.sessionManager.saveMessages(
-        request.sessionId,
-        current,
-        request.context.fileUuid,
-      )
+      await sessionManager.saveMessages(request.sessionId, current, request.context.fileUuid)
     }
   }
 
   private async persistPartialContent(content: string): Promise<void> {
     if (!content) return
-    await this.options.aiService.sessionManager.saveMessage(
+    await this.options.sessionManager.saveMessage(
       this.options.request.sessionId,
       new AIMessage(content),
       this.options.request.context.fileUuid,

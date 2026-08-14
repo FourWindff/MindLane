@@ -7,6 +7,7 @@ import {
 } from '@langchain/core/messages'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StreamManager, type StreamRuntime } from '../streamManager.js'
+import type { SessionManager } from '../context/sessionManager.js'
 import { ToolRegistry } from '../tools/registry.js'
 
 function deferred<T>() {
@@ -48,9 +49,7 @@ function createHarness() {
     sessionId: string
   }) => StreamRuntime | Promise<StreamRuntime> = () => createRuntime()
   const manager = new StreamManager({
-    aiService: {
-      sessionManager,
-    } as never,
+    sessionManager: sessionManager as unknown as SessionManager,
     eventSink: (event) => events.push(event),
     createRuntime: (request) => runtimeFactory(request),
   })

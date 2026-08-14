@@ -419,6 +419,19 @@
 - 每个模块只委托一个领域模块；分组遵循"一个领域服务对应一个模块"：file+workspace 归 `fs`、ai+editlog 归 `ai`、chat 归 `chat`、settings 归 `settings`、mcp 归 `mcp`、shell 归 `shell`、window 归 `window`。
 - 由 bootstrap（启动编排）唯一装配，模块内部不构造任何服务。
 
+### 装配（Assembly）
+
+- 主进程启动时一次性实例化并接线领域服务的动作：agent 侧服务（sessionManager / checkpointer / memoryManager / memoryExtractor / editLogStore）由装配函数创建并完成交叉接线（sessionManager ↔ checkpointer），随后由启动编排（bootstrap）按消费方所需分发。
+- 消费方（handler 模块、streamManager、orchestrator）只接收已装配的服务或窄接口，从不自行构造服务。
+- 装配点本身允许很浅：它的职责就是实例化与接线，"没有行为"不是缺陷；缺陷是把装配点当作服务传给无关消费方，让新增一个存储波及所有消费方。
+- _Avoid_: 服务袋（Service Bag）——把全部服务打包后整个传给每个消费方，消费方往里掏字段（历史形态：AiService）。
+
+### AI 服务就绪（AI Service Readiness）
+
+- AI 功能（聊天、记忆、编辑历史）可用的前提：agent 侧服务装配（见「装配」）成功。
+- 装配失败时应用**降级而非失败**：导图编辑不受影响，聊天入口禁用并明确提示（启动弹窗 + 红色禁用态）。
+- 与「对话就绪」独立：对话就绪是 provider 配置层面的门控（设置已加载、API Key 已填、模型已选）；AI 服务就绪是主进程服务装配层面的门控（装配函数成功）。两者任一不满足都禁用聊天，原因不同。
+
 ### 旁路（Bypass）
 
 - 渲染层绕过桥、直接调用主进程能力的通道（历史上曾暴露原始 `ipcRenderer`，可 invoke 任意 channel）。

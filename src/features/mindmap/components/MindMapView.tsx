@@ -18,12 +18,14 @@ function MindMapWorkspace({
   chatOpen,
   capsuleExpanded,
   onToggleChat,
+  aiReady,
 }: {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
   chatOpen: boolean
   capsuleExpanded: boolean
   onToggleChat: () => void
+  aiReady: boolean
 }) {
   const view = useMindmapOperationController()
 
@@ -52,6 +54,7 @@ function MindMapWorkspace({
         stylePanelOpen={view.stylePanelOpen}
         documentRefsPanelOpen={view.documentRefsPanelOpen}
         hasDocumentRefs={view.hasDocumentRefs}
+        aiReady={aiReady}
         stylePanel={
           view.stylePanelOpen ? <StylePanel onClose={view.actions.closeStylePanel} /> : null
         }
@@ -130,12 +133,14 @@ export function MindMapView({
   chatOpen,
   capsuleExpanded,
   onToggleChat,
+  aiReady,
 }: {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
   chatOpen: boolean
   capsuleExpanded: boolean
   onToggleChat: () => void
+  aiReady: boolean
 }) {
   return (
     <StyleProvider>
@@ -146,6 +151,7 @@ export function MindMapView({
           chatOpen={chatOpen}
           capsuleExpanded={capsuleExpanded}
           onToggleChat={onToggleChat}
+          aiReady={aiReady}
         />
       </ReactFlowProvider>
     </StyleProvider>

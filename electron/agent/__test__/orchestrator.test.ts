@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { AgentOrchestrator } from '../orchestrator.js'
-import { AiService } from '../service.js'
+import type { AgentServices } from '../service.js'
 import { ProviderCapability, type LLMProvider } from '../providers/index.js'
 import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages'
 import type { BaseMessage } from '@langchain/core/messages'
@@ -24,25 +24,26 @@ function createMockProvider(
   } as unknown as LLMProvider
 }
 
-function createMockAiService(checkpointer?: unknown): AiService {
+// 边界 cast（唯一谎言点）：graph 结构测试从不运行提取回调等真实服务路径。
+function createMockServices(checkpointer?: unknown): AgentServices {
   return {
     checkpointer: {
       getAdapter: vi.fn().mockReturnValue(checkpointer),
     },
-  } as unknown as AiService
+  } as unknown as AgentServices
 }
 
 // ─── 测试 ────────────────────────────────────────────────────
 
 describe('AgentOrchestrator 编译缓存', () => {
   let provider: LLMProvider
-  let aiService: AiService
+  let services: AgentServices
   let orchestrator: AgentOrchestrator
 
   beforeEach(() => {
     provider = createMockProvider()
-    aiService = createMockAiService()
-    orchestrator = new AgentOrchestrator(provider, aiService)
+    services = createMockServices()
+    orchestrator = new AgentOrchestrator(provider, services)
   })
 
   it('getCompiledMindmapSubgraph() 多次调用返回同一实例', () => {
@@ -56,7 +57,7 @@ describe('AgentOrchestrator 编译缓存', () => {
     provider = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
     )
-    orchestrator = new AgentOrchestrator(provider, aiService)
+    orchestrator = new AgentOrchestrator(provider, services)
     const getCompiledPalaceSubgraph = (orchestrator as unknown as Record<string, () => unknown>)[
       'getCompiledPalaceSubgraph'
     ].bind(orchestrator)
@@ -71,8 +72,8 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     )
     const providerWithoutPalace = createMockProvider(new Set([ProviderCapability.Chat]))
 
-    const orchestratorWith = new AgentOrchestrator(providerWithPalace, createMockAiService())
-    const orchestratorWithout = new AgentOrchestrator(providerWithoutPalace, createMockAiService())
+    const orchestratorWith = new AgentOrchestrator(providerWithPalace, createMockServices())
+    const orchestratorWithout = new AgentOrchestrator(providerWithoutPalace, createMockServices())
 
     const buildGraphWith = (
       orchestratorWith as unknown as Record<string, () => { nodes: Record<string, unknown> }>
@@ -92,7 +93,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
 
   it('隔离独立子图的回调，避免父流重复结束同一 run', async () => {
     const provider = createMockProvider()
-    const orchestrator = new AgentOrchestrator(provider, createMockAiService())
+    const orchestrator = new AgentOrchestrator(provider, createMockServices())
     const invoke = vi.fn().mockResolvedValue({ messages: [], response: 'done' })
 
     vi.spyOn(
@@ -116,7 +117,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
 describe('AgentOrchestrator contextCompact node', () => {
   it('graph includes contextCompact node', () => {
     const provider = createMockProvider()
-    const orchestrator = new AgentOrchestrator(provider, createMockAiService())
+    const orchestrator = new AgentOrchestrator(provider, createMockServices())
 
     const buildGraph = (
       orchestrator as unknown as Record<string, () => { nodes: Record<string, unknown> }>
@@ -128,7 +129,7 @@ describe('AgentOrchestrator contextCompact node', () => {
 
   it('START edge points to contextCompact, not supervisor', () => {
     const provider = createMockProvider()
-    const orchestrator = new AgentOrchestrator(provider, createMockAiService())
+    const orchestrator = new AgentOrchestrator(provider, createMockServices())
 
     const buildGraph = (
       orchestrator as unknown as Record<string, () => { edges: Array<[string, string]> }>
@@ -150,7 +151,7 @@ describe('AgentOrchestrator extractToolCalls', () => {
   let extractToolCalls: (msgs: BaseMessage[]) => Array<{ name: string; result: string }> | undefined
 
   beforeEach(() => {
-    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockAiService())
+    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
     extractToolCalls = (orchestrator as unknown as { extractToolCalls: typeof extractToolCalls })[
       'extractToolCalls'
     ].bind(orchestrator)

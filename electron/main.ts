@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, Menu, safeStorage, shell, dialog } from 'electron'
 import { resolveChatProvider } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
@@ -14,7 +14,7 @@ import type { AppSettings } from './fs/types.js'
 import { IPC } from './ipc.js'
 import type { ChatStreamEvent } from './ipc.js'
 
-import { AiService } from './agent/service.js'
+import { initAgentServices, type AgentServices } from './agent/service.js'
 import { AgentOrchestrator } from './agent/orchestrator.js'
 import { StreamManager } from './agent/streamManager.js'
 import { McpManager } from './mcp/mcpManager.js'
@@ -77,7 +77,7 @@ process.on('unhandledRejection', (reason) => {
 })
 
 let fsService: FileSystemService
-let aiService: AiService
+let services: AgentServices | null = null
 let aiServiceReady = false
 let streamManager: StreamManager | null = null
 let chatOrchestrator: AgentOrchestrator | null = null
@@ -214,16 +214,33 @@ app.whenReady().then(async () => {
     }
   })()
 
-  aiService = new AiService()
+  // AI 服务装配：成功 → 置位就绪门控；失败 → 弹窗告知降级，不退出，
+  // 导图编辑等非 AI 功能照常可用（渲染层经桥读取 isReady 显示禁用态）。
   try {
-    const settings = await fsService.appState.load()
-    refreshLogSecrets(settings)
-    await aiService.init(userDataPath)
-    await cleanupToolResultOffloads(userDataPath)
+    services = await initAgentServices(userDataPath)
     aiServiceReady = true
   } catch (err) {
     appLog.error('AI service init failed:', err)
     console.error('AI service init failed:', err)
+    dialog.showErrorBox(
+      'AI 服务初始化失败',
+      '聊天与记忆已禁用，导图编辑不受影响。可重启应用后重试。',
+    )
+  }
+
+  // best-effort，独立于 AI 装配：单次垃圾回收/脱敏故障不牵连 AI 就绪状态。
+  void (async () => {
+    try {
+      await cleanupToolResultOffloads(userDataPath)
+    } catch (err) {
+      appLog.warn('tool-result offload cleanup failed:', err)
+    }
+  })()
+
+  try {
+    refreshLogSecrets(await fsService.appState.load())
+  } catch (err) {
+    appLog.warn('log secrets refresh failed:', err)
   }
 
   const eventSink = (event: ChatStreamEvent) => {
@@ -237,7 +254,8 @@ app.whenReady().then(async () => {
       const settings = await fsService.appState.load()
       const provider = resolveChatProvider(settings)
       const messagePipeline = resolveMessagePipelineConfig(settings)
-      chatOrchestrator = new AgentOrchestrator(provider, aiService, {
+      // 惰性创建仅发生在就绪门控通过之后（getChatOrchestrator），services 必非空。
+      chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
         messagePipeline,
       })
@@ -245,29 +263,34 @@ app.whenReady().then(async () => {
     return chatOrchestrator
   }
 
-  streamManager = new StreamManager({
-    aiService,
-    eventSink,
-    createRuntime: async () => {
-      const settings = await fsService.appState.load()
-      const provider = resolveChatProvider(settings)
-      providerLog.info(
-        '初始化： %s, model=%s',
-        settings.activeProviders.chat || 'dashscope',
-        settings.chatModel,
-      )
-      const messagePipeline = resolveMessagePipelineConfig(settings)
-      const orchestrator = await ensureChatOrchestrator()
-      orchestrator.updateProvider(provider, messagePipeline)
-      // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
-      orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
-      return orchestrator.getStreamRuntime()
-    },
-  })
+  // 装配成功才构造 StreamManager：入参收窄为 sessionManager。
+  if (services) {
+    const sessionManager = services.sessionManager
+    streamManager = new StreamManager({
+      sessionManager,
+      eventSink,
+      createRuntime: async () => {
+        const settings = await fsService.appState.load()
+        const provider = resolveChatProvider(settings)
+        providerLog.info(
+          '初始化： %s, model=%s',
+          settings.activeProviders.chat || 'dashscope',
+          settings.chatModel,
+        )
+        const messagePipeline = resolveMessagePipelineConfig(settings)
+        const orchestrator = await ensureChatOrchestrator()
+        orchestrator.updateProvider(provider, messagePipeline)
+        // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
+        orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
+        return orchestrator.getStreamRuntime()
+      },
+    })
+  }
 
   const ctx: HandlerContext = {
     fsService,
-    aiService,
+    sessionManager: services?.sessionManager ?? null,
+    editLogStore: services?.editLogStore ?? null,
     getWindow: () => win,
     getStreamManager: () => streamManager,
     getChatOrchestrator: async () => {
