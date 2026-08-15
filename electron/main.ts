@@ -124,6 +124,59 @@ function createWindow() {
     }
   })
 
+  // Native escape hatch when the renderer hangs or crashes: lets the user
+  // force-close the app even if the renderer can't answer, instead of
+  // hunting the process down in a terminal.
+  let hangDialogOpen = false
+  browserWindow.on('unresponsive', () => {
+    if (hangDialogOpen || browserWindow.isDestroyed()) return
+    hangDialogOpen = true
+    void dialog
+      .showMessageBox(browserWindow, {
+        type: 'warning',
+        title: 'MindLane not responding',
+        message: 'The application window has stopped responding.',
+        detail: 'You can wait for it to recover, or force quit the app.',
+        buttons: ['Force quit', 'Wait'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      })
+      .then(({ response }) => {
+        hangDialogOpen = false
+        if (response === 0 && !browserWindow.isDestroyed()) {
+          forceClose = true
+          browserWindow.close()
+        }
+      })
+  })
+  browserWindow.on('responsive', () => {
+    hangDialogOpen = false
+  })
+  browserWindow.webContents.on('render-process-gone', (_event, details) => {
+    if (browserWindow.isDestroyed()) return
+    void dialog
+      .showMessageBox(browserWindow, {
+        type: 'error',
+        title: 'MindLane crashed',
+        message: 'The renderer process has exited.',
+        detail: `Reason: ${details.reason}. You can reload the page, or close the app.`,
+        buttons: ['Close app', 'Reload'],
+        defaultId: 1,
+        cancelId: 0,
+        noLink: true,
+      })
+      .then(({ response }) => {
+        if (browserWindow.isDestroyed()) return
+        if (response === 1) {
+          browserWindow.webContents.reload()
+        } else {
+          forceClose = true
+          browserWindow.close()
+        }
+      })
+  })
+
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send(IPC.MainProcessMessage, new Date().toLocaleString())
   })
