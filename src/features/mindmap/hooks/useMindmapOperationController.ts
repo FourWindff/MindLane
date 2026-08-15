@@ -16,7 +16,6 @@ import {
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useStyleStore } from '@/features/mindmap/style/styleStore'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
@@ -44,8 +43,8 @@ export function useMindmapOperationController() {
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const capabilities = useSettingsStore((state) => state.capabilities)
   const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
-  const structureType = useStyleStore((state) => state.structureType)
-  const visualVariant = useStyleStore((state) => state.visualVariant)
+  const structureType = useActiveMindmapStore((state) => state.style.structureType)
+  const visualVariant = useActiveMindmapStore((state) => state.style.visualVariant)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
   const documentRefs = useActiveMindmapStore((state) => state.documentRefs)
@@ -82,7 +81,7 @@ export function useMindmapOperationController() {
   )
 
   const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapPersistence()
-  const generatePalace = usePalaceGeneration({ nodes, edges, selectedId, editor })
+  const generatePalace = usePalaceGeneration({ nodes, edges, selectedId, editor, visualVariant })
 
   useEffect(() => {
     if (!hasDocumentOpen || nodes.length === 0) return

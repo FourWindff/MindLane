@@ -1,5 +1,6 @@
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
+import type { MindmapStyleState } from '@/features/mindmap/style/types'
 
 export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
 
@@ -24,6 +25,8 @@ export interface MindLaneFile {
     nodes: MindLaneNode[]
     edges: MindLaneEdge[]
     viewport: { x: number; y: number; zoom: number }
+    /** 每个文件的独立样式；旧文件可能缺失，加载时回退默认样式 */
+    style?: MindmapStyleState
   }
   documents: DocumentRef[]
 }

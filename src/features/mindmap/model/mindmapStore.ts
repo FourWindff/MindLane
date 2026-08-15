@@ -9,6 +9,8 @@ import {
   isPalaceNodeData,
 } from '@/shared/lib/fileFormat'
 import { nodeRegistry } from '@/features/mindmap/nodes'
+import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
+import type { MindmapStyleState } from '@/features/mindmap/style/types'
 
 export interface MindmapState {
   nodes: Node[]
@@ -22,6 +24,7 @@ export interface MindmapState {
   workspacePath: string | null
   viewport: Viewport
   documentRefs: DocumentRef[]
+  style: MindmapStyleState
   canUndo: boolean
   canRedo: boolean
 
@@ -38,6 +41,8 @@ export interface MindmapState {
   markClean: () => void
   setFilePath: (filePath: string) => void
   setViewport: (viewport: Viewport) => void
+  /** 更新当前文档样式（合并），并标记文档为待保存。 */
+  setStyle: (partial: Partial<MindmapStyleState>) => void
   /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void
 
@@ -66,12 +71,23 @@ export function createMindmapStore(): MindmapStore {
     workspacePath: null,
     viewport: initialFile.mindmap.viewport,
     documentRefs: [],
+    style: { ...DEFAULT_STYLE },
     canUndo: false,
     canRedo: false,
 
     setFilePath: (filePath) => set({ filePath }),
 
     setViewport: (viewport) => set({ viewport }),
+
+    setStyle: (partial) =>
+      set((s) => {
+        const style = { ...s.style, ...partial }
+        const unchanged =
+          style.structureType === s.style.structureType &&
+          style.visualVariant === s.style.visualVariant &&
+          style.colorScheme === s.style.colorScheme
+        return unchanged ? {} : { style, dirty: true }
+      }),
 
     setHistoryAvailability: (canUndo, canRedo) => set({ canUndo, canRedo }),
 
@@ -120,6 +136,9 @@ export function createMindmapStore(): MindmapStore {
         workspacePath,
         dirty: false,
         viewport: data.mindmap.viewport,
+        style: data.mindmap.style
+          ? { ...DEFAULT_STYLE, ...data.mindmap.style }
+          : { ...DEFAULT_STYLE },
         canUndo: false,
         canRedo: false,
       })
@@ -139,6 +158,7 @@ export function createMindmapStore(): MindmapStore {
         workspacePath: null,
         dirty: false,
         viewport: f.mindmap.viewport,
+        style: { ...DEFAULT_STYLE },
         canUndo: false,
         canRedo: false,
       })
@@ -157,6 +177,7 @@ export function createMindmapStore(): MindmapStore {
         workspacePath: null,
         dirty: false,
         viewport: f.mindmap.viewport,
+        style: { ...DEFAULT_STYLE },
         documentRefs: [],
         canUndo: false,
         canRedo: false,
@@ -164,7 +185,8 @@ export function createMindmapStore(): MindmapStore {
     },
 
     toMindLaneFile: (): MindLaneFile => {
-      const { nodes, edges, fileUuid, fileTitle, fileCreatedAt, viewport, documentRefs } = get()
+      const { nodes, edges, fileUuid, fileTitle, fileCreatedAt, viewport, documentRefs, style } =
+        get()
       const now = new Date().toISOString()
       return {
         version: '1.0',
@@ -184,6 +206,7 @@ export function createMindmapStore(): MindmapStore {
             className: e.className,
           })),
           viewport,
+          style: { ...style },
         },
         documents: documentRefs,
       }

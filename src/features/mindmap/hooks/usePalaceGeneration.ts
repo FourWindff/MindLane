@@ -5,19 +5,21 @@ import { selectChatReady, useSettingsStore } from '@/features/settings/model/set
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId } from '@/shared/lib/mindmapTree'
-import { useStyleStore } from '@/features/mindmap/style/styleStore'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
+import type { VisualVariant } from '@/features/mindmap/style/types'
 
 export function usePalaceGeneration({
   nodes,
   edges,
   selectedId,
   editor,
+  visualVariant,
 }: {
   nodes: Node[]
   edges: Edge[]
   selectedId: string | null
   editor: MindmapEditor
+  visualVariant: VisualVariant
 }) {
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const chatReady = useSettingsStore(selectChatReady)
@@ -55,7 +57,7 @@ export function usePalaceGeneration({
     const parentId = findParentId(edges, selectedNodes[0]?.id ?? '') ?? 'root'
     const parentNode = nodes.find((node) => node.id === parentId)
     const firstSelected = nodes.find((node) => node.id === selectedNodes[0]?.id)
-    const offsetX = VISUAL_VARIANTS[useStyleStore.getState().visualVariant].spacing.offsetX
+    const offsetX = VISUAL_VARIANTS[visualVariant].spacing.offsetX
     const placeholderNode: Node = {
       id: palaceId,
       type: 'palace',
@@ -151,5 +153,5 @@ export function usePalaceGeneration({
       rollback()
       ai.setError(`生成异常：${error instanceof Error ? error.message : String(error)}`)
     }
-  }, [aiBusy, chatReady, edges, editor, nodes, selectedId])
+  }, [aiBusy, chatReady, edges, editor, nodes, selectedId, visualVariant])
 }

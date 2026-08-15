@@ -42,7 +42,6 @@ MindLane is an Electron desktop mind-mapping app. The renderer is a React + Vite
 
 - Renderer state is managed with Zustand. Key stores are:
   - `src/features/mindmap/model/mindmapStore.ts`
-  - `src/features/mindmap/style/styleStore.ts`
   - `src/features/chat/model/aiStore.ts`
   - `src/features/settings/model/settingsStore.ts`
   - `src/features/workspace/store.ts`

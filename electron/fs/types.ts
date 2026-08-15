@@ -5,12 +5,6 @@ import type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry
 // 边界 DTO 与结果信封由契约模块单一声明，主进程 fs 域经 re-export 复用同一类型。
 export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry }
 
-export interface MindmapStyleSettings {
-  structureType: 'logic' | 'mindmap'
-  visualVariant: 'card' | 'outline' | 'minimal'
-  colorScheme: 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
-}
-
 export interface AppSettings {
   apiKey: string
   chatModel: string
@@ -30,7 +24,6 @@ export interface AppSettings {
   workspacePathsByUuid: Record<string, string>
   filePathsByUuid: Record<string, string>
   messagePipeline?: MessagePipelineConfig
-  mindmapStyle?: Partial<MindmapStyleSettings>
   /** MCP 用户态：每个 server 的连接状态与非敏感展示信息（不含任何凭据） */
   mcpServers: Record<string, McpServerUserState>
 }

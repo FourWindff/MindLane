@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Palette, Brush } from 'lucide-react'
-import { useStyleStore } from '@/features/mindmap/style/styleStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
 import type { ColorSchemeId, StructureType, VisualVariant } from '@/features/mindmap/style/types'
@@ -16,12 +16,9 @@ export function StylePanel({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
-  const structureType = useStyleStore((s) => s.structureType)
-  const visualVariant = useStyleStore((s) => s.visualVariant)
-  const colorScheme = useStyleStore((s) => s.colorScheme)
-  const setStructureType = useStyleStore((s) => s.setStructureType)
-  const setVisualVariant = useStyleStore((s) => s.setVisualVariant)
-  const setColorScheme = useStyleStore((s) => s.setColorScheme)
+  const style = useActiveMindmapStore((s) => s.style)
+  const setStyle = useActiveMindmapStore((s) => s.setStyle)
+  const { structureType, visualVariant, colorScheme } = style
 
   return (
     <div className="style-panel" role="dialog" aria-label="导图样式">
@@ -65,7 +62,7 @@ export function StylePanel({
               <button
                 key={s.id}
                 className={`style-panel__style-option ${structureType === s.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setStructureType(s.id as StructureType)}
+                onClick={() => setStyle({ structureType: s.id as StructureType })}
                 title={s.description}
               >
                 <StructurePreview id={s.id as StructureType} active={structureType === s.id} />
@@ -82,7 +79,7 @@ export function StylePanel({
               <button
                 key={v.id}
                 className={`style-panel__style-option ${visualVariant === v.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setVisualVariant(v.id as VisualVariant)}
+                onClick={() => setStyle({ visualVariant: v.id as VisualVariant })}
                 title={v.description}
               >
                 <VariantPreview variant={v.id as VisualVariant} active={visualVariant === v.id} />
@@ -100,7 +97,7 @@ export function StylePanel({
             <button
               key={cs.id}
               className={`style-panel__color-option ${colorScheme === cs.id ? 'style-panel__color-option--active' : ''}`}
-              onClick={() => setColorScheme(cs.id as ColorSchemeId)}
+              onClick={() => setStyle({ colorScheme: cs.id as ColorSchemeId })}
               aria-label={cs.label}
               title={cs.label}
             >

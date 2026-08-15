@@ -1,14 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { StylePanel } from '../StylePanel'
-import { useStyleStore } from '@/features/mindmap/style/styleStore'
+import { MindmapInstance } from '@/features/mindmap/model/mindmapInstance'
+import { MindmapInstanceContext } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
 import { COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 
+function renderStylePanel(): string {
+  const instance = new MindmapInstance('/test/path.mindlane')
+  instance.newFile('测试')
+  instance.store
+    .getState()
+    .setStyle({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })
+  return renderToString(
+    <MindmapInstanceContext.Provider value={instance}>
+      <StylePanel initialTab="color" />
+    </MindmapInstanceContext.Provider>,
+  )
+}
+
 describe('StylePanel color tab', () => {
   it('renders a color row for each color scheme', () => {
-    useStyleStore.setState({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })
-    const html = renderToString(<StylePanel initialTab="color" />)
+    const html = renderStylePanel()
 
     for (const cs of COLOR_SCHEMES) {
       const buttonMatch = html.match(

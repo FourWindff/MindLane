@@ -3,7 +3,6 @@ import { MindMapView } from '@/features/mindmap/components/MindMapView'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { SettingsModal } from '@/features/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
-import { loadMindmapStyleFromBackend } from '@/features/mindmap/style/styleStore'
 import { ChatInputBar } from '@/features/chat/components/ChatInputBar'
 import { ChatMessageList } from '@/features/chat/components/ChatMessageList'
 import { ChatCapsuleBar } from '@/features/chat/components/ChatCapsuleBar'
@@ -88,7 +87,6 @@ function AppContent() {
 
   useEffect(() => {
     void loadSettingsFromBackend()
-    void loadMindmapStyleFromBackend()
     void window.mindlane?.ai.isReady().then(setAiReady)
     const disconnectAiStore = connectAiStore(mindmapRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。

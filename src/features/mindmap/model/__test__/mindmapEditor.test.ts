@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMindmapStore } from '../mindmapStore'
 import { MindmapHistory } from '../mindmapHistory'
 import { MindmapEditor } from '../mindmapEditor'
+import { createEmptyFile } from '@/shared/lib/fileFormat'
 
 describe('MindmapEditor', () => {
   let store: ReturnType<typeof createMindmapStore>
@@ -258,6 +259,34 @@ describe('MindmapEditor', () => {
       expect(store.getState().nodes.length).toBe(1)
       expect(store.getState().canUndo).toBe(false)
       expect(store.getState().canRedo).toBe(false)
+    })
+  })
+
+  describe('loadFile', () => {
+    it('should initialize structureType from the loaded file style', () => {
+      const file = createEmptyFile('导图')
+      file.mindmap.style = {
+        structureType: 'mindmap',
+        visualVariant: 'minimal',
+        colorScheme: 'ocean',
+      }
+
+      editor.loadFile('/test/mindmap.mindlane', file, null)
+
+      expect(store.getState().style.structureType).toBe('mindmap')
+      expect(store.getState().dirty).toBe(false)
+    })
+
+    it('should fall back to default style when file has no style field', () => {
+      const file = createEmptyFile('旧文件')
+
+      editor.loadFile('/test/legacy.mindlane', file, null)
+
+      expect(store.getState().style).toEqual({
+        structureType: 'logic',
+        visualVariant: 'card',
+        colorScheme: 'default',
+      })
     })
   })
 })

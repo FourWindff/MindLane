@@ -19,27 +19,6 @@ describe('AppState', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('preserves mindmapStyle when updating other settings fields', async () => {
-    fs.writeFileSync(
-      path.join(tmpDir, 'settings.json'),
-      JSON.stringify({
-        mindmapStyle: { structureType: 'logic', visualVariant: 'card', colorScheme: 'ocean' },
-        chatModel: 'old-model',
-      }),
-    )
-
-    const result = await appState.update({ chatModel: 'new-model' })
-    expect(result.ok).toBe(true)
-
-    const settings = await appState.load()
-    expect(settings.chatModel).toBe('new-model')
-    expect(settings.mindmapStyle).toEqual({
-      structureType: 'logic',
-      visualVariant: 'card',
-      colorScheme: 'ocean',
-    })
-  })
-
   it('keeps non-enumerated setting fields when updating', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),

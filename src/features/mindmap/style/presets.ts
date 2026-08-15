@@ -1,4 +1,17 @@
-import type { ColorSchemeDef, StructureTypeDef, VisualVariant, VisualVariantDef } from './types'
+import type {
+  ColorSchemeDef,
+  MindmapStyleState,
+  StructureTypeDef,
+  VisualVariant,
+  VisualVariantDef,
+} from './types'
+
+/** 新建文件 / 无 style 字段旧文件的默认样式 */
+export const DEFAULT_STYLE: MindmapStyleState = {
+  structureType: 'logic',
+  visualVariant: 'card',
+  colorScheme: 'default',
+}
 
 /** 结构轴：只决定布局算法 */
 export const STRUCTURE_TYPES: StructureTypeDef[] = [

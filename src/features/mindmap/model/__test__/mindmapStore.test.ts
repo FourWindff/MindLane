@@ -44,6 +44,75 @@ describe('mindmapStore.viewport', () => {
   })
 })
 
+describe('mindmapStore.style', () => {
+  let store: ReturnType<typeof createMindmapStore>
+
+  beforeEach(() => {
+    store = createMindmapStore()
+    store.getState().newFile('测试')
+  })
+
+  it('should restore per-file style from loaded file', () => {
+    const file = createEmptyFile('测试文件')
+    file.mindmap.style = {
+      structureType: 'mindmap',
+      visualVariant: 'minimal',
+      colorScheme: 'ocean',
+    }
+
+    store.getState().loadFile('/test/path.mindlane', file, null)
+
+    expect(store.getState().style).toEqual({
+      structureType: 'mindmap',
+      visualVariant: 'minimal',
+      colorScheme: 'ocean',
+    })
+  })
+
+  it('should fall back to default style for files without a style field', () => {
+    const file = createEmptyFile('旧文件')
+
+    store.getState().loadFile('/test/legacy.mindlane', file, null)
+
+    expect(store.getState().style).toEqual({
+      structureType: 'logic',
+      visualVariant: 'card',
+      colorScheme: 'default',
+    })
+  })
+
+  it('should mark document dirty and persist style in toMindLaneFile', () => {
+    store.getState().setStyle({ colorScheme: 'warm' })
+
+    expect(store.getState().dirty).toBe(true)
+    expect(store.getState().toMindLaneFile().mindmap.style).toEqual({
+      structureType: 'logic',
+      visualVariant: 'card',
+      colorScheme: 'warm',
+    })
+  })
+
+  it('should not mark document dirty when style is unchanged', () => {
+    store
+      .getState()
+      .setStyle({ structureType: 'logic', visualVariant: 'card', colorScheme: 'default' })
+
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it('should reset style on newFile', () => {
+    store.getState().setStyle({ structureType: 'mindmap', colorScheme: 'night' })
+
+    store.getState().newFile('新文件')
+
+    expect(store.getState().style).toEqual({
+      structureType: 'logic',
+      visualVariant: 'card',
+      colorScheme: 'default',
+    })
+  })
+})
+
 describe('mindmapStore.workspacePath', () => {
   it('records workspacePath on loadFile and clears it on newFile/clearDocument', () => {
     const store = createMindmapStore()
