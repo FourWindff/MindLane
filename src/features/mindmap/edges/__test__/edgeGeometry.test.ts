@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Position } from '@xyflow/react'
 import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
+import { buildTaperedPath } from '../taperedEdge'
 
 const fallback = {
   sourceX: 0,
@@ -76,5 +77,30 @@ describe('resolveMindmapEdgeGeometry', () => {
     const g = resolveEdgeGeometry({ fallback })
 
     expect(g).toEqual(fallback)
+  })
+})
+
+describe('buildTaperedPath 树干渐变', () => {
+  const horizontal = {
+    sourceX: 0,
+    sourceY: 0,
+    targetX: 100,
+    targetY: 0,
+    sourcePosition: Position.Right,
+    targetPosition: Position.Left,
+  }
+
+  it('水平直线边：源端宽（半宽 3）、目标端窄（半宽 0.5），首尾闭合', () => {
+    const d = buildTaperedPath(horizontal, 0.25, 6, 1)
+
+    expect(d.startsWith('M0,3 ')).toBe(true)
+    expect(d).toContain(' L100,0.5')
+    expect(d).toContain(' L100,-0.5')
+    expect(d.endsWith(' Z')).toBe(true)
+  })
+
+  it('细化后曲线采样点足够多（>16），避免尖角', () => {
+    const d = buildTaperedPath(horizontal, 0.25, 6, 1, 24)
+    expect(d.split('L').length).toBeGreaterThan(40)
   })
 })

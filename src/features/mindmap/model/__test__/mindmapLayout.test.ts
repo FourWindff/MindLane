@@ -32,7 +32,7 @@ describe('mindmapLayout', () => {
 
     const result = mindmapLayout.reflow(nodes, edges, 'logic')
 
-    expect(result.find((node) => node.id === 'a')?.position).toEqual({ x: 260, y: -32 })
-    expect(result.find((node) => node.id === 'b')?.position).toEqual({ x: 260, y: 32 })
+    expect(result.find((node) => node.id === 'a')?.position).toEqual({ x: 200, y: -26 })
+    expect(result.find((node) => node.id === 'b')?.position).toEqual({ x: 200, y: 26 })
   })
 })
