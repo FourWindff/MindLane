@@ -45,18 +45,6 @@ export function extractNodeInfo(node: Node): ContextNodeInfo {
   return { id: node.id, type: 'text', label: node.id }
 }
 
-const MARKER_RE =
-  /\[(?:INTENT:\w+|PALACE_INPUT:[\s\S]*?|MINDMAP_INPUT:[\s\S]*?|MINDMAP_TITLE:[\s\S]*?)\]/g
-const PARTIAL_MARKER_RE = /\[(?:INTENT|PALACE_INPUT|MINDMAP_INPUT|MINDMAP_TITLE)[^\]]*$/i
-
-/**
- * Removes AI protocol markers (e.g. [INTENT:...], [MINDMAP_INPUT:...])
- * from a message string.
- */
-export function stripMarkers(text: string): string {
-  return text.replace(MARKER_RE, '').replace(PARTIAL_MARKER_RE, '').trim()
-}
-
 export function toolDisplayName(name: string): string {
   const map = {
     generateMindmap: '生成思维导图',

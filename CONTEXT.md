@@ -368,7 +368,7 @@
 
 - provider 自声明的能力集合：`chat`（对话）、`vision`（视觉理解）、`imageGen`（文生图）。
 - 记忆宫殿功能要求 chat provider 同时具备 `vision` + `imageGen`；不具备时（如 Kimi Code、MiniMax、DeepSeek）入口返回友好错误，不降级尝试。
-- 视觉与文生图**未设独立 provider 槽位**：`activeProviders.image` 仅存在于 settings 形状中，主进程始终使用 chat provider 承载 palace 子图（已知遗留，见 ADR-0014 附注）。
+- 视觉与文生图**未设独立 provider 槽位**：主进程始终使用 chat provider 承载 palace 子图（历史遗留的 `activeProviders.image` 槽位已随死代码清理移除，见 ADR-0014 附注）。
 
 ## 日志
 

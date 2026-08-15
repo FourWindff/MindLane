@@ -79,16 +79,11 @@ interface AiState {
 
   setBusy: (busy: boolean) => void
   setStep: (step: AiPipelineStep) => void
-  appendStreamText: (text: string) => void
-  resetStream: () => void
   setError: (message: string) => void
   setFileError: (fileUuid: string, message: string) => void
   clearError: () => void
   reset: () => void
   addChatMessage: (message: ChatMessage) => void
-  setChatMessages: (messages: ChatMessage[]) => void
-  startNewChat: () => void
-  setSessions: (sessions: ChatSession[]) => void
   setShowSessionList: (show: boolean) => void
   loadSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
@@ -246,19 +241,6 @@ export const useAiStore = create<AiState>((set, get) => ({
       if (!fileUuid) return {}
       return patchFileChat(state, fileUuid, { step })
     }),
-  appendStreamText: (text) =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      const current = state.fileChats[fileUuid]
-      return patchFileChat(state, fileUuid, { streamText: (current?.streamText ?? '') + text })
-    }),
-  resetStream: () =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { streamText: '' })
-    }),
   setError: (errorMessage) =>
     set((state) => {
       const fileUuid = state.currentFileUuid
@@ -294,31 +276,6 @@ export const useAiStore = create<AiState>((set, get) => ({
         chatMessages: [...(current?.chatMessages ?? []), message],
         lastUserMessageAt: Date.now(),
       })
-    }),
-  setChatMessages: (chatMessages) =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { chatMessages })
-    }),
-  startNewChat: () => {
-    const sessionId = generateSessionId()
-    const fileUuid = get().currentFileUuid
-    const workspacePath = get().workspacePath
-    if (!fileUuid) return
-    set((state) => ({
-      ...patchFileChat(state, fileUuid, createFileChatState(sessionId)),
-      showSessionList: false,
-      attachedDocument: null,
-      sessionFileUuids: { ...state.sessionFileUuids, [sessionId]: fileUuid },
-    }))
-    void persistActiveSession(workspacePath, fileUuid, sessionId)
-  },
-  setSessions: (sessions) =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { sessions })
     }),
   setShowSessionList: (showSessionList) => set({ showSessionList }),
   setAttachedDocument: (attachedDocument) => set({ attachedDocument }),

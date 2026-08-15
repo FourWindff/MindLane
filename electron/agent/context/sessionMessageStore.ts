@@ -211,10 +211,6 @@ export class SessionMessageStore {
     return path.join(this.baseDir, workspaceUuid, `${sessionId}.jsonl`)
   }
 
-  getBaseDir(): string {
-    return this.baseDir
-  }
-
   getWorkspaceUuid(): string {
     return this.workspaceContext.getStore() ?? this.workspaceUuid
   }

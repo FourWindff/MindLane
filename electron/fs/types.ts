@@ -21,7 +21,6 @@ export interface AppSettings {
   chatModel: string
   activeProviders: {
     chat: string
-    image: string
   }
   providerConfigs: Record<string, ProviderConfig>
   editor: {
@@ -57,7 +56,7 @@ export interface ProviderConfig {
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   chatModel: '',
-  activeProviders: { chat: 'dashscope', image: 'dashscope' },
+  activeProviders: { chat: 'dashscope' },
   providerConfigs: {},
   editor: {
     autoSaveIntervalMs: 30_000,

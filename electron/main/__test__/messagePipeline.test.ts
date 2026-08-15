@@ -18,7 +18,7 @@ const pipeline = (partial: Partial<MessagePipelineConfig>): MessagePipelineConfi
 const baseSettings = (overrides: Partial<AppSettings> = {}): AppSettings => ({
   apiKey: '',
   chatModel: 'qwen-max',
-  activeProviders: { chat: 'dashscope', image: 'dashscope' },
+  activeProviders: { chat: 'dashscope' },
   providerConfigs: {},
   editor: { autoSaveIntervalMs: 30_000, maxBackups: 5, cachePruneDays: 30 },
   recentFilesMax: 10,
@@ -44,7 +44,7 @@ describe('resolveMessagePipelineConfig', () => {
   it('lets the active provider override the global config', () => {
     const config = resolveMessagePipelineConfig(
       baseSettings({
-        activeProviders: { chat: 'kimi-code', image: 'dashscope' },
+        activeProviders: { chat: 'kimi-code' },
         messagePipeline: pipeline({ maxContextTokens: 8_000 }),
         providerConfigs: {
           'kimi-code': { apiKey: 'k', messagePipeline: { maxContextTokens: 4_000 } },
@@ -58,7 +58,7 @@ describe('resolveMessagePipelineConfig', () => {
   it('fills defaults for keys the provider override omits', () => {
     const config = resolveMessagePipelineConfig(
       baseSettings({
-        activeProviders: { chat: 'kimi-code', image: 'dashscope' },
+        activeProviders: { chat: 'kimi-code' },
         providerConfigs: {
           'kimi-code': { apiKey: 'k', messagePipeline: { enabled: false } },
         },

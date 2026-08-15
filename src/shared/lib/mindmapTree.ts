@@ -437,26 +437,3 @@ export function withNewChild(
   const laidOut = reflowChildren(parentId, nextNodes, nextEdges, offsetX, gapY, structureType)
   return { nodes: laidOut, edges: nextEdges, newNodeId: childId }
 }
-
-export function withNewSibling(
-  nodes: Node[],
-  edges: Edge[],
-  selectedId: string,
-  data: TextNodeData,
-  offsetX: number,
-  gapY: number,
-  structureType: 'logic' | 'mindmap' = 'logic',
-): { nodes: Node[]; edges: Edge[] } {
-  const parentId = findParentId(edges, selectedId)
-  if (!parentId) return { nodes, edges }
-  const { nodes: n2, edges: e2 } = withNewChild(
-    nodes,
-    edges,
-    parentId,
-    data,
-    offsetX,
-    gapY,
-    structureType,
-  )
-  return { nodes: n2, edges: e2 }
-}

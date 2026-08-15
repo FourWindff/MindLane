@@ -26,7 +26,6 @@ interface WorkspaceStore {
   openWorkspaceFile: (filePath: string) => Promise<boolean>
   createMindlaneFile: (name: string, parentPath?: string) => Promise<boolean>
   refreshWorkspaceFiles: (workspacePath?: string | null) => Promise<void>
-  refreshTree: () => Promise<void>
   syncAfterFileSaved: (filePath: string) => Promise<void>
   updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
   setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => Promise<void>
@@ -390,18 +389,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       const files = await listWorkspaceFiles(targetWorkspacePath)
       const tree = await listWorkspaceTree(targetWorkspacePath)
       set({ files, tree, workspacePath: targetWorkspacePath })
-    } catch (error) {
-      set({ lastError: error instanceof Error ? error.message : String(error) })
-    }
-  },
-
-  refreshTree: async () => {
-    const workspacePath = get().workspacePath
-    if (!workspacePath) return
-    try {
-      const tree = await listWorkspaceTree(workspacePath)
-      const files = flattenTreeFiles(tree)
-      set({ tree, files })
     } catch (error) {
       set({ lastError: error instanceof Error ? error.message : String(error) })
     }

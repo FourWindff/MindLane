@@ -14,7 +14,6 @@ function capabilitiesForProvider(providers: ProviderInfo[], providerId: string):
 interface SettingsState {
   loaded: boolean
   activeChatProvider: string
-  activeImageProvider: string
   apiKey: string
   chatModel: string
   autoSaveIntervalMs: number
@@ -24,14 +23,11 @@ interface SettingsState {
 
   hydrate: (data: Partial<SettingsState>) => void
   setActiveChatProvider: (id: string) => void
-  setActiveImageProvider: (id: string) => void
   setApiKey: (key: string) => void
   setChatModel: (model: string) => void
   setAutoSaveIntervalMs: (ms: number) => void
   setProviders: (providers: ProviderInfo[]) => void
   setCapabilities: (capabilities: string[]) => void
-  setProviderApiKey: (providerId: string, apiKey: string) => void
-  setProviderBaseUrl: (providerId: string, baseUrl: string) => void
 }
 
 function persistToBackend(partial: Record<string, unknown>) {
@@ -51,7 +47,6 @@ export function selectChatReady(
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   loaded: false,
   activeChatProvider: 'dashscope',
-  activeImageProvider: 'dashscope',
   apiKey: '',
   chatModel: '',
   autoSaveIntervalMs: 30_000,
@@ -73,10 +68,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     })
     persistToBackend({ activeProviders: { chat: id }, chatModel: '' })
     loadCapabilities()
-  },
-  setActiveImageProvider: (id) => {
-    set({ activeImageProvider: id })
-    persistToBackend({ activeProviders: { image: id } })
   },
   setApiKey: (key) => {
     const providerId = get().activeChatProvider
@@ -109,28 +100,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           : capabilitiesForProvider(providers, state.activeChatProvider),
     })),
   setCapabilities: (capabilities) => set({ capabilities }),
-  setProviderApiKey: (providerId, apiKey) => {
-    set((state) => ({
-      providerConfigs: {
-        ...state.providerConfigs,
-        [providerId]: { ...state.providerConfigs[providerId], apiKey },
-      },
-    }))
-    persistToBackend({ providerConfigs: { [providerId]: { apiKey } } })
-  },
-  setProviderBaseUrl: (providerId, baseUrl) => {
-    set((state) => ({
-      providerConfigs: {
-        ...state.providerConfigs,
-        [providerId]: {
-          ...state.providerConfigs[providerId],
-          apiKey: state.providerConfigs[providerId]?.apiKey ?? '',
-          baseUrl,
-        },
-      },
-    }))
-    persistToBackend({ providerConfigs: { [providerId]: { baseUrl } } })
-  },
 }))
 
 export async function loadSettingsFromBackend(): Promise<void> {
@@ -140,7 +109,7 @@ export async function loadSettingsFromBackend(): Promise<void> {
   const s = settings as {
     apiKey?: string
     chatModel?: string
-    activeProviders?: { chat?: string; image?: string }
+    activeProviders?: { chat?: string }
     providerConfigs?: Record<string, { apiKey: string; baseUrl?: string }>
     editor?: { autoSaveIntervalMs?: number }
   }
@@ -155,7 +124,6 @@ export async function loadSettingsFromBackend(): Promise<void> {
     chatModel: s.chatModel ?? '',
     autoSaveIntervalMs: s.editor?.autoSaveIntervalMs ?? 30_000,
     activeChatProvider: providerId,
-    activeImageProvider: s.activeProviders?.image ?? 'dashscope',
     providerConfigs: configs,
   })
 

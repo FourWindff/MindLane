@@ -55,7 +55,7 @@ describe('AppState', () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),
       JSON.stringify({
-        activeProviders: { chat: 'openai', image: 'dashscope' },
+        activeProviders: { chat: 'openai' },
       }),
     )
 
@@ -66,7 +66,7 @@ describe('AppState', () => {
     expect(result.ok).toBe(true)
 
     const settings = await appState.load()
-    expect(settings.activeProviders).toEqual({ chat: 'anthropic', image: 'dashscope' })
+    expect(settings.activeProviders).toEqual({ chat: 'anthropic' })
     expect(settings.editor).toEqual({
       autoSaveIntervalMs: 10000,
       maxBackups: DEFAULT_SETTINGS.editor.maxBackups,

@@ -20,7 +20,6 @@ export interface MindmapState {
   fileTitle: string
   fileCreatedAt: string
   workspacePath: string | null
-  editingNodeId: string | null
   viewport: Viewport
   documentRefs: DocumentRef[]
   canUndo: boolean
@@ -36,10 +35,8 @@ export interface MindmapState {
   /** @internal 仅供 MindmapEditor 调用；用于无脏标记的临时 UI 更新。 */
   setEdgesTransient: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void
 
-  setEditingNodeId: (id: string | null) => void
   markClean: () => void
   setFilePath: (filePath: string) => void
-  setFileTitle: (fileTitle: string) => void
   setViewport: (viewport: Viewport) => void
   /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void
@@ -68,16 +65,11 @@ export function createMindmapStore(): MindmapStore {
     fileCreatedAt: initialFile.metadata.createdAt,
     workspacePath: null,
     viewport: initialFile.mindmap.viewport,
-    editingNodeId: null,
     documentRefs: [],
     canUndo: false,
     canRedo: false,
 
-    setEditingNodeId: (id) => set({ editingNodeId: id }),
-
     setFilePath: (filePath) => set({ filePath }),
-
-    setFileTitle: (fileTitle) => set({ fileTitle }),
 
     setViewport: (viewport) => set({ viewport }),
 
@@ -164,7 +156,6 @@ export function createMindmapStore(): MindmapStore {
         fileCreatedAt: f.metadata.createdAt,
         workspacePath: null,
         dirty: false,
-        editingNodeId: null,
         viewport: f.mindmap.viewport,
         documentRefs: [],
         canUndo: false,

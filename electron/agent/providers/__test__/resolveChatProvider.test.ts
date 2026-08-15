@@ -10,7 +10,7 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     ...DEFAULT_SETTINGS,
     apiKey: 'global-key',
     chatModel: 'qwen-plus',
-    activeProviders: { chat: 'dashscope', image: 'dashscope' },
+    activeProviders: { chat: 'dashscope' },
     providerConfigs: {},
     ...overrides,
   }
@@ -68,16 +68,16 @@ describe('resolveChatProvider', () => {
   })
 
   it('throws for an unknown provider', () => {
-    expect(() =>
-      resolveChatProvider(makeSettings({ activeProviders: { chat: 'nope', image: 'dashscope' } })),
-    ).toThrow('未知的 provider: nope')
+    expect(() => resolveChatProvider(makeSettings({ activeProviders: { chat: 'nope' } }))).toThrow(
+      '未知的 provider: nope',
+    )
   })
 
   it('resolves a different provider against its own catalog', () => {
     const kimi = KimiCodeProvider.defaultModels[0]!
     const provider = resolveChatProvider(
       makeSettings({
-        activeProviders: { chat: 'kimi-code', image: 'dashscope' },
+        activeProviders: { chat: 'kimi-code' },
         chatModel: kimi.id,
       }),
     )
@@ -88,7 +88,7 @@ describe('resolveChatProvider', () => {
   it('resolves DeepSeek and pins the chat model to the non-thinking (chatDeepSeek) mode', () => {
     const provider = resolveChatProvider(
       makeSettings({
-        activeProviders: { chat: 'deepseek', image: 'dashscope' },
+        activeProviders: { chat: 'deepseek' },
         chatModel: 'deepseek-v4-flash',
         providerConfigs: { deepseek: { apiKey: 'ds-key' } },
       }),
