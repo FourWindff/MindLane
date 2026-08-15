@@ -40,6 +40,8 @@ export const VISUAL_VARIANTS: Record<VisualVariant, VisualVariantDef> = {
 }
 
 export const COLOR_SCHEMES: ColorSchemeDef[] = [
+  { id: 'default', label: '默认', swatch: '#9ca3af' },
+  { id: 'rainbow', label: '彩虹', swatch: '#f87171' },
   { id: 'warm', label: '暖石', swatch: '#f5f4f2' },
   { id: 'ocean', label: '海蓝', swatch: '#e8f4fd' },
   { id: 'forest', label: '森绿', swatch: '#edf5ed' },

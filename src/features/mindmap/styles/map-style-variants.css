@@ -69,6 +69,16 @@
    ══════════════════════════════════════════════════════ */
 
 /* 各配色方案定义画布专属变量 */
+[data-color-scheme='default'] {
+  --canvas-bg: #f8f8f8;
+  --canvas-dot: rgba(0, 0, 0, 0.06);
+}
+
+[data-color-scheme='rainbow'] {
+  --canvas-bg: #fafafa;
+  --canvas-dot: rgba(0, 0, 0, 0.06);
+}
+
 [data-color-scheme='warm'] {
   --canvas-bg: #f5f4f2;
   --canvas-dot: rgba(0, 0, 0, 0.07);
@@ -92,4 +102,13 @@
 [data-color-scheme='night'] {
   --canvas-bg: #1a1b2e;
   --canvas-dot: rgba(255, 255, 255, 0.04);
+}
+
+/* 彩虹配色：节点背景轻微竖向渐变（上浅下深，基于分支色） */
+[data-color-scheme='rainbow'] .text-node {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--node-bg, #ffffff) 80%, #ffffff) 0%,
+    var(--node-bg, #ffffff) 100%
+  );
 }

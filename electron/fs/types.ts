@@ -8,7 +8,7 @@ export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry
 export interface MindmapStyleSettings {
   structureType: 'logic' | 'mindmap'
   visualVariant: 'card' | 'outline' | 'minimal'
-  colorScheme: 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
+  colorScheme: 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 }
 
 export interface AppSettings {

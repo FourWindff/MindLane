@@ -12,7 +12,7 @@ type StyleStore = MindmapStyleState & StyleActions
 const DEFAULT_STATE: MindmapStyleState = {
   structureType: 'logic',
   visualVariant: 'card',
-  colorScheme: 'warm',
+  colorScheme: 'default',
 }
 
 /** 旧版持久化数据：mapStyle 为 'mindmap-card' 之类的复合 id */

@@ -9,7 +9,7 @@ export type StructureType = 'logic' | 'mindmap'
 export type VisualVariant = 'card' | 'outline' | 'minimal'
 
 /** 配色方案 */
-export type ColorSchemeId = 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
+export type ColorSchemeId = 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 
 /** 边路径算法 */
 export type EdgePathKind = 'bezier' | 'smooth-step' | 'step'

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { STRUCTURE_TYPES, VISUAL_VARIANTS } from '../presets'
+import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '../presets'
+import { SCHEME_PALETTES } from '../colorPalettes'
 
 describe('导图样式模块配置', () => {
   it('结构轴包含 逻辑图 + 思维导图', () => {
@@ -24,5 +25,24 @@ describe('导图样式模块配置', () => {
     expect(VISUAL_VARIANTS.minimal.edge.connect).toBe('bottom')
     expect(VISUAL_VARIANTS.card.edge.stroke).toBe('trunk')
     expect(VISUAL_VARIANTS.outline.edge.connect).toBe('side')
+  })
+})
+
+describe('配色方案', () => {
+  it('包含 默认（灰）与 彩虹，且每套调色板齐全', () => {
+    const ids = COLOR_SCHEMES.map((c) => c.id)
+    expect(ids).toContain('default')
+    expect(ids).toContain('rainbow')
+
+    for (const scheme of COLOR_SCHEMES) {
+      const palette = SCHEME_PALETTES[scheme.id]
+      expect(palette, `${scheme.id} palette`).toBeTruthy()
+      expect(palette.branches.length, `${scheme.id} branches`).toBeGreaterThan(0)
+    }
+  })
+
+  it('默认配色全分支同灰（单分支），彩虹配色 6 种分支色', () => {
+    expect(SCHEME_PALETTES.default.branches).toHaveLength(1)
+    expect(SCHEME_PALETTES.rainbow.branches).toHaveLength(6)
   })
 })

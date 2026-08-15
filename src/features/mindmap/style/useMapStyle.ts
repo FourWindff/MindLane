@@ -25,7 +25,7 @@ const DEFAULT_VARIANT = VISUAL_VARIANTS.card
 export const StyleContext = createContext<StyleContextValue>({
   structureType: 'logic',
   visualVariant: 'card',
-  colorScheme: 'warm',
+  colorScheme: 'default',
   edge: DEFAULT_VARIANT.edge,
   spacing: DEFAULT_VARIANT.spacing,
 })

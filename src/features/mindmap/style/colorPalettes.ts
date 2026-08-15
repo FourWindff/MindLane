@@ -29,6 +29,170 @@ export interface SchemePalette {
 
 // ─── 各方案调色板 ─────────────────────────────────────────────────────────────
 
+/** 默认（xyflow 风格灰）：所有分支同灰，不做彩虹区分 */
+const DEFAULT_GRAY: SchemePalette = {
+  canvasBg: '#f8f8f8',
+  canvasDot: 'rgba(0,0,0,0.06)',
+  root: { nodeBg: '#ffffff', nodeBorder: '#b1b1b7', nodeText: '#222222' },
+  branches: [
+    {
+      depth1: {
+        nodeBg: '#ffffff',
+        nodeBorder: '#b1b1b7',
+        nodeText: '#333333',
+        edgeStroke: '#b1b1b7',
+      },
+      depth2: {
+        nodeBg: '#ffffff',
+        nodeBorder: '#c3c3c8',
+        nodeText: '#444444',
+        edgeStroke: '#c3c3c8',
+      },
+      depth3: {
+        nodeBg: '#ffffff',
+        nodeBorder: '#d4d4d8',
+        nodeText: '#555555',
+        edgeStroke: '#d4d4d8',
+      },
+    },
+  ],
+}
+
+/** 彩虹：6 种鲜明色相按分支循环，节点背景带竖向渐变 */
+const RAINBOW: SchemePalette = {
+  canvasBg: '#fafafa',
+  canvasDot: 'rgba(0,0,0,0.06)',
+  root: { nodeBg: '#ffffff', nodeBorder: '#d1d5db', nodeText: '#111827' },
+  branches: [
+    // 红
+    {
+      depth1: {
+        nodeBg: '#fee2e2',
+        nodeBorder: '#f87171',
+        nodeText: '#7f1d1d',
+        edgeStroke: '#f87171',
+      },
+      depth2: {
+        nodeBg: '#fff1f1',
+        nodeBorder: '#fca5a5',
+        nodeText: '#991b1b',
+        edgeStroke: '#fca5a5',
+      },
+      depth3: {
+        nodeBg: '#fff8f8',
+        nodeBorder: '#fecaca',
+        nodeText: '#b91c1c',
+        edgeStroke: '#fecaca',
+      },
+    },
+    // 橙
+    {
+      depth1: {
+        nodeBg: '#ffedd5',
+        nodeBorder: '#fb923c',
+        nodeText: '#7c2d12',
+        edgeStroke: '#fb923c',
+      },
+      depth2: {
+        nodeBg: '#fff7ed',
+        nodeBorder: '#fdba74',
+        nodeText: '#9a3412',
+        edgeStroke: '#fdba74',
+      },
+      depth3: {
+        nodeBg: '#fffbf5',
+        nodeBorder: '#fed7aa',
+        nodeText: '#c2410c',
+        edgeStroke: '#fed7aa',
+      },
+    },
+    // 黄
+    {
+      depth1: {
+        nodeBg: '#fef9c3',
+        nodeBorder: '#facc15',
+        nodeText: '#713f12',
+        edgeStroke: '#facc15',
+      },
+      depth2: {
+        nodeBg: '#fefce8',
+        nodeBorder: '#fde047',
+        nodeText: '#854d0e',
+        edgeStroke: '#fde047',
+      },
+      depth3: {
+        nodeBg: '#fffef0',
+        nodeBorder: '#fef08a',
+        nodeText: '#a16207',
+        edgeStroke: '#fef08a',
+      },
+    },
+    // 绿
+    {
+      depth1: {
+        nodeBg: '#dcfce7',
+        nodeBorder: '#4ade80',
+        nodeText: '#14532d',
+        edgeStroke: '#4ade80',
+      },
+      depth2: {
+        nodeBg: '#f0fdf4',
+        nodeBorder: '#86efac',
+        nodeText: '#166534',
+        edgeStroke: '#86efac',
+      },
+      depth3: {
+        nodeBg: '#f7fff9',
+        nodeBorder: '#bbf7d0',
+        nodeText: '#15803d',
+        edgeStroke: '#bbf7d0',
+      },
+    },
+    // 蓝
+    {
+      depth1: {
+        nodeBg: '#dbeafe',
+        nodeBorder: '#3b82f6',
+        nodeText: '#1e3a5f',
+        edgeStroke: '#3b82f6',
+      },
+      depth2: {
+        nodeBg: '#eff6ff',
+        nodeBorder: '#93c5fd',
+        nodeText: '#1d4ed8',
+        edgeStroke: '#93c5fd',
+      },
+      depth3: {
+        nodeBg: '#f5f9ff',
+        nodeBorder: '#bfdbfe',
+        nodeText: '#2563eb',
+        edgeStroke: '#bfdbfe',
+      },
+    },
+    // 紫
+    {
+      depth1: {
+        nodeBg: '#ede9fe',
+        nodeBorder: '#8b5cf6',
+        nodeText: '#4c1d95',
+        edgeStroke: '#8b5cf6',
+      },
+      depth2: {
+        nodeBg: '#f5f3ff',
+        nodeBorder: '#a78bfa',
+        nodeText: '#5b21b6',
+        edgeStroke: '#a78bfa',
+      },
+      depth3: {
+        nodeBg: '#fafaff',
+        nodeBorder: '#c4b5fd',
+        nodeText: '#6d28d9',
+        edgeStroke: '#c4b5fd',
+      },
+    },
+  ],
+}
+
 const WARM: SchemePalette = {
   canvasBg: '#f5f4f2',
   canvasDot: 'rgba(0,0,0,0.07)',
@@ -700,6 +864,8 @@ const NIGHT: SchemePalette = {
 }
 
 export const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
+  default: DEFAULT_GRAY,
+  rainbow: RAINBOW,
   warm: WARM,
   ocean: OCEAN,
   forest: FOREST,
