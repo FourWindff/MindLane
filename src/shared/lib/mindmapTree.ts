@@ -2,8 +2,8 @@ import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import { Position, type Edge, type Node } from '@xyflow/react'
 import { defaultNodeSize } from './nodeSize'
 
-export const CHILD_OFFSET_X = 260
-export const CHILD_GAP_Y = 24
+export const CHILD_OFFSET_X = 200
+export const CHILD_GAP_Y = 12
 
 export function newId(): string {
   return crypto.randomUUID()
