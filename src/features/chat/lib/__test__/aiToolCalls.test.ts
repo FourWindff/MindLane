@@ -66,7 +66,7 @@ describe('handleMindmapToolCall', () => {
 
     const remainingNodes = store.getState().nodes
     expect(remainingNodes.map((node) => node.id)).toEqual(['root', 'first', 'last'])
-    expect(remainingNodes.find((node) => node.id === 'first')?.position.y).toBe(-32)
-    expect(remainingNodes.find((node) => node.id === 'last')?.position.y).toBe(32)
+    expect(remainingNodes.find((node) => node.id === 'first')?.position.y).toBe(-26)
+    expect(remainingNodes.find((node) => node.id === 'last')?.position.y).toBe(26)
   })
 })

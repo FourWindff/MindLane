@@ -54,18 +54,12 @@
   color: var(--node-text, var(--ml-text));
 }
 
+/* 选中：下边框变主题色高亮。不改 border-bottom-width / font-weight，
+   避免节点测量尺寸变化触发整树重排（dimensions → reflow）。 */
 [data-map-style='minimal'] .text-node--selected {
   background: transparent;
   box-shadow: none;
-}
-
-/* ── 边线粗细随风格调整 ── */
-[data-map-style='outline'] .react-flow__edge-path {
-  stroke-width: 1.5 !important;
-}
-
-[data-map-style='minimal'] .react-flow__edge-path {
-  stroke-width: 1 !important;
+  border-bottom-color: var(--ml-accent);
 }
 
 /* ══════════════════════════════════════════════════════

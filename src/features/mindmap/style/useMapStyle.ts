@@ -1,23 +1,33 @@
 import { createContext, useContext } from 'react'
-import type { ColorSchemeId, MapStyleId } from './types'
+import { VISUAL_VARIANTS } from './presets'
+import type {
+  ColorSchemeId,
+  EdgeModeConfig,
+  MindmapSpacing,
+  StructureType,
+  VisualVariant,
+} from './types'
 
 export interface StyleContextValue {
-  mapStyle: MapStyleId
-  colorScheme: ColorSchemeId
   /** 'logic' | 'mindmap' — 决定布局算法 */
-  structureType: 'logic' | 'mindmap'
-  /** 'card' | 'outline' | 'minimal' — 决定节点/边视觉 */
-  visualVariant: 'card' | 'outline' | 'minimal'
-  /** 边路径算法（bezier / smooth-step / step） */
-  edgeVariant: 'bezier' | 'smooth-step' | 'step'
+  structureType: StructureType
+  /** 'card' | 'outline' | 'minimal' — 决定节点/边视觉与间距 */
+  visualVariant: VisualVariant
+  colorScheme: ColorSchemeId
+  /** 当前视觉变体的边配置 */
+  edge: EdgeModeConfig
+  /** 当前视觉变体的布局间距 */
+  spacing: MindmapSpacing
 }
 
+const DEFAULT_VARIANT = VISUAL_VARIANTS.card
+
 export const StyleContext = createContext<StyleContextValue>({
-  mapStyle: 'logic-card',
-  colorScheme: 'warm',
   structureType: 'logic',
   visualVariant: 'card',
-  edgeVariant: 'bezier',
+  colorScheme: 'warm',
+  edge: DEFAULT_VARIANT.edge,
+  spacing: DEFAULT_VARIANT.spacing,
 })
 
 export function useMapStyle(): StyleContextValue {

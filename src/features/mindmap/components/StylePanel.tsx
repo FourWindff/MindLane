@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Palette, Brush } from 'lucide-react'
 import { useStyleStore } from '@/features/mindmap/style/styleStore'
-import { MAP_STYLES, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
+import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
-import type { MapStyleId, ColorSchemeId } from '@/features/mindmap/style/types'
+import type { ColorSchemeId, StructureType, VisualVariant } from '@/features/mindmap/style/types'
 
 type Tab = 'style' | 'color'
 
@@ -16,13 +16,12 @@ export function StylePanel({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
-  const mapStyle = useStyleStore((s) => s.mapStyle)
+  const structureType = useStyleStore((s) => s.structureType)
+  const visualVariant = useStyleStore((s) => s.visualVariant)
   const colorScheme = useStyleStore((s) => s.colorScheme)
-  const setMapStyle = useStyleStore((s) => s.setMapStyle)
+  const setStructureType = useStyleStore((s) => s.setStructureType)
+  const setVisualVariant = useStyleStore((s) => s.setVisualVariant)
   const setColorScheme = useStyleStore((s) => s.setColorScheme)
-
-  const logicStyles = MAP_STYLES.filter((s) => s.structureType === 'logic')
-  const mindmapStyles = MAP_STYLES.filter((s) => s.structureType === 'mindmap')
 
   return (
     <div className="style-panel" role="dialog" aria-label="导图样式">
@@ -35,7 +34,7 @@ export function StylePanel({
         )}
       </div>
 
-      {/* 标签切换：只有风格 + 配色两个 tab */}
+      {/* 标签切换：风格 + 配色两个 tab */}
       <div className="style-panel__tabs" role="tablist">
         <button
           role="tab"
@@ -57,39 +56,37 @@ export function StylePanel({
         </button>
       </div>
 
-      {/* ── 风格面板 ── */}
+      {/* ── 风格面板：结构轴 + 视觉轴独立选择 ── */}
       {activeTab === 'style' && (
         <div className="style-panel__section">
-          {/* 逻辑图分组 */}
-          <div className="style-panel__group-label">逻辑图</div>
+          <div className="style-panel__group-label">结构</div>
           <div className="style-panel__style-grid">
-            {logicStyles.map((ms) => (
+            {STRUCTURE_TYPES.map((s) => (
               <button
-                key={ms.id}
-                className={`style-panel__style-option ${mapStyle === ms.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setMapStyle(ms.id as MapStyleId)}
-                title={ms.description}
+                key={s.id}
+                className={`style-panel__style-option ${structureType === s.id ? 'style-panel__style-option--active' : ''}`}
+                onClick={() => setStructureType(s.id as StructureType)}
+                title={s.description}
               >
-                <LogicPreview variant={ms.visualVariant} active={mapStyle === ms.id} />
-                <span className="style-panel__style-label">{ms.label}</span>
+                <StructurePreview id={s.id as StructureType} active={structureType === s.id} />
+                <span className="style-panel__style-label">{s.label}</span>
               </button>
             ))}
           </div>
 
-          {/* 思维导图分组 */}
           <div className="style-panel__group-label" style={{ marginTop: 12 }}>
-            思维导图
+            视觉样式
           </div>
           <div className="style-panel__style-grid">
-            {mindmapStyles.map((ms) => (
+            {Object.values(VISUAL_VARIANTS).map((v) => (
               <button
-                key={ms.id}
-                className={`style-panel__style-option ${mapStyle === ms.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setMapStyle(ms.id as MapStyleId)}
-                title={ms.description}
+                key={v.id}
+                className={`style-panel__style-option ${visualVariant === v.id ? 'style-panel__style-option--active' : ''}`}
+                onClick={() => setVisualVariant(v.id as VisualVariant)}
+                title={v.description}
               >
-                <MindmapPreview variant={ms.visualVariant} active={mapStyle === ms.id} />
-                <span className="style-panel__style-label">{ms.label}</span>
+                <VariantPreview variant={v.id as VisualVariant} active={visualVariant === v.id} />
+                <span className="style-panel__style-label">{v.label}</span>
               </button>
             ))}
           </div>
@@ -133,202 +130,173 @@ function ColorSwatch({ schemeId }: { schemeId: ColorSchemeId }) {
   )
 }
 
-// ─── 逻辑图微缩预览 SVG ────────────────────────────────────────────────────────
+// ─── 结构轴预览：只展示树形状（单向 vs 双向） ────────────────────────────────
 
-function LogicPreview({
-  variant,
-  active,
-}: {
-  variant: 'card' | 'outline' | 'minimal'
-  active: boolean
-}) {
+function StructurePreview({ id, active }: { id: StructureType; active: boolean }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
   const fill = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
 
-  if (variant === 'card') {
+  if (id === 'mindmap') {
     return (
-      <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
-        {/* 根节点 */}
+      <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
         <rect
-          x="2"
+          x="24"
           y="13"
           width="16"
           height="10"
-          rx="2.5"
+          rx="2"
           fill={fill}
           stroke={color}
           strokeWidth="1.3"
         />
-        {/* 子节点 */}
         <rect
-          x="28"
-          y="4"
-          width="22"
-          height="8"
-          rx="2"
+          x="2"
+          y="5"
+          width="13"
+          height="7"
+          rx="1.5"
           fill={fill}
           stroke={color}
           strokeWidth="1"
         />
         <rect
-          x="28"
-          y="14"
-          width="22"
-          height="8"
-          rx="2"
-          fill={fill}
-          stroke={color}
-          strokeWidth="1"
-        />
-        <rect
-          x="28"
+          x="2"
           y="24"
-          width="22"
-          height="8"
-          rx="2"
+          width="13"
+          height="7"
+          rx="1.5"
           fill={fill}
           stroke={color}
           strokeWidth="1"
         />
-        {/* 贝塞尔边 */}
-        <path d="M18 18 C22 18 24 8 28 8" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M18 18 C22 18 24 18 28 18" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M18 18 C22 18 24 28 28 28" stroke={color} strokeWidth="1" fill="none" />
+        <rect
+          x="49"
+          y="5"
+          width="13"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <rect
+          x="49"
+          y="24"
+          width="13"
+          height="7"
+          rx="1.5"
+          fill={fill}
+          stroke={color}
+          strokeWidth="1"
+        />
+        <path d="M24 18 L15 8.5 L15 8.5 L15 8.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M24 18 L15 18 L15 27.5 L15 27.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M40 18 L49 8.5" stroke={color} strokeWidth="1" fill="none" />
+        <path d="M40 18 L49 27.5" stroke={color} strokeWidth="1" fill="none" />
       </svg>
     )
   }
-  if (variant === 'outline') {
-    return (
-      <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
-        <rect x="2" y="13" width="16" height="10" rx="1.5" stroke={color} strokeWidth="1.3" />
-        <rect x="28" y="4" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="28" y="14" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="28" y="24" width="22" height="8" rx="1" stroke={color} strokeWidth="1" />
-        {/* smooth-step 折线 */}
-        <path d="M18 18 L22 18 L22 8  L28 8" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L28 18" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L22 28 L28 28" stroke={color} strokeWidth="1" fill="none" />
-      </svg>
-    )
-  }
-  // minimal
+  // logic：单向展开
   return (
-    <svg className="style-panel__preview" viewBox="0 0 54 36" fill="none">
-      <line x1="2" y1="19.5" x2="18" y2="19.5" stroke={color} strokeWidth="1.5" />
-      <line x1="28" y1="8.5" x2="50" y2="8.5" stroke={color} strokeWidth="1.2" />
-      <line x1="28" y1="18.5" x2="50" y2="18.5" stroke={color} strokeWidth="1.2" />
-      <line x1="28" y1="28.5" x2="50" y2="28.5" stroke={color} strokeWidth="1.2" />
-      {/* 直角折线 */}
-      <path d="M18 18 L22 18 L22 8  L28 8" stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L28 18" stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L22 28 L28 28" stroke={color} strokeWidth="1" fill="none" />
+    <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
+      <rect
+        x="2"
+        y="13"
+        width="16"
+        height="10"
+        rx="2"
+        fill={fill}
+        stroke={color}
+        strokeWidth="1.3"
+      />
+      <rect
+        x="30"
+        y="3"
+        width="14"
+        height="7"
+        rx="1.5"
+        fill={fill}
+        stroke={color}
+        strokeWidth="1"
+      />
+      <rect
+        x="30"
+        y="15"
+        width="14"
+        height="7"
+        rx="1.5"
+        fill={fill}
+        stroke={color}
+        strokeWidth="1"
+      />
+      <rect
+        x="30"
+        y="27"
+        width="14"
+        height="7"
+        rx="1.5"
+        fill={fill}
+        stroke={color}
+        strokeWidth="1"
+      />
+      <path d="M18 18 L30 6.5" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M18 18 L30 18.5" stroke={color} strokeWidth="1" fill="none" />
+      <path d="M18 18 L30 30.5" stroke={color} strokeWidth="1" fill="none" />
     </svg>
   )
 }
 
-// ─── 思维导图微缩预览 SVG ──────────────────────────────────────────────────────
+// ─── 视觉轴预览：只展示节点样式 + 边样式与连接方式 ──────────────────────────
 
-function MindmapPreview({
-  variant,
-  active,
-}: {
-  variant: 'card' | 'outline' | 'minimal'
-  active: boolean
-}) {
+function VariantPreview({ variant, active }: { variant: VisualVariant; active: boolean }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
   const fill = active ? 'var(--ml-accent-soft)' : 'rgba(0,0,0,0.06)'
 
   if (variant === 'card') {
     return (
       <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
-        {/* 中心根节点 */}
         <rect
-          x="22"
+          x="2"
           y="13"
-          width="20"
+          width="18"
           height="10"
-          rx="2.5"
+          rx="3"
           fill={fill}
           stroke={color}
           strokeWidth="1.3"
         />
-        {/* 右侧子节点 */}
         <rect
-          x="47"
-          y="4"
-          width="15"
-          height="7"
-          rx="1.5"
+          x="42"
+          y="13"
+          width="18"
+          height="10"
+          rx="3"
           fill={fill}
           stroke={color}
           strokeWidth="1"
         />
-        <rect
-          x="47"
-          y="25"
-          width="15"
-          height="7"
-          rx="1.5"
-          fill={fill}
-          stroke={color}
-          strokeWidth="1"
-        />
-        {/* 左侧子节点 */}
-        <rect
-          x="2"
-          y="4"
-          width="15"
-          height="7"
-          rx="1.5"
-          fill={fill}
-          stroke={color}
-          strokeWidth="1"
-        />
-        <rect
-          x="2"
-          y="25"
-          width="15"
-          height="7"
-          rx="1.5"
-          fill={fill}
-          stroke={color}
-          strokeWidth="1"
-        />
-        {/* 边 */}
-        <path d="M42 18 C44 18 45 7.5 47 7.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M42 18 C44 18 45 28.5 47 28.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 C20 18 19 7.5 17 7.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 C20 18 19 28.5 17 28.5" stroke={color} strokeWidth="1" fill="none" />
+        {/* 树干渐变：源端粗、末端细的填充形状 */}
+        <path d="M20 16.5 L28 16 L36 17.3 L36 18.7 L28 19 L20 18.5 Z" fill={color} />
       </svg>
     )
   }
   if (variant === 'outline') {
     return (
       <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
-        <rect x="22" y="13" width="20" height="10" rx="1.5" stroke={color} strokeWidth="1.3" />
-        <rect x="47" y="4" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="47" y="25" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="2" y="4" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <rect x="2" y="25" width="15" height="7" rx="1" stroke={color} strokeWidth="1" />
-        <path d="M42 18 L44 18 L44 7.5  L47 7.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M44 18 L44 28.5 L47 28.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M22 18 L20 18 L20 7.5  L17 7.5" stroke={color} strokeWidth="1" fill="none" />
-        <path d="M20 18 L20 28.5 L17 28.5" stroke={color} strokeWidth="1" fill="none" />
+        <rect x="2" y="13" width="18" height="10" rx="2" stroke={color} strokeWidth="1.3" />
+        <rect x="42" y="13" width="18" height="10" rx="2" stroke={color} strokeWidth="1" />
+        {/* smooth-step 折线，连接侧边中点 */}
+        <path d="M20 18 L27 18 L27 18 L34 18" stroke={color} strokeWidth="1.5" fill="none" />
       </svg>
     )
   }
-  // minimal
+  // minimal：下划线节点 + 直角折线连接下边框
   return (
     <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
-      <line x1="22" y1="19.5" x2="42" y2="19.5" stroke={color} strokeWidth="1.5" />
-      <line x1="47" y1="8.5" x2="62" y2="8.5" stroke={color} strokeWidth="1.2" />
-      <line x1="47" y1="28.5" x2="62" y2="28.5" stroke={color} strokeWidth="1.2" />
-      <line x1="2" y1="8.5" x2="17" y2="8.5" stroke={color} strokeWidth="1.2" />
-      <line x1="2" y1="28.5" x2="17" y2="28.5" stroke={color} strokeWidth="1.2" />
-      <path d="M42 18 L44 18 L44 8.5  L47 8.5" stroke={color} strokeWidth="1" fill="none" />
-      <path d="M44 18 L44 28.5 L47 28.5" stroke={color} strokeWidth="1" fill="none" />
-      <path d="M22 18 L20 18 L20 8.5  L17 8.5" stroke={color} strokeWidth="1" fill="none" />
-      <path d="M20 18 L20 28.5 L17 28.5" stroke={color} strokeWidth="1" fill="none" />
+      <line x1="2" y1="18" x2="20" y2="18" stroke={color} strokeWidth="1.5" />
+      <line x1="42" y1="18" x2="62" y2="18" stroke={color} strokeWidth="1.5" />
+      {/* 边从根节点底部出发，横向连接后进入子节点底部 */}
+      <path d="M11 18 L11 23 L51.5 23 L51.5 18" stroke={color} strokeWidth="1.2" fill="none" />
     </svg>
   )
 }

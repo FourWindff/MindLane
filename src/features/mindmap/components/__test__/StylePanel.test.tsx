@@ -7,7 +7,7 @@ import { COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 
 describe('StylePanel color tab', () => {
   it('renders a color row for each color scheme', () => {
-    useStyleStore.setState({ mapStyle: 'mindmap-card', colorScheme: 'warm' })
+    useStyleStore.setState({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })
     const html = renderToString(<StylePanel initialTab="color" />)
 
     for (const cs of COLOR_SCHEMES) {

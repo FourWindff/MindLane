@@ -1,16 +1,37 @@
 import { create } from 'zustand'
-import type { ColorSchemeId, MapStyleId, MindmapStyleState } from './types'
+import type { ColorSchemeId, MindmapStyleState, StructureType, VisualVariant } from './types'
 
 interface StyleActions {
-  setMapStyle: (id: MapStyleId) => void
+  setStructureType: (type: StructureType) => void
+  setVisualVariant: (variant: VisualVariant) => void
   setColorScheme: (id: ColorSchemeId) => void
 }
 
 type StyleStore = MindmapStyleState & StyleActions
 
 const DEFAULT_STATE: MindmapStyleState = {
-  mapStyle: 'logic-card',
+  structureType: 'logic',
+  visualVariant: 'card',
   colorScheme: 'warm',
+}
+
+/** 旧版持久化数据：mapStyle 为 'mindmap-card' 之类的复合 id */
+interface LegacyMindmapStyle {
+  mapStyle?: string
+  structureType?: StructureType
+  visualVariant?: VisualVariant
+  colorScheme?: ColorSchemeId
+}
+
+function structureFromLegacy(mapStyle?: string): StructureType | undefined {
+  if (!mapStyle) return undefined
+  return mapStyle.startsWith('mindmap') ? 'mindmap' : 'logic'
+}
+
+function variantFromLegacy(mapStyle?: string): VisualVariant | undefined {
+  if (!mapStyle) return undefined
+  const v = mapStyle.split('-')[1]
+  return v === 'outline' || v === 'minimal' ? v : 'card'
 }
 
 function persistToBackend(partial: Partial<MindmapStyleState>) {
@@ -20,14 +41,19 @@ function persistToBackend(partial: Partial<MindmapStyleState>) {
 export const useStyleStore = create<StyleStore>((set) => ({
   ...DEFAULT_STATE,
 
-  setMapStyle(id) {
-    set({ mapStyle: id })
-    persistToBackend({ mapStyle: id })
+  setStructureType(structureType) {
+    set({ structureType })
+    persistToBackend({ structureType })
   },
 
-  setColorScheme(id) {
-    set({ colorScheme: id })
-    persistToBackend({ colorScheme: id })
+  setVisualVariant(visualVariant) {
+    set({ visualVariant })
+    persistToBackend({ visualVariant })
+  },
+
+  setColorScheme(colorScheme) {
+    set({ colorScheme })
+    persistToBackend({ colorScheme })
   },
 }))
 
@@ -35,11 +61,12 @@ export const useStyleStore = create<StyleStore>((set) => ({
 export async function loadMindmapStyleFromBackend(): Promise<void> {
   try {
     const raw = await window.mindlane?.settings.load()
-    const saved = raw?.mindmapStyle
-    if (!saved) return
-
+    const saved = (raw?.mindmapStyle ?? {}) as LegacyMindmapStyle
     useStyleStore.setState({
-      mapStyle: saved.mapStyle ?? DEFAULT_STATE.mapStyle,
+      structureType:
+        saved.structureType ?? structureFromLegacy(saved.mapStyle) ?? DEFAULT_STATE.structureType,
+      visualVariant:
+        saved.visualVariant ?? variantFromLegacy(saved.mapStyle) ?? DEFAULT_STATE.visualVariant,
       colorScheme: saved.colorScheme ?? DEFAULT_STATE.colorScheme,
     })
   } catch {

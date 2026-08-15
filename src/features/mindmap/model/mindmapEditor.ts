@@ -9,8 +9,9 @@ import {
   findParentId,
   findRootNode,
   newId,
-  CHILD_OFFSET_X,
 } from '@/shared/lib/mindmapTree'
+import { useStyleStore } from '@/features/mindmap/style/styleStore'
+import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
 import { mindmapLayout, type MindmapStructureType } from './mindmapLayout'
@@ -132,10 +133,11 @@ export class MindmapEditor {
     }
 
     const parentNode = nodes.find((n) => n.id === parentId)
+    const offsetX = VISUAL_VARIANTS[useStyleStore.getState().visualVariant].spacing.offsetX
     const position =
       options.position ??
       (parentNode
-        ? { x: parentNode.position.x + CHILD_OFFSET_X, y: parentNode.position.y }
+        ? { x: parentNode.position.x + offsetX, y: parentNode.position.y }
         : { x: 0, y: 0 })
 
     const data = options.data
@@ -300,7 +302,9 @@ export class MindmapEditor {
       return
     }
 
-    const offsetX = parentNode.position.x + CHILD_OFFSET_X
+    const offsetX =
+      parentNode.position.x +
+      VISUAL_VARIANTS[useStyleStore.getState().visualVariant].spacing.offsetX
     const offsetY = parentNode.position.y - firstSubRoot.position.y
 
     const commands: MindmapCommand[] = []

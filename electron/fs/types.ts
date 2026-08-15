@@ -6,13 +6,8 @@ import type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry
 export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry }
 
 export interface MindmapStyleSettings {
-  mapStyle:
-    | 'logic-card'
-    | 'logic-outline'
-    | 'logic-minimal'
-    | 'mindmap-card'
-    | 'mindmap-outline'
-    | 'mindmap-minimal'
+  structureType: 'logic' | 'mindmap'
+  visualVariant: 'card' | 'outline' | 'minimal'
   colorScheme: 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 }
 

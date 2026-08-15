@@ -1,7 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
 import { useStyleStore } from './styleStore'
-import { MAP_STYLES } from './presets'
-import { getStructureType, getVisualVariant } from './types'
+import { VISUAL_VARIANTS } from './presets'
 import { StyleContext, type StyleContextValue } from './useMapStyle'
 
 /**
@@ -12,21 +11,14 @@ import { StyleContext, type StyleContextValue } from './useMapStyle'
  * 供 CSS 选择器实现无 JS 的视觉风格覆写（仅作用于画布内部）。
  */
 export function StyleProvider({ children }: { children: ReactNode }) {
-  const mapStyle = useStyleStore((s) => s.mapStyle)
+  const structureType = useStyleStore((s) => s.structureType)
+  const visualVariant = useStyleStore((s) => s.visualVariant)
   const colorScheme = useStyleStore((s) => s.colorScheme)
 
-  const structureType = useMemo(() => getStructureType(mapStyle), [mapStyle])
-  const visualVariant = useMemo(() => getVisualVariant(mapStyle), [mapStyle])
-
-  const edgeVariant = useMemo(
-    () => MAP_STYLES.find((s) => s.id === mapStyle)?.edgeVariant ?? 'bezier',
-    [mapStyle],
-  )
-
-  const ctx = useMemo<StyleContextValue>(
-    () => ({ mapStyle, colorScheme, structureType, visualVariant, edgeVariant }),
-    [mapStyle, colorScheme, structureType, visualVariant, edgeVariant],
-  )
+  const ctx = useMemo<StyleContextValue>(() => {
+    const config = VISUAL_VARIANTS[visualVariant]
+    return { structureType, visualVariant, colorScheme, edge: config.edge, spacing: config.spacing }
+  }, [structureType, visualVariant, colorScheme])
 
   return (
     <StyleContext.Provider value={ctx}>

@@ -78,6 +78,46 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g).toEqual(fallback)
   })
+
+  it('bottom 连接：边从节点下边框水平引出，句柄为朝向子节点的侧边', () => {
+    const root = node(0, 0, { depth: 0, width: 160, height: 40 })
+    const child = node(300, 100, { width: 160, height: 40 })
+
+    const g = resolveEdgeGeometry({
+      sourceNode: root,
+      targetNode: child,
+      fallback,
+      connect: 'bottom',
+      strokeWidth: 2,
+    })
+
+    expect(g.sourcePosition).toBe(Position.Right) // 朝向右侧子节点
+    expect(g.targetPosition).toBe(Position.Left)
+    expect(g.sourceX).toBe(160) // 根节点右缘
+    expect(g.sourceY).toBe(39) // 根节点底部 - 半线宽（与下边框对齐）
+    expect(g.targetX).toBe(300) // 子节点左缘
+    expect(g.targetY).toBe(139) // 子节点底部 - 半线宽
+  })
+
+  it('bottom 连接：子节点在左侧时从左侧引出，方向对称', () => {
+    const root = node(0, 0, { depth: 0, width: 160, height: 40 })
+    const child = node(-300, 100, { width: 160, height: 40 })
+
+    const g = resolveEdgeGeometry({
+      sourceNode: root,
+      targetNode: child,
+      fallback,
+      connect: 'bottom',
+      strokeWidth: 2,
+    })
+
+    expect(g.sourcePosition).toBe(Position.Left)
+    expect(g.targetPosition).toBe(Position.Right)
+    expect(g.sourceX).toBe(0) // 根节点左缘
+    expect(g.sourceY).toBe(39)
+    expect(g.targetX).toBe(-140) // 子节点右缘
+    expect(g.targetY).toBe(139)
+  })
 })
 
 describe('buildTaperedPath 树干渐变', () => {

@@ -44,9 +44,8 @@ export function useMindmapOperationController() {
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const capabilities = useSettingsStore((state) => state.capabilities)
   const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
-  const structureType = useStyleStore((state) => state.mapStyle).startsWith('mindmap')
-    ? ('mindmap' as const)
-    : ('logic' as const)
+  const structureType = useStyleStore((state) => state.structureType)
+  const visualVariant = useStyleStore((state) => state.visualVariant)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
   const documentRefs = useActiveMindmapStore((state) => state.documentRefs)
@@ -344,6 +343,14 @@ export function useMindmapOperationController() {
     const timer = window.setTimeout(() => reactFlow.fitView({ padding: 0.2, duration: 300 }), 50)
     return () => window.clearTimeout(timer)
   }, [editor, reactFlow, structureType])
+
+  // 视觉变体切换（间距不同）需重新布局；结构未变时仅重排位置
+  const previousVisualVariantRef = useRef(visualVariant)
+  useEffect(() => {
+    if (previousVisualVariantRef.current === visualVariant) return
+    previousVisualVariantRef.current = visualVariant
+    editor.reflow()
+  }, [editor, visualVariant])
 
   return {
     nodes,

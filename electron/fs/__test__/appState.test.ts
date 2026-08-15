@@ -23,7 +23,7 @@ describe('AppState', () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),
       JSON.stringify({
-        mindmapStyle: { mapStyle: 'logic-card', colorScheme: 'ocean' },
+        mindmapStyle: { structureType: 'logic', visualVariant: 'card', colorScheme: 'ocean' },
         chatModel: 'old-model',
       }),
     )
@@ -33,7 +33,11 @@ describe('AppState', () => {
 
     const settings = await appState.load()
     expect(settings.chatModel).toBe('new-model')
-    expect(settings.mindmapStyle).toEqual({ mapStyle: 'logic-card', colorScheme: 'ocean' })
+    expect(settings.mindmapStyle).toEqual({
+      structureType: 'logic',
+      visualVariant: 'card',
+      colorScheme: 'ocean',
+    })
   })
 
   it('keeps non-enumerated setting fields when updating', async () => {

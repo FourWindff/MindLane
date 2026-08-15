@@ -30,7 +30,7 @@ export function MindmapEdge(props: EdgeProps) {
   } = props
 
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
-  const { edgeVariant, colorScheme } = useMapStyle()
+  const { edge, colorScheme } = useMapStyle()
 
   const { edgePath, edgeStroke, taperPath } = useMemo(() => {
     const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
@@ -53,16 +53,20 @@ export function MindmapEdge(props: EdgeProps) {
       sourceNode,
       targetNode,
       fallback: { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition },
+      connect: edge.connect,
+      strokeWidth: edge.strokeWidth,
     })
 
     let path: string
     let taperPath: string | undefined
-    if (edgeVariant === 'bezier') {
+    if (edge.path === 'bezier') {
       const curvature = computeSiblingCurvature(siblingIndex >= 0 ? siblingIndex : 0, siblingCount)
       ;[path] = getBezierPath({ ...geometry, curvature })
-      const baseWidth = Math.max(3, 6 - depth)
-      taperPath = buildTaperedPath(geometry, curvature, baseWidth, 1)
-    } else if (edgeVariant === 'smooth-step') {
+      if (edge.stroke === 'trunk' && edge.connect === 'side') {
+        const baseWidth = Math.max(3, 6 - depth)
+        taperPath = buildTaperedPath(geometry, curvature, baseWidth, 1)
+      }
+    } else if (edge.path === 'smooth-step') {
       ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 8 })
     } else {
       // step / 直角折线
@@ -82,7 +86,7 @@ export function MindmapEdge(props: EdgeProps) {
     targetY,
     sourcePosition,
     targetPosition,
-    edgeVariant,
+    edge,
     colorScheme,
   ])
 
@@ -97,7 +101,11 @@ export function MindmapEdge(props: EdgeProps) {
       )}
       <BaseEdge
         path={edgePath}
-        style={{ ...style, stroke: taperPath ? 'transparent' : edgeStroke }}
+        style={{
+          ...style,
+          stroke: taperPath ? 'transparent' : edgeStroke,
+          strokeWidth: taperPath ? undefined : edge.strokeWidth,
+        }}
         markerEnd={markerEnd}
         markerStart={markerStart}
         interactionWidth={interactionWidth}

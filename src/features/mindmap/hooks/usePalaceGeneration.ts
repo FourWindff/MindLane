@@ -4,7 +4,9 @@ import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
-import { findParentId, newId, CHILD_OFFSET_X } from '@/shared/lib/mindmapTree'
+import { findParentId, newId } from '@/shared/lib/mindmapTree'
+import { useStyleStore } from '@/features/mindmap/style/styleStore'
+import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 
 export function usePalaceGeneration({
   nodes,
@@ -53,11 +55,12 @@ export function usePalaceGeneration({
     const parentId = findParentId(edges, selectedNodes[0]?.id ?? '') ?? 'root'
     const parentNode = nodes.find((node) => node.id === parentId)
     const firstSelected = nodes.find((node) => node.id === selectedNodes[0]?.id)
+    const offsetX = VISUAL_VARIANTS[useStyleStore.getState().visualVariant].spacing.offsetX
     const placeholderNode: Node = {
       id: palaceId,
       type: 'palace',
       position: {
-        x: firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X,
+        x: firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + offsetX,
         y: firstSelected?.position.y ?? parentNode?.position.y ?? 0,
       },
       data: {
