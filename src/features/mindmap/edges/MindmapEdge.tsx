@@ -4,7 +4,17 @@ import { computeSiblingCurvature } from './siblingOffset'
 import { buildTaperedPath } from './taperedEdge'
 import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
-import { getEdgeColor } from '@/features/mindmap/style/colorPalettes'
+import { getEdgeColor, getNodeColor } from '@/features/mindmap/style/colorPalettes'
+
+interface EdgeGradient {
+  id: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  from: string
+  to: string
+}
 
 export function MindmapEdge(props: EdgeProps) {
   const {
@@ -32,7 +42,7 @@ export function MindmapEdge(props: EdgeProps) {
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
   const { edge, colorScheme } = useMapStyle()
 
-  const { edgePath, edgeStroke, taperPath } = useMemo(() => {
+  const { edgePath, edgeStroke, taperPath, gradient } = useMemo(() => {
     const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
 
     const siblingEdges = edges
@@ -73,7 +83,27 @@ export function MindmapEdge(props: EdgeProps) {
       ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 0 })
     }
 
-    return { edgePath: path, edgeStroke: stroke, taperPath }
+    // 极简式（连接下边框）：边颜色从源节点边框色渐变到目标节点边框色，
+    // 使两端与节点下边框无缝衔接
+    let edgeStroke = stroke
+    let gradient: EdgeGradient | undefined
+    if (edge.connect === 'bottom' && sourceNode && targetNode) {
+      const targetDepth = (targetNode.data?.depth as number | undefined) ?? 0
+      const targetBranchIndex = (targetNode.data?.branchIndex as number | undefined) ?? 0
+      const gradientId = `mindmap-edge-${id.replace(/[^a-zA-Z0-9]/g, '_')}`
+      gradient = {
+        id: gradientId,
+        x1: geometry.sourceX,
+        y1: geometry.sourceY,
+        x2: geometry.targetX,
+        y2: geometry.targetY,
+        from: getNodeColor(colorScheme, depth, branchIndex).nodeBorder,
+        to: getNodeColor(colorScheme, targetDepth, targetBranchIndex).nodeBorder,
+      }
+      edgeStroke = `url(#${gradientId})`
+    }
+
+    return { edgePath: path, edgeStroke, taperPath, gradient }
   }, [
     edges,
     nodes,
@@ -92,6 +122,21 @@ export function MindmapEdge(props: EdgeProps) {
 
   return (
     <g>
+      {gradient && (
+        <defs>
+          <linearGradient
+            id={gradient.id}
+            gradientUnits="userSpaceOnUse"
+            x1={gradient.x1}
+            y1={gradient.y1}
+            x2={gradient.x2}
+            y2={gradient.y2}
+          >
+            <stop offset="0%" stopColor={gradient.from} />
+            <stop offset="100%" stopColor={gradient.to} />
+          </linearGradient>
+        </defs>
+      )}
       {taperPath && (
         <path
           d={taperPath}
@@ -105,6 +150,8 @@ export function MindmapEdge(props: EdgeProps) {
           ...style,
           stroke: taperPath ? 'transparent' : edgeStroke,
           strokeWidth: taperPath ? undefined : edge.strokeWidth,
+          // 极简式边与节点下边框对齐：关闭像素吸附避免亚像素错位
+          ...(edge.connect === 'bottom' ? { shapeRendering: 'auto' as const } : {}),
         }}
         markerEnd={markerEnd}
         markerStart={markerStart}
