@@ -7,3 +7,4 @@ export {
 } from './loaders.js'
 export { splitDocuments, CHUNK_SIZE } from './split.js'
 export { batchDocuments, computeBudgetChars } from './batch.js'
+export { prepareDocument } from './prepare.js'

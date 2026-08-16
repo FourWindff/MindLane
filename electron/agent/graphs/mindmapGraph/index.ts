@@ -1,17 +1,13 @@
 import { StateGraph, START, END, Send, getWriter } from '@langchain/langgraph'
-import path from 'node:path'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
-import type { DocumentRef } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
 import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
 import {
-  loadDocument,
   createDefaultLoaders,
-  splitDocuments,
-  batchDocuments,
   computeBudgetChars,
+  prepareDocument,
   type DocumentLoaderRegistry,
 } from '../../document/index.js'
 import { extractRootTree } from './shared/rootTree.js'
@@ -20,14 +16,6 @@ import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
 import type { StreamStep } from '../../../ipc.js'
-
-import {
-  hashText,
-  hashFile,
-  shortHash,
-  saveDocumentTextCache,
-  buildTextPreview,
-} from './documentTextCache.js'
 
 const log = logger.withContext('mindmap')
 
@@ -265,12 +253,15 @@ async function loadDocumentNode(
   }
 
   try {
-    // Document ingestion pipeline: load → split → batch; batches are precomputed into state
-    const loaders = { ...createDefaultLoaders(), ...options.loaders }
-    const docs = await loadDocument(source, loaders)
-    const chunks = await splitDocuments(docs)
+    // Document ingestion pipeline: load → split → batch + DocumentRef assembly
     const budgetChars = computeBudgetChars(options.provider.contextWindow)
-    const batches = batchDocuments(chunks, budgetChars)
+    const { batches, documentRef } = await prepareDocument({
+      source,
+      loaders: { ...createDefaultLoaders(), ...options.loaders },
+      budgetChars,
+      userDataPath: options.userDataPath,
+      existingRef: state.documentRef ?? undefined,
+    })
 
     if (batches.length === 0) {
       return {
@@ -281,80 +272,11 @@ async function loadDocumentNode(
     }
 
     log.info(
-      '文档管线： source=%s, docs=%d, chunks=%d, batches=%d, budget=%d 字符',
+      '文档管线： source=%s, batches=%d, budget=%d 字符',
       source.type,
-      docs.length,
-      chunks.length,
       batches.length,
       budgetChars,
     )
-
-    const existingRef = state.documentRef
-    const text = docs.map((doc) => doc.pageContent).join('\n\n')
-
-    let hash: string
-    let baseFilename: string
-    let persistedSource: string
-    let filename: string
-    let type: DocumentRef['type']
-
-    switch (source.type) {
-      case 'pdf':
-      case 'docx':
-      case 'pptx':
-      case 'xlsx':
-      case 'markdown': {
-        const filePath = source.path!
-        type = source.type
-        hash =
-          (await hashFile(filePath).catch(() => undefined)) ?? existingRef?.sha256 ?? hashText(text)
-        baseFilename = existingRef?.filename || path.basename(filePath)
-        persistedSource = filePath
-        filename = existingRef?.filename || path.basename(filePath)
-        break
-      }
-      case 'text': {
-        type = 'text'
-        hash = hashText(text)
-        baseFilename = '用户输入'
-        persistedSource = buildTextPreview(text)
-        filename = `用户输入_${shortHash(hash)}.txt`
-        break
-      }
-      case 'url': {
-        type = 'url'
-        hash = hashText(text)
-        baseFilename = existingRef?.filename || 'URL来源'
-        persistedSource = source.url!
-        filename = existingRef?.filename || `URL来源_${shortHash(hash)}.txt`
-        break
-      }
-      default: {
-        // Exhaustive fallback
-        type = source.type as DocumentRef['type']
-        hash = hashText(text)
-        baseFilename = existingRef?.filename || '未命名'
-        persistedSource = String(source.path ?? source.url ?? source.content ?? '')
-        filename = existingRef?.filename || `未命名_${shortHash(hash)}.txt`
-      }
-    }
-
-    let textPath: string | undefined
-    if (options.userDataPath) {
-      textPath = await saveDocumentTextCache(options.userDataPath, baseFilename, hash, text)
-    }
-
-    const documentRef: DocumentRef = {
-      id: hash,
-      type,
-      source: persistedSource,
-      filename,
-      importedAt: existingRef?.importedAt || new Date().toISOString(),
-      title: existingRef?.title,
-      pageCount: existingRef?.pageCount,
-      textPath,
-      sha256: hash,
-    }
 
     // Phase-start event so the first (possibly long) extraction doesn't look
     // like the run is still stuck reading the document.
