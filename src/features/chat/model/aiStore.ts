@@ -531,6 +531,65 @@ async function persistActiveSession(
   })
 }
 
+export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): FileChatState {
+  switch (event.type) {
+    case 'token':
+      return { ...chat, streamText: chat.streamText + event.payload }
+    case 'message-start':
+      return chat.streamText.trim()
+        ? {
+            ...chat,
+            chatMessages: [...chat.chatMessages, { role: 'assistant', content: chat.streamText }],
+            streamText: '',
+          }
+        : chat
+    case 'tool-start': {
+      const name = event.payload.name
+      return name ? { ...chat, activeTools: [...chat.activeTools, name] } : chat
+    }
+    case 'tool-end': {
+      const name = event.payload.name
+      return { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
+    }
+    case 'step':
+      return { ...chat, step: event.payload }
+    case 'end': {
+      const response = event.payload
+      const messages = response.messages?.length
+        ? response.messages
+        : response.content || chat.streamText
+          ? [
+              {
+                role: 'assistant' as const,
+                content: response.content || chat.streamText,
+                toolCalls: response.toolCalls,
+              },
+            ]
+          : []
+      const { previous } = splitCurrentTurn(chat.chatMessages)
+      return {
+        ...chat,
+        chatMessages: [...previous, ...messages],
+        busy: false,
+        stopRequested: false,
+        step: 'idle',
+        streamText: '',
+        activeTools: [],
+      }
+    }
+    case 'error':
+      return {
+        ...chat,
+        busy: false,
+        stopRequested: false,
+        step: 'idle',
+        streamText: '',
+        activeTools: [],
+        errorMessage: event.payload,
+      }
+  }
+}
+
 function routeStreamEvent(event: ChatStreamEvent): boolean {
   const currentState = useAiStore.getState()
   const pendingFileUuid = currentState.sessionFileUuids[event.sessionId]
@@ -552,78 +611,12 @@ function routeStreamEvent(event: ChatStreamEvent): boolean {
     const current = state.fileChats[fileUuid]
     if (!current) return state
     accepted = true
-    let chat = current
     let activeStreamIds = state.activeStreamIds
-
-    switch (event.type) {
-      case 'token':
-        chat = { ...chat, streamText: chat.streamText + event.payload }
-        break
-      case 'message-start':
-        if (chat.streamText.trim()) {
-          chat = {
-            ...chat,
-            chatMessages: [...chat.chatMessages, { role: 'assistant', content: chat.streamText }],
-            streamText: '',
-          }
-        }
-        break
-      case 'tool-start': {
-        const name = event.payload.name
-        chat = { ...chat, activeTools: name ? [...chat.activeTools, name] : chat.activeTools }
-        break
-      }
-      case 'tool-end': {
-        const name = event.payload.name
-        chat = { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
-        break
-      }
-      case 'step':
-        chat = { ...chat, step: event.payload }
-        break
-      case 'end': {
-        const response = event.payload
-        const messages = response.messages?.length
-          ? response.messages
-          : response.content || chat.streamText
-            ? [
-                {
-                  role: 'assistant' as const,
-                  content: response.content || chat.streamText,
-                  toolCalls: response.toolCalls,
-                },
-              ]
-            : []
-        const { previous } = splitCurrentTurn(chat.chatMessages)
-        chat = {
-          ...chat,
-          chatMessages: [...previous, ...messages],
-          busy: false,
-          stopRequested: false,
-          step: 'idle',
-          streamText: '',
-          activeTools: [],
-        }
-        activeStreamIds = { ...activeStreamIds }
-        delete activeStreamIds[event.sessionId]
-        break
-      }
-      case 'error':
-        chat = {
-          ...chat,
-          busy: false,
-          stopRequested: false,
-          step: 'idle',
-          streamText: '',
-          activeTools: [],
-          errorMessage: event.payload,
-        }
-        activeStreamIds = { ...activeStreamIds }
-        delete activeStreamIds[event.sessionId]
-        break
+    if (event.type === 'end' || event.type === 'error') {
+      activeStreamIds = { ...activeStreamIds }
+      delete activeStreamIds[event.sessionId]
     }
-
-    const fileChats = { ...state.fileChats, [fileUuid]: chat }
+    const fileChats = { ...state.fileChats, [fileUuid]: reduceStreamEvent(current, event) }
     return { fileChats, activeStreamIds }
   })
   return accepted

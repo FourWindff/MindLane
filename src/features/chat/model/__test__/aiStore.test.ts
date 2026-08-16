@@ -3,6 +3,7 @@ import {
   connectAiStore,
   createFileChatState,
   deriveChatCapsuleEntries,
+  reduceStreamEvent,
   selectCurrentChatHasFile,
   useAiStore,
   type ChatSession,
@@ -686,5 +687,168 @@ describe('deriveChatCapsuleEntries projection', () => {
     useAiStore.getState().setInputDraft('请帮我生成一个思维导图')
 
     expect(useAiStore.getState().inputDraft).toBe('请帮我生成一个思维导图')
+  })
+})
+
+describe('reduceStreamEvent', () => {
+  const base = createFileChatState('session-a')
+
+  it('appends token payload to streamText', () => {
+    const next = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'A',
+    })
+    const next2 = reduceStreamEvent(next, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'B',
+    })
+    expect(next2.streamText).toBe('AB')
+  })
+
+  it('flushes non-empty streamText into an assistant message on message-start', () => {
+    const withText = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'hi',
+    })
+    const next = reduceStreamEvent(withText, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(next.chatMessages).toEqual([{ role: 'assistant', content: 'hi' }])
+    expect(next.streamText).toBe('')
+  })
+
+  it('leaves state unchanged on message-start when streamText is empty', () => {
+    const next = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(next).toBe(base)
+  })
+
+  it('tracks tool start and end in activeTools', () => {
+    const started = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { name: 'search', input: {} },
+    })
+    expect(started.activeTools).toEqual(['search'])
+    const ended = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { name: 'search', output: 'ok' },
+    })
+    expect(ended.activeTools).toEqual([])
+  })
+
+  it('ignores tool-start with an empty name', () => {
+    const next = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { name: '', input: {} },
+    })
+    expect(next).toBe(base)
+  })
+
+  it('sets the pipeline step', () => {
+    const next = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: 'extracting',
+    })
+    expect(next.step).toBe('extracting')
+  })
+
+  it('replaces the current turn with end payload messages', () => {
+    const started = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'streamed',
+    })
+    const ended = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: {
+        content: '',
+        messages: [{ role: 'assistant', content: 'final' }],
+      },
+    })
+    expect(ended.chatMessages).toEqual([{ role: 'assistant', content: 'final' }])
+    expect(ended.streamText).toBe('')
+    expect(ended.busy).toBe(false)
+    expect(ended.stopRequested).toBe(false)
+    expect(ended.step).toBe('idle')
+    expect(ended.activeTools).toEqual([])
+  })
+
+  it('falls back to content and then streamText for end messages', () => {
+    const fromContent = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: 'done' },
+    })
+    expect(fromContent.chatMessages).toEqual([{ role: 'assistant', content: 'done' }])
+
+    const withText = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'streamed',
+    })
+    const fromStreamText = reduceStreamEvent(withText, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: '' },
+    })
+    expect(fromStreamText.chatMessages).toEqual([{ role: 'assistant', content: 'streamed' }])
+  })
+
+  it('keeps prior turns intact when ending with an empty payload', () => {
+    const ended = reduceStreamEvent(
+      { ...base, chatMessages: [{ role: 'user', content: 'q' }] },
+      {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'end',
+        payload: { content: '' },
+      },
+    )
+    expect(ended.chatMessages).toEqual([{ role: 'user', content: 'q' }])
+  })
+
+  it('writes an error and resets the chat state', () => {
+    const started = reduceStreamEvent(
+      { ...base, busy: true, step: 'chatting', activeTools: ['search'], streamText: 'x' },
+      {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'error',
+        payload: 'boom',
+      },
+    )
+    expect(started.errorMessage).toBe('boom')
+    expect(started.busy).toBe(false)
+    expect(started.stopRequested).toBe(false)
+    expect(started.step).toBe('idle')
+    expect(started.streamText).toBe('')
+    expect(started.activeTools).toEqual([])
   })
 })
