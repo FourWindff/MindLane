@@ -1,12 +1,6 @@
-import {
-  AIMessage,
-  ToolMessage,
-  SystemMessage,
-  type BaseMessage,
-  RemoveMessage,
-} from '@langchain/core/messages'
+import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { END, START, StateGraph, REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
+import { END, START, StateGraph } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
@@ -41,9 +35,11 @@ import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePipelineConfig } from './context/pipeline.js'
 import type { StreamRuntime } from './streamManager.js'
 import { splitCurrentTurn } from '../ipc.js'
-import { buildSystemPrompt, loadMemoryContext } from './agenthub/mindlane/context.js'
-import { Consolidator } from './context/consolidator.js'
-import { createExtractionCallback } from './memory/memoryExtractor.js'
+import {
+  runContextCompact,
+  type RunContextAssemblyDeps,
+  type RunContextCompactConfig,
+} from './context/runContextCompact.js'
 
 interface AssistantMessage {
   role: 'assistant'
@@ -410,99 +406,20 @@ export class AgentOrchestrator {
       },
     )
 
-    // Proactive compaction node: compress to persistence (rolling summary), then
-    // read unarchived messages by budget. The running summary flows to the
-    // supervisor via state.summary (injected as `## 历史摘要`).
-    const contextCompactNode = async (
-      state: MainGraphStateType,
-      config?: { configurable?: Record<string, unknown> },
-    ) => {
-      const sessionManager = this.services.sessionManager
-      const threadId = config?.configurable?.thread_id as string
-
-      // 预载记忆一次，供预算估算的每次 buildMessages 复用（避免每轮重复读盘）；
-      // supervisor 的真实调用仍现读现用（记忆提取可能在 run 中途写入新证据）。
-      const memory = await loadMemoryContext(
-        state.context ?? undefined,
-        this.services.memoryManager,
-      )
-
-      const buildMessages = async (
-        messages: BaseMessage[],
-        lastSummary?: string,
-      ): Promise<BaseMessage[]> => {
-        const systemPrompt = await buildSystemPrompt({
-          context: state.context ?? undefined,
-          capabilityFlags: { hasPalace: this.hasPalace },
-          lastSummary,
-          memory,
-        })
-
-        return [new SystemMessage(systemPrompt), ...messages]
-      }
-
-      const getToolDefinitions = () => toolRegistry.allTools
-
-      // Memory extraction hooks into compression: the archived slice plus
-      // the file's editlog are the extraction input (fire-and-forget).
-      // 装配后必全：memoryExtractor / editLogStore 非可选，仅凭 fileUuid 判断是否触发。
-      const fileUuid = state.context?.fileUuid
-      const memoryExtractor = this.services.memoryExtractor
-      const editLogStore = this.services.editLogStore
-      const onArchived = fileUuid
-        ? createExtractionCallback({
-            extractor: memoryExtractor,
-            editLogStore,
-            provider: this.provider,
-            workspaceUuid: sessionManager.workspaceUuid,
-            fileUuid,
-            filePath: state.context?.filePath,
-          })
-        : undefined
-
-      const consolidator = new Consolidator(
-        {
-          sessionManager,
-          provider: this.provider,
-          buildMessages,
-          getToolDefinitions,
-          onArchived,
-        },
-        {
-          safetyBuffer: AGENT_LIMITS.consolidationSafetyBuffer,
-          consolidationRatio: AGENT_LIMITS.consolidationRatio,
-          maxContextMessages: AGENT_LIMITS.maxContextMessages,
-          maxMessagesBeforeTokenCheck: AGENT_LIMITS.maxMessagesBeforeTokenCheck,
-          maxConsolidationRounds: AGENT_LIMITS.maxConsolidationRounds,
-        },
-      )
-
-      try {
-        await consolidator.maybe_consolidate_by_tokens(threadId)
-        const contextMessages = await consolidator.getMessagesForContext(threadId, {
-          maxMessages: AGENT_LIMITS.maxContextMessages,
-          budget:
-            AGENT_LIMITS.contextWindowTokens -
-            AGENT_LIMITS.maxCompletionTokens -
-            AGENT_LIMITS.consolidationSafetyBuffer,
-        })
-
-        const meta = sessionManager.getSessionMeta(threadId)
-
-        return {
-          summary: meta?._lastSummary ?? '',
-          messages: [new RemoveMessage({ id: REMOVE_ALL_MESSAGES }), ...contextMessages],
-        }
-      } catch (err) {
-        // I/O 级故障（LLM 失败已在 Consolidator 内部吞掉并自愈）：
-        // 跳过本次压缩，消息原样交给 supervisor；超预算由 supervisor 的
-        // 非 LLM 裁剪重试兜底。
-        logger
-          .withContext('compact')
-          .warn('Consolidator failed for session %s, skipping compaction:', threadId, err)
-        return {}
-      }
+    // Proactive compaction: compress to persistence (rolling summary), then read
+    // unarchived messages by budget. The running summary flows to the supervisor
+    // via state.summary (injected as `## 历史摘要`). Assembly lives in
+    // runContextCompact; this node is a one-line delegator so the call graph
+    // attributes Consolidator's caller to a named module symbol.
+    const runAssemblyDeps: RunContextAssemblyDeps = {
+      provider: this.provider,
+      services: this.services,
+      hasPalace: this.hasPalace,
+      userDataPath: this.options.userDataPath,
+      toolRegistry,
     }
+    const contextCompactNode = (state: MainGraphStateType, config?: RunContextCompactConfig) =>
+      runContextCompact(runAssemblyDeps, state, config)
 
     // Unified routing function: MindLaneAgent.route() already handles fallback when palace is unavailable.
     const routeFn = (state: MainGraphStateType) => supervisor.route(state)
