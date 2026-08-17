@@ -17,7 +17,7 @@ export type MindmapCommand =
   | { type: 'updateNode'; nodeId: string; patch: (node: Node) => Node }
   | { type: 'deleteSubtree'; rootId: string }
   | { type: 'moveNode'; nodeId: string; position: { x: number; y: number } }
-  | { type: 'addEdge'; edge: Edge }
+  | { type: 'addEdge'; edge: Edge; index?: number }
   | { type: 'removeEdge'; edgeId: string }
   | { type: 'batch'; commands: MindmapCommand[] }
 

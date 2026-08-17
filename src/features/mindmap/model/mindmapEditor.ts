@@ -390,12 +390,21 @@ export class MindmapEditor {
     const { ctx } = buildValidationContext(nodes, edges, this.state.assets)
     validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
 
+    // 保序：删除前记录旧 position 与旧父边下标。重挂时根节点恢复旧 position
+    // （否则 (0,0) 会按 y 重排漂移），父边插回原下标（否则 edges 顺序即 XML
+    // 序列化/保存顺序会把该节点排到最后）。
     const oldParentId = findParentId(edges, nodeId)
+    const oldNode = nodes.find((n) => n.id === nodeId)
+    const oldEdgeIndex = edges.findIndex((e) => e.target === nodeId)
     const commands: MindmapCommand[] = [{ type: 'deleteSubtree', rootId: nodeId }]
     for (const n of parsed.nodes) {
       commands.push({
         type: 'addNode',
-        node: { ...n, data: { ...n.data, justAdded: true } },
+        node: {
+          ...n,
+          position: n.id === nodeId && oldNode?.position ? oldNode.position : n.position,
+          data: { ...n.data, justAdded: true },
+        },
       })
     }
     if (oldParentId) {
@@ -408,6 +417,7 @@ export class MindmapEditor {
           type: 'mindmap',
           className: 'mindmap-edge mindmap-edge--enter',
         },
+        index: oldEdgeIndex >= 0 ? oldEdgeIndex : undefined,
       })
     }
     for (const e of parsed.edges) {
@@ -856,6 +866,13 @@ export class MindmapEditor {
           edges,
         }
       case 'addEdge':
+        // 可选 index：原位插入（保序场景，如 replaceNodeFromXml 重挂）；缺省追加到末尾。
+        if (command.index !== undefined && command.index >= 0 && command.index <= edges.length) {
+          return {
+            nodes,
+            edges: [...edges.slice(0, command.index), command.edge, ...edges.slice(command.index)],
+          }
+        }
         return { nodes, edges: [...edges, command.edge] }
       case 'removeEdge':
         return { nodes, edges: edges.filter((e) => e.id !== command.edgeId) }

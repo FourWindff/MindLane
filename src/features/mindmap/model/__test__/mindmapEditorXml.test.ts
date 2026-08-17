@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createMindmapStore } from '../mindmapStore'
+import { createMindmapStore, type MindmapState } from '../mindmapStore'
 import { MindmapHistory } from '../mindmapHistory'
 import { MindmapEditor } from '../mindmapEditor'
 import { serializeMindlaneFile } from '@/shared/lib/mindmapXml'
@@ -228,6 +228,113 @@ describe('MindmapEditor XML 集成', () => {
       ).toBe(true)
       // 打开时布局重算：位置不再为 {0,0}
       expect(state2.nodes.find((n) => n.id === a)!.position.x).toBeGreaterThan(0)
+    })
+  })
+
+  describe('replaceNodeFromXml 保序', () => {
+    /** 插入三个根级兄弟 A/B/C，返回 { aId, bId, cId } 与 label 映射。 */
+    async function seedSiblings() {
+      await editor.insertFromXml(
+        `<node type="text" content="A" /><node type="text" content="B" /><node type="text" content="C" />`,
+        { parentId: 'root' },
+      )
+      const state = store.getState()
+      const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
+      const [aId, bId, cId] = state.edges.filter((e) => e.source === 'root').map((e) => e.target)
+      expect([aId, bId, cId].map((id) => labels.get(id!))).toEqual(['A', 'B', 'C'])
+      return { aId: aId!, bId: bId!, cId: cId!, labels }
+    }
+
+    function rootChildOrder(state: MindmapState) {
+      return state.edges.filter((e) => e.source === 'root').map((e) => e.target)
+    }
+
+    function yOrder(state: MindmapState) {
+      return rootChildOrder(state)
+        .map((id) => ({ id, y: state.nodes.find((n) => n.id === id)!.position.y }))
+        .sort((a, b) => a.y - b.y)
+        .map((x) => x.id)
+    }
+
+    it('重挂后兄弟顺序保持原位（edges 顺序与 y 布局）', async () => {
+      const { bId, labels } = await seedSiblings()
+
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+      const state = store.getState()
+      const labelOf = (id: string) =>
+        (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
+
+      // edges 顺序（= XML 序列化/保存顺序）
+      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      // 视觉布局顺序（y 升序）
+      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      // 内容确实被替换
+      expect(labelOf(bId)).toBe('B-更新')
+      expect(labels.get(bId)).toBe('B')
+    })
+
+    it('带子树的节点更新后原位保持，子树顺序由 XML 决定', async () => {
+      const { bId } = await seedSiblings()
+
+      await editor.replaceNodeFromXml(
+        `<node id="${bId}" type="text" content="B-更新">
+           <node type="text" content="B1" />
+           <node type="text" content="B2" />
+         </node>`,
+      )
+      const state = store.getState()
+      const labelOf = (id: string) =>
+        (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
+
+      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      // 子树内部顺序：按 XML 声明顺序（B1 在 B2 前）
+      const b1 = state.edges.find((e) => e.source === bId)!.target
+      const b2 = state.edges.filter((e) => e.source === bId)[1]!.target
+      expect(labelOf(b1)).toBe('B1')
+      expect(labelOf(b2)).toBe('B2')
+    })
+
+    it('保存→重载 roundtrip 后顺序仍保持（序列化顺序 = edges 顺序）', async () => {
+      const { bId } = await seedSiblings()
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+
+      const file = store.getState().toMindLaneFile()
+      const xml = serializeMindlaneFile(file)
+      const { deserializeMindlaneFile } = await import('@/shared/lib/mindmapXml')
+      const parsed = await deserializeMindlaneFile(xml)
+
+      const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
+      editor2.loadFile('/tmp/order.mindlane', parsed, null)
+      const state2 = editor2['store'].getState()
+      const labelOf = (id: string) =>
+        (state2.nodes.find((n) => n.id === id)!.data as { label: string }).label
+      const order = state2.edges.filter((e) => e.source === 'root').map((e) => labelOf(e.target))
+      expect(order).toEqual(['A', 'B-更新', 'C'])
+      // 重载后 position 全部重算（y 归零退化排序）也不得改变顺序
+      const ySorted = state2.edges
+        .filter((e) => e.source === 'root')
+        .map((e) => ({ id: e.target, y: state2.nodes.find((n) => n.id === e.target)!.position.y }))
+        .sort((a, b) => a.y - b.y)
+        .map((x) => labelOf(x.id))
+      expect(ySorted).toEqual(['A', 'B-更新', 'C'])
+    })
+
+    it('undo 整单还原（含顺序）', async () => {
+      const { bId } = await seedSiblings()
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+
+      editor.undo()
+      const state = store.getState()
+      const labelOf = (id: string) =>
+        (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
+      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B', 'C'])
+
+      editor.redo()
+      const after = store.getState()
+      const labelAfter = (id: string) =>
+        (after.nodes.find((n) => n.id === id)!.data as { label: string }).label
+      expect(rootChildOrder(after).map(labelAfter)).toEqual(['A', 'B-更新', 'C'])
     })
   })
 })
