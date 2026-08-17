@@ -13,6 +13,8 @@ const READ_TIMEOUT_MS = 3000
 interface PendingRequest {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
+  /** 请求模式：respond 据此还原渲染层应答的载荷形态（snapshot=JSON 字符串→对象）。 */
+  mode?: 'xml' | 'snapshot'
 }
 
 /**
@@ -59,6 +61,7 @@ export class MindmapReadRequester {
           clearTimeout(timer)
           reject(error)
         },
+        mode: extra.mode,
       })
       const request: MindmapReadRequest = {
         requestId,
@@ -74,11 +77,21 @@ export class MindmapReadRequester {
     const entry = this.pending.get(payload.requestId)
     if (!entry) return
     this.pending.delete(payload.requestId)
-    if (payload.ok) {
-      entry.resolve(payload.summary)
-    } else {
+    if (!payload.ok) {
       entry.reject(new Error(payload.error))
+      return
     }
+    // 快照模式：渲染层把 {nodeIds, assetIds, parents} JSON 序列化进 summary，
+    // 这里还原为对象，否则写工具会拿到字符串导致 nodeIds.map 崩溃。
+    if (entry.mode === 'snapshot') {
+      try {
+        entry.resolve(JSON.parse(payload.summary))
+      } catch {
+        entry.reject(new Error('渲染层返回的编辑器快照格式无效'))
+      }
+      return
+    }
+    entry.resolve(payload.summary)
   }
 
   /** 当前未决请求数（测试与观测用）。 */
