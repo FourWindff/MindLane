@@ -85,6 +85,12 @@
   opacity: 1;
 }
 
+/* 双向布局：根节点左侧分支的收起按钮镜像到节点左侧 */
+.text-node__collapse-btn--left {
+  left: -18px;
+  right: auto;
+}
+
 .text-node__collapse-btn--collapsed {
   opacity: 1;
 }

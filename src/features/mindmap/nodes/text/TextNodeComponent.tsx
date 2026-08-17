@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
@@ -17,10 +17,12 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore(selectCurrentChatBusy)
-  const { visualVariant, colorScheme } = useMapStyle()
+  const { visualVariant, colorScheme, structureType } = useMapStyle()
 
   const editing = !!data.editing
   const collapsed = data.collapsed === true
+  // 双向布局中根节点左侧的分支：收起按钮与折叠箭头镜像到节点左侧
+  const leftSide = structureType === 'mindmap' && data.side === 'left'
   // 折叠控件：节点有子节点时显示（子节点由边派生）
   const hasChildren = edges.some((e) => e.source === id)
 
@@ -153,14 +155,18 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       {!editing && hasChildren && (
         <button
           type="button"
-          className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+          className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}${leftSide ? ' text-node__collapse-btn--left' : ''}`}
           onClick={toggleCollapsed}
           aria-label={collapsed ? '展开子树' : '折叠子树'}
           title={collapsed ? '展开子树' : '折叠子树'}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {collapsed ? (
-            <ChevronRight size={14} strokeWidth={2} />
+            leftSide ? (
+              <ChevronLeft size={14} strokeWidth={2} />
+            ) : (
+              <ChevronRight size={14} strokeWidth={2} />
+            )
           ) : (
             <ChevronDown size={14} strokeWidth={2} />
           )}
