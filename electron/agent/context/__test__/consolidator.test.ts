@@ -372,22 +372,15 @@ describe('Consolidator 提取回调接缝', () => {
   }
 
   const EXTRACTION_JSON = JSON.stringify({
-    disciplines: [
-      {
-        name: 'engineering',
-        patterns: [
-          { subTag: 'modular', description: '用户偏好模块化', observation: '倾向组件化设计' },
-        ],
-      },
-    ],
+    facts: ['用户偏好模块化设计', '用户偏好先跑 MVP'],
   })
 
-  /** Summary calls return text; extraction calls (prompt contains the analyst marker) return JSON. */
+  /** Summary calls return text; extraction calls (prompt contains the curator marker) return JSON. */
   function makeExtractionAwareModel(): BaseChatModel {
     const model = new FakeListChatModel({ responses: ['summary'] })
     model.invoke = (async (input: unknown) => {
       const text = JSON.stringify(input)
-      return new AIMessage(text.includes('认知模式分析师') ? EXTRACTION_JSON : 'summary')
+      return new AIMessage(text.includes('认知档案管理员') ? EXTRACTION_JSON : 'summary')
     }) as unknown as BaseChatModel['invoke']
     return model
   }
@@ -498,9 +491,8 @@ describe('Consolidator 提取回调接缝', () => {
     await vi.waitFor(async () => {
       expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
     })
-    const memoryDir = path.join(tmpDir, 'mindlanememory')
-    const memoryContent = fs.readFileSync(path.join(memoryDir, 'engineering-modular.md'), 'utf-8')
-    expect(memoryContent).toContain('倾向组件化设计')
+    const memoryContent = fs.readFileSync(path.join(tmpDir, 'mindlanememory', 'MEMORY.md'), 'utf-8')
+    expect(memoryContent).toContain('用户偏好模块化设计')
   })
 
   it('提取回调抛错时压缩不受影响且 editlog 保留', async () => {

@@ -156,7 +156,6 @@ export interface ChatContext {
   workspaceFiles?: WorkspaceFileInfo[]
   attachedDocument?: DocumentRef
   linkedDocuments?: DocumentRef[]
-  fileTags?: string[]
 }
 
 // ---- 轮次状态（Turn State）契约 ----

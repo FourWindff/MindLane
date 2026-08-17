@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { createEmptyFile, migrateDocumentRef } from '../fileFormat'
 
-describe('MindLaneFile tags', () => {
-  it('createEmptyFile should produce file with tags optional', () => {
-    const file = createEmptyFile('Test')
-    expect(file.metadata.tags).toBeUndefined()
-  })
-
-  it('assigns a stable UUID to each new file', () => {
+describe('MindLaneFile metadata', () => {
+  it('createEmptyFile produces file with a stable UUID', () => {
     const first = createEmptyFile('First')
     const second = createEmptyFile('Second')
 

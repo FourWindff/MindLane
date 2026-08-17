@@ -19,7 +19,6 @@ export interface MindLaneFile {
     title: string
     createdAt: string
     updatedAt: string
-    tags?: string[]
   }
   mindmap: {
     nodes: MindLaneNode[]

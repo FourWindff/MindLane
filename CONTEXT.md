@@ -392,28 +392,24 @@
 
 ## 记忆系统
 
-### 思维模式记忆（Pattern Memory）
+### MEMORY.md 事实记忆（Fact Memory）
 
-- 记忆系统目前唯一的记忆类型：用户的学科思维模式与偏好。
-- 归属于 6 个固定学科分类（formal-sciences / natural-sciences / engineering / humanities / social-sciences / creative-arts），分类下挂 subTag。
-- 消费方：聊天时按 `.mindlane` 文件的 tags 加载相关记忆，注入 system prompt 以适配用户思维风格。
+- 记忆系统唯一的存储：`userData/mindlanememory/MEMORY.md`，一行一条事实，记录用户的思维方式、偏好与习惯。
+- 消费方：对话每次运行时把 `MEMORY.md` 全文注入 system prompt 的 `<MEMORY>` 段，以适配用户思维风格。
+- 文件始终是「已整理」的当前事实集：提取时 LLM 读入全文，合并去重后整体重写，不做增量追加。
 
 ### 记忆证据来源（Memory Evidence Source）
 
-- 思维模式记忆的输入语料，目前有两个：
+- 记忆的输入语料，目前有两个：
   1. **对话内容**：会话中的用户与 AI 消息。
   2. **节点编辑历史**：用户在前端对节点**文本内容**的编辑记录。属于"用户亲笔写的东西"，与对话同质；不含加节点、拖布局等结构性操作。
 
-### 记忆提取时机
+### 记忆提取时机（Memory Extraction Timing）
 
 - 记忆提取**挂钩在会话压缩（consolidation）上**：`Consolidator` 压缩旧消息时，被压缩的消息切片即为提取输入，`lastConsolidated` 游标复用为提取游标。
+- 提取 fire-and-forget，不进用户等待的关键路径；失败不影响压缩主流程。
 - 从不触发压缩的会话不做提取——这是有意接受的盲区（短会话信号不足）；节点编辑历史随该会话的下一次压缩一起提取，不做独立兜底。
 - 摘要 LLM 失败时不推进游标，提取随之下轮顺延，证据不丢。
-
-### subTag
-
-- 思维模式记忆在学科分类下的细分标签，kebab-case，一个 subTag 对应记忆目录下的一个 `.md` 文件。
-- 开放词表但**复用优先**：提取时把现有 subTag 清单喂给 LLM，只有现有 tag 均不匹配时才允许新建。
 - 提取使用 chatModel（非 reasoningModel）。
 
 ### 工作区内文档（Workspace Document）

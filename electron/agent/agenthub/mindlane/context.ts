@@ -1,8 +1,7 @@
 import type { ChatContext } from '../../../ipc.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
 
-const MEMORY_INDEX_TAG = 'USER_MEMORY_INDEX'
-const RELEVANT_MEMORIES_TAG = 'RELEVANT_MEMORIES'
+const MEMORY_TAG = 'MEMORY'
 
 // 系统提示只包含跨轮次逐字节稳定的前缀：记忆段 + 核心规则 + 环境策略 + `## 历史摘要`。
 // 易变编辑器状态（选中节点、附件、文件身份）不进 system prompt，改由主进程序列化为
@@ -13,13 +12,12 @@ export interface CapabilityFlags {
 }
 
 /**
- * 预载记忆上下文：索引 + 按文件标签命中的相关记忆。
+ * 预载记忆上下文：`MEMORY.md` 的完整内容。
  * 由 `loadMemoryContext` 一次性读盘产出，供预算估算路径复用，
  * 避免每轮估算重复读盘；supervisor 真实调用仍现读现用（新鲜优先）。
  */
 export interface MemoryContext {
-  index: string
-  memories: string[]
+  memory: string
 }
 
 export interface SystemPromptInput {
@@ -32,20 +30,15 @@ export interface SystemPromptInput {
 }
 
 /**
- * 从磁盘加载一次记忆上下文（索引 + 相关记忆）。
+ * 从磁盘加载一次记忆上下文（`MEMORY.md` 全文）。
  * 无记忆管理器时返回 undefined。
  */
 export async function loadMemoryContext(
-  context: ChatContext | undefined,
   memoryManager: MemoryManager | undefined,
 ): Promise<MemoryContext | undefined> {
   if (!memoryManager) return undefined
-  const tags = context?.fileTags
-  const [index, memories] = await Promise.all([
-    memoryManager.loadIndex(),
-    tags?.length ? memoryManager.loadMemoriesForTags(tags) : Promise.resolve([] as string[]),
-  ])
-  return { index, memories }
+  const memory = await memoryManager.loadMemory()
+  return { memory }
 }
 
 /**
@@ -69,35 +62,24 @@ export async function buildSystemPrompt(input: SystemPromptInput): Promise<strin
 }
 
 /**
- * 记忆段：`USER_MEMORY_INDEX`（索引非空时）+ `RELEVANT_MEMORIES`（命中且带 tags 时）。
+ * 记忆段：`<MEMORY>`（内容非空时）。
  * `memory` 预载优先于 `memoryManager` 加载。
  */
 async function buildMemorySection(input: SystemPromptInput): Promise<string> {
-  const tags = input.context?.fileTags
-
-  let index: string
-  let memories: string[]
+  let memory: string
 
   if (input.memory) {
-    index = input.memory.index
-    memories = input.memory.memories
+    memory = input.memory.memory
   } else if (input.memoryManager) {
-    const loaded = await loadMemoryContext(input.context, input.memoryManager)
+    const loaded = await loadMemoryContext(input.memoryManager)
     if (!loaded) return ''
-    index = loaded.index
-    memories = loaded.memories
+    memory = loaded.memory
   } else {
     return ''
   }
 
-  let section = ''
-  if (index.trim()) {
-    section += `<${MEMORY_INDEX_TAG}>\n${index.trim()}\n</${MEMORY_INDEX_TAG}>\n`
-  }
-  if (memories.length > 0 && tags) {
-    section += `<${RELEVANT_MEMORIES_TAG} tags="${tags.join(',')}">\n${memories.join('\n\n')}\n</${RELEVANT_MEMORIES_TAG}>\n`
-  }
-  return section
+  if (!memory.trim()) return ''
+  return `<${MEMORY_TAG}>\n${memory.trim()}\n</${MEMORY_TAG}>\n`
 }
 
 function buildCorePrompt(

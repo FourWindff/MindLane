@@ -12,14 +12,12 @@ function tmpMemoryDir(): string {
 
 async function withMemoryManager(dir: string): Promise<MemoryManager> {
   const mm = new MemoryManager(dir)
-  await mm.writeMemory('eng-mod', '用户偏好模块化', 'eng content')
-  await mm.writeMemory('hum-tl', '用户偏好时间轴', 'hum content')
+  await mm.writeMemory('用户偏好模块化设计\n用户偏好时间轴叙事')
   return mm
 }
 
 const ctx: ChatContext = {
   fileUuid: 'file-1',
-  fileTags: ['eng'],
   hasDocumentOpen: true,
   filePath: '/t.mindlane',
   fileTitle: 't',
@@ -31,16 +29,14 @@ const baseInput: SystemPromptInput = {
 }
 
 describe('buildSystemPrompt memory', () => {
-  it('loads memory via manager and injects index + relevant memories', async () => {
+  it('loads memory via manager and injects MEMORY content', async () => {
     const dir = tmpMemoryDir()
     const mm = await withMemoryManager(dir)
     try {
       const prompt = await buildSystemPrompt({ ...baseInput, memoryManager: mm })
-      expect(prompt).toContain('USER_MEMORY_INDEX')
-      expect(prompt).toContain('eng-mod')
-      expect(prompt).toContain('RELEVANT_MEMORIES')
-      expect(prompt).toContain('eng content')
-      expect(prompt).not.toContain('hum content')
+      expect(prompt).toContain('<MEMORY>')
+      expect(prompt).toContain('用户偏好模块化设计')
+      expect(prompt).toContain('用户偏好时间轴叙事')
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true })
     }
@@ -50,24 +46,23 @@ describe('buildSystemPrompt memory', () => {
     const dir = tmpMemoryDir()
     const mm = await withMemoryManager(dir)
     try {
-      const preloaded = await loadMemoryContext(baseInput.context, mm)
+      const preloaded = await loadMemoryContext(mm)
       expect(preloaded).toBeDefined()
 
       const fresh = await buildSystemPrompt({ ...baseInput, memoryManager: mm })
       const withPreload = await buildSystemPrompt({ ...baseInput, memory: preloaded })
 
       expect(withPreload).toBe(fresh)
-      expect(withPreload).toContain('USER_MEMORY_INDEX')
-      expect(withPreload).toContain('eng content')
+      expect(withPreload).toContain('<MEMORY>')
+      expect(withPreload).toContain('用户偏好模块化设计')
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true })
     }
   })
 
-  it('omits memory sections when neither manager nor preload is given', async () => {
+  it('omits the memory section when neither manager nor preload is given', async () => {
     const prompt = await buildSystemPrompt({ ...baseInput })
-    expect(prompt).not.toContain('USER_MEMORY_INDEX')
-    expect(prompt).not.toContain('RELEVANT_MEMORIES')
+    expect(prompt).not.toContain('<MEMORY>')
   })
 })
 

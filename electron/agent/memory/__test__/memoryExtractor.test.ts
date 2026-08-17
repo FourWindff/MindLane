@@ -2,11 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import { HumanMessage, AIMessage } from '@langchain/core/messages'
+import { HumanMessage } from '@langchain/core/messages'
 import { MemoryExtractor } from '../memoryExtractor.js'
 import { MemoryManager } from '../memoryManager.js'
 import type { LLMProvider } from '../../providers/index.js'
-import type { MindLaneFile } from '../../../../src/shared/lib/fileFormat.js'
 
 // Minimal mock provider for testing
 interface MockProvider {
@@ -23,20 +22,9 @@ function createMockProvider(responseContent: string): MockProvider {
   }
 }
 
-function makeMindlaneFile(): MindLaneFile {
-  return {
-    version: '1.0',
-    metadata: {
-      fileUuid: 'file-uuid-1',
-      title: 'Test',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-    },
-    mindmap: { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } },
-    documents: [],
-  }
+function memoryFilePath(tempDir: string): string {
+  return path.join(tempDir, 'mindlanememory', 'MEMORY.md')
 }
-
 describe('MemoryExtractor', () => {
   let tempDir: string
   let manager: MemoryManager
@@ -51,128 +39,61 @@ describe('MemoryExtractor', () => {
     await fs.promises.rm(tempDir, { recursive: true, force: true })
   })
 
-  it('persist writes patterns to memory files and updates index', async () => {
-    const extractor = new MemoryExtractor(manager)
-    await extractor.persist([
-      {
-        discipline: 'engineering',
-        subTag: 'modular',
-        description: '用户偏好模块化',
-        observation: '倾向组件化设计',
-      },
-    ])
-
-    const index = await manager.loadIndex()
-    expect(index).toContain('engineering-modular')
-
-    const content = await fs.promises.readFile(
-      path.join(tempDir, 'mindlanememory', 'engineering-modular.md'),
-      'utf-8',
+  it('merges new facts with existing memory and rewrites MEMORY.md', async () => {
+    await manager.writeMemory('用户偏好模块化设计')
+    const mockProvider = createMockProvider(
+      JSON.stringify({
+        facts: ['用户偏好模块化设计', '用户偏好先跑 MVP 再迭代'],
+      }),
     )
-    expect(content).toContain('倾向组件化设计')
-  })
-
-  it('extractAndPersist calls LLM, persists patterns, and updates .mindlane tags', async () => {
-    const mindlanePath = path.join(tempDir, 'test.mindlane')
-    await fs.promises.writeFile(mindlanePath, JSON.stringify(makeMindlaneFile(), null, 2), 'utf-8')
-
-    const mockResponse = JSON.stringify({
-      disciplines: [
-        {
-          name: 'engineering',
-          patterns: [
-            {
-              subTag: 'modular',
-              description: '用户偏好模块化',
-              observation: '倾向组件化设计',
-              evidence: ['我们把这个拆成几个模块'],
-            },
-          ],
-        },
-      ],
-    })
-    const mockProvider = createMockProvider(mockResponse)
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [
-        new HumanMessage('我们把这个拆成几个模块来做'),
-        new AIMessage('好的，我来帮你设计模块结构'),
-      ],
+      messages: [new HumanMessage('先做个最小版本试试')],
       editlogEntries: [],
-      filePath: mindlanePath,
     })
 
-    // Verify memory file was created
-    const index = await manager.loadIndex()
-    expect(index).toContain('engineering-modular')
-
-    // Verify .mindlane file was updated with discipline tag
-    const updatedRaw = await fs.promises.readFile(mindlanePath, 'utf-8')
-    const updated = JSON.parse(updatedRaw) as MindLaneFile
-    expect(updated.metadata.tags).toContain('engineering')
+    expect(await fs.promises.readFile(memoryFilePath(tempDir), 'utf-8')).toBe(
+      '用户偏好模块化设计\n用户偏好先跑 MVP 再迭代\n',
+    )
   })
 
-  it('extractAndPersist handles empty LLM response gracefully', async () => {
-    const mindlanePath = path.join(tempDir, 'empty.mindlane')
-    await fs.promises.writeFile(mindlanePath, JSON.stringify(makeMindlaneFile(), null, 2), 'utf-8')
-
-    const mockProvider = createMockProvider('{"disciplines": []}')
+  it('keeps existing memory when LLM returns empty facts', async () => {
+    await manager.writeMemory('用户偏好模块化设计')
+    const mockProvider = createMockProvider('{"facts": []}')
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
       messages: [new HumanMessage('hello')],
       editlogEntries: [],
-      filePath: mindlanePath,
     })
 
-    // No memory file should be created
-    const index = await manager.loadIndex()
-    expect(index).toBe('')
+    expect(await fs.promises.readFile(memoryFilePath(tempDir), 'utf-8')).toBe(
+      '用户偏好模块化设计\n',
+    )
   })
 
-  it('extractAndPersist merges new discipline tags with existing ones', async () => {
-    const mindlaneFile = makeMindlaneFile()
-    mindlaneFile.metadata.tags = ['humanities']
-    const mindlanePath = path.join(tempDir, 'merge.mindlane')
-    await fs.promises.writeFile(mindlanePath, JSON.stringify(mindlaneFile, null, 2), 'utf-8')
-
-    const mockResponse = JSON.stringify({
-      disciplines: [
-        {
-          name: 'engineering',
-          patterns: [
-            {
-              subTag: 'modular',
-              description: '用户偏好模块化',
-              observation: '倾向组件化设计',
-            },
-          ],
-        },
-      ],
-    })
-    const mockProvider = createMockProvider(mockResponse)
+  it('creates MEMORY.md from scratch when no existing memory', async () => {
+    const mockProvider = createMockProvider(JSON.stringify({ facts: ['用户偏好时间轴叙事'] }))
 
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [new HumanMessage('拆模块')],
+      messages: [new HumanMessage('帮我梳理时间线')],
       editlogEntries: [],
-      filePath: mindlanePath,
     })
 
-    const updatedRaw = await fs.promises.readFile(mindlanePath, 'utf-8')
-    const updated = JSON.parse(updatedRaw) as MindLaneFile
-    expect(updated.metadata.tags).toContain('humanities')
-    expect(updated.metadata.tags).toContain('engineering')
+    expect(await fs.promises.readFile(memoryFilePath(tempDir), 'utf-8')).toBe(
+      '用户偏好时间轴叙事\n',
+    )
   })
 
-  it('extractAndPersist 剥离证据消息末尾的 EDITOR_STATE 块', async () => {
+  it('strips EDITOR_STATE blocks from evidence before prompting', async () => {
     const turnStateSuffix =
       '\n<EDITOR_STATE file_uuid="f" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
-    const mockProvider = createMockProvider('{"disciplines": []}')
+    const mockProvider = createMockProvider('{"facts": []}')
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
@@ -188,59 +109,47 @@ describe('MemoryExtractor', () => {
     expect(prompt).not.toContain('旧节点')
   })
 
-  it('extractAndPersist works without filePath (skips tag update)', async () => {
-    const mockResponse = JSON.stringify({
-      disciplines: [
-        {
-          name: 'engineering',
-          patterns: [
-            { subTag: 'modular', description: '用户偏好模块化', observation: '倾向组件化设计' },
-          ],
-        },
-      ],
-    })
-    const mockProvider = createMockProvider(mockResponse)
-
+  it('includes editlog entries in the prompt', async () => {
+    const mockProvider = createMockProvider('{"facts": []}')
     const extractor = new MemoryExtractor(manager)
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [new HumanMessage('拆模块')],
-      editlogEntries: [],
+      messages: [new HumanMessage('改一下节点')],
+      editlogEntries: [{ ts: 1, nodeId: 'n1', before: 'AI 写的', after: '用户改的' }],
     })
 
-    expect(await manager.loadIndex()).toContain('engineering-modular')
+    const invokeSpy = mockProvider.model.invoke as unknown as ReturnType<typeof vi.fn>
+    const prompt = String(invokeSpy.mock.calls[0]![0][0].content)
+    expect(prompt).toContain('节点 n1')
+    expect(prompt).toContain('「AI 写的」→「用户改的」')
   })
 
-  it('parseExtractionResponse handles markdown code blocks', async () => {
+  it('parses markdown code fenced JSON responses', async () => {
+    const mockProvider = createMockProvider('```json\n{"facts": ["用户偏好快速验证"]}\n```')
+
     const extractor = new MemoryExtractor(manager)
-
-    const mockProvider = createMockProvider(
-      '```json\n{"disciplines": [{"name": "engineering", "patterns": [{"subTag": "mvp", "description": "先跑MVP", "observation": "用户偏好快速验证"}]}]}\n```',
-    )
-
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
       messages: [new HumanMessage('先做个最小版本试试')],
       editlogEntries: [],
     })
 
-    const index = await manager.loadIndex()
-    expect(index).toContain('engineering-mvp')
+    expect(await fs.promises.readFile(memoryFilePath(tempDir), 'utf-8')).toContain(
+      '用户偏好快速验证',
+    )
   })
 
-  it('parseExtractionResponse skips unknown disciplines', async () => {
+  it('ignores malformed LLM responses without clobbering memory', async () => {
+    await manager.writeMemory('既有事实')
+    const mockProvider = createMockProvider('not json at all')
+
     const extractor = new MemoryExtractor(manager)
-
-    const mockProvider = createMockProvider(
-      '{"disciplines": [{"name": "alchemy", "patterns": [{"subTag": "gold", "description": "点金", "observation": "点石成金"}]}]}',
-    )
-
     await extractor.extractAndPersist({
       provider: mockProvider as unknown as LLMProvider,
-      messages: [new HumanMessage('点石成金')],
+      messages: [new HumanMessage('hello')],
       editlogEntries: [],
     })
 
-    expect(await manager.loadIndex()).toBe('')
+    expect(await fs.promises.readFile(memoryFilePath(tempDir), 'utf-8')).toBe('既有事实\n')
   })
 })

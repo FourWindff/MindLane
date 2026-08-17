@@ -18,42 +18,23 @@ describe('MemoryManager', () => {
     await fs.promises.rm(tempDir, { recursive: true, force: true })
   })
 
-  it('loadIndex returns empty when no index', async () => {
-    expect(await manager.loadIndex()).toBe('')
+  it('loadMemory returns empty when MEMORY.md missing', async () => {
+    expect(await manager.loadMemory()).toBe('')
   })
 
-  it('writeMemory creates file and rebuilds index', async () => {
-    await manager.writeMemory('eng-mod', '用户偏好模块化', '倾向组件化')
-    expect(await manager.loadIndex()).toContain('eng-mod')
+  it('writeMemory creates MEMORY.md', async () => {
+    await manager.writeMemory('用户偏好模块化')
+    expect(await manager.loadMemory()).toBe('用户偏好模块化\n')
     const content = await fs.promises.readFile(
-      path.join(tempDir, 'mindlanememory', 'eng-mod.md'),
+      path.join(tempDir, 'mindlanememory', 'MEMORY.md'),
       'utf-8',
     )
-    expect(content).toContain('tag: eng-mod')
-    expect(content).toContain('倾向组件化')
+    expect(content).toBe('用户偏好模块化\n')
   })
 
-  it('writeMemory appends to existing file', async () => {
-    await manager.writeMemory('eng-mod', 'desc', '第一次')
-    await manager.writeMemory('eng-mod', 'desc', '第二次')
-    const content = await fs.promises.readFile(
-      path.join(tempDir, 'mindlanememory', 'eng-mod.md'),
-      'utf-8',
-    )
-    expect(content).toContain('第一次')
-    expect(content).toContain('第二次')
-  })
-
-  it('loadMemoriesForTags filters by prefix', async () => {
-    await manager.writeMemory('eng-mod', 'd1', 'eng')
-    await manager.writeMemory('hum-tl', 'd2', 'hum')
-    expect(await manager.loadMemoriesForTags(['eng'])).toHaveLength(1)
-    expect((await manager.loadMemoriesForTags(['eng', 'hum'])).length).toBe(2)
-  })
-
-  it('listTags returns all memory tags', async () => {
-    await manager.writeMemory('eng-mod', 'd1', 'c1')
-    await manager.writeMemory('hum-tl', 'd2', 'c2')
-    expect((await manager.listTags()).sort()).toEqual(['eng-mod', 'hum-tl'])
+  it('writeMemory overwrites the full file', async () => {
+    await manager.writeMemory('事实一\n事实二')
+    await manager.writeMemory('事实一\n合并后的事实')
+    expect(await manager.loadMemory()).toBe('事实一\n合并后的事实\n')
   })
 })

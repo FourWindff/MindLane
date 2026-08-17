@@ -11,7 +11,6 @@ import type { StreamRequest } from '../../agent/streamManager.js'
 import type { ChatContext, MindmapReadResponse } from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
-import { readFileTags } from '../fileTags.js'
 import { aiNotReadyResponse } from './helpers.js'
 import type { HandlerContext } from './context.js'
 
@@ -37,11 +36,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
           return { ok: false, error: '消息不能为空' }
         }
 
-        let fileTags: string[] | undefined
-        if (payload.context?.filePath) {
-          fileTags = await readFileTags(payload.context.filePath)
-        }
-
         const workspacePath = payload.context.workspacePath
         // 源头不变量：发送必有活动文件（fileUuid 创建即存在），下游不做存在性检查。
         // 工作区路径仍是持久化前提（workspaceUuid 解析），此处保留。
@@ -65,7 +59,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
             selectedNodes: payload.context.selectedNodes?.filter(
               (n) => n.type === 'text' || n.type === 'palace',
             ),
-            fileTags,
           },
           documentRef: payload.context?.attachedDocument,
         }

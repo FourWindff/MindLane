@@ -41,7 +41,7 @@ export async function runContextCompact(
 
   // 预载记忆一次，供预算估算的每次 buildMessages 复用（避免每轮重复读盘）；
   // supervisor 的真实调用仍现读现用（记忆提取可能在 run 中途写入新证据）。
-  const memory = await loadMemoryContext(state.context ?? undefined, services.memoryManager)
+  const memory = await loadMemoryContext(services.memoryManager)
 
   const buildMessages = async (
     messages: BaseMessage[],
@@ -70,7 +70,6 @@ export async function runContextCompact(
         provider,
         workspaceUuid: sessionManager.workspaceUuid,
         fileUuid,
-        filePath: state.context?.filePath,
       })
     : undefined
 
