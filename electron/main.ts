@@ -1,4 +1,6 @@
 import { app, BrowserWindow, Menu, safeStorage, shell, dialog } from 'electron'
+import { DOMParser as LinkedomDOMParser } from 'linkedom'
+import { registerXmlDomParser } from '../src/shared/lib/mindmapXml/parser.js'
 import { resolveChatProvider } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {
@@ -21,6 +23,10 @@ import { McpManager } from './mcp/mcpManager.js'
 import { createMcpClient } from './mcp/clientFactory.js'
 import { logger, RotatingFileSink } from './shared/logger.js'
 import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
+
+// XML 解析内核按进程装配（设计文档 5.1）：主进程用 linkedom（HTML parser 容错 AI 输出），
+// 渲染层用 DOMParser；linkedom 不进渲染层 bundle（可选依赖 canvas 无法被静态解析）。
+registerXmlDomParser(LinkedomDOMParser)
 
 import { registerFsHandlers } from './main/handlers/fs.js'
 import { registerAiHandlers } from './main/handlers/ai.js'

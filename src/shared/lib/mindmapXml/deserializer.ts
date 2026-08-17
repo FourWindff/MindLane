@@ -10,7 +10,12 @@ import type { Edge, Node } from '@xyflow/react'
 import type { MindLaneFile, MindLaneNode } from '../fileFormat.js'
 import { unescapeXml } from './escape.js'
 import { findUnescapedInAttrValues, normalizeSelfClosingTags } from './normalize.js'
-import { parseXmlStrict, parseXmlTolerant, topLevelElements } from './parser.js'
+import {
+  parseXmlStrict,
+  parseXmlTolerant,
+  topLevelElements,
+  type ParsedDocumentLike,
+} from './parser.js'
 import { attrOf, xmlNodeTypeRegistry } from './registry.js'
 import {
   MINDLANE_ROOT_TAG,
@@ -184,7 +189,7 @@ export async function parseXmlFragment(xml: string): Promise<ParsedFragment> {
 
 // ─── 文件面 ──────────────────────────────────────────────────────────────────
 
-function sectionElement(doc: Document, tag: string): Element | undefined {
+function sectionElement(doc: ParsedDocumentLike, tag: string): Element | undefined {
   return Array.from(doc.documentElement.childNodes).find(
     (n): n is Element => n.nodeType === 1 && (n as Element).tagName.toLowerCase() === tag,
   )

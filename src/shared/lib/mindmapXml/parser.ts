@@ -1,42 +1,58 @@
 /**
- * 解析内核（不自研）：浏览器端 DOMParser，主进程/测试环境 linkedom。
+ * 解析内核（不自研）：浏览器端 DOMParser，主进程 linkedom。
  *
  * 两套严格度分开（PRD 1.3-2）：
  * - 文件（编辑器生成）→ 严格 XML 模式，畸形输入映射 `xml_parse_error`；
  * - AI 交互片段（工具参数/上下文）→ 容错 HTML 模式。
+ *
+ * 解析器按进程装配（设计文档：浏览器端 DOMParser，主进程 linkedom）：
+ * - 渲染层：`globalThis.DOMParser` 恒可用，本模块不 import linkedom
+ *   （linkedom 的可选依赖 canvas 无法被 Vite/Rollup 静态解析，必须留在渲染层图外）；
+ * - 主进程：启动时 `registerXmlDomParser(linkedom.DOMParser)` 注入；
+ * - 测试环境（Electron-as-Node）：vitest setup 注入。
  */
 
 import { MindmapXmlError } from './types.js'
 import { checkXmlWellFormed } from './normalize.js'
 
 type DomParserCtor = new () => {
-  parseFromString(xml: string, contentType: string): Document
+  parseFromString(xml: string, contentType: string): ParsedDocumentLike
 }
 
-let cachedDomParser: DomParserCtor | undefined
+/** 解析器返回值的结构子集（浏览器 Document 与 linkedom 文档类型不同，取共同形状）。 */
+export interface ParsedDocumentLike {
+  documentElement: Element
+  body?: Element | null
+  querySelector?: (selectors: string) => Element | null
+}
 
-async function getDomParser(): Promise<DomParserCtor> {
-  if (cachedDomParser) return cachedDomParser
+let injectedParser: DomParserCtor | undefined
+
+/** 主进程装配入口：把进程内 XML/HTML parser 注入（Node 侧为 linkedom.DOMParser）。
+ * 参数用 unknown 接受：linkedom 的 DOM 类型与浏览器 lib.dom 结构不兼容，装配处收窄。 */
+export function registerXmlDomParser(ctor: unknown): void {
+  injectedParser = ctor as DomParserCtor
+}
+
+function getDomParser(): DomParserCtor {
   const global = globalThis as { DOMParser?: DomParserCtor }
-  if (typeof global.DOMParser === 'function') {
-    cachedDomParser = global.DOMParser
-    return cachedDomParser
-  }
-  // Node 环境（主进程 / 迁移 / 测试）：linkedom 与浏览器 DOMParser 同构。
-  const linkedom = (await import('linkedom')) as { DOMParser: DomParserCtor }
-  cachedDomParser = linkedom.DOMParser
-  return cachedDomParser
+  if (typeof global.DOMParser === 'function') return global.DOMParser
+  if (injectedParser) return injectedParser
+  throw new MindmapXmlError(
+    'xml_parse_error',
+    '当前环境没有可用的 XML parser：渲染层需 DOMParser，主进程/测试环境需注入 linkedom',
+  )
 }
 
 /**
  * 严格解析 XML（文件面）。畸形输入抛 `xml_parse_error`，绝不裸抛。
  */
-export async function parseXmlStrict(xml: string): Promise<Document> {
+export function parseXmlStrict(xml: string): ParsedDocumentLike {
   const structureError = checkXmlWellFormed(xml)
   if (structureError) {
     throw new MindmapXmlError('xml_parse_error', `XML 结构不完整：${structureError}`)
   }
-  const Parser = await getDomParser()
+  const Parser = getDomParser()
   try {
     const doc = new Parser().parseFromString(xml, 'application/xml')
     const parserError = doc.querySelector?.('parsererror')
@@ -61,13 +77,13 @@ export async function parseXmlStrict(xml: string): Promise<Document> {
  * 容错解析（AI 片段面）：HTML parser 容忍 AI 的不规范输出。
  * 调用方应先经 normalizeSelfClosingTags 预处理。
  */
-export async function parseXmlTolerant(xml: string): Promise<Document> {
+export function parseXmlTolerant(xml: string): ParsedDocumentLike {
   const structureError = checkXmlWellFormed(xml)
   if (structureError) {
     // 容错模式的底线：标签配对仍必须成立，否则 AI 拿到的是残缺结构
     throw new MindmapXmlError('xml_parse_error', `XML 结构不完整：${structureError}`)
   }
-  const Parser = await getDomParser()
+  const Parser = getDomParser()
   try {
     return new Parser().parseFromString(xml, 'text/html')
   } catch (err) {
@@ -78,10 +94,8 @@ export async function parseXmlTolerant(xml: string): Promise<Document> {
   }
 }
 
-/** 解析结果中的顶层元素列表。
- * 浏览器 HTML 模式：documentElement 为 html，取 body 子元素；
- * linkedom HTML 模式：documentElement 即片段首个元素，其余顶层元素是其元素级兄弟。 */
-export function topLevelElements(doc: Document): Element[] {
+/** 解析结果中的顶层元素列表。 */
+export function topLevelElements(doc: ParsedDocumentLike): Element[] {
   const root = doc.documentElement
   if (!root) return []
   if (root.tagName.toLowerCase() === 'html') {

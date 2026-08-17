@@ -20,7 +20,14 @@ export default defineConfig({
             rollupOptions: {
               external: (id) => {
                 if (id.startsWith('node:') || id === 'electron') return true
-                const nativeOrProblematic = ['better-sqlite3', 'pdf-parse', 'officeparser']
+                const nativeOrProblematic = [
+                  'better-sqlite3',
+                  'pdf-parse',
+                  'officeparser',
+                  // linkedom 的可选依赖 canvas 无法被 Rollup 静态解析（try/catch require），
+                  // 且主进程经 node_modules 运行时解析即可
+                  'linkedom',
+                ]
                 return nativeOrProblematic.some((pkg) => id === pkg || id.startsWith(pkg + '/'))
               },
             },

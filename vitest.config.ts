@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    setupFiles: ['vitest.setup.ts'],
     include: [
       'electron/**/*/__test__/**/*.test.ts',
       'src/**/__test__/**/*.test.ts',
