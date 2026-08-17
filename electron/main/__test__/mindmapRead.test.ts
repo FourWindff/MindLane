@@ -5,15 +5,30 @@ import { MindmapReadRequester } from '../mindmapRead.js'
 /** 伪 BrowserWindow：只记录发出的请求，不真正触达渲染层。 */
 function fakeWindow(): {
   window: unknown
-  sent: Array<{ requestId: string; fileUuid: string }>
+  sent: Array<{ requestId: string; fileUuid: string; query?: unknown; mode?: 'xml' | 'snapshot' }>
 } {
-  const sent: Array<{ requestId: string; fileUuid: string }> = []
+  const sent: Array<{
+    requestId: string
+    fileUuid: string
+    query?: unknown
+    mode?: 'xml' | 'snapshot'
+  }> = []
   const window = {
     isDestroyed: () => false,
     webContents: {
-      send: vi.fn((_channel: string, payload: { requestId: string; fileUuid: string }) => {
-        sent.push(payload)
-      }),
+      send: vi.fn(
+        (
+          _channel: string,
+          payload: {
+            requestId: string
+            fileUuid: string
+            query?: unknown
+            mode?: 'xml' | 'snapshot'
+          },
+        ) => {
+          sent.push(payload)
+        },
+      ),
     },
   }
   return { window, sent }
