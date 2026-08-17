@@ -3,6 +3,7 @@ import type { Edge, Node } from '@xyflow/react'
 import {
   CHILD_GAP_Y,
   CHILD_OFFSET_X,
+  collectDescendantIds,
   createInitialEdges,
   createInitialNodes,
   withNewChild,
@@ -30,6 +31,36 @@ function sideOf(nodes: Node[], id: string): 'left' | 'right' {
   const node = nodes.find((n) => n.id === id)!
   return node.position.x < root.position.x ? 'left' : 'right'
 }
+
+describe('collectDescendantIds 折叠隐藏集合', () => {
+  it('返回折叠节点的全部后代、不含折叠节点自身', () => {
+    let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
+    const a = addChild(tree, 'root', 'a')
+    tree = a
+    const a1 = addChild(tree, a.newNodeId, 'a1')
+    tree = a1
+    const a2 = addChild(tree, a.newNodeId, 'a2')
+    tree = a2
+    const a21 = addChild(tree, a2.newNodeId, 'a2-1')
+    tree = a21
+
+    const ids = collectDescendantIds(tree.edges, a.newNodeId)
+    expect(ids.has(a.newNodeId)).toBe(false)
+    expect(ids.has(a1.newNodeId)).toBe(true)
+    expect(ids.has(a2.newNodeId)).toBe(true)
+    expect(ids.has(a21.newNodeId)).toBe(true)
+    expect(ids.size).toBe(3)
+  })
+
+  it('叶子节点（无子节点）的后代集合为空', () => {
+    let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
+    const a = addChild(tree, 'root', 'a')
+    tree = a
+
+    const ids = collectDescendantIds(tree.edges, a.newNodeId)
+    expect(ids.size).toBe(0)
+  })
+})
 
 describe('mindmap 布局左右分侧', () => {
   it('新增子节点不改变已有节点的左右侧归属', () => {

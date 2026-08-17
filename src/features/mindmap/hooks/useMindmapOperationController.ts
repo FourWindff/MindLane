@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from 'react'
 import {
@@ -24,7 +25,7 @@ import { usePalaceGeneration } from './usePalaceGeneration'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { isDefaultViewport } from '@/shared/lib/fileFormat'
-import { collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
+import { collectDescendantIds, findParentId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
 import type { ContextMenuState } from '@/features/mindmap/components/MindMapContextMenu'
@@ -81,20 +82,40 @@ export function useMindmapOperationController() {
     [activeInstance.store, editor, reactFlow, reactFlowStore],
   )
 
-  // 折叠节点的整棵子树在渲染层隐藏（数据完整保留，仅 CSS 隐藏）
+  // 折叠节点的整棵子树在渲染层隐藏（数据完整保留，仅 CSS 隐藏）。
+  // 折叠节点自身保持可见（展开按钮仍在）；xyflow 会为节点包装器写入内联
+  // visibility: visible（节点测量完成即可见），类名规则压不过内联样式，
+  // 因此对隐藏节点同时注入 style 覆盖（node.style 在 xyflow 内联样式之后展开）。
   const hiddenNodeIds = useMemo(() => {
     const hidden = new Set<string>()
     for (const node of nodes) {
       if ((node.data as { collapsed?: boolean }).collapsed === true) {
-        for (const id of collectSubtreeIds(edges, node.id)) hidden.add(id)
+        for (const id of collectDescendantIds(edges, node.id)) hidden.add(id)
       }
     }
     return hidden
   }, [edges, nodes])
   const canvasNodes = useMemo(
     () =>
-      nodes.map((n) => (hiddenNodeIds.has(n.id) ? { ...n, className: 'mindmap-node--hidden' } : n)),
+      nodes.map((n) =>
+        hiddenNodeIds.has(n.id)
+          ? {
+              ...n,
+              className: 'mindmap-node--hidden',
+              style: {
+                ...n.style,
+                visibility: 'hidden',
+                pointerEvents: 'none',
+              } as CSSProperties,
+            }
+          : n,
+      ),
     [hiddenNodeIds, nodes],
+  )
+  // 隐藏子树内部的边一并从渲染层移除，避免悬挂边指向空位
+  const canvasEdges = useMemo(
+    () => edges.filter((e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target)),
+    [edges, hiddenNodeIds],
   )
 
   const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapPersistence()
@@ -414,7 +435,7 @@ export function useMindmapOperationController() {
 
   return {
     nodes: canvasNodes,
-    edges,
+    edges: canvasEdges,
     nodeTypes,
     edgeTypes,
     aiBusy,

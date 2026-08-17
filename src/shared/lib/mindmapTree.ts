@@ -55,6 +55,16 @@ export function collectSubtreeIds(edges: Edge[], rootId: string): Set<string> {
   return ids
 }
 
+/**
+ * 收集一棵子树的全部后代 id（不含 rootId 自身）。
+ * 折叠渲染时用于隐藏折叠节点的所有子孙节点，折叠节点自身保持可见（展开按钮仍在）。
+ */
+export function collectDescendantIds(edges: Edge[], rootId: string): Set<string> {
+  const ids = collectSubtreeIds(edges, rootId)
+  ids.delete(rootId)
+  return ids
+}
+
 export function getChildIdsOrdered(nodes: Node[], edges: Edge[], parentId: string): string[] {
   const ids = getChildIds(edges, parentId)
   const y = new Map(nodes.map((n) => [n.id, n.position.y]))
