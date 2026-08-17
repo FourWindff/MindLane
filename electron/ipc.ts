@@ -138,6 +138,10 @@ export interface ContextNodeInfo {
   id: string
   type: 'text' | 'palace'
   label: string
+  /** 根节点链（root → … → 本节点，compact 轮次状态用） */
+  chain?: string[]
+  /** 直接子节点（compact 子树，深度 1） */
+  children?: ContextNodeInfo[]
   extra?: Record<string, unknown>
 }
 
@@ -180,7 +184,7 @@ export function xmlEscape(value: string): string {
  * 结构约定：根标签携带文件身份属性（file_uuid / file_path / file_title）；
  * `<SELECTED_NODES count>` 恒发（空选 count="0" 且无子节点）；
  * `<ATTACHED_DOCUMENT>` / `<LINKED_DOCUMENTS>` 存在时才发。
- * 不含导图树摘要——模型需要完整结构时按需调用 `getMindmapContext` 读工具。
+ * 不含导图树摘要——模型需要完整结构时按需调用 `readMindmap` 读工具。
  */
 export function serializeTurnState(context: ChatContext): string {
   let xml = `<${EDITOR_STATE_TAG} file_uuid="${xmlEscape(context.fileUuid)}" file_path="${xmlEscape(context.filePath ?? '')}" file_title="${xmlEscape(context.fileTitle ?? '')}">
@@ -190,8 +194,26 @@ export function serializeTurnState(context: ChatContext): string {
   xml += `<SELECTED_NODES count="${selectedNodes.length}">
 `
   for (const node of selectedNodes) {
-    xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" label="${xmlEscape(node.label || '')}"/>
+    // 协议 XML 形状：id/type/content/collapsed；compact 模式带根节点链 + 直接子树
+    const collapsed =
+      (node as { collapsed?: boolean }).collapsed === true ? ' collapsed="true"' : ''
+    const chain =
+      node.chain && node.chain.length > 1 ? ` chain="${node.chain.map(xmlEscape).join(',')}"` : ''
+    const children =
+      (node as { children?: Array<{ id: string; type: string; label?: string }> }).children ?? []
+    if (children.length === 0) {
+      xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" content="${xmlEscape(node.label || '')}"${collapsed}${chain}/>
 `
+    } else {
+      xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" content="${xmlEscape(node.label || '')}"${collapsed}${chain}>
+`
+      for (const child of children) {
+        xml += `    <node id="${xmlEscape(child.id)}" type="${xmlEscape(child.type)}" content="${xmlEscape(child.label || '')}"/>
+`
+      }
+      xml += `  </node>
+`
+    }
   }
   xml += `</SELECTED_NODES>
 `
@@ -243,10 +265,30 @@ export function stripTurnState(text: string): string {
   return text.slice(0, openIndex).replace(/\r?\n+$/, '')
 }
 
+/** 读导图查询参数（PRD 6.2：树查询，非行寻址）。 */
+export interface MindmapReadQuery {
+  scope?: 'whole' | 'subtree'
+  subtreeId?: string
+  type?: string
+  textContains?: string
+  maxDepth?: number
+}
+
 /** 主进程 → 渲染层：按需读导图请求（requestId 关联并发 runner）。 */
 export interface MindmapReadRequest {
   requestId: string
   fileUuid: string
+  query?: MindmapReadQuery
+  /** xml=mindmap 节 XML 片段（默认）；snapshot=写工具校验用节点/资源快照 */
+  mode?: 'xml' | 'snapshot'
+}
+
+/** 渲染层 → 主进程：写工具校验快照。 */
+export interface MindmapEditorSnapshot {
+  nodeIds: string[]
+  assetIds: string[]
+  /** target → source（纯树，每节点至多一个父） */
+  parents: Record<string, string>
 }
 
 /** 渲染层 → 主进程：读导图应答。 */

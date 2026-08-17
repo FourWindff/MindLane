@@ -5,8 +5,19 @@ import { defaultNodeSize } from './nodeSize'
 export const CHILD_OFFSET_X = 200
 export const CHILD_GAP_Y = 12
 
+/**
+ * nanoid(8) 风格短 id（PRD 6.4）：字母数字 + `-`/`_`，XML/JSON 安全。
+ * 64⁸ 碰撞空间，单文件内唯一即可；旧文件中的 UUID id 不迁移、新旧共存；
+ * 根节点固定锚点 `root`。
+ */
 export function newId(): string {
-  return crypto.randomUUID()
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
+  const bytes = crypto.getRandomValues(new Uint8Array(8))
+  let id = ''
+  for (const byte of bytes) {
+    id += ALPHABET[byte % ALPHABET.length]
+  }
+  return id
 }
 
 export function createInitialNodes(): Node[] {
@@ -72,10 +83,16 @@ function nodeWidth(nodeId: string, nodes: Node[]): number {
 function subtreeHeight(nodeId: string, edges: Edge[], nodes: Node[], gapY: number): number {
   const selfH = nodeHeight(nodeId, nodes)
   const childIds = getChildIds(edges, nodeId)
-  if (childIds.length === 0) return selfH
+  // 折叠节点按叶子处理（PRD 04）：子树不参与尺寸计算，展开时重新布局
+  if (childIds.length === 0 || isNodeCollapsed(nodes, nodeId)) return selfH
   const childHeights = childIds.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
   const childrenTotal = childHeights.reduce((sum, h) => sum + h, 0) + (childIds.length - 1) * gapY
   return Math.max(selfH, childrenTotal)
+}
+
+/** 节点是否处于折叠状态（通用展示属性，缺省展开）。 */
+export function isNodeCollapsed(nodes: Node[], nodeId: string): boolean {
+  return nodes.find((n) => n.id === nodeId)?.data?.collapsed === true
 }
 
 // ─── 逻辑图布局（从左向右） ────────────────────────────────────────────────────
@@ -137,7 +154,7 @@ function layoutLogicSubtree(
   metaMap.set(nodeId, { depth, branchIndex })
 
   const childIds = getChildIdsOrdered(nodes, edges, nodeId)
-  if (childIds.length === 0) return
+  if (childIds.length === 0 || isNodeCollapsed(nodes, nodeId)) return
 
   const childX = x + selfW + gapX
   const childHeights = childIds.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
@@ -198,7 +215,7 @@ function layoutMindmapSide(
   metaMap.set(nodeId, { depth, branchIndex, side: direction })
 
   const childIds = getChildIdsOrdered(nodes, edges, nodeId)
-  if (childIds.length === 0) return
+  if (childIds.length === 0 || isNodeCollapsed(nodes, nodeId)) return
 
   const childX =
     direction === 'right' ? x + selfW + gapX : x - gapX - nodeWidth(childIds[0]!, nodes)
@@ -253,6 +270,8 @@ function layoutMindmap(
   metaMap.set(rootId, { depth: 0, branchIndex: -1 })
 
   const children = getChildIdsOrdered(nodes, edges, rootId)
+  // 根节点折叠：整图只剩根（根的位置/手柄已在上方设置）
+  if (isNodeCollapsed(nodes, rootId)) return
 
   // 分侧持久化在 data.side 中，重新布局时保持不变，避免新增节点导致左右洗牌。
   // 未分侧的新节点分到数量较少的一侧（平局归右），全新导图效果即左右交替。

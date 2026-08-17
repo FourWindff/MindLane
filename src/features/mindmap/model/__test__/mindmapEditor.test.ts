@@ -151,19 +151,19 @@ describe('MindmapEditor', () => {
       expect(store.getState().nodes.find((n) => n.id === nodeId)!.position.x).toBe(beforeX)
     })
 
-    it('should apply edge remove and connect through native changes', () => {
+    it('should apply edge removal through native changes', () => {
       const { nodeId: a } = editor.addChild(rootId())
-      const { nodeId: b } = editor.addChild(rootId())
-      const edgeId = `e_${a}_${b}`
+      const edgeId = `e_${a}_${a}`
 
-      editor.applyNativeConnect({ source: a, target: b, sourceHandle: null, targetHandle: null })
-      expect(store.getState().edges.some((e) => e.source === a && e.target === b)).toBe(true)
-
+      // 纯树约束（ADR-0015）：任意连线入口已移除，边只能由加子/加兄弟产生。
+      const edgesBefore = store.getState().edges.length
       editor.applyNativeEdgeChanges([{ id: edgeId, type: 'remove' }])
-      expect(store.getState().edges.some((e) => e.id === edgeId)).toBe(false)
+      expect(store.getState().edges.length).toBe(edgesBefore)
 
-      editor.undo()
-      expect(store.getState().edges.some((e) => e.id === edgeId)).toBe(true)
+      // 通过 addChild 产生的边可以被原生 remove 移除
+      const childEdge = store.getState().edges.find((e) => e.target === a)!
+      editor.applyNativeEdgeChanges([{ id: childEdge.id, type: 'remove' }])
+      expect(store.getState().edges.some((e) => e.id === childEdge.id)).toBe(false)
     })
   })
 

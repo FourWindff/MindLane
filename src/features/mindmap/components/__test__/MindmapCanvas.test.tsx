@@ -44,6 +44,7 @@ describe('MindmapCanvas', () => {
     expect(reactFlowProps?.onEdgesChange).toBeUndefined()
     expect(reactFlowProps?.onConnect).toBeUndefined()
     expect(reactFlowProps?.nodesDraggable).toBe(false)
+    // 纯树约束（ADR-0015）：任意连线入口移除，连接永不启用
     expect(reactFlowProps?.nodesConnectable).toBe(false)
     expect(reactFlowProps?.elementsSelectable).toBe(false)
   })
@@ -71,7 +72,8 @@ describe('MindmapCanvas', () => {
     expect(reactFlowProps?.onEdgesChange).toBe(onEdgesChange)
     expect(reactFlowProps?.onConnect).toBe(onConnect)
     expect(reactFlowProps?.nodesDraggable).toBe(false)
-    expect(reactFlowProps?.nodesConnectable).toBe(true)
+    // 纯树约束：即使传入 onConnect，连接能力仍关闭（入口已移除）
+    expect(reactFlowProps?.nodesConnectable).toBe(false)
     expect(reactFlowProps?.elementsSelectable).toBe(true)
   })
 

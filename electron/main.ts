@@ -316,7 +316,8 @@ app.whenReady().then(async () => {
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
         messagePipeline,
-        mindmapReadProvider: (fileUuid) => mindmapReadRequester.request(fileUuid),
+        mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
+        mindmapSnapshotRequester: (fileUuid) => mindmapReadRequester.requestSnapshot(fileUuid),
       })
     }
     return chatOrchestrator

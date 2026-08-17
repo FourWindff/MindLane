@@ -113,7 +113,7 @@ function buildMindmapPayload(state: MainGraphStateType): Record<string, unknown>
   return {
     ok: true,
     title: state.mindmapTitle,
-    yamlFragment: state.mindmapYaml,
+    xmlFragment: state.mindmapXml,
     documentRef: state.documentRef,
   }
 }

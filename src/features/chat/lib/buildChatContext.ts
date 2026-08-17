@@ -1,7 +1,7 @@
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { extractNodeInfo } from '@/features/chat/lib/chatUtils'
+import { extractNodeInfoCompact } from '@/features/chat/lib/chatUtils'
 import type { ChatContext } from '../../../../electron/ipc'
 
 /**
@@ -32,7 +32,9 @@ export function buildChatContext(): ChatContext {
 
   const selected = mindmapState.nodes.filter((n) => n.selected)
   if (selected.length > 0) {
-    ctx.selectedNodes = selected.map(extractNodeInfo)
+    ctx.selectedNodes = selected.map((n) =>
+      extractNodeInfoCompact(n, mindmapState.nodes, mindmapState.edges),
+    )
   }
 
   if (wsState.workspacePath) {

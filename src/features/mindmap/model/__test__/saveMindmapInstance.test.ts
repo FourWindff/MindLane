@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MindmapInstance } from '../mindmapInstance'
 import { saveMindmapInstance } from '../saveMindmapInstance'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
+import { deserializeMindlaneFile } from '@/shared/lib/mindmapXml'
 
 function createDirtyInstance(filePath: string | null): MindmapInstance {
   const instance = new MindmapInstance('test')
@@ -43,6 +44,32 @@ describe('saveMindmapInstance', () => {
     })
     expect(instance.store.getState().dirty).toBe(false)
     expect(syncAfterFileSaved).toHaveBeenCalledWith('/b.mindlane')
+  })
+
+  it('save payload is legal XML that roundtrips back to the same structure', async () => {
+    const instance = createDirtyInstance('/b.mindlane')
+    instance.editor.addChild('root', { label: '子 & <特殊>' })
+    let savedPayload: { filePath: string; data: unknown } | null = null
+    const save = vi.fn((payload: { filePath: string; data: unknown }) => {
+      savedPayload = payload
+      return Promise.resolve({ ok: true, data: { filePath: '/b.mindlane' } })
+    })
+    vi.stubGlobal('window', { mindlane: { file: { save } } })
+
+    await saveMindmapInstance(instance, { syncAfterFileSaved })
+
+    // 主进程序列化端产物必须是合法 XML，读回 roundtrip 一致
+    const file = savedPayload!.data as Parameters<typeof serializeMindlaneFile>[0]
+    const { serializeMindlaneFile } = await import('@/shared/lib/mindmapXml')
+    const xml = serializeMindlaneFile(file)
+    expect(xml.startsWith('<mindlane version="1.0">')).toBe(true)
+    const parsed = await deserializeMindlaneFile(xml)
+    expect(parsed.metadata.title).toBe('B')
+    expect(parsed.mindmap.nodes).toHaveLength(3)
+    const labels = parsed.mindmap.nodes.map((n) => (n.data as { label: string }).label)
+    expect(labels).toEqual(expect.arrayContaining(['子 & <特殊>']))
+    // 保存守卫语义不变：nodes/edges/documentRefs 引用相等才 markClean
+    expect(instance.store.getState().dirty).toBe(false)
   })
 
   it('keeps the instance dirty when it changes again during persistence', async () => {

@@ -37,7 +37,6 @@ describe('MindmapOperationController', () => {
       deleteSubtrees: vi.fn(),
       applyNativeNodeChanges: vi.fn(),
       applyNativeEdgeChanges: vi.fn(),
-      applyNativeConnect: vi.fn(),
       setNodeSelected: vi.fn(),
       setNodeEditing: vi.fn(),
       reset: vi.fn(),
@@ -79,15 +78,14 @@ describe('MindmapOperationController', () => {
     const controller = createController()
     const nodeChanges = [{ id: 'a', type: 'select' as const, selected: true }]
     const edgeChanges = [{ id: 'root-a', type: 'select' as const, selected: true }]
-    const connection = { source: 'a', target: 'b', sourceHandle: null, targetHandle: null }
 
     controller.handleNodesChange(nodeChanges)
     controller.handleEdgesChange(edgeChanges)
-    controller.handleConnect(connection)
 
     expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(nodeChanges, 'logic')
     expect(editor.applyNativeEdgeChanges).toHaveBeenCalledWith(edgeChanges)
-    expect(editor.applyNativeConnect).toHaveBeenCalledWith(connection)
+    // 纯树约束：任意连线入口移除后，控制器不再暴露 handleConnect
+    expect((controller as Record<string, unknown>).handleConnect).toBeUndefined()
   })
 
   it('selects a surviving sibling before deleting selected subtrees', () => {

@@ -170,7 +170,7 @@ const MindmapStateAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
-  mindmapYaml: Annotation<string>({
+  mindmapXml: Annotation<string>({
     reducer: replaceReducer,
     default: () => '',
   }),

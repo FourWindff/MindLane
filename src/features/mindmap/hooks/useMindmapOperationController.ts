@@ -24,7 +24,8 @@ import { usePalaceGeneration } from './usePalaceGeneration'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { isDefaultViewport } from '@/shared/lib/fileFormat'
-import { findParentId } from '@/shared/lib/mindmapTree'
+import { collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
+import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
 import type { ContextMenuState } from '@/features/mindmap/components/MindMapContextMenu'
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
@@ -78,6 +79,22 @@ export function useMindmapOperationController() {
         },
       }),
     [activeInstance.store, editor, reactFlow, reactFlowStore],
+  )
+
+  // 折叠节点的整棵子树在渲染层隐藏（数据完整保留，仅 CSS 隐藏）
+  const hiddenNodeIds = useMemo(() => {
+    const hidden = new Set<string>()
+    for (const node of nodes) {
+      if ((node.data as { collapsed?: boolean }).collapsed === true) {
+        for (const id of collectSubtreeIds(edges, node.id)) hidden.add(id)
+      }
+    }
+    return hidden
+  }, [edges, nodes])
+  const canvasNodes = useMemo(
+    () =>
+      nodes.map((n) => (hiddenNodeIds.has(n.id) ? { ...n, className: 'mindmap-node--hidden' } : n)),
+    [hiddenNodeIds, nodes],
   )
 
   const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapPersistence()
@@ -167,6 +184,50 @@ export function useMindmapOperationController() {
   }, [contextMenu.scope])
 
   const openContextMenu = useCallback((menu: ContextMenuState) => setContextMenu(menu), [])
+
+  // 本地图片插入：读文件转 base64 → sha256 去重 → addAsset → image 节点
+  const insertImageRef = useRef<HTMLInputElement | null>(null)
+  const insertImage = useCallback(() => {
+    if (!insertImageRef.current) {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.style.display = 'none'
+      input.addEventListener('change', () => {
+        const file = input.files?.[0]
+        input.value = ''
+        if (!file) return
+        const reader = new FileReader()
+        reader.onload = () => {
+          const dataUrl = typeof reader.result === 'string' ? reader.result : null
+          if (!dataUrl) {
+            useAiStore.getState().setError('图片读取失败')
+            return
+          }
+          void (async () => {
+            const asset = await assetFromDataUrl(dataUrl)
+            if (!asset) {
+              useAiStore.getState().setError('图片格式不支持')
+              return
+            }
+            const parentId = selectedId ?? 'root'
+            const assetId = activeInstance.store.getState().addAsset(asset)
+            editor.addNode({
+              type: 'image',
+              data: { assetId, alt: file.name },
+              parentId,
+            })
+          })()
+        }
+        reader.onerror = () => useAiStore.getState().setError('图片读取失败')
+        reader.readAsDataURL(file)
+      })
+      insertImageRef.current = input
+      document.body.appendChild(input)
+    }
+    insertImageRef.current.click()
+  }, [activeInstance.store, editor, selectedId])
+
   const onNodeContextMenu = useCallback(
     (event: ReactMouseEvent, node: Node) => {
       event.preventDefault()
@@ -352,7 +413,7 @@ export function useMindmapOperationController() {
   }, [editor, visualVariant])
 
   return {
-    nodes,
+    nodes: canvasNodes,
     edges,
     nodeTypes,
     edgeTypes,
@@ -375,7 +436,6 @@ export function useMindmapOperationController() {
     canvas: {
       onNodesChange: controller.handleNodesChange,
       onEdgesChange: controller.handleEdgesChange,
-      onConnect: controller.handleConnect,
       onNodeClick,
       onNodeContextMenu,
       onSelectionContextMenu,
@@ -394,6 +454,7 @@ export function useMindmapOperationController() {
       save,
       centerRoot: controller.centerRoot,
       generatePalace,
+      insertImage,
       closeContextMenu: () => setContextMenu({ scope: 'closed' }),
       closePalaceModal: () => setPalaceModal(null),
       toggleStylePanel: () => {

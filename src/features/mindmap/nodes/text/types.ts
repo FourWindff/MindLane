@@ -3,6 +3,8 @@ export type TextNodeData = {
   palaceId?: string
   pageRange?: string
   summary?: string
+  /** 通用折叠属性：折叠该节点后的整棵子树；缺省展开，只影响展示 */
+  collapsed?: boolean
   justAdded?: boolean
   exiting?: boolean
   editing?: boolean

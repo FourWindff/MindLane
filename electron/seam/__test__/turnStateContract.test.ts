@@ -44,8 +44,8 @@ describe('serializeTurnState', () => {
     )
 
     expect(xml).toContain('<SELECTED_NODES count="2">')
-    expect(xml).toContain('<node id="n1" type="text" label="节点一"/>')
-    expect(xml).toContain('<node id="n2" type="palace" label="宫殿"/>')
+    expect(xml).toContain('<node id="n1" type="text" content="节点一"/>')
+    expect(xml).toContain('<node id="n2" type="palace" content="宫殿"/>')
   })
 
   it('emits ATTACHED_DOCUMENT and LINKED_DOCUMENTS only when present', () => {
@@ -103,11 +103,46 @@ describe('serializeTurnState', () => {
     )
 
     expect(xml).toContain('file_title="A &amp; B &lt;tag&gt; &quot;quote&quot;"')
-    expect(xml).toContain('label="x &lt; y &gt; z &amp; &quot;w&quot;"')
+    expect(xml).toContain('content="x &lt; y &gt; z &amp; &quot;w&quot;"')
     expect(xml).toContain('path="/docs/a&amp;b.txt"')
     // 原文中的 < > & " 不再以裸字符出现，结构不被破坏。
-    expect(xml).not.toContain('label="x <')
+    expect(xml).not.toContain('content="x <')
     expect(xml).not.toContain('&"w"')
+  })
+
+  it('emits compact mode: root chain + direct subtree for selected nodes', () => {
+    const xml = serializeTurnState(
+      baseContext({
+        selectedNodes: [
+          {
+            id: 'n3',
+            type: 'text',
+            label: '选中',
+            chain: ['root', 'n1', 'n3'],
+            children: [
+              { id: 'n4', type: 'text', label: '子节点' },
+              { id: 'n5', type: 'text', label: '另一个' },
+            ],
+          },
+        ],
+      }),
+    )
+
+    expect(xml).toContain('<node id="n3" type="text" content="选中" chain="root,n1,n3">')
+    expect(xml).toContain('<node id="n4" type="text" content="子节点"/>')
+    expect(xml).toContain('<node id="n5" type="text" content="另一个"/>')
+    expect(xml).toContain('</node>')
+  })
+
+  it('omits the chain attribute for root-level selections', () => {
+    const xml = serializeTurnState(
+      baseContext({
+        selectedNodes: [{ id: 'root', type: 'text', label: '中心', chain: ['root'] }],
+      }),
+    )
+
+    expect(xml).not.toContain('chain=')
+    expect(xml).toContain('<node id="root" type="text" content="中心"/>')
   })
 
   it('contains no mindmap tree: no summary text, no nodes beyond the selected list', () => {

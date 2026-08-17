@@ -2,6 +2,8 @@ import { memo, useCallback, useRef, useState, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Image, Landmark, Minimize2 } from 'lucide-react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData } from './types'
 
 type TransitionPhase = 'collapsed' | 'expanding' | 'expanded' | 'collapsing'
@@ -11,6 +13,10 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const stations = data.stations ?? []
   const expanded = !!data.expanded
   const editor = useActiveMindmapEditor()
+  const assets = useActiveMindmapStore((state) => state.assets)
+  const asset = data.assetId ? assets.find((a) => a.id === data.assetId) : undefined
+  // 图片一律经 asset 引用；迁移期下载失败的旧数据保留 imageUrl 兜底
+  const imageSrc = asset ? assetToDataUrl(asset) : data.imageUrl || ''
 
   const prevExpanded = useRef(expanded)
   const [phase, setPhase] = useState<TransitionPhase>(expanded ? 'expanded' : 'collapsed')
@@ -67,13 +73,8 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
             <Minimize2 size={14} strokeWidth={2} />
           </button>
           <div className="palace-node__thumb">
-            {data.imageUrl ? (
-              <img
-                src={data.imageUrl}
-                alt="记忆宫殿"
-                className="palace-node__img"
-                draggable={false}
-              />
+            {imageSrc ? (
+              <img src={imageSrc} alt="记忆宫殿" className="palace-node__img" draggable={false} />
             ) : (
               <div className="palace-node__placeholder">
                 <Landmark size={24} strokeWidth={1.5} />

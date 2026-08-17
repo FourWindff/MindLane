@@ -38,14 +38,15 @@ function createTestRegistry(
   const registry = new ToolRegistry()
   const hasPalace = options.hasPalace ?? true
 
-  const actionTools = createMindmapActionTools(hasPalace)
-  registry.registerTool(actionTools.addTextNodeTool)
+  const actionTools = createMindmapActionTools(async () => ({
+    nodeIds: ['root'],
+    assetIds: [],
+    parents: {},
+  }))
+  registry.registerTool(actionTools.insertXmlFragmentTool)
   registry.registerTool(actionTools.updateNodeTool)
+  registry.registerTool(actionTools.moveNodeTool)
   registry.registerTool(actionTools.deleteNodeTool)
-  registry.registerTool(actionTools.batchAddNodesTool)
-  if (actionTools.addPalaceNodeTool) {
-    registry.registerTool(actionTools.addPalaceNodeTool)
-  }
 
   const schemas = getToolSchemas()
   for (const tool of schemas) {
@@ -70,7 +71,7 @@ function createInitialState() {
     error: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapYaml: '',
+    mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,

@@ -113,6 +113,18 @@ describe('buildSystemPrompt sections', () => {
     expect(prompt).not.toContain('节点一')
   })
 
+  it('injects the node type registry into the XML contract (stable prefix)', async () => {
+    const prompt = await buildSystemPrompt(baseInput)
+    expect(prompt).toContain('<MINDLANE_XML_CONTRACT>')
+    expect(prompt).toContain('### 节点类型注册表')
+    expect(prompt).toContain('text（文本节点）')
+    expect(prompt).toContain('image（图片节点）')
+    expect(prompt).toContain('palace（记忆宫殿节点）')
+    expect(prompt).toContain('block_not_found')
+    expect(prompt).not.toContain('batchAddMindmapNodes')
+    expect(prompt).not.toContain('addPalaceNode')
+  })
+
   it('is byte-identical across turns when memory and summary are unchanged', async () => {
     const promptA = await buildSystemPrompt({
       ...baseInput,

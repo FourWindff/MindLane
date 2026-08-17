@@ -5,6 +5,8 @@ import { selectChatReady, useSettingsStore } from '@/features/settings/model/set
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId } from '@/shared/lib/mindmapTree'
+import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import type { VisualVariant } from '@/features/mindmap/style/types'
 
@@ -123,6 +125,26 @@ export function usePalaceGeneration({
         return
       }
 
+      // 图片生成即内嵌（PRD 4.1）：data URL → base64 asset，sha256 去重；
+      // 下载失败该次插入报错（子图已把远程 URL 转 data URL，失败在子图内报错）
+      let assetId: string | undefined
+      if (result.imageUrl) {
+        const dataUrl = parseDataUrl(result.imageUrl)
+          ? result.imageUrl
+          : await window.mindlane?.ai
+              .urlToDataUrl({ url: result.imageUrl })
+              .then((r) => (r.ok ? r.data.dataUrl : null))
+        if (!dataUrl) {
+          rollback()
+          ai.setError('宫殿图片下载失败，本次插入已取消')
+          return
+        }
+        const asset = await assetFromDataUrl(dataUrl)
+        if (asset) {
+          assetId = mindmapRegistry.getActive()?.store.getState().addAsset(asset)
+        }
+      }
+
       editor.batch([
         {
           type: 'updateNode',
@@ -131,7 +153,8 @@ export function usePalaceGeneration({
             ...node,
             data: {
               label: result.label,
-              imageUrl: result.imageUrl,
+              ...(assetId ? { assetId } : {}),
+              imageUrl: '',
               stations: result.stations,
               sourceNodeIds: result.sourceNodeIds,
               expanded: true,

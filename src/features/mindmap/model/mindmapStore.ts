@@ -4,13 +4,13 @@ import {
   createEmptyFile,
   type MindLaneFile,
   type DocumentRef,
+  type MindlaneAsset,
   migrateDocumentRef,
-  isTextNodeData,
-  isPalaceNodeData,
 } from '@/shared/lib/fileFormat'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
+import { mindmapLayout } from './mindmapLayout'
 
 export interface MindmapState {
   nodes: Node[]
@@ -23,6 +23,8 @@ export interface MindmapState {
   fileCreatedAt: string
   workspacePath: string | null
   viewport: Viewport
+  /** 内嵌图片资源（assets 节），sha256 内容去重 */
+  assets: MindlaneAsset[]
   documentRefs: DocumentRef[]
   style: MindmapStyleState
   canUndo: boolean
@@ -41,6 +43,8 @@ export interface MindmapState {
   markClean: () => void
   setFilePath: (filePath: string) => void
   setViewport: (viewport: Viewport) => void
+  /** 添加内嵌图片资源；sha256 相同则复用已有 asset，返回实际使用的 asset id。 */
+  addAsset: (asset: MindlaneAsset) => string
   /** 更新当前文档样式（合并），并标记文档为待保存。 */
   setStyle: (partial: Partial<MindmapStyleState>) => void
   /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */
@@ -50,7 +54,6 @@ export interface MindmapState {
   newFile: (title?: string) => void
   clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
-  getContextSummary: () => string
   addDocumentRef: (ref: DocumentRef) => void
 }
 
@@ -70,6 +73,7 @@ export function createMindmapStore(): MindmapStore {
     fileCreatedAt: initialFile.metadata.createdAt,
     workspacePath: null,
     viewport: initialFile.mindmap.viewport,
+    assets: [],
     documentRefs: [],
     style: { ...DEFAULT_STYLE },
     canUndo: false,
@@ -78,6 +82,13 @@ export function createMindmapStore(): MindmapStore {
     setFilePath: (filePath) => set({ filePath }),
 
     setViewport: (viewport) => set({ viewport }),
+
+    addAsset: (asset) => {
+      const existing = get().assets.find((a) => a.sha256 === asset.sha256)
+      if (existing) return existing.id
+      set((s) => ({ assets: [...s.assets, asset], dirty: true }))
+      return asset.id
+    },
 
     setStyle: (partial) =>
       set((s) => {
@@ -124,9 +135,20 @@ export function createMindmapStore(): MindmapStore {
         ...n,
         data: n.data,
       }))
+      // 打开时丢弃 position（文件不存位置），由确定性布局算法重算并缓存于内存实例
+      const style = data.mindmap.style
+        ? { ...DEFAULT_STYLE, ...data.mindmap.style }
+        : { ...DEFAULT_STYLE }
+      const laidOut = mindmapLayout.reflow(
+        hydratedNodes as Node[],
+        data.mindmap.edges as Edge[],
+        style.structureType,
+        style.visualVariant,
+      )
       set({
-        nodes: hydratedNodes as Node[],
+        nodes: laidOut,
         edges: data.mindmap.edges as Edge[],
+        assets: data.assets ?? [],
         documentRefs: (data.documents || []).map(migrateDocumentRef),
         hasDocumentOpen: true,
         filePath,
@@ -136,9 +158,7 @@ export function createMindmapStore(): MindmapStore {
         workspacePath,
         dirty: false,
         viewport: data.mindmap.viewport,
-        style: data.mindmap.style
-          ? { ...DEFAULT_STYLE, ...data.mindmap.style }
-          : { ...DEFAULT_STYLE },
+        style,
         canUndo: false,
         canRedo: false,
       })
@@ -158,6 +178,7 @@ export function createMindmapStore(): MindmapStore {
         workspacePath: null,
         dirty: false,
         viewport: f.mindmap.viewport,
+        assets: [],
         style: { ...DEFAULT_STYLE },
         canUndo: false,
         canRedo: false,
@@ -177,6 +198,7 @@ export function createMindmapStore(): MindmapStore {
         workspacePath: null,
         dirty: false,
         viewport: f.mindmap.viewport,
+        assets: [],
         style: { ...DEFAULT_STYLE },
         documentRefs: [],
         canUndo: false,
@@ -185,8 +207,17 @@ export function createMindmapStore(): MindmapStore {
     },
 
     toMindLaneFile: (): MindLaneFile => {
-      const { nodes, edges, fileUuid, fileTitle, fileCreatedAt, viewport, documentRefs, style } =
-        get()
+      const {
+        nodes,
+        edges,
+        fileUuid,
+        fileTitle,
+        fileCreatedAt,
+        viewport,
+        assets,
+        documentRefs,
+        style,
+      } = get()
       const now = new Date().toISOString()
       return {
         version: '1.0',
@@ -208,6 +239,7 @@ export function createMindmapStore(): MindmapStore {
           viewport,
           style: { ...style },
         },
+        assets,
         documents: documentRefs,
       }
     },
@@ -217,51 +249,6 @@ export function createMindmapStore(): MindmapStore {
         documentRefs: [...s.documentRefs.filter((doc) => doc.id !== ref.id), ref],
         dirty: true,
       }))
-    },
-
-    getContextSummary: (): string => {
-      const { nodes, edges, fileTitle } = get()
-      const childrenMap = new Map<string, string[]>()
-      for (const edge of edges) {
-        const list = childrenMap.get(edge.source) ?? []
-        list.push(edge.target)
-        childrenMap.set(edge.source, list)
-      }
-
-      const parentSet = new Set(edges.map((e) => e.target))
-      const roots = nodes.filter((n) => !parentSet.has(n.id))
-
-      function describeNode(node: Node): string {
-        switch (node.type) {
-          case 'palace': {
-            if (isPalaceNodeData(node.data)) {
-              return `[宫殿] ${node.data.label} (id: ${node.id}, ${node.data.stations.length}个站点)`
-            }
-            return `[宫殿] ${node.id}`
-          }
-          default:
-            if (isTextNodeData(node.data)) {
-              return `${node.data.label} (id: ${node.id})`
-            }
-            return `${node.id}`
-        }
-      }
-
-      function renderTree(nodeId: string, depth: number): string {
-        const node = nodes.find((n) => n.id === nodeId)
-        if (!node) return ''
-        const indent = '  '.repeat(depth)
-        const line = `${indent}- ${describeNode(node)}`
-        const children = childrenMap.get(nodeId) ?? []
-        const childLines = children.map((cid) => renderTree(cid, depth + 1)).filter(Boolean)
-        return [line, ...childLines].join('\n')
-      }
-
-      const treeText = roots
-        .map((r) => renderTree(r.id, 0))
-        .filter(Boolean)
-        .join('\n')
-      return `标题: ${fileTitle}\n节点数: ${nodes.length}\n\n${treeText}`
     },
   }))
 }

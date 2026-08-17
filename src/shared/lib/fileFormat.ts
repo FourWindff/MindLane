@@ -1,8 +1,11 @@
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
+import type { ImageNodeData } from '@/features/mindmap/nodes/image/types'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
 
 export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
+export type { MindlaneAsset } from './mindmapXml/types'
+import type { MindlaneAsset } from './mindmapXml/types'
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
@@ -27,6 +30,8 @@ export interface MindLaneFile {
     /** 每个文件的独立样式；旧文件可能缺失，加载时回退默认样式 */
     style?: MindmapStyleState
   }
+  /** 内嵌图片资源（XML assets 节），节点经 asset 属性引用，sha256 去重 */
+  assets: MindlaneAsset[]
   documents: DocumentRef[]
 }
 
@@ -41,6 +46,7 @@ export interface MindLaneEdge {
 export type MindLaneNode =
   | { id: string; type: 'text'; position: XY; data: TextNodeData }
   | { id: string; type: 'palace'; position: XY; data: PalaceNodeData }
+  | { id: string; type: 'image'; position: XY; data: ImageNodeData }
 
 interface XY {
   x: number
@@ -143,6 +149,7 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
       edges: [],
       viewport: DEFAULT_VIEWPORT,
     },
+    assets: [],
     documents: [],
   }
 }

@@ -89,6 +89,7 @@ function MindMapWorkspace({
           onRemove={view.actions.removeSelected}
           onReset={view.actions.reset}
           onGeneratePalace={view.actions.generatePalace}
+          onInsertImage={view.actions.insertImage}
           canAddSibling={view.canAddSibling}
           canRemove={view.canRemove}
           aiBusy={view.aiBusy}

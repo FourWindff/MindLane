@@ -50,3 +50,9 @@
   transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   cursor: default;
 }
+
+/* 折叠节点的整棵子树在渲染层隐藏（数据完整保留） */
+.mindmap-node--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}

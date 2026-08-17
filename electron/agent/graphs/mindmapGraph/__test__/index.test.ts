@@ -35,7 +35,7 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     error: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapYaml: '',
+    mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,
@@ -99,7 +99,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.error).toBe('')
-    expect(result.mindmapYaml).toContain('人工智能导论')
+    expect(result.mindmapXml).toContain('人工智能导论')
     expect(result.mindmapTitle).toBe('人工智能导论')
     expect(result.pendingSubgraph).toBeNull()
     expect(result.leafResults).toHaveLength(1)
@@ -168,7 +168,7 @@ describe('mindmapGraph', () => {
     expect(result.error).toBe('')
     expect(result.documentBatches).toHaveLength(3)
     expect(result.leafResults).toHaveLength(3)
-    expect(result.mindmapYaml).toContain('Merged Long Text')
+    expect(result.mindmapXml).toContain('Merged Long Text')
     expect(firstPrompt).not.toContain(tail)
     expect(thirdPrompt).toContain(tail)
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
@@ -213,7 +213,7 @@ describe('mindmapGraph', () => {
 
     expect(urlLoader).toHaveBeenCalledWith({ type: 'url', url: 'https://example.test/doc' })
     expect(result.error).toBe('')
-    expect(result.mindmapYaml).toContain('URL Root')
+    expect(result.mindmapXml).toContain('URL Root')
     expect(result.documentRef?.type).toBe('url')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
@@ -278,7 +278,7 @@ describe('mindmapGraph', () => {
         error: 'stale error',
         mindmapInputSource: { type: 'text', content: 'fresh text' },
         mindmapInputTitle: 'Fresh Root',
-        mindmapYaml: 'Stale Root:\n  - Stale Child\n',
+        mindmapXml: 'Stale Root:\n  - Stale Child\n',
         mindmapTitle: 'Stale Root',
         documentBatches: [[new Document({ pageContent: 'stale text' })]],
         batchIndex: 99,
@@ -291,8 +291,8 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.error).toBe('')
-    expect(result.mindmapYaml).toContain('Fresh Root')
-    expect(result.mindmapYaml).not.toContain('Stale Root')
+    expect(result.mindmapXml).toContain('Fresh Root')
+    expect(result.mindmapXml).not.toContain('Stale Root')
     expect(result.mindmapTitle).toBe('Fresh Root')
     expect(result.leafResults).toHaveLength(1)
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
@@ -327,7 +327,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.error).toBe('')
-    expect(result.mindmapYaml).toContain('人工智能导论')
+    expect(result.mindmapXml).toContain('人工智能导论')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
 
@@ -340,7 +340,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.error).toContain('YAML 校验失败：Unexpected scalar at node end')
-    expect(result.mindmapYaml).toBe('')
+    expect(result.mindmapXml).toBe('')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
 
@@ -365,7 +365,7 @@ describe('mindmapGraph', () => {
     expect(result.error).toBe('')
     expect(result.leafResults).toHaveLength(2)
     expect(result.finalTree).toBeTruthy()
-    expect(result.mindmapYaml).toContain('Merged Root')
+    expect(result.mindmapXml).toContain('Merged Root')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
 
@@ -524,7 +524,7 @@ describe('mindmapGraph wave concurrency', () => {
     )
 
     expect(result.error).toContain('boom p1')
-    expect(result.mindmapYaml).toBe('')
+    expect(result.mindmapXml).toBe('')
     // only the first wave (batches 0-3) ran; batches 4-5 were never dispatched
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
@@ -554,7 +554,7 @@ describe('mindmapGraph wave concurrency', () => {
     expect(mergePrompts[1]).toContain('--- Tree 1 ---')
     expect(mergePrompts[1]).not.toContain('--- Tree 2 ---')
     expect(mergePrompts[2]).toContain('--- Tree 2 ---')
-    expect(result.mindmapYaml).toContain('Merged Root')
+    expect(result.mindmapXml).toContain('Merged Root')
   })
 
   it('emits quantified progress events with the step enum unchanged', async () => {

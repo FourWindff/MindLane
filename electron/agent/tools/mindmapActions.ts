@@ -1,182 +1,267 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
-import { validateMindmapYaml } from '../utils/yamlValidation.js'
+import {
+  MindmapXmlError,
+  buildValidationContext,
+  parseXmlFragment,
+  validateFragmentForInsert,
+} from '../../../src/shared/lib/mindmapXml/index.js'
+import type { MindmapEditorSnapshot } from '../../ipc.js'
 
-// AI 操作 Mindmap 节点的工具集
-// 方案一：AI 返回操作指令，前端执行
+/**
+ * AI 写工具集（固定 4 个，PRD 6.1）：insertXmlFragment / updateMindmapNode /
+ * moveMindmapNode / deleteMindmapNode。工具集不随节点类型增长——类型知识走
+ * 注册表校验 + 系统提示注入。
+ *
+ * 校验职责：主进程工具对 XML 做语法/类型/转义/纯树/存在性校验（错误码回传给 AI），
+ * 返回 action 指令；渲染层执行器把校验通过的片段落图（编辑器是唯一写文件方）。
+ * 快照提供者经反向 IPC 拉编辑器活状态（nodeIds/assetIds/parents）。
+ */
 
-// ========== 添加 Text 节点 ==========
-const addTextNodeTool = tool(
-  async ({ parentId, label, palaceId }) => {
-    if (!label.trim()) {
-      return { ok: false, error: '节点标签不能为空' }
+/** 写工具校验用编辑器快照提供者（主进程装配时注入）。 */
+export type EditorSnapshotProvider = (fileUuid: string) => Promise<MindmapEditorSnapshot>
+
+/** 错误码 + 恢复策略（PRD 5.4：工具结果返回给 AI，提示词含恢复策略）。 */
+function xmlErrorResult(err: unknown): { ok: false; error: string } {
+  if (err instanceof MindmapXmlError) {
+    const recovery: Record<string, string> = {
+      xml_parse_error: '重写 XML 后重试',
+      empty_xml: '补充节点内容',
+      block_not_found: '先调用 readMindmap 重新定位后再操作',
+      invalid_type: '改用注册表中的节点类型',
+      text_unescaped: '把 & < > " \' 转义为实体后重试',
+      tree_invalid: '修正为纯树（去重 id、避开 root、目标不得在被移子树内）',
+      asset_not_found: '修正或去掉 asset 属性（asset 必须来自上下文）',
     }
-
     return {
-      ok: true,
-      action: 'addNode',
-      data: {
-        type: 'text' as const,
-        parentId: parentId || undefined,
-        nodeData: {
-          label: label.trim(),
-          ...(palaceId && { palaceId }),
-        },
-      },
+      ok: false,
+      error: `[${err.code}] ${err.message}。恢复策略：${recovery[err.code] ?? '重试'}`,
     }
-  },
-  {
-    name: 'addTextNode',
-    description:
-      '在思维导图中添加一个新的文本节点。parentId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id），如果没有明确的父节点则不提供 parentId（会添加到根节点）。',
-    schema: z.object({
-      parentId: z
-        .string()
-        .optional()
-        .describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
-      label: z.string().describe('节点显示文本（必填）'),
-      palaceId: z.string().optional().describe('关联的记忆宫殿ID（可选）'),
-    }),
-  },
-)
+  }
+  return { ok: false, error: err instanceof Error ? err.message : String(err) }
+}
 
-// ========== 添加 Palace 节点 ==========
-const addPalaceNodeTool = tool(
-  async ({ parentId, label, imageUrl, stations, sourceNodeIds }) => {
-    if (!label.trim()) {
-      return { ok: false, error: '宫殿名称不能为空' }
-    }
-    if (!stations || stations.length === 0) {
-      return { ok: false, error: '宫殿必须包含至少一个站点' }
-    }
+function hasNode(nodes: Set<string>, id: string | undefined): boolean {
+  return id !== undefined && nodes.has(id)
+}
 
-    return {
-      ok: true,
-      action: 'addNode',
-      data: {
-        type: 'palace' as const,
-        parentId: parentId || undefined,
-        nodeData: {
-          label: label.trim(),
-          imageUrl: imageUrl || '',
-          stations: stations.map((s, index) => ({
-            order: s.order ?? index + 1,
-            content: s.content,
-            anchorVisual: s.anchorVisual || '',
-            association: s.association,
-            x: s.x ?? 0,
-            y: s.y ?? 0,
-            linkedNodeId: s.linkedNodeId,
-          })),
-          sourceNodeIds: sourceNodeIds || [],
-        },
-      },
-    }
-  },
-  {
-    name: 'addPalaceNode',
-    description:
-      '在思维导图中添加一个记忆宫殿节点。记忆宫殿包含多个站点，每个站点关联一个记忆内容。',
-    schema: z.object({
-      parentId: z
-        .string()
-        .optional()
-        .describe('父节点ID，可以从上下文的节点树中根据节点标签推断得到，不提供则添加到根节点'),
-      label: z.string().describe('宫殿名称（必填）'),
-      imageUrl: z.string().optional().describe('宫殿图片URL'),
-      stations: z
-        .array(
-          z.object({
-            order: z.number().optional().describe('站点顺序号'),
-            content: z.string().describe('站点记忆内容'),
-            anchorVisual: z.string().optional().describe('锚点视觉形象'),
-            association: z.string().optional().describe('联想关联内容'),
-            x: z.number().optional().describe('在图片中的X坐标'),
-            y: z.number().optional().describe('在图片中的Y坐标'),
-            linkedNodeId: z.string().describe('关联的节点ID'),
-          }),
+// ========== insertXmlFragment（统一写入口） ==========
+
+/**
+ * 创建统一写入口工具：任意位置插入嵌套 XML 片段（含批量子树生成）。
+ * position: root=挂到根节点 / child=挂到 parentId 之下 / after|before=成为 parentId 兄弟。
+ * parentId 省略时回退链：选中节点 → 根节点 root → 报错。
+ */
+export function createInsertXmlFragmentTool(provider: EditorSnapshotProvider) {
+  return tool(
+    async ({ fileUuid, xml, parentId, position }) => {
+      try {
+        const parsed = await parseXmlFragment(xml)
+        const snapshot = await provider(fileUuid ?? '')
+
+        const { ctx } = buildValidationContext(
+          snapshot.nodeIds.map((id) => ({ id })),
+          [],
+          snapshot.assetIds.map((id) => ({ id })),
         )
-        .describe('宫殿站点列表（必填）'),
-      sourceNodeIds: z.array(z.string()).optional().describe('来源节点ID列表'),
-    }),
-  },
-)
+        validateFragmentForInsert(parsed, ctx)
 
-// ========== 更新节点 ==========
-const updateNodeTool = tool(
-  async ({ nodeId, nodeType, changes }) => {
-    if (!nodeId.trim()) {
-      return { ok: false, error: '节点ID不能为空' }
-    }
-
-    // 根据节点类型验证字段
-    const validatedChanges: Record<string, unknown> = {}
-
-    switch (nodeType) {
-      case 'text': {
-        const textChanges = changes as { label?: string; palaceId?: string }
-        if (textChanges.label !== undefined) {
-          validatedChanges.label = textChanges.label
+        const pos = position ?? 'child'
+        if (pos === 'child' || pos === 'after' || pos === 'before') {
+          if (parentId && !hasNode(ctx.nodeIds, parentId)) {
+            return {
+              ok: false,
+              error: `[block_not_found] 定位节点「${parentId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
+            }
+          }
         }
-        if (textChanges.palaceId !== undefined) {
-          validatedChanges.palaceId = textChanges.palaceId
+
+        return {
+          ok: true,
+          action: 'insertXmlFragment',
+          data: { xml, parentId, position: pos, nodeCount: parsed.nodes.length },
         }
-        break
+      } catch (err) {
+        return xmlErrorResult(err)
       }
-      case 'palace': {
-        const palaceChanges = changes as {
-          label?: string
-          imageUrl?: string
-          stations?: unknown[]
-          sourceNodeIds?: string[]
+    },
+    {
+      name: 'insertXmlFragment',
+      description: `在思维导图中插入一个 XML 片段（嵌套子树，支持批量）。position 定位：child=挂到 parentId 之下（默认）；after/before=插入到 parentId 这个兄弟节点的后面/前面；root=挂到根节点。parentId 省略时按 选中节点 → 根节点 回退。规则：新节点禁止编写 id（系统 mint）；type 必填（text/image/palace）；content 是纯文本属性，特殊字符需转义；图片节点必须引用上下文中的 asset。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      schema: z.object({
+        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
+        xml: z.string().describe('要插入的 XML 片段（顶层多个 <node> = 批量插入）'),
+        parentId: z
+          .string()
+          .optional()
+          .describe('position=child 时为父节点 id；position=after/before 时为兄弟节点 id'),
+        position: z
+          .enum(['root', 'child', 'after', 'before'])
+          .optional()
+          .describe('插入位置（缺省 child）'),
+      }),
+    },
+  )
+}
+
+// ========== updateMindmapNode（整体替换，参数改 XML） ==========
+
+/**
+ * 创建更新工具：XML 参数整体替换节点（含子树）。片段根节点 id 必须存在
+ * （block_not_found）；根节点不允许替换（tree_invalid）。
+ */
+export function createUpdateMindmapNodeTool(provider: EditorSnapshotProvider) {
+  return tool(
+    async ({ fileUuid, xml }) => {
+      try {
+        const parsed = await parseXmlFragment(xml)
+        const snapshot = await provider(fileUuid ?? '')
+        const existing = new Set(snapshot.nodeIds)
+
+        if (parsed.rootIds.length !== 1) {
+          return {
+            ok: false,
+            error:
+              '[tree_invalid] updateMindmapNode 必须提供恰好一个根 <node>（含子树）。恢复策略：用单个根节点重写',
+          }
         }
-        if (palaceChanges.label !== undefined) {
-          validatedChanges.label = palaceChanges.label
+        const nodeId = parsed.rootIds[0]!
+        if (nodeId === 'root') {
+          return {
+            ok: false,
+            error: '[tree_invalid] root 是导图锚点，不可被替换。恢复策略：不要触碰 root',
+          }
         }
-        if (palaceChanges.imageUrl !== undefined) {
-          validatedChanges.imageUrl = palaceChanges.imageUrl
+        if (!existing.has(nodeId)) {
+          return {
+            ok: false,
+            error: `[block_not_found] 节点「${nodeId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
+          }
         }
-        if (palaceChanges.stations !== undefined) {
-          validatedChanges.stations = palaceChanges.stations
+
+        // 子树内的新 id 不得与编辑器其它节点冲突（被替换节点自身除外）
+        const { ctx } = buildValidationContext(
+          snapshot.nodeIds.map((id) => ({ id })),
+          [],
+          snapshot.assetIds.map((id) => ({ id })),
+        )
+        validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
+
+        return {
+          ok: true,
+          action: 'updateMindmapNode',
+          data: { xml, nodeId, nodeCount: parsed.nodes.length },
         }
-        if (palaceChanges.sourceNodeIds !== undefined) {
-          validatedChanges.sourceNodeIds = palaceChanges.sourceNodeIds
-        }
-        break
+      } catch (err) {
+        return xmlErrorResult(err)
       }
-      default:
-        return { ok: false, error: `不支持的节点类型: ${nodeType}` }
-    }
+    },
+    {
+      name: 'updateMindmapNode',
+      description: `整体替换一个导图节点（内容/类型/子树）。xml 参数是单个根 <node>，其 id 必须是 readMindmap 提供的现有节点 id；节点本身被替换为新 XML 的形状，原子树被新子树整体替换。root 不可替换。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      schema: z.object({
+        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
+        xml: z.string().describe('单个根 <node> 的 XML（id 引用现有节点）'),
+      }),
+    },
+  )
+}
 
-    return {
-      ok: true,
-      action: 'updateNode',
-      data: { nodeId, nodeType, changes: validatedChanges },
-    }
-  },
-  {
-    name: 'updateMindmapNode',
-    description:
-      '更新指定思维导图节点的属性。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。',
-    schema: z.object({
-      nodeId: z.string().describe('要更新的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
-      nodeType: z.enum(['text', 'palace']).describe('节点类型（必填）'),
-      changes: z.record(z.unknown()).describe('要更新的字段对象'),
-    }),
-  },
-)
+// ========== moveMindmapNode（摘除 + 重挂 + 重布局） ==========
 
-// ========== 删除节点 ==========
+/**
+ * 创建移动工具：摘除子树 + 重挂 + 重布局（单条 batch 历史，原子）。
+ * root 不可移动；目标不得位于被移子树内（环 → tree_invalid）。
+ */
+export function createMoveMindmapNodeTool(provider: EditorSnapshotProvider) {
+  return tool(
+    async ({ fileUuid, nodeId, targetId, position }) => {
+      try {
+        const snapshot = await provider(fileUuid ?? '')
+        const existing = new Set(snapshot.nodeIds)
+
+        if (nodeId === 'root') {
+          return {
+            ok: false,
+            error: '[tree_invalid] root 是导图锚点，不可移动。恢复策略：不要触碰 root',
+          }
+        }
+        if (!existing.has(nodeId)) {
+          return {
+            ok: false,
+            error: `[block_not_found] 节点「${nodeId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
+          }
+        }
+        const target = targetId ?? 'root'
+        if (target === nodeId) {
+          return {
+            ok: false,
+            error: '[tree_invalid] 目标节点不能是自身。恢复策略：改用其它目标',
+          }
+        }
+        if (!existing.has(target)) {
+          return {
+            ok: false,
+            error: `[block_not_found] 目标节点「${target}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
+          }
+        }
+
+        // 环检测：沿 parents 链从 target 向上走到根，命中 nodeId 即环
+        let current: string | undefined = snapshot.parents[target]
+        while (current) {
+          if (current === nodeId) {
+            return {
+              ok: false,
+              error:
+                '[tree_invalid] 不能把节点移动到它自己的子树内（会产生环）。恢复策略：改用其它目标',
+            }
+          }
+          current = snapshot.parents[current]
+        }
+
+        return {
+          ok: true,
+          action: 'moveMindmapNode',
+          data: { nodeId, targetId: target, position: position ?? 'child' },
+        }
+      } catch (err) {
+        return xmlErrorResult(err)
+      }
+    },
+    {
+      name: 'moveMindmapNode',
+      description: `移动一个节点（连同其整棵子树）到新位置，原子操作（一次撤销还原）。position：child=成为 targetId 的子节点（默认）；after/before=成为 targetId 的兄弟。root 不可移动；不能移动到自己的子树内。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      schema: z.object({
+        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
+        nodeId: z.string().describe('要移动的节点 id（含其子树）'),
+        targetId: z.string().optional().describe('目标节点 id（缺省 root）'),
+        position: z
+          .enum(['child', 'after', 'before'])
+          .optional()
+          .describe('相对目标的插入位置（缺省 child）'),
+      }),
+    },
+  )
+}
+
+// ========== deleteMindmapNode（保留） ==========
+
 const deleteNodeTool = tool(
-  async ({ nodeId, confirmDeleteSubtree }) => {
+  async ({ fileUuid, nodeId, confirmDeleteSubtree }) => {
     if (!nodeId.trim()) {
       return { ok: false, error: '节点ID不能为空' }
     }
-
+    if (nodeId === 'root') {
+      return {
+        ok: false,
+        error: '[tree_invalid] root 是导图锚点，不可删除。恢复策略：不要触碰 root',
+      }
+    }
     return {
       ok: true,
       action: 'deleteNode',
       data: {
+        fileUuid,
         nodeId,
         confirmDeleteSubtree: confirmDeleteSubtree ?? true,
       },
@@ -185,80 +270,28 @@ const deleteNodeTool = tool(
   {
     name: 'deleteMindmapNode',
     description:
-      '删除指定的思维导图节点。nodeId 可以从上下文的思维导图节点树中推断（每个节点都标注了 id）。如果该节点有子节点，默认会一并删除其子树。',
+      '删除指定的思维导图节点（连同其整棵子树）。nodeId 必须来自 readMindmap 提供的 id；root 不可删除。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。',
     schema: z.object({
-      nodeId: z.string().describe('要删除的节点ID，可以从上下文的节点树中根据节点标签推断得到'),
+      fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
+      nodeId: z.string().describe('要删除的节点ID（含子树）'),
       confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
     }),
   },
 )
 
-// ========== 批量操作 ==========
-const batchAddNodesTool = tool(
-  async ({ yamlFragment, parentId }) => {
-    if (!yamlFragment || !yamlFragment.trim()) {
-      return { ok: false, error: 'YAML 片段不能为空' }
-    }
-
-    const validation = validateMindmapYaml(yamlFragment, { mode: 'fragment' })
-    if (!validation.ok) {
-      return { ok: false, error: `YAML 片段无效：${validation.reason}` }
-    }
-
-    return {
-      ok: true,
-      action: 'batchAddNodes',
-      data: {
-        yamlFragment: yamlFragment.trim(),
-        parentId: parentId || undefined,
-      },
-    }
-  },
-  {
-    name: 'batchAddMindmapNodes',
-    description: `批量添加多个节点到思维导图中。你只需提供一个 YAML 格式的大纲片段，系统会自动解析并插入到指定父节点下方。
-
-重要规则：
-1. 如果要扩展现有节点，YAML 片段应直接列出要添加的子节点，不要包含父节点本身的名称。
-2. 可以直接提供子节点列表（不需要顶层根节点包裹）。
-
-扩展现有节点的正确示例（parentId 指向已有节点）：
-- "Z-Score 标准化":
-    - "公式：z = (x-μ)/σ"
-    - "适用场景"
-- "Min-Max 归一化"
-
-错误示例（不要这样写，会导致父节点重复）：
-- "标准化数值变量":       ← 不要包含父节点本身
-    - "Z-Score 标准化"
-
-每个条目是一个字符串（无子节点）或一个键值对（键为节点标签，值为子节点数组）。
-如果不提供 parentId，节点将插入到当前选中的节点或根节点下方。`,
-    schema: z.object({
-      yamlFragment: z.string().describe('YAML 格式的大纲片段，描述要添加的节点结构'),
-      parentId: z.string().optional().describe('父节点ID，不提供则插入到当前选中节点或根节点'),
-    }),
-  },
-)
-
-type MindmapActionTools = {
-  addTextNodeTool: typeof addTextNodeTool
-  updateNodeTool: typeof updateNodeTool
+export interface MindmapWriteTools {
+  insertXmlFragmentTool: ReturnType<typeof createInsertXmlFragmentTool>
+  updateNodeTool: ReturnType<typeof createUpdateMindmapNodeTool>
+  moveNodeTool: ReturnType<typeof createMoveMindmapNodeTool>
   deleteNodeTool: typeof deleteNodeTool
-  batchAddNodesTool: typeof batchAddNodesTool
-  addPalaceNodeTool?: typeof addPalaceNodeTool
 }
 
-// 导出工具创建函数
-export function createMindmapActionTools(hasPalace = true): MindmapActionTools {
-  const tools: MindmapActionTools = {
-    addTextNodeTool,
-    updateNodeTool,
+/** 创建固定 4 写工具。 */
+export function createMindmapActionTools(provider: EditorSnapshotProvider): MindmapWriteTools {
+  return {
+    insertXmlFragmentTool: createInsertXmlFragmentTool(provider),
+    updateNodeTool: createUpdateMindmapNodeTool(provider),
+    moveNodeTool: createMoveMindmapNodeTool(provider),
     deleteNodeTool,
-    batchAddNodesTool,
   }
-  if (hasPalace) {
-    tools.addPalaceNodeTool = addPalaceNodeTool
-  }
-  return tools
 }

@@ -385,3 +385,28 @@ function formatNodeTitle(node: MindmapYamlNode): string {
 function stringifyYamlScalar(value: string): string {
   return YAML.stringify(value).trim()
 }
+
+// ─── XML 大纲序列化（PRD：generateMindmapFragment 输出 XML 片段） ─────────────
+
+function escapeXmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+/** 把大纲树序列化为 XML 片段（AI 批量插入入口，type 必填、content 唯一内容通道）。 */
+export function serializeXmlOutline(node: MindmapYamlNode, depth = 0): string {
+  const indent = '  '.repeat(depth)
+  const attrs = [
+    `type="text"`,
+    `content="${escapeXmlText(node.label)}"`,
+    ...(node.page_range ? [`pageRange="${escapeXmlText(node.page_range)}"`] : []),
+    ...(node.summary ? [`summary="${escapeXmlText(node.summary)}"`] : []),
+  ].join(' ')
+  const children = (node.children ?? []).map((child) => serializeXmlOutline(child, depth + 1))
+  if (children.length === 0) return `${indent}<node ${attrs} />`
+  return `${indent}<node ${attrs}>\n${children.join('\n')}\n${indent}</node>`
+}

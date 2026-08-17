@@ -15,7 +15,7 @@ function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSu
     error: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapYaml: '',
+    mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,

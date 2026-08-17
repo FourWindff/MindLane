@@ -13,8 +13,8 @@ class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
       ...(data.palaceId != null && { palaceId: data.palaceId }),
       ...(data.pageRange != null && { pageRange: data.pageRange }),
       ...(data.summary != null && { summary: data.summary }),
-      ...(data.side != null && { side: data.side }),
-      ...(data.branchIndex != null && { branchIndex: data.branchIndex }),
+      // 布局产物（depth/branchIndex/side）不落盘（PRD 2.2），打开时布局重算
+      ...(data.collapsed === true && { collapsed: true }),
     }
   }
 }

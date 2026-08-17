@@ -59,6 +59,36 @@
   word-break: break-word;
 }
 
+.text-node__collapse-btn {
+  position: absolute;
+  right: -18px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--ml-border, rgba(0, 0, 0, 0.12));
+  border-radius: 50%;
+  background: var(--ml-node-bg, #fff);
+  color: var(--ml-node-text, inherit);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  box-shadow: var(--ml-shadow-soft, 0 1px 3px rgba(0, 0, 0, 0.15));
+}
+
+.text-node:hover .text-node__collapse-btn,
+.text-node--selected .text-node__collapse-btn {
+  opacity: 1;
+}
+
+.text-node__collapse-btn--collapsed {
+  opacity: 1;
+}
+
 .text-node__textarea {
   field-sizing: content;
   display: block;

@@ -160,7 +160,8 @@ export class Runner {
             output?: unknown
           }
           if (event.event === 'on_tool_start') {
-            if (event.name === 'batchAddMindmapNodes') this.emit('step', 'generating-map')
+            if (event.name === 'insertXmlFragment' || event.name === 'generateMindmapFragment')
+              this.emit('step', 'generating-map')
             runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
             runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
             this.emit('tool-start', {

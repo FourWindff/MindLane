@@ -24,7 +24,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
       mindmapInputTitle: 'Test',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
@@ -61,7 +61,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
@@ -78,10 +78,10 @@ describe('MindmapSubgraphState', () => {
     })
   })
 
-  it('has mindmapYaml field', async () => {
+  it('has mindmapXml field', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('test', async (state) => {
-        expect(state.mindmapYaml).toBe('root:\n  label: Test\n')
+        expect(state.mindmapXml).toBe('root:\n  label: Test\n')
         return {}
       })
       .addEdge('__start__', 'test')
@@ -98,7 +98,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: 'root:\n  label: Test\n',
+      mindmapXml: 'root:\n  label: Test\n',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
@@ -127,7 +127,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
@@ -160,7 +160,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
@@ -191,7 +191,7 @@ describe('MindmapSubgraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
@@ -229,7 +229,7 @@ describe('MainGraphState', () => {
       error: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
       mindmapInputTitle: 'Test',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
@@ -263,7 +263,7 @@ describe('MainGraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapYaml: '',
+      mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
       leafResults: [],

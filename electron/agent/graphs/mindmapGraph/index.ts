@@ -2,7 +2,7 @@ import { StateGraph, START, END, Send, getWriter } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
-import { serializeMindmapOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
+import { serializeXmlOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
 import { validateMindmapYaml } from '../../utils/yamlValidation.js'
 import {
   createDefaultLoaders,
@@ -91,7 +91,7 @@ function createMindmapRunReset(): typeof MindmapSubgraphState.Update {
   return {
     response: '',
     error: '',
-    mindmapYaml: '',
+    mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,
@@ -404,7 +404,7 @@ async function mergeTreesNode(
   const treesYaml = group.trees
     .map((tree, i) => {
       const rootTree = extractRootTree(tree, `Tree ${i + 1}`)
-      return `--- Tree ${i + 1} ---\n${rootTree ? serializeMindmapOutline(rootTree) : String(tree)}`
+      return `--- Tree ${i + 1} ---\n${rootTree ? serializeXmlOutline(rootTree) : String(tree)}`
     })
     .join('\n\n')
 
@@ -502,7 +502,7 @@ async function buildOutputNode(
 
   return {
     pendingSubgraph: null,
-    mindmapYaml: serializeMindmapOutline(rootTree),
+    mindmapXml: serializeXmlOutline(rootTree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
   }

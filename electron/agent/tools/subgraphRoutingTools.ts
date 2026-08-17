@@ -8,7 +8,7 @@ export function createGenerateMindmapFragmentTool(): DynamicStructuredTool {
   return new DynamicStructuredTool({
     name: GENERATE_MINDMAP_FRAGMENT_TOOL,
     description:
-      '从当前附加文档或用户输入生成一个思维导图 YAML 片段。该工具不需要参数；系统会自动从当前上下文选择输入来源。得到结果后你需要根据当前思维导图上下文再调用 batchAddMindmapNodes 选择插入位置。',
+      '从当前附加文档或用户输入生成一个思维导图 XML 片段（<node type="text" content="…"> 嵌套）。该工具不需要参数；系统会自动从当前上下文选择输入来源。得到结果后你需要根据当前思维导图上下文再调用 insertXmlFragment 选择插入位置。',
     schema: z.object({}).strict(),
     func: async () => '',
   })
@@ -18,7 +18,7 @@ export function createGeneratePalaceTool(): DynamicStructuredTool {
   return new DynamicStructuredTool({
     name: GENERATE_PALACE_TOOL,
     description:
-      '根据当前选中的节点、用户输入或附加文档生成记忆宫殿设计。该工具不需要参数；系统会自动从当前上下文选择输入来源。得到结果后你需要根据当前思维导图上下文再调用 addPalaceNode 选择插入位置。',
+      '根据当前选中的节点、用户输入或附加文档生成记忆宫殿设计。该工具不需要参数；系统会自动从当前上下文选择输入来源。得到结果后你需要根据当前思维导图上下文再调用 insertXmlFragment 插入 palace 节点（type="palace"，站点为 <station> 子元素）。',
     schema: z.object({}).strict(),
     func: async () => '',
   })

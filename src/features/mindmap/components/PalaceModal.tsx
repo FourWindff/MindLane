@@ -1,4 +1,6 @@
 import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData, PalaceStation } from '@/shared/lib/fileFormat'
 
 interface PalaceModalProps {
@@ -34,6 +36,9 @@ function buildPathD(stations: PalaceStation[]): string {
 export function PalaceModal({ data, onClose }: PalaceModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const pathRef = useRef<SVGPathElement>(null)
+  const assets = useActiveMindmapStore((state) => state.assets)
+  const asset = data.assetId ? assets.find((a) => a.id === data.assetId) : undefined
+  const imageSrc = asset ? assetToDataUrl(asset) : data.imageUrl || ''
   const stations = useMemo(
     () => [...(data.stations ?? [])].sort((a, b) => a.order - b.order),
     [data.stations],
@@ -109,9 +114,9 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
 
         <div className="palace-modal__body">
           <div className="palace-modal__image-wrap">
-            {data.imageUrl ? (
+            {imageSrc ? (
               <img
-                src={data.imageUrl}
+                src={imageSrc}
                 alt={data.label}
                 className="palace-modal__image"
                 draggable={false}

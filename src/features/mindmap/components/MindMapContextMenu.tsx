@@ -12,6 +12,7 @@ type ContextMenuProps = {
   onRemove: () => void
   onReset: () => void
   onGeneratePalace?: () => void
+  onInsertImage?: () => void
   canAddSibling: boolean
   canRemove: boolean
   aiBusy: boolean
@@ -28,6 +29,7 @@ export function MindMapContextMenu({
   onRemove,
   onReset,
   onGeneratePalace,
+  onInsertImage,
   canAddSibling,
   canRemove,
   aiBusy,
@@ -73,6 +75,15 @@ export function MindMapContextMenu({
         disabled={!canAddSibling || aiBusy}
       >
         同级
+      </button>
+      <button
+        type="button"
+        className="mindmap-ctx__item"
+        role="menuitem"
+        onClick={() => run(() => onInsertImage?.())}
+        disabled={!onInsertImage || aiBusy}
+      >
+        插入图片
       </button>
       <button
         type="button"

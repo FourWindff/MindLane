@@ -1,7 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
@@ -11,12 +13,25 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as TextNodeData
   const editor = useActiveMindmapEditor()
   const instance = useActiveMindmapInstance()
+  const edges = useActiveMindmapStore((state) => state.edges)
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const { visualVariant, colorScheme } = useMapStyle()
 
   const editing = !!data.editing
+  const collapsed = data.collapsed === true
+  // 折叠控件：节点有子节点时显示（子节点由边派生）
+  const hasChildren = edges.some((e) => e.source === id)
+
+  const toggleCollapsed = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (aiBusy) return
+      editor.setNodeCollapsed(id, !collapsed)
+    },
+    [aiBusy, collapsed, editor, id],
+  )
 
   const clearEditing = useCallback(() => {
     editor.setNodeEditing(id, false)
@@ -134,6 +149,22 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
         />
       ) : (
         <span className="text-node__label">{label}</span>
+      )}
+      {!editing && hasChildren && (
+        <button
+          type="button"
+          className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? '展开子树' : '折叠子树'}
+          title={collapsed ? '展开子树' : '折叠子树'}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {collapsed ? (
+            <ChevronRight size={14} strokeWidth={2} />
+          ) : (
+            <ChevronDown size={14} strokeWidth={2} />
+          )}
+        </button>
       )}
     </div>
   )

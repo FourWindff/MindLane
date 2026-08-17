@@ -1,7 +1,13 @@
-import type { Connection, Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
+import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { type MindLaneFile, type MindLaneNode } from '@/shared/lib/fileFormat'
 import { parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
+import {
+  MindmapXmlError,
+  parseXmlFragment,
+  validateFragmentForInsert,
+  buildValidationContext,
+} from '@/shared/lib/mindmapXml'
 import {
   collectSubtreeIds,
   createInitialEdges,
@@ -10,6 +16,7 @@ import {
   findRootNode,
   newId,
 } from '@/shared/lib/mindmapTree'
+import { defaultNodeSize } from '@/shared/lib/nodeSize'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
@@ -135,6 +142,10 @@ export class MindmapEditor {
       const selected = nodes.find((n) => n.selected)
       parentId = selected?.id ?? findRootNode(nodes, edges)?.id ?? nodes[0]?.id ?? 'root'
     }
+    if (parentId === 'root' && !nodes.some((n) => n.id === 'root')) {
+      // root 锚点不存在（重置/空文档）：以第一个节点为父
+      parentId = nodes[0]?.id ?? 'root'
+    }
 
     const parentNode = nodes.find((n) => n.id === parentId)
     const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
@@ -200,6 +211,72 @@ export class MindmapEditor {
     })
   }
 
+  /**
+   * 切换节点折叠状态（通用属性，走命令历史可撤销；折叠只影响展示，子树完整保留）。
+   */
+  setNodeCollapsed(nodeId: string, collapsed: boolean): void {
+    this.updateNodeData(nodeId, { collapsed: collapsed || undefined })
+  }
+
+  /**
+   * 移动子树到新位置（摘除 + 重挂 + 重布局，单条 batch 历史，原子）。
+   * position: child=挂到 targetId 之下（默认）；after/before=成为 targetId 兄弟的前/后。
+   * root 不可移动；目标不得位于被移子树内（环）。
+   */
+  moveSubtree(
+    nodeId: string,
+    targetId: string,
+    position: 'child' | 'after' | 'before' = 'child',
+  ): void {
+    if (nodeId === 'root' || targetId === nodeId) return
+    const edges = this.state.edges
+    const subtreeIds = collectSubtreeIds(edges, nodeId)
+    if (subtreeIds.has(targetId)) return
+
+    const oldParentId = findParentId(edges, nodeId)
+    const newParentId =
+      position === 'child'
+        ? targetId
+        : (findParentId(edges, targetId) ?? findRootNode(this.state.nodes, edges)?.id)
+    if (!newParentId || newParentId === nodeId) return
+    if (position === 'child' && newParentId === oldParentId) return
+
+    const commands: MindmapCommand[] = []
+    const incomingEdge = edges.find((e) => e.target === nodeId)
+    if (incomingEdge) {
+      commands.push({ type: 'removeEdge', edgeId: incomingEdge.id })
+    }
+
+    // after/before：垂直对齐到目标兄弟上/下方，保证重布局后的兄弟顺序
+    if (position !== 'child' && oldParentId === newParentId) {
+      const sibling = this.state.nodes.find((n) => n.id === targetId)
+      const node = this.state.nodes.find((n) => n.id === nodeId)
+      if (sibling && node) {
+        const siblingH = sibling.measured?.height ?? defaultNodeSize(sibling.type).height
+        const nodeH = node.measured?.height ?? defaultNodeSize(node.type).height
+        const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+        const align =
+          position === 'before'
+            ? sibling.position.y - gapY - nodeH
+            : sibling.position.y + siblingH + gapY
+        commands.push({ type: 'moveNode', nodeId, position: { x: node.position.x, y: align } })
+      }
+    }
+
+    commands.push({
+      type: 'addEdge',
+      edge: {
+        id: `e-${newParentId}-${nodeId}`,
+        source: newParentId,
+        target: nodeId,
+        type: 'mindmap',
+        className: 'mindmap-edge',
+      },
+    })
+    // runBatch 内联重布局（removeEdge/addEdge 触发 shouldReflowAfter）
+    this.runBatch(commands, false)
+  }
+
   deleteSubtree(rootId: string): void {
     this.deleteSubtrees([rootId])
   }
@@ -207,6 +284,7 @@ export class MindmapEditor {
   deleteSubtrees(rootIds: string[]): void {
     const allIds = new Set<string>()
     for (const rootId of rootIds) {
+      if (rootId === 'root') continue
       for (const id of collectSubtreeIds(this.state.edges, rootId)) allIds.add(id)
     }
 
@@ -242,6 +320,7 @@ export class MindmapEditor {
   }
 
   moveNode(nodeId: string, position: { x: number; y: number }): void {
+    if (nodeId === 'root') return
     this.execute({ type: 'moveNode', nodeId, position })
   }
 
@@ -259,11 +338,113 @@ export class MindmapEditor {
 
   // ─── YAML / AI 批量插入 ───
 
+  /**
+   * 解析并插入 XML 片段（AI 写操作统一入口之一）。
+   * 校验失败抛 MindmapXmlError（错误码回传给 AI），不产生部分挂载。
+   * position: child=挂到 parentId 之下（默认）；after/before=插入到 parentId 兄弟的前/后；
+   * root=挂到根节点。
+   */ async insertFromXml(
+    xml: string,
+    options: { parentId?: string; position?: 'root' | 'child' | 'after' | 'before' } = {},
+  ): Promise<void> {
+    const parsed = await parseXmlFragment(xml)
+    const { ctx } = buildValidationContext(this.state.nodes, this.state.edges, this.state.assets)
+    validateFragmentForInsert(parsed, ctx)
+
+    const position = options.position ?? 'child'
+    if (position === 'after' || position === 'before') {
+      this.insertParsedFragmentSibling(parsed, {
+        siblingId: options.parentId ?? '',
+        before: position === 'before',
+      })
+      return
+    }
+    const parentId = position === 'root' ? 'root' : options.parentId
+    this.insertParsedFragment(parsed, { parentId })
+  }
+
+  /**
+   * 整体替换节点（含子树，updateMindmapNode 前端执行）：
+   * 删除旧子树 → 用片段（同 id 根）重挂到旧父节点下，单条 batch 历史。
+   */
+  async replaceNodeFromXml(xml: string): Promise<void> {
+    const parsed = await parseXmlFragment(xml)
+    if (parsed.rootIds.length !== 1) {
+      throw new MindmapXmlError(
+        'tree_invalid',
+        'updateMindmapNode 必须提供恰好一个根 <node>（含子树）',
+      )
+    }
+    const nodeId = parsed.rootIds[0]!
+    if (nodeId === 'root') {
+      throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可被替换')
+    }
+    const nodes = this.state.nodes
+    const edges = this.state.edges
+    if (!nodes.some((n) => n.id === nodeId)) {
+      throw new MindmapXmlError(
+        'block_not_found',
+        `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
+      )
+    }
+    const { ctx } = buildValidationContext(nodes, edges, this.state.assets)
+    validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
+
+    const oldParentId = findParentId(edges, nodeId)
+    const commands: MindmapCommand[] = [{ type: 'deleteSubtree', rootId: nodeId }]
+    for (const n of parsed.nodes) {
+      commands.push({
+        type: 'addNode',
+        node: { ...n, data: { ...n.data, justAdded: true } },
+      })
+    }
+    if (oldParentId) {
+      commands.push({
+        type: 'addEdge',
+        edge: {
+          id: `e-${oldParentId}-${nodeId}`,
+          source: oldParentId,
+          target: nodeId,
+          type: 'mindmap',
+          className: 'mindmap-edge mindmap-edge--enter',
+        },
+      })
+    }
+    for (const e of parsed.edges) {
+      commands.push({
+        type: 'addEdge',
+        edge: {
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          type: e.type ?? 'mindmap',
+          className: 'mindmap-edge mindmap-edge--enter',
+        },
+      })
+    }
+    this.runBatch(commands, false)
+  }
+
   insertFromYaml(yamlFragment: string, options: { parentId?: string } = {}): void {
+    const parsed = parseYamlFragment(yamlFragment)
+    this.insertParsedFragment(parsed, options)
+  }
+
+  /**
+   * insertFromYaml / insertFromXml 共用的落图逻辑（布局/聚合/历史/回退链对齐）。
+   * 回退链：显式 parentId → 选中节点 → 根节点。
+   */
+  /**
+   * insertFromYaml / insertFromXml 共用的落图逻辑（布局/聚合/历史/回退链对齐）。
+   * 回退链：显式 parentId → 选中节点 → 根节点。
+   */
+  private insertParsedFragment(
+    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
+    options: { parentId?: string },
+  ): void {
     const nodes = this.state.nodes
     const edges = this.state.edges
 
-    const parsed = parseYamlFragment(yamlFragment)
     const targetParentId =
       options.parentId ??
       nodes.find((n) => n.selected)?.id ??
@@ -271,16 +452,63 @@ export class MindmapEditor {
       nodes[0]?.id
 
     if (!targetParentId) {
-      console.warn('[insertFromYaml] 无法确定父节点')
+      console.warn('[insertParsedFragment] 无法确定父节点')
       return
     }
 
     const parentNode = nodes.find((n) => n.id === targetParentId)
     if (!parentNode) {
-      console.warn('[insertFromYaml] 父节点不存在:', targetParentId)
+      console.warn('[insertParsedFragment] 父节点不存在:', targetParentId)
       return
     }
 
+    const anchorX =
+      parentNode.position.x + VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    this.insertParsedFragmentAt(parsed, targetParentId, anchorX, parentNode.position.y)
+  }
+
+  /**
+   * 兄弟定位插入（after/before）：目标父 = 兄弟的父节点，垂直对齐到兄弟上/下方。
+   */
+  private insertParsedFragmentSibling(
+    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
+    options: { siblingId: string; before: boolean },
+  ): void {
+    const nodes = this.state.nodes
+    const edges = this.state.edges
+    const sibling = nodes.find((n) => n.id === options.siblingId)
+    if (!sibling) {
+      console.warn('[insertParsedFragmentSibling] 兄弟节点不存在:', options.siblingId)
+      return
+    }
+    const parentId = findParentId(edges, options.siblingId) ?? findRootNode(nodes, edges)?.id
+    if (!parentId) {
+      console.warn('[insertParsedFragmentSibling] 无法确定兄弟的父节点')
+      return
+    }
+    const parentNode = nodes.find((n) => n.id === parentId)
+    if (!parentNode) return
+
+    const spacing = VISUAL_VARIANTS[this.state.style.visualVariant].spacing
+    const siblingH = sibling.measured?.height ?? defaultNodeSize(sibling.type).height
+    const firstH = defaultNodeSize(parsed.nodes[0]?.type ?? 'text').height
+    const anchorX =
+      parentNode.position.x + VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    const anchorY = options.before
+      ? sibling.position.y - spacing.gapY - firstH
+      : sibling.position.y + siblingH + spacing.gapY
+    this.insertParsedFragmentAt(parsed, parentId, anchorX, anchorY)
+  }
+
+  /**
+   * 共用的片段落图核心：dagre 初始布局 → 平移对齐锚点 → 批量命令 → 单条历史。
+   */
+  private insertParsedFragmentAt(
+    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
+    targetParentId: string,
+    anchorX: number,
+    anchorY: number,
+  ): void {
     const laidOut = mindmapLayout.initial(parsed.nodes, parsed.edges, {
       rootX: 0,
       rootY: 0,
@@ -296,19 +524,18 @@ export class MindmapEditor {
 
     const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {
-      console.warn('[insertFromYaml] 无法找到子树根节点')
+      console.warn('[insertParsedFragment] 无法找到子树根节点')
       return
     }
 
     const firstSubRoot = laidOut.find((n) => n.id === subRootIds[0])
     if (!firstSubRoot) {
-      console.warn('[insertFromYaml] 子树根节点不在布局结果中')
+      console.warn('[insertParsedFragment] 子树根节点不在布局结果中')
       return
     }
 
-    const offsetX =
-      parentNode.position.x + VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
-    const offsetY = parentNode.position.y - firstSubRoot.position.y
+    const offsetX = anchorX - firstSubRoot.position.x
+    const offsetY = anchorY - firstSubRoot.position.y
 
     const commands: MindmapCommand[] = []
 
@@ -470,25 +697,6 @@ export class MindmapEditor {
       this.removeEdge(edgeId)
     }
   }
-
-  applyNativeConnect(connection: Connection): void {
-    if (!connection.source || !connection.target) return
-    const existing = this.state.edges.find(
-      (e) => e.source === connection.source && e.target === connection.target,
-    )
-    if (existing) return
-
-    const edge: Edge = {
-      id: `e_${connection.source}_${connection.target}`,
-      source: connection.source,
-      target: connection.target,
-      type: 'mindmap',
-      className: 'mindmap-edge',
-    }
-    this.addEdge(edge)
-  }
-
-  // ─── 临时 UI 状态（不进入历史） ───
 
   setNodeEditing(nodeId: string, editing: boolean): void {
     this.state.setNodesTransient((nodes) =>

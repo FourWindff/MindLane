@@ -67,7 +67,7 @@ export function MindmapCanvas({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       nodesDraggable={false}
-      nodesConnectable={!disabled}
+      nodesConnectable={false}
       elementsSelectable={!disabled}
       onMoveEnd={onMoveEnd}
       onInit={onInit}

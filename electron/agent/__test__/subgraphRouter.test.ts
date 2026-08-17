@@ -21,7 +21,7 @@ function createMinimalState(overrides: Partial<MainGraphStateType> = {}): MainGr
     error: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapYaml: '',
+    mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,
@@ -136,7 +136,7 @@ describe('SubgraphRouter.packageResult', () => {
       pendingSubgraphToolCallId: 'call-mindmap',
       pendingSubgraphToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
       mindmapTitle: '测试导图',
-      mindmapYaml: 'root:\n  - child',
+      mindmapXml: 'root:\n  - child',
     })
 
     const result = packageResult(state)
@@ -148,7 +148,7 @@ describe('SubgraphRouter.packageResult', () => {
     expect(JSON.parse(toolMessage.content as string)).toEqual({
       ok: true,
       title: '测试导图',
-      yamlFragment: 'root:\n  - child',
+      xmlFragment: 'root:\n  - child',
       documentRef: null,
     })
     expect(result.pendingSubgraph).toBeNull()

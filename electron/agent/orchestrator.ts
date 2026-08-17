@@ -3,6 +3,7 @@ import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
+import type { MindmapEditorSnapshot } from '../ipc.js'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
 import type { AgentServices } from './service.js'
 import type {
@@ -18,9 +19,9 @@ import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/lib/fileFormat.js'
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import { createMindmapActionTools } from './tools/mindmapActions.js'
+import { createMindmapActionTools, type EditorSnapshotProvider } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
-import { createGetMindmapContextTool } from './tools/mindmapRead.js'
+import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { logger } from '../shared/logger.js'
@@ -67,7 +68,9 @@ interface AgentOrchestratorOptions {
   userDataPath?: string
   messagePipeline?: MessagePipelineConfig
   /** 按需读导图快照提供者：主进程装配时注入（经反向 IPC 向渲染层拉取）。 */
-  mindmapReadProvider?: (fileUuid: string) => Promise<string>
+  mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
+  /** 写工具校验快照提供者（节点/资源/父关系）。 */
+  mindmapSnapshotRequester?: (fileUuid: string) => Promise<MindmapEditorSnapshot>
 }
 
 interface PalaceFromNodesResult {
@@ -149,19 +152,23 @@ export class AgentOrchestrator {
 
   /**
    * Register MindLane's default tools into the toolRegistry.
-   * Action tools are registered first, followed by routing tools.
+   * XML 写工具（固定 4 个）先注册，随后是路由工具。
    */
   private registerDefaultTools(options: { hasPalace: boolean }): void {
-    const actionTools = createMindmapActionTools(options.hasPalace)
-
-    this.toolRegistry.registerTool(actionTools.addTextNodeTool)
-    this.toolRegistry.registerTool(actionTools.updateNodeTool)
-    this.toolRegistry.registerTool(actionTools.deleteNodeTool)
-    this.toolRegistry.registerTool(actionTools.batchAddNodesTool)
-
-    if (actionTools.addPalaceNodeTool) {
-      this.toolRegistry.registerTool(actionTools.addPalaceNodeTool)
+    // 写工具校验依赖编辑器活状态快照（反向 IPC）；未装配 provider 时校验退化为仅语法层
+    const editorSnapshotProvider: EditorSnapshotProvider = (fileUuid) => {
+      const requester = this.options.mindmapSnapshotRequester
+      if (!requester) {
+        return Promise.reject(new Error('编辑器快照通道不可用，无法校验写操作'))
+      }
+      return requester(fileUuid)
     }
+    const actionTools = createMindmapActionTools(editorSnapshotProvider)
+
+    this.toolRegistry.registerTool(actionTools.insertXmlFragmentTool)
+    this.toolRegistry.registerTool(actionTools.updateNodeTool)
+    this.toolRegistry.registerTool(actionTools.moveNodeTool)
+    this.toolRegistry.registerTool(actionTools.deleteNodeTool)
 
     // Read-only workspace file access for the mindlane chat agent.
     this.toolRegistry.registerTool(
@@ -171,7 +178,7 @@ export class AgentOrchestrator {
     // 按需读导图：模型需要整图结构（超出选中范围）时实时拉取。
     const mindmapReadProvider = this.options.mindmapReadProvider
     if (mindmapReadProvider) {
-      this.toolRegistry.registerTool(createGetMindmapContextTool(mindmapReadProvider))
+      this.toolRegistry.registerTool(createReadMindmapTool(mindmapReadProvider))
     }
 
     for (const tool of getToolSchemas()) {
@@ -465,7 +472,7 @@ export class AgentOrchestrator {
       toolCalls: this.extractToolCalls(result.messages),
     }
 
-    // Mindmap data now flows through YAML → batchAddMindmapNodes tool calls
+    // Mindmap data flows through XML fragment → insertXmlFragment tool calls
     // The insertion is handled by the tool execution in the supervisor loop
 
     if (result.memoryRoute.length > 0) {

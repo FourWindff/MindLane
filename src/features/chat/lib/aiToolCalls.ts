@@ -1,18 +1,24 @@
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { ChatToolCall } from '@/shared/lib/fileFormat'
+import { MindmapXmlError } from '@/shared/lib/mindmapXml'
 
 type ToolCallResult = ChatToolCall
 
-interface AddNodeAction {
-  type: 'text' | 'palace'
+interface InsertXmlAction {
+  xml: string
   parentId?: string
-  nodeData: Record<string, unknown>
+  position?: 'root' | 'child' | 'after' | 'before'
 }
 
 interface UpdateNodeAction {
+  xml: string
   nodeId: string
-  nodeType: string
-  changes: Record<string, unknown>
+}
+
+interface MoveNodeAction {
+  nodeId: string
+  targetId: string
+  position?: 'child' | 'after' | 'before'
 }
 
 interface DeleteNodeAction {
@@ -20,18 +26,28 @@ interface DeleteNodeAction {
   confirmDeleteSubtree: boolean
 }
 
+/** 固定写工具集（PRD 6.1）：1 读 + 4 写，YAML 入口已废弃。 */
 export const MINDMAP_ACTION_TOOLS = [
-  'addTextNode',
-  'addPalaceNode',
+  'insertXmlFragment',
   'updateMindmapNode',
+  'moveMindmapNode',
   'deleteMindmapNode',
-  'batchAddMindmapNodes',
-]
+] as const
+
+function warnToolError(name: string, error: unknown): void {
+  const message =
+    error instanceof MindmapXmlError
+      ? `[${error.code}] ${error.message}`
+      : error instanceof Error
+        ? error.message
+        : String(error)
+  console.warn(`[AI Tool] ${name} 执行失败：${message}`)
+}
 
 export function handleMindmapToolCall(toolCall: ToolCallResult, editor: MindmapEditor): boolean {
   try {
     const result = JSON.parse(toolCall.result) as
-      { ok: true; action: string; data: unknown } | { ok: false; error: string }
+      { ok: true; action: string; data: Record<string, unknown> } | { ok: false; error: string }
 
     if (!result.ok) {
       console.warn(`[AI Tool] ${toolCall.name} failed:`, result.error)
@@ -39,45 +55,37 @@ export function handleMindmapToolCall(toolCall: ToolCallResult, editor: MindmapE
     }
 
     switch (result.action) {
-      case 'addNode': {
-        const data = result.data as AddNodeAction
-        const { type, parentId, nodeData } = data
-        editor.addNode({ type, data: nodeData, parentId })
+      case 'insertXmlFragment': {
+        const data = result.data as unknown as InsertXmlAction
+        void editor
+          .insertFromXml(data.xml, { parentId: data.parentId, position: data.position })
+          .catch((err) => warnToolError(toolCall.name, err))
         return true
       }
 
-      case 'updateNode': {
-        const data = result.data as UpdateNodeAction
-        const { nodeId, changes } = data
-        editor.updateNodeData(nodeId, changes)
+      case 'updateMindmapNode': {
+        const data = result.data as unknown as UpdateNodeAction
+        void editor.replaceNodeFromXml(data.xml).catch((err) => warnToolError(toolCall.name, err))
+        return true
+      }
+
+      case 'moveMindmapNode': {
+        const data = result.data as unknown as MoveNodeAction
+        editor.moveSubtree(data.nodeId, data.targetId, data.position ?? 'child')
         return true
       }
 
       case 'deleteNode': {
-        const data = result.data as DeleteNodeAction
-        const { nodeId, confirmDeleteSubtree } = data
-
-        if (!confirmDeleteSubtree) {
+        const data = result.data as unknown as DeleteNodeAction
+        if (data.nodeId === 'root') {
+          console.warn('[AI Tool] deleteMindmapNode: root 不可删除')
+          return false
+        }
+        if (!data.confirmDeleteSubtree) {
           console.warn('[AI Tool] Delete cancelled: user did not confirm')
           return false
         }
-
-        editor.deleteSubtree(nodeId)
-        return true
-      }
-
-      case 'batchAddNodes': {
-        const { yamlFragment, parentId } = result.data as {
-          yamlFragment: string
-          parentId?: string
-        }
-
-        if (!yamlFragment) {
-          console.warn('[AI Tool] batchAddNodes: yamlFragment is empty')
-          return false
-        }
-
-        editor.insertFromYaml(yamlFragment, { parentId })
+        editor.deleteSubtree(data.nodeId)
         return true
       }
 

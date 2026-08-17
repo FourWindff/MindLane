@@ -1,5 +1,6 @@
 import type { ChatContext } from '../../../ipc.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
+import { xmlNodeTypeRegistry } from '../../../../src/shared/lib/mindmapXml/registry.js'
 
 const MEMORY_TAG = 'MEMORY'
 
@@ -56,6 +57,7 @@ export async function buildSystemPrompt(input: SystemPromptInput): Promise<strin
   if (memorySection) parts.push(memorySection)
 
   parts.push(buildCorePrompt(input.capabilityFlags, input.lastSummary))
+  parts.push(buildMindmapXmlContract())
   parts.push(buildEnvironmentPrompt())
 
   return parts.join('').trim()
@@ -94,8 +96,8 @@ function buildCorePrompt(
 
   let prompt = `<SYSTEM_PROMPT>
 你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。
-当用户需要从文档、URL 或文本生成思维导图时，先调用 generateMindmapFragment；工具返回 YAML 后，再根据当前思维导图上下文调用 batchAddMindmapNodes 选择插入位置。
-当用户需要生成记忆宫殿时，先调用 generatePalace；工具返回宫殿数据后，再根据当前思维导图上下文调用 addPalaceNode 选择插入位置。
+当用户需要从文档、URL 或文本生成思维导图时，先调用 generateMindmapFragment；工具返回 XML 片段后，再根据当前思维导图上下文调用 insertXmlFragment 选择插入位置。
+当用户需要生成记忆宫殿时，先调用 generatePalace；工具返回宫殿数据后，再根据当前思维导图上下文调用 insertXmlFragment 插入 palace 节点。
 generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要直接复制给用户。
 `
 
@@ -106,6 +108,38 @@ generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要�
   prompt += `</SYSTEM_PROMPT>
 `
   return prompt
+}
+
+/**
+ * 导图 XML 契约段（PRD 6.5 / issue 06）：注册表描述注入稳定前缀。
+ *
+ * 内容完全由代码定义（xmlNodeTypeRegistry），跨轮次逐字节稳定，不破坏前缀缓存命中；
+ * 新增节点类型只需注册条目，提示词段落自动更新，无需手写。
+ */
+export function buildMindmapXmlContract(): string {
+  return `<MINDLANE_XML_CONTRACT>
+## 导图 XML 契约
+
+- 节点：<node id="…" type="text|image|…" content="内容" [collapsed="true"]>
+- type 必填；未知类型报 invalid_type。
+- 子树：<node> 内嵌套 <node> 即父子；同级多个 <node> 为兄弟；顶层多个 = 批量插入。
+- 纯树：不允许出现环或多父；root 不可创建/删除/移动。
+- content 是纯文本；含 " < > & 时用实体 &quot; &lt; &gt; &amp;。
+- 图片：<node type="image" asset="a1" … />，asset 必须来自上下文（readMindmap 输出）。
+- id：创建新节点时禁止编写 id；引用节点必须使用 readMindmap 提供的 id。
+- 定位：insertXmlFragment 的 position 用 child（挂子节点）或 after/before（兄弟）。
+
+### 节点类型注册表
+${xmlNodeTypeRegistry.describeAll()}
+
+## 失败恢复
+
+- block_not_found: 重新调用 readMindmap 定位后再操作。
+- xml_parse_error / text_unescaped: 修正 XML 后重试。
+- invalid_type / asset_not_found: 按错误信息改用注册类型/引用。
+- tree_invalid: 修正为纯树（去重 id、避开 root、目标不得在被移子树内）。
+</MINDLANE_XML_CONTRACT>
+`
 }
 
 function buildEnvironmentPrompt(): string {

@@ -11,6 +11,7 @@ class PalaceDescriptor extends NodeTypeDescriptor<PalaceNodeData> {
   serialize(data: PalaceNodeData) {
     return {
       label: data.label,
+      ...(data.assetId != null && { assetId: data.assetId }),
       imageUrl: data.imageUrl,
       stations: data.stations,
       sourceNodeIds: data.sourceNodeIds,

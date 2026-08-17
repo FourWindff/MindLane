@@ -187,7 +187,7 @@ describe('StreamManager + Runner', () => {
     expect(content.endsWith('</EDITOR_STATE>')).toBe(true)
     expect(content).toContain('file_uuid="file-a"')
     expect(content).toContain('<SELECTED_NODES count="1">')
-    expect(content).toContain('label="选中节点"')
+    expect(content).toContain('content="选中节点"')
     // 导图树不进轮次状态（无 <MINDMAP 外壳）。
     expect(content).not.toContain('<MINDMAP')
 

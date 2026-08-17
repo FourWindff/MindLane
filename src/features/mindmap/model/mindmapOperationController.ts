@@ -1,4 +1,4 @@
-import type { Connection, Edge, EdgeChange, Node, NodeChange, Viewport } from '@xyflow/react'
+import type { Edge, EdgeChange, Node, NodeChange, Viewport } from '@xyflow/react'
 import type { MindmapEditor } from './mindmapEditor'
 import type { MindmapStructureType } from './mindmapLayout'
 import {
@@ -15,7 +15,6 @@ type OperationEditor = Pick<
   | 'deleteSubtrees'
   | 'applyNativeNodeChanges'
   | 'applyNativeEdgeChanges'
-  | 'applyNativeConnect'
   | 'setNodeSelected'
   | 'setNodeEditing'
   | 'reset'
@@ -74,11 +73,6 @@ export function createMindmapOperationController({
     handleEdgesChange(changes: EdgeChange[]) {
       if (getState().aiBusy) return
       editor.applyNativeEdgeChanges(changes)
-    },
-
-    handleConnect(connection: Connection) {
-      if (getState().aiBusy) return
-      editor.applyNativeConnect(connection)
     },
 
     handleSelectionChange(selectedNodes: Node[]) {
