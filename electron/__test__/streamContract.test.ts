@@ -151,10 +151,15 @@ describe('MindmapWrite request/response payload shapes', () => {
     const request: MindmapWriteRequest = {
       requestId: 'req-1',
       fileUuid: 'file-a',
-      action: 'a',
+      action: 'insertXmlFragment',
       args: {},
     }
-    const ok: MindmapWriteResponse = { requestId: 'req-1', ok: true, action: 'a', data: null }
+    const ok: MindmapWriteResponse = {
+      requestId: 'req-1',
+      ok: true,
+      action: 'insertXmlFragment',
+      data: null,
+    }
     const error: MindmapWriteResponse = { requestId: 'req-1', ok: false, error: 'e' }
     expect(ok.requestId).toBe(request.requestId)
     expect(error.requestId).toBe(request.requestId)

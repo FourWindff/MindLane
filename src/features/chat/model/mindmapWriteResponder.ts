@@ -7,7 +7,12 @@ import {
   validateFragmentForInsert,
   validateMove,
 } from '@/shared/lib/mindmapXml'
-import type { MindmapWriteRequest, MindmapWriteResponse } from '../../../../electron/ipc'
+import type {
+  MindmapWriteRequest,
+  MindmapWriteResponse,
+  WriteAction,
+  WriteActionArgs,
+} from '../../../../electron/ipc'
 
 /**
  * 渲染层落盘应答器（PRD：即时落盘 · 下半段）。
@@ -103,17 +108,13 @@ const MOVE_POSITIONS = new Set(['child', 'after', 'before'])
  * 校验顺序与主进程快照校验一致（01 移入共享库后同一词汇表）。
  */
 async function applyWriteAction(
-  action: string,
+  action: WriteAction,
   args: Record<string, unknown>,
   editor: MindmapEditor,
 ): Promise<unknown> {
   switch (action) {
     case 'insertXmlFragment': {
-      const { xml, parentId, position } = args as {
-        xml?: unknown
-        parentId?: string
-        position?: 'root' | 'child' | 'after' | 'before'
-      }
+      const { xml, parentId, position } = args as WriteActionArgs['insertXmlFragment']
       if (typeof xml !== 'string') {
         throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
       }
@@ -133,7 +134,7 @@ async function applyWriteAction(
     }
 
     case 'updateMindmapNode': {
-      const { xml } = args as { xml?: unknown }
+      const { xml } = args as WriteActionArgs['updateMindmapNode']
       if (typeof xml !== 'string') {
         throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
       }
@@ -143,11 +144,7 @@ async function applyWriteAction(
     }
 
     case 'moveMindmapNode': {
-      const { nodeId, targetId, position } = args as {
-        nodeId?: unknown
-        targetId?: unknown
-        position?: 'child' | 'after' | 'before'
-      }
+      const { nodeId, targetId, position } = args as WriteActionArgs['moveMindmapNode']
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
         throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
       }
@@ -164,10 +161,7 @@ async function applyWriteAction(
     }
 
     case 'deleteNode': {
-      const { nodeId, confirmDeleteSubtree } = args as {
-        nodeId?: unknown
-        confirmDeleteSubtree?: unknown
-      }
+      const { nodeId, confirmDeleteSubtree } = args as WriteActionArgs['deleteNode']
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
         throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
       }
@@ -192,7 +186,11 @@ async function applyWriteAction(
       return { nodeId, deleted: true }
     }
 
-    default:
-      throw new Error(`未知的落盘动作：${action}`)
+    default: {
+      // The WriteAction union is exhaustive; this arm is unreachable and only
+      // guards against adding a new action without a responder case.
+      const neverAction: never = action
+      throw new Error(`未知的落盘动作：${neverAction}`)
+    }
   }
 }

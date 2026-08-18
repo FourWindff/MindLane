@@ -1,5 +1,6 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
+import type { WriteAction } from '../../ipc.js'
 
 /**
  * AI write tool set (fixed 4, PRD 6.1): insertXmlFragment / updateMindmapNode /
@@ -18,7 +19,7 @@ import { z } from 'zod/v3'
 /** Write-tool renderer proxy: forwards args and returns the renderer's write ack (as-is). */
 export type MindmapWriteProxy = (
   fileUuid: string,
-  action: string,
+  action: WriteAction,
   args: Record<string, unknown>,
 ) => Promise<unknown>
 

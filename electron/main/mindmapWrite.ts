@@ -1,5 +1,10 @@
 import type { BrowserWindow } from 'electron'
-import { IPC, type MindmapWriteRequest, type MindmapWriteResponse } from '../ipc.js'
+import {
+  IPC,
+  type MindmapWriteRequest,
+  type MindmapWriteResponse,
+  type WriteAction,
+} from '../ipc.js'
 import { RendererRequester } from './rendererRequester.js'
 
 const WRITE_TIMEOUT_MS = 3000
@@ -26,7 +31,7 @@ export class MindmapWriteRequester {
     )
   }
 
-  request(fileUuid: string, action: string, args: Record<string, unknown>): Promise<unknown> {
+  request(fileUuid: string, action: WriteAction, args: Record<string, unknown>): Promise<unknown> {
     return this.inner.request<unknown>(() => ({ fileUuid, action, args }))
   }
 
