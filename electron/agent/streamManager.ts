@@ -206,6 +206,7 @@ export class Runner {
             name?: string
             input?: unknown
             output?: unknown
+            error?: unknown
             toolCallId?: string
           }
           if (event.event === 'on_tool_start') {
@@ -226,6 +227,19 @@ export class Runner {
               id: event.toolCallId ?? '',
               name: event.name ?? 'unknown',
               status: deriveToolStatus(output),
+              output,
+            })
+          } else if (event.event === 'on_tool_error') {
+            // LangGraph tools-mode also reports thrown tool errors; without this the
+            // card would never get a terminal status (no on_tool_end is emitted).
+            const err = event.error as unknown
+            const output =
+              typeof err === 'string' ? err : err instanceof Error ? err.message : String(err ?? '')
+            runnerLog.error('tool 错误： %s, %s', event.name, output)
+            this.emit('tool-end', {
+              id: event.toolCallId ?? '',
+              name: event.name ?? 'unknown',
+              status: 'error',
               output,
             })
           }

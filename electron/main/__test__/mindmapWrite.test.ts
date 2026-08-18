@@ -73,6 +73,27 @@ describe('MindmapWriteRequester', () => {
     expect(requester.pendingCount).toBe(0)
   })
 
+  it('clears the request timer once the renderer answers (no dangling timer per request)', async () => {
+    const { window, sent } = fakeWindow()
+    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+
+    const promise = requester.request('file-a', 'insertXmlFragment', { xml: '<node/>' })
+    expect(vi.getTimerCount()).toBe(1)
+
+    requester.respond({
+      requestId: sent[0]!.requestId,
+      ok: true,
+      action: 'insertXmlFragment',
+      data: { nodeCount: 1 },
+    })
+    await expect(promise).resolves.toEqual({
+      ok: true,
+      action: 'insertXmlFragment',
+      data: { nodeCount: 1 },
+    })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('rejects with the renderer error when the response signals failure', async () => {
     const { window, sent } = fakeWindow()
     const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)

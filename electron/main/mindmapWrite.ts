@@ -7,6 +7,7 @@ const WRITE_TIMEOUT_MS = 3000
 interface PendingRequest {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
+  timer: ReturnType<typeof setTimeout>
 }
 
 /**
@@ -34,10 +35,8 @@ export class MindmapWriteRequester {
       }, WRITE_TIMEOUT_MS)
       this.pending.set(requestId, {
         resolve,
-        reject: (error) => {
-          clearTimeout(timer)
-          reject(error)
-        },
+        reject,
+        timer,
       })
       const request: MindmapWriteRequest = { requestId, fileUuid, action, args }
       window.webContents.send(IPC.AiMindmapWriteRequest, request)
@@ -48,6 +47,7 @@ export class MindmapWriteRequester {
     const entry = this.pending.get(payload.requestId)
     if (!entry) return
     this.pending.delete(payload.requestId)
+    clearTimeout(entry.timer)
     if (!payload.ok) {
       entry.reject(new Error(payload.error))
       return

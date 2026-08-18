@@ -366,6 +366,42 @@ describe('StreamManager + Runner', () => {
     })
   })
 
+  it('emits a terminal tool-end with error status when a tool throws (on_tool_error)', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-err',
+            name: 'insertXmlFragment',
+            input: { xml: '<node/>' },
+          },
+          {
+            event: 'on_tool_error',
+            toolCallId: 'call-err',
+            name: 'insertXmlFragment',
+            error: new Error('boom'),
+          },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-err', name: 'insertXmlFragment', status: 'error', output: 'boom' },
+    })
+  })
+
   it('re-emits subgraph tool-start/tool-end from messages-mode chunks', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     const subgraphResult = JSON.stringify({
