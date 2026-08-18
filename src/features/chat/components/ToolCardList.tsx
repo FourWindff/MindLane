@@ -88,12 +88,7 @@ function StatusGlyph({ status }: { status: ToolCardStatus }) {
 }
 
 function CardClassName(status: ToolCardStatus, extra?: string): string {
-  return cx(
-    'chat-message-list__tool-card',
-    `chat-message-list__tool-card--${status}`,
-    status === 'running' && 'chat-message-list__tool-card--active',
-    extra,
-  )
+  return cx('chat-message-list__tool-card', `chat-message-list__tool-card--${status}`, extra)
 }
 
 function SingleLineCard({ card }: { card: ToolCardItem & { status: ToolCardStatus } }) {

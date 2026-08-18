@@ -106,7 +106,7 @@ describe('ToolCardList rendering', () => {
       />,
     )
 
-    expect(html).toContain('chat-message-list__tool-card--active')
+    expect(html).toContain('chat-message-list__tool-card--running')
     expect(html).toContain('chat-message-list__tool-card--error')
     expect(html).not.toContain('chat-message-list__tool-card__toggle')
     expect(html).not.toContain('chat-message-list__tool-card__stage')
