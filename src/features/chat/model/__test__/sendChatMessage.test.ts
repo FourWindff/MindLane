@@ -3,6 +3,7 @@ import {
   connectAiStore,
   createFileChatState,
   deriveChatCapsuleEntries,
+  resetChatRetryStateForTests,
   useAiStore,
   type ChatStreamEvent,
   type FileChatState,
@@ -98,6 +99,10 @@ function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
   })
 }
 
+beforeEach(() => {
+  resetChatRetryStateForTests()
+})
+
 describe('sendChatMessage handshake', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -106,6 +111,8 @@ describe('sendChatMessage handshake', () => {
       currentFilePath: null,
       fileChats: {},
       filePaths: {},
+      fileUuidPaths: {},
+      allSessions: [],
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
@@ -162,6 +169,8 @@ describe('sendChatMessage handshake', () => {
     const entries = deriveChatCapsuleEntries(
       useAiStore.getState().fileChats,
       useAiStore.getState().filePaths,
+      useAiStore.getState().fileUuidPaths,
+      useAiStore.getState().allSessions,
       useAiStore.getState().currentFileUuid,
       useAiStore.getState().currentFilePath,
     )

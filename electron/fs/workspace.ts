@@ -7,8 +7,27 @@ import type { AppState } from './appState.js'
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   workspaceUuid: '',
   activeSessionIds: {},
+  fileUuidPaths: {},
   lastOpenedFilePath: null,
   recentFiles: [],
+}
+
+function isMindlanePath(filePath: string): boolean {
+  return path.extname(filePath).toLowerCase() === '.mindlane'
+}
+
+/** Coerce an untrusted value into a valid `fileUuidPaths` map. */
+export function coerceFileUuidPaths(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, string] =>
+        entry[0] !== '' &&
+        typeof entry[1] === 'string' &&
+        entry[1] !== '' &&
+        isMindlanePath(entry[1]),
+    ),
+  )
 }
 
 /** Coerce an untrusted value into a valid `lastOpenedFilePath` (string or null). */
@@ -87,6 +106,28 @@ export class Workspace {
     return this.saveState(workspacePath, async () => ({ activeSessionIds }))
   }
 
+  /**
+   * 写入/更新会话文件索引单条映射（fileUuid -> filePath）。
+   * 供打开/新建/另存路径（主进程）与改名/移动路径（渲染层经桥）调用。
+   * fileUuid 或 filePath 为空时静默跳过，不落盘。
+   */
+  async updateFileUuidPath(
+    workspacePath: string,
+    fileUuid: string,
+    filePath: string,
+  ): Promise<IpcResult<void>> {
+    if (!fileUuid || !filePath) return { ok: true, data: undefined }
+    return this.saveState(workspacePath, async () => {
+      const current = await this.loadFromDisk(workspacePath)
+      return {
+        fileUuidPaths: {
+          ...(current.ok ? current.data.fileUuidPaths : DEFAULT_WORKSPACE_STATE.fileUuidPaths),
+          [fileUuid]: filePath,
+        },
+      }
+    })
+  }
+
   async setActiveSessionId(
     workspacePath: string,
     fileUuid: string,
@@ -137,6 +178,24 @@ export class Workspace {
         }
       })
       return { recentFiles: valid }
+    })
+  }
+
+  /** 剔除路径已不存在的会话文件索引条目，避免失效路径长期残留。 */
+  async pruneFileUuidPaths(workspacePath: string): Promise<IpcResult<void>> {
+    return this.saveState(workspacePath, async () => {
+      const current = await this.loadFromDisk(workspacePath)
+      const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
+      const valid = Object.fromEntries(
+        Object.entries(state.fileUuidPaths).filter(([, filePath]) => {
+          try {
+            return fs.existsSync(filePath)
+          } catch {
+            return false
+          }
+        }),
+      )
+      return { fileUuidPaths: valid }
     })
   }
 
@@ -194,6 +253,7 @@ export class Workspace {
                   ),
                 )
               : {},
+          fileUuidPaths: coerceFileUuidPaths(parsed.fileUuidPaths),
           lastOpenedFilePath,
           recentFiles: coerceRecentFiles(parsed.recentFiles),
         }
@@ -253,7 +313,7 @@ export class Workspace {
   }
 
   private isSupportedFile(filePath: string): boolean {
-    return path.extname(filePath).toLowerCase() === '.mindlane'
+    return isMindlanePath(filePath)
   }
 
   private isWithinWorkspace(filePath: string, workspacePath: string): boolean {

@@ -33,6 +33,7 @@ const api: MindlaneBridge = {
     openFilePath: (payload) => ipcRenderer.invoke(IPC.WorkspaceOpenFilePath, payload),
     getSession: () => ipcRenderer.invoke(IPC.WorkspaceGetSession),
     updateState: (payload) => ipcRenderer.invoke(IPC.WorkspaceUpdateState, payload),
+    updateFileUuidPath: (payload) => ipcRenderer.invoke(IPC.WorkspaceUpdateFileUuidPath, payload),
     switchDirectory: (payload) => ipcRenderer.invoke(IPC.WorkspaceSwitch, payload),
     listTree: (payload) => ipcRenderer.invoke(IPC.WorkspaceListTree, payload),
     createSubfolder: (payload) => ipcRenderer.invoke(IPC.WorkspaceCreateSubfolder, payload),

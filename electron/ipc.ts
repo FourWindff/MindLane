@@ -48,6 +48,7 @@ export enum IPC {
   WorkspaceDeleteItem = 'workspace:delete-item',
   WorkspaceRenameItem = 'workspace:rename-item',
   WorkspaceMoveItem = 'workspace:move-item',
+  WorkspaceUpdateFileUuidPath = 'workspace:update-file-uuid-path',
 
   ChatListSessions = 'chat:list-sessions',
   ChatLoadSession = 'chat:load-session',
@@ -110,6 +111,8 @@ export interface WorkspaceSession {
   workspacePath: string | null
   workspaceUuid: string | null
   activeSessionIds: Record<string, string>
+  /** 会话文件索引：fileUuid -> filePath，跨启动渲染胶囊条用。 */
+  fileUuidPaths: Record<string, string>
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
   restoreLastWorkspaceOnLaunch: boolean
@@ -457,6 +460,12 @@ export interface MindlaneBridge {
         activeSession?: { fileUuid: string; sessionId: string }
       } & Partial<WorkspaceState>,
     ) => Promise<{ ok: true } | { ok: false; error: string }>
+    /** 更新会话文件索引单条映射（改名/移动后修正路径用）。 */
+    updateFileUuidPath: (payload: {
+      workspacePath: string
+      fileUuid: string
+      filePath: string
+    }) => Promise<{ ok: true } | { ok: false; error: string }>
     switchDirectory: (payload: {
       workspacePath: string
     }) => Promise<IpcResult<{ workspacePath: string }>>
@@ -484,7 +493,8 @@ export interface MindlaneBridge {
   chat: {
     listSessions: (payload: {
       workspacePath: string
-      fileUuid: string
+      /** 省略时返回当前 workspace 全量会话（保持按 updatedAt 降序、支持 limit/offset）。 */
+      fileUuid?: string
       limit?: number
       offset?: number
     }) => Promise<IpcResult<{ sessions: ChatSessionMeta[] }>>

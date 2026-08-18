@@ -6,7 +6,7 @@ import {
   type ChatCapsuleEntry,
 } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resolveCapsuleOpenPath } from '@/features/chat/lib/capsuleOpenPath'
 
 import '../styles/chat-capsule-bar.css'
 
@@ -21,19 +21,29 @@ export function ChatCapsuleBar({ expanded, onToggleExpand }: ChatCapsuleBarProps
   const setShowSessionList = useAiStore((s) => s.setShowSessionList)
   const fileChats = useAiStore((s) => s.fileChats)
   const filePaths = useAiStore((s) => s.filePaths)
+  const fileUuidPaths = useAiStore((s) => s.fileUuidPaths)
+  const allSessions = useAiStore((s) => s.allSessions)
   const currentFilePath = useAiStore((s) => s.currentFilePath)
 
   const entries = useMemo(
-    () => deriveChatCapsuleEntries(fileChats, filePaths, currentFileUuid, currentFilePath),
-    [fileChats, filePaths, currentFileUuid, currentFilePath],
+    () =>
+      deriveChatCapsuleEntries(
+        fileChats,
+        filePaths,
+        fileUuidPaths,
+        allSessions,
+        currentFileUuid,
+        currentFilePath,
+      ),
+    [fileChats, filePaths, fileUuidPaths, allSessions, currentFileUuid, currentFilePath],
   )
 
   const handleSelect = useCallback(
     (fileUuid: string) => {
-      const filePath = mindmapRegistry.getByFileUuid(fileUuid)?.store.getState().filePath
+      const filePath = resolveCapsuleOpenPath(fileUuid, fileUuidPaths)
       if (filePath) void openWorkspaceFile(filePath)
     },
-    [openWorkspaceFile],
+    [openWorkspaceFile, fileUuidPaths],
   )
 
   return (

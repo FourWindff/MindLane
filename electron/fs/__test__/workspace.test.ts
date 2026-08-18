@@ -292,4 +292,102 @@ describe('Workspace', () => {
     expect(recent.data).toHaveLength(1)
     expect(recent.data[0]?.filePath).toBe(existingFile)
   })
+
+  it('updateFileUuidPath persists the mapping and load round-trips it', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const filePath = path.join(workspacePath, 'note.mindlane')
+    fs.writeFileSync(filePath, '{}')
+
+    const result = await workspace.updateFileUuidPath(workspacePath, 'file-a', filePath)
+    expect(result.ok).toBe(true)
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.fileUuidPaths).toEqual({ 'file-a': filePath })
+  })
+
+  it('updateFileUuidPath overwrites an existing entry and keeps unrelated entries', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const firstPath = path.join(workspacePath, 'first.mindlane')
+    const renamedPath = path.join(workspacePath, 'renamed.mindlane')
+    const otherPath = path.join(workspacePath, 'other.mindlane')
+    fs.writeFileSync(firstPath, '{}')
+    fs.writeFileSync(renamedPath, '{}')
+    fs.writeFileSync(otherPath, '{}')
+
+    await workspace.updateFileUuidPath(workspacePath, 'file-a', firstPath)
+    await workspace.updateFileUuidPath(workspacePath, 'file-b', otherPath)
+    await workspace.updateFileUuidPath(workspacePath, 'file-a', renamedPath)
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.fileUuidPaths).toEqual({
+      'file-a': renamedPath,
+      'file-b': otherPath,
+    })
+  })
+
+  it('updateFileUuidPath skips silently when fileUuid or filePath is empty', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+
+    const result = await workspace.updateFileUuidPath(workspacePath, '', '/a.mindlane')
+    expect(result.ok).toBe(true)
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.fileUuidPaths).toEqual({})
+  })
+
+  it('load drops invalid fileUuidPaths entries (non-string values, empty keys, non-.mindlane paths)', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    const docPath = path.join(workspacePath, 'doc.mindlane')
+    fs.mkdirSync(path.dirname(statePath), { recursive: true })
+    fs.writeFileSync(docPath, '{}')
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({
+        fileUuidPaths: {
+          'file-valid': docPath,
+          'file-empty-key': '',
+          'file-non-string': 42,
+          'file-wrong-ext': '/tmp/other.txt',
+          'file-missing-value': undefined,
+        },
+      }),
+    )
+
+    const result = await workspace.load(workspacePath)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.fileUuidPaths).toEqual({ 'file-valid': docPath })
+  })
+
+  it('pruneFileUuidPaths removes entries whose files no longer exist', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const keptFile = path.join(workspacePath, 'kept.mindlane')
+    const goneFile = path.join(workspacePath, 'gone.mindlane')
+    fs.writeFileSync(keptFile, '{}')
+    fs.writeFileSync(goneFile, '{}')
+
+    await workspace.updateFileUuidPath(workspacePath, 'file-kept', keptFile)
+    await workspace.updateFileUuidPath(workspacePath, 'file-gone', goneFile)
+    fs.unlinkSync(goneFile)
+
+    const pruned = await workspace.pruneFileUuidPaths(workspacePath)
+    expect(pruned.ok).toBe(true)
+
+    const loaded = await workspace.load(workspacePath)
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.data.fileUuidPaths).toEqual({ 'file-kept': keptFile })
+  })
 })
