@@ -59,19 +59,25 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
       }
       const data = await applyWriteAction(request.action, request.args, editor)
       deps.persistFile(request.fileUuid)
-      await deps.respond({
+      await safeRespond({
         requestId: request.requestId,
         ok: true,
         action: request.action,
         data,
       })
     } catch (err) {
-      await deps.respond({
+      await safeRespond({
         requestId: request.requestId,
         ok: false,
         error: formatXmlError(err),
       })
     }
+  }
+
+  function safeRespond(payload: MindmapWriteResponse): Promise<void> {
+    // The ack channel has nowhere to report failures (timeout semantics belong
+    // to the main process); only avoid an unhandled rejection here.
+    return Promise.resolve(deps.respond(payload)).catch(() => undefined)
   }
 
   return {
@@ -86,6 +92,10 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
     },
   }
 }
+
+const DEFAULT_POSITION = 'child'
+const INSERT_POSITIONS = new Set(['root', 'child', 'after', 'before'])
+const MOVE_POSITIONS = new Set(['child', 'after', 'before'])
 
 /**
  * 原子校验 + 落图：校验失败抛 MindmapXmlError（错误码 + 恢复策略由 formatXmlError
@@ -107,12 +117,14 @@ async function applyWriteAction(
       if (typeof xml !== 'string') {
         throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
       }
+      if (typeof position !== 'undefined' && !INSERT_POSITIONS.has(position)) {
+        throw new Error(`position 参数无效：${String(position)}，只能是 root/child/after/before`)
+      }
       const parsed = await parseXmlFragment(xml)
       const state = editor.getState()
       const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
       validateFragmentForInsert(parsed, ctx)
-      const pos =
-        position === 'root' || position === 'after' || position === 'before' ? position : 'child'
+      const pos = position ?? DEFAULT_POSITION
       if (pos !== 'root' && parentId && !ctx.nodeIds.has(parentId)) {
         throw new MindmapXmlError('block_not_found', `定位节点「${parentId}」不存在`)
       }
@@ -127,7 +139,7 @@ async function applyWriteAction(
       }
       const parsed = await parseXmlFragment(xml)
       await editor.replaceNodeFromXml(xml)
-      return { nodeId: parsed.rootIds[0], nodeCount: parsed.nodes.length }
+      return { xml, nodeId: parsed.rootIds[0], nodeCount: parsed.nodes.length }
     }
 
     case 'moveMindmapNode': {
@@ -139,11 +151,14 @@ async function applyWriteAction(
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
         throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
       }
+      if (typeof position !== 'undefined' && !MOVE_POSITIONS.has(position)) {
+        throw new Error(`position 参数无效：${String(position)}，只能是 child/after/before`)
+      }
       const target = typeof targetId === 'string' && targetId.trim() ? targetId : 'root'
       const state = editor.getState()
       const { ctx, childrenOf } = buildValidationContext(state.nodes, state.edges, state.assets)
       validateMove(nodeId, target, { nodeIds: ctx.nodeIds, childrenOf })
-      const pos = position === 'after' || position === 'before' ? position : 'child'
+      const pos = position ?? DEFAULT_POSITION
       editor.moveSubtree(nodeId, target, pos)
       return { nodeId, targetId: target, position: pos }
     }
@@ -154,10 +169,21 @@ async function applyWriteAction(
         confirmDeleteSubtree?: unknown
       }
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
-        throw new Error('节点ID不能为空')
+        throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
       }
       if (nodeId === 'root') {
         throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可删除')
+      }
+      // The renderer responder is now the sole validator (main-process snapshot
+      // validation was removed): a missing node must fail with block_not_found
+      // instead of silently no-oping and acing a false success.
+      const state = editor.getState()
+      const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
+      if (!ctx.nodeIds.has(nodeId)) {
+        throw new MindmapXmlError(
+          'block_not_found',
+          `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
+        )
       }
       if (confirmDeleteSubtree === false) {
         return { nodeId, deleted: false }

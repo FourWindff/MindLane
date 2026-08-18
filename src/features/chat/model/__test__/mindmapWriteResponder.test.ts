@@ -241,6 +241,10 @@ describe('MindmapWriteResponder', () => {
 
   it('honors confirmDeleteSubtree=false by declining the delete', async () => {
     const fake = createFakeEditor()
+    fake.state.nodes = [
+      { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
+      { id: 'n1', type: 'text', position: { x: 200, y: 0 }, data: { label: 'N1' } },
+    ]
     const { send, respond, stop } = setupResponder({ 'file-a': asEditor(fake) })
 
     send({
@@ -278,6 +282,101 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       ok: false,
       error: formatXmlError(new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可删除')),
+    })
+    stop()
+  })
+
+  it('rejects deleting a nonexistent node with block_not_found and never touches the editor', async () => {
+    const fake = createFakeEditor()
+    fake.state.nodes = [
+      { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
+    ]
+    const { send, respond, persistFile, stop } = setupResponder({ 'file-a': asEditor(fake) })
+
+    send({ requestId: 'r1', fileUuid: 'file-a', action: 'deleteNode', args: { nodeId: 'ghost' } })
+    await flush()
+
+    expect(fake.editor.deleteSubtree).not.toHaveBeenCalled()
+    expect(persistFile).not.toHaveBeenCalled()
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'r1',
+      ok: false,
+      error: formatXmlError(
+        new MindmapXmlError('block_not_found', '节点「ghost」不存在，请先 readMindmap 重新定位'),
+      ),
+    })
+    stop()
+  })
+
+  it('rejects an invalid insert position instead of silently coercing to child', async () => {
+    const fake = createFakeEditor()
+    fake.state.nodes = [
+      { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
+    ]
+    const { send, respond, stop } = setupResponder({ 'file-a': asEditor(fake) })
+
+    send({
+      requestId: 'r1',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: { xml: '<node>a</node>', position: 'sideways' },
+    })
+    await flush()
+
+    expect(fake.editor.insertFromXml).not.toHaveBeenCalled()
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'r1',
+      ok: false,
+      error: 'position 参数无效：sideways，只能是 root/child/after/before',
+    })
+    stop()
+  })
+
+  it('rejects an invalid move position instead of silently coercing to child', async () => {
+    const fake = createFakeEditor()
+    fake.state.nodes = [
+      { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
+      { id: 'n1', type: 'text', position: { x: 200, y: 0 }, data: { label: 'N1' } },
+    ]
+    const { send, respond, stop } = setupResponder({ 'file-a': asEditor(fake) })
+
+    send({
+      requestId: 'r1',
+      fileUuid: 'file-a',
+      action: 'moveMindmapNode',
+      args: { nodeId: 'n1', targetId: 'root', position: 'root' },
+    })
+    await flush()
+
+    expect(fake.editor.moveSubtree).not.toHaveBeenCalled()
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'r1',
+      ok: false,
+      error: 'position 参数无效：root，只能是 child/after/before',
+    })
+    stop()
+  })
+
+  it('keeps xml in the updateMindmapNode ack data (pre-proxy tool shape)', async () => {
+    const fake = createFakeEditor()
+    fake.state.nodes = [
+      { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
+    ]
+    const { send, respond, stop } = setupResponder({ 'file-a': asEditor(fake) })
+
+    send({
+      requestId: 'r1',
+      fileUuid: 'file-a',
+      action: 'updateMindmapNode',
+      args: { xml: '<node id="n1" type="text" content="B" />' },
+    })
+    await flush()
+
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'r1',
+      ok: true,
+      action: 'updateMindmapNode',
+      data: { xml: '<node id="n1" type="text" content="B" />', nodeId: 'n1', nodeCount: 1 },
     })
     stop()
   })
