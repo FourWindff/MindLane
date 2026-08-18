@@ -49,7 +49,8 @@ export interface ChatCapsuleEntry {
   fileUuid: string
   fileName: string
   status: 'generating' | 'stopping' | 'idle'
-  lastUserMessageAt: number
+  /** 该文件最近一次会话的 updatedAt（毫秒），胶囊排序依据；无会话时为 0。 */
+  lastActivityAt: number
 }
 
 interface ActiveFileInfo {
@@ -68,6 +69,10 @@ interface AiState {
   currentFilePath: string | null
   fileChats: Record<string, FileChatState>
   filePaths: Record<string, string>
+  /** 会话文件索引（持久映射）：fileUuid -> filePath，跨启动渲染胶囊条用。 */
+  fileUuidPaths: Record<string, string>
+  /** 当前 workspace 全量会话列表（无 fileUuid 的全量拉取），胶囊条成员与排序依据。 */
+  allSessions: ChatSession[]
   loadedFileChats: Record<string, boolean>
   sessionFileUuids: Record<string, string>
   activeStreamIds: Record<string, string>
@@ -91,10 +96,14 @@ interface AiState {
   setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
   updateFileLocation: (fileUuid: string, filePath: string) => void
+  /** 改名/移动后同步内存与持久映射（调用方另经桥落盘）。 */
+  updateFileUuidPath: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string) => void
   markStreamStopping: (sessionId: string) => void
   sendChatMessage: (text: string) => Promise<boolean>
   stopChatStream: () => void
+  /** 恢复/切换 workspace 与 deleteSession 成功后重拉胶囊条持久输入（全量会话 + 映射）。 */
+  refreshCapsuleData: () => Promise<void>
 }
 
 export function createFileChatState(activeSessionId = generateSessionId()): FileChatState {
@@ -167,41 +176,57 @@ function stripTurnStateFromMessages(messages: ChatMessage[]): ChatMessage[] {
   })
 }
 
+/**
+ * 胶囊条读时投影：成员 = 有会话记录（且映射中有路径）∪ 流进行中 ∪ 当前文件；
+ * 排序 = 当前文件置顶，其余按该文件最近一次会话的 updatedAt 降序。
+ * 内存 `fileChats` 仅投影状态（busy/stopping/generating），不再单独决定成员。
+ */
 export function deriveChatCapsuleEntries(
   fileChats: Record<string, FileChatState>,
   filePaths: Record<string, string>,
+  fileUuidPaths: Record<string, string>,
+  allSessions: ChatSession[],
   currentFileUuid: string | null,
   currentFilePath: string | null,
 ): ChatCapsuleEntry[] {
-  const entries: ChatCapsuleEntry[] = []
-  const candidateKeys = new Set(Object.keys(fileChats))
+  const sessionsByFile = new Map<string, ChatSession[]>()
+  for (const session of allSessions) {
+    const list = sessionsByFile.get(session.fileUuid) ?? []
+    list.push(session)
+    sessionsByFile.set(session.fileUuid, list)
+  }
+  const mostRecentSessionAt = (fileUuid: string): number => {
+    const list = sessionsByFile.get(fileUuid) ?? []
+    return list.reduce((max, session) => {
+      const at = Date.parse(session.updatedAt) || 0
+      return at > max ? at : max
+    }, 0)
+  }
+
+  const candidateKeys = new Set([...Object.keys(fileChats), ...sessionsByFile.keys()])
   if (currentFileUuid) candidateKeys.add(currentFileUuid)
+
+  const entries: ChatCapsuleEntry[] = []
   for (const fileUuid of candidateKeys) {
     const chat = fileChats[fileUuid]
     const isCurrent = fileUuid === currentFileUuid
-    if (!chat) {
-      if (!isCurrent) continue
-      entries.push({
-        fileUuid,
-        fileName: pathBasename(currentFilePath) ?? fileUuid,
-        status: 'idle',
-        lastUserMessageAt: 0,
-      })
-      continue
-    }
-    if (!(chat.lastUserMessageAt > 0 || chat.busy || isCurrent)) continue
-    const filePath = filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null)
+    const isStreaming = Boolean(chat?.busy || chat?.stopRequested)
+    // 有会话但映射中无路径（文件已删/升级前从未打开过）的文件不显示。
+    const hasSessionWithPath = Boolean(sessionsByFile.has(fileUuid) && fileUuidPaths[fileUuid])
+    if (!(isCurrent || isStreaming || hasSessionWithPath)) continue
+    const filePath =
+      fileUuidPaths[fileUuid] ?? filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null)
     entries.push({
       fileUuid,
       fileName: pathBasename(filePath) ?? fileUuid,
-      status: chat.stopRequested ? 'stopping' : chat.busy ? 'generating' : 'idle',
-      lastUserMessageAt: chat.lastUserMessageAt,
+      status: chat?.stopRequested ? 'stopping' : chat?.busy ? 'generating' : 'idle',
+      lastActivityAt: mostRecentSessionAt(fileUuid),
     })
   }
   return entries.sort((a, b) => {
     if (a.fileUuid === currentFileUuid) return -1
     if (b.fileUuid === currentFileUuid) return 1
-    return b.lastUserMessageAt - a.lastUserMessageAt
+    return b.lastActivityAt - a.lastActivityAt
   })
 }
 
@@ -221,6 +246,8 @@ export const useAiStore = create<AiState>((set, get) => ({
   currentFilePath: null,
   fileChats: {},
   filePaths: {},
+  fileUuidPaths: {},
+  allSessions: [],
   loadedFileChats: {},
   sessionFileUuids: {},
   activeStreamIds: {},
@@ -361,6 +388,8 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
     if (replacementSessionId)
       await persistActiveSession(state.workspacePath, fileUuid, replacementSessionId)
+    // 删除会话可能让文件失去全部会话：重拉全量会话刷新胶囊条。
+    void useAiStore.getState().refreshCapsuleData()
   },
 
   loadFileChat: (fileUuid) => {
@@ -375,10 +404,31 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
     return load
   },
+  refreshCapsuleData: async () => {
+    const workspaceSession = await window.mindlane?.workspace.getSession()
+    const workspacePath = workspaceSession?.workspacePath ?? null
+    const fileUuidPaths = workspaceSession?.fileUuidPaths ?? {}
+    let allSessions: ChatSession[] = []
+    if (workspacePath) {
+      const result = await window.mindlane?.chat?.listSessions({
+        workspacePath,
+      })
+      if (result?.ok) allSessions = result.data.sessions
+    }
+    useAiStore.setState({ workspacePath, fileUuidPaths, allSessions })
+  },
   updateFileLocation: (fileUuid, filePath) =>
     set((state) => ({
       ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
       filePaths: { ...state.filePaths, [fileUuid]: filePath },
+    })),
+
+  /** 持久映射 + 内存路径同步更新（改名/移动后由 workspace store 经桥调用）。 */
+  updateFileUuidPath: (fileUuid, filePath) =>
+    set((state) => ({
+      ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
+      filePaths: { ...state.filePaths, [fileUuid]: filePath },
+      fileUuidPaths: { ...state.fileUuidPaths, [fileUuid]: filePath },
     })),
 
   registerStream: (fileUuid, sessionId, streamId) => {
@@ -672,7 +722,10 @@ export function connectAiStore(registry: AiStoreRegistry): () => void {
         return
       }
       const workspacePath = workspaceSession?.workspacePath ?? null
-      useAiStore.setState({ workspacePath })
+      useAiStore.setState({
+        workspacePath,
+        fileUuidPaths: workspaceSession?.fileUuidPaths ?? {},
+      })
       if (workspacePath && shouldLoadFileChat) {
         await useAiStore.getState().loadFileChat(active.fileUuid)
       }

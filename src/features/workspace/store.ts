@@ -219,6 +219,8 @@ async function applyWorkspaceSession(
   const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
   await syncWorkspaceState(sessionData)
   clearMindLaneFile()
+  // 切换 workspace：拉取新 workspace 的全量会话与 fileUuidPaths，刷新胶囊条。
+  void useAiStore.getState().refreshCapsuleData()
   return true
 }
 
@@ -258,6 +260,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       set({ initialized: true, initializing: false })
+      // 启动恢复：拉取当前 workspace 的全量会话与 fileUuidPaths，刷新胶囊条。
+      void useAiStore.getState().refreshCapsuleData()
     } catch (error) {
       clearMindLaneFile()
       set({
@@ -530,7 +534,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         const fileUuid = renamedInstance.store.getState().fileUuid
         renamedInstance.store.getState().setFilePath(result.data.newPath)
         mindmapRegistry.renameKey(oldPath, result.data.newPath)
-        useAiStore.getState().updateFileLocation(fileUuid, result.data.newPath)
+        useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
+        // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次重命名。
+        void window.mindlane?.workspace
+          .updateFileUuidPath({ workspacePath, fileUuid, filePath: result.data.newPath })
+          .catch(() => {})
       }
 
       const tree = await listWorkspaceTree(workspacePath)
@@ -566,7 +574,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         const fileUuid = movedInstance.store.getState().fileUuid
         movedInstance.store.getState().setFilePath(result.data.newPath)
         mindmapRegistry.renameKey(sourcePath, result.data.newPath)
-        useAiStore.getState().updateFileLocation(fileUuid, result.data.newPath)
+        useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
+        // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次移动。
+        void window.mindlane?.workspace
+          .updateFileUuidPath({ workspacePath, fileUuid, filePath: result.data.newPath })
+          .catch(() => {})
       }
 
       const tree = await listWorkspaceTree(workspacePath)

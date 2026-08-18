@@ -106,6 +106,8 @@ describe('sendChatMessage handshake', () => {
       currentFilePath: null,
       fileChats: {},
       filePaths: {},
+      fileUuidPaths: {},
+      allSessions: [],
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
@@ -162,6 +164,8 @@ describe('sendChatMessage handshake', () => {
     const entries = deriveChatCapsuleEntries(
       useAiStore.getState().fileChats,
       useAiStore.getState().filePaths,
+      useAiStore.getState().fileUuidPaths,
+      useAiStore.getState().allSessions,
       useAiStore.getState().currentFileUuid,
       useAiStore.getState().currentFilePath,
     )

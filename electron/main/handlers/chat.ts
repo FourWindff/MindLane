@@ -10,7 +10,7 @@ export function registerChatHandlers(ctx: HandlerContext): void {
     IPC.ChatListSessions,
     async (
       _e,
-      payload: { workspacePath: string; fileUuid: string; limit?: number; offset?: number },
+      payload: { workspacePath: string; fileUuid?: string; limit?: number; offset?: number },
     ) => {
       if (!ctx.isAiServiceReady()) return aiNotReadyResponse()
       const sessionManager = ctx.sessionManager

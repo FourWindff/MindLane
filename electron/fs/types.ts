@@ -31,6 +31,8 @@ export interface AppSettings {
 export interface WorkspaceState {
   workspaceUuid: string
   activeSessionIds: Record<string, string>
+  /** 会话文件索引：fileUuid -> filePath 的持久映射，跨启动渲染胶囊条用。 */
+  fileUuidPaths: Record<string, string>
   lastOpenedFilePath: string | null
   recentFiles: RecentFileEntry[]
 }

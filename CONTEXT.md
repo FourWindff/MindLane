@@ -151,7 +151,7 @@
 
 - 每个 `fileUuid` 独立的聊天状态，是聊天状态的**唯一事实源**。
 - 包含：`activeSessionId`、`chatMessages`、`sessions`、`busy`、`step`、`streamText`、`errorMessage`、`activeTools`、`stopRequested`、`lastUserMessageAt`。
-- `stopRequested` 为流停止标记（`markStreamStopping` 置位，`end`/`error` 复位）；`lastUserMessageAt` 为最近一次用户输入时间，二者是胶囊投影的事实源。
+- `stopRequested` 为流停止标记（`markStreamStopping` 置位，`end`/`error` 复位）；`lastUserMessageAt` 为最近一次用户输入时间，二者供胶囊投影覆盖流状态使用。
 - 所有流相关状态都按文件隔离，确保文件 A 生成时切换到文件 B 不会互相干扰。
 - store 顶层**不存在**这组字段的镜像副本；组件经只读 selector 投影读取当前文件的 `FileChatState`，写入只打到 `fileChats`。
 
@@ -185,10 +185,18 @@
 
 ### 会话 API
 
-- `listSessions({ workspacePath, fileUuid })` 只返回指定文件的会话列表。
+- `listSessions({ workspacePath, fileUuid? })`：`fileUuid` 省略时返回当前 workspace 全量会话（按 `updatedAt` 降序、支持 `limit`/`offset`），胶囊条用它获得"有会话的文件"集合与排序依据；指定时只返回该文件的会话列表（会话列表模式）。
 - `loadSession({ workspacePath, sessionId })` 保持，返回该会话的消息。
-- `deleteSession({ workspacePath, sessionId })` 保持，删除后清理 `activeSessionIds` 映射。
+- `deleteSession({ workspacePath, sessionId })` 保持，删除后清理 `activeSessionIds` 映射；渲染层成功后重拉全量会话刷新胶囊条。
 - `saveSession` 删除：runner 在流中自动持久化消息，前端不再手动保存。
+
+### 会话文件索引（fileUuidPaths）
+
+- workspace `state.json` 中 `fileUuid -> filePath` 的持久映射，是跨启动渲染胶囊条所需的身份拼图（会话数据本就持久且带 `fileUuid`，缺的只是路径）。
+- 写入时机：打开/新建/另存/保存经 `syncWorkspaceFromFile` 顺手落盘（`data.metadata.fileUuid` 缺失时静默跳过）；改名/移动成功后由渲染层经 `workspace.updateFileUuidPath` 桥修正路径。
+- 加载时与 `activeSessionIds` 同款 coerce：仅保留键值都是非空字符串的条目，值必须是 `.mindlane` 路径。
+- 恢复 workspace 时主进程 prune 一次：剔除 `existsSync` 不存在的路径，避免失效条目长期残留；渲染层不做 `existsSync`。
+- 用途：`deriveChatCapsuleEntries` 的成员判定（有会话 + 有路径才显示）与标签（basename），以及点击未打开文件的胶囊时的打开路径回退。
 
 ### ChatContext
 
@@ -197,11 +205,13 @@
 
 ### ChatCapsuleBar 状态
 
-- 最近对话文件列表的**读时投影**，由 `deriveChatCapsuleEntries` 从 `fileChats` + `filePaths` + `currentFileUuid` 派生，不是独立维护的镜像。
-- 每个条目包含：`fileUuid`、`fileName`（来自 `filePaths` 的路径基名）、`status`、最近一次用户输入时间 `lastInputAt`。
-- `status` 派生：`stopRequested` → `stopping`；`busy` → `generating`；否则 `idle`。
-- 成员判定：`lastUserMessageAt > 0`，或流进行中，或是当前文件。
-- 当前 `fileUuid` 的条目排在首位并放大显示，其余按 `lastInputAt` 降序。
+- 最近对话文件列表的**读时投影**，由 `deriveChatCapsuleEntries` 从 `fileChats` + `filePaths` + `fileUuidPaths` + 全量会话列表 + `currentFileUuid` 派生，不是独立维护的镜像。
+- 每个条目包含：`fileUuid`、`fileName`（来自 `fileUuidPaths` 的路径基名，回退 `filePaths`/当前文件路径）、`status`、最近会话活动时间。
+- `status` 派生：`stopRequested` → `stopping`；`busy` → `generating`；否则 `idle`；内存 `fileChats` 仅投影状态，不再单独决定成员，同一文件内存与持久层合并时以内存状态覆盖。
+- 成员判定：该文件有会话记录（且 `fileUuidPaths` 中有路径），或流进行中，或是当前文件；有会话但映射无路径（升级前从未打开过/文件已删）不显示。
+- 当前 `fileUuid` 的条目排在首位并放大显示，其余按该文件最近一次会话的 `updatedAt` 降序。
+- 持久输入（全量会话 + `fileUuidPaths`）在恢复/切换 workspace 时拉取一次，`deleteSession` 成功后重拉全量会话；新聊天/新会话不重拉，内存状态即时反映。
+- 点击胶囊：路径优先取 `mindmapRegistry` 实例（改名/移动后最新），未在本启动打开过时回退 `fileUuidPaths` 经 `openWorkspaceFile` 打开。
 
 ### Mindmap Tool Call Router
 

@@ -54,6 +54,13 @@ async function syncWorkspaceFromFile(
   await ctx.fsService.workspace
     .openFile(workspacePath, filePath, title, recentFilesMax)
     .catch(() => {})
+  // 顺手落盘会话文件索引；fileUuid 缺失（旧文件/无元数据）时静默跳过。
+  const fileUuid = data?.metadata?.fileUuid
+  if (fileUuid) {
+    await ctx.fsService.workspace
+      .updateFileUuidPath(workspacePath, fileUuid, filePath)
+      .catch(() => {})
+  }
 }
 
 export function registerFsHandlers(ctx: HandlerContext): void {
@@ -233,6 +240,20 @@ export function registerFsHandlers(ctx: HandlerContext): void {
   ipcMain.handle(IPC.WorkspaceGetSession, async () => {
     return getWorkspaceSessionForService(ctx.fsService)
   })
+
+  ipcMain.handle(
+    IPC.WorkspaceUpdateFileUuidPath,
+    async (_e, payload: { workspacePath: string; fileUuid: string; filePath: string }) => {
+      if (!payload.workspacePath || !payload.fileUuid || !payload.filePath) {
+        return { ok: false, error: '参数缺失' }
+      }
+      return ctx.fsService.workspace.updateFileUuidPath(
+        payload.workspacePath,
+        payload.fileUuid,
+        payload.filePath,
+      )
+    },
+  )
 
   ipcMain.handle(
     IPC.WorkspaceUpdateState,
