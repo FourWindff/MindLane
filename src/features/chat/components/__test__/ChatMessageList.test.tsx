@@ -240,6 +240,54 @@ describe('ChatMessageList', () => {
     expect(html).toContain('Update Node')
   })
 
+  it('merges a pure-tool message into the next text-bearing AI message (no empty bubble)', () => {
+    const html = renderMessageList({
+      fileChats: {
+        'file-a': fileChat({
+          chatMessages: [
+            {
+              role: 'assistant',
+              content: '',
+              toolCalls: [{ name: 'insertXmlFragment', status: 'success' }],
+            },
+            {
+              role: 'assistant',
+              content: '已插入',
+              toolCalls: [{ name: 'readMindmap', status: 'success' }],
+            },
+          ],
+        }),
+      },
+    })
+
+    // Both cards end up attached above the single text bubble; the empty
+    // pure-tool message produces no separate bubble.
+    const cards = html.match(/chat-message-list__tool-card__name/g)
+    expect(cards).toHaveLength(2)
+    expect((html.match(/chat-message-list__bubble--ai/g) ?? []).length).toBe(1)
+    expect(html).toContain('已插入')
+  })
+
+  it('keeps an isolated pure-tool message as a card-only row with no empty bubble', () => {
+    const html = renderMessageList({
+      fileChats: {
+        'file-a': fileChat({
+          chatMessages: [
+            {
+              role: 'assistant',
+              content: '',
+              toolCalls: [{ name: 'generateMindmapFragment', status: 'success' }],
+            },
+          ],
+        }),
+      },
+    })
+
+    expect(html).toContain('Generate Mindmap Fragment')
+    expect((html.match(/chat-message-list__bubble--ai/g) ?? []).length).toBe(0)
+    expect(html).toContain('chat-message-list__tool-cards')
+  })
+
   it('renders streaming tool cards with the same card component and rules', () => {
     const html = renderMessageList({
       fileChats: {

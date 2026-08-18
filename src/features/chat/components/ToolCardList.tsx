@@ -13,6 +13,8 @@ export interface ToolCardItem {
   step?: string
   completed?: number
   total?: number
+  /** Accumulated live subgraph stages (streaming equivalent of `steps`). */
+  stages?: ChatToolCallStep[]
   /** Historical subgraph stage trace (persisted, ChatToolCall.steps). */
   steps?: ChatToolCallStep[]
 }
@@ -67,6 +69,7 @@ export function ToolCardList({ cards }: { cards: ToolCardItem[] }) {
 function ToolCardRow({ card }: { card: ToolCardItem & { status: ToolCardStatus } }) {
   const stages =
     card.steps ??
+    card.stages ??
     (card.step ? [{ step: card.step, completed: card.completed, total: card.total }] : undefined)
   if (!isSubgraphCard(card.name) || !stages || stages.length === 0) {
     return <SingleLineCard card={card} />

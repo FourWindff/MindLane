@@ -8,6 +8,7 @@ import {
   selectCurrentChatSessions,
   selectCurrentChatStreamText,
   useAiStore,
+  type ChatMessage,
   type ChatSession,
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
@@ -18,6 +19,42 @@ import '../styles/chat-message-list.css'
 
 function cx(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ')
+}
+
+/**
+ * Fold pure-tool assistant messages (no text, only tool calls) into the next
+ * text-bearing assistant message instead of leaving an empty bubble. When no
+ * such message exists before a user boundary (or the end of the list), the
+ * cards are kept as a card-only entry so tool records are never dropped.
+ */
+function mergePureToolMessages(messages: ChatMessage[]): ChatMessage[] {
+  const merged: ChatMessage[] = []
+  let carried: ChatMessage['toolCalls'] | undefined
+  for (const msg of messages) {
+    if (msg.role === 'assistant') {
+      if (msg.content?.trim()) {
+        merged.push({
+          ...msg,
+          ...(carried?.length ? { toolCalls: [...carried, ...(msg.toolCalls ?? [])] } : {}),
+        })
+        carried = undefined
+        continue
+      }
+      if (msg.toolCalls?.length) {
+        carried = [...(carried ?? []), ...msg.toolCalls]
+        continue
+      }
+    } else if (carried?.length) {
+      // A user boundary with no intervening text: keep a card-only entry.
+      merged.push({ role: 'assistant', content: '', toolCalls: carried })
+      carried = undefined
+    }
+    merged.push(msg)
+  }
+  if (carried?.length) {
+    merged.push({ role: 'assistant', content: '', toolCalls: carried })
+  }
+  return merged
 }
 
 export function ChatMessageList() {
@@ -92,6 +129,11 @@ export function ChatMessageList() {
 
   const isEmpty = messages.length === 0 && !streamingText
 
+  // Pure-tool messages are merged forward so no empty bubble is rendered;
+  // the merge happens at the display boundary so live and loaded history
+  // share the same rule.
+  const renderedMessages = mergePureToolMessages(messages)
+
   return (
     <div
       className={cx('chat-message-list', isEmpty && 'chat-message-list--empty')}
@@ -117,7 +159,7 @@ export function ChatMessageList() {
         </div>
       )}
 
-      {[...messages].reverse().map((msg, i) => {
+      {[...renderedMessages].reverse().map((msg, i) => {
         const isUser = msg.role === 'user'
         const toolCalls = msg.toolCalls && msg.toolCalls.length > 0 ? msg.toolCalls : undefined
         return (
@@ -130,20 +172,22 @@ export function ChatMessageList() {
           >
             <div className={cx('chat-message-list__ai', isUser && 'chat-message-list__ai--user')}>
               {!isUser && toolCalls && <ToolCardList cards={toolCalls} />}
-              <div
-                className={cx(
-                  'chat-message-list__bubble',
-                  isUser ? 'chat-message-list__bubble--user' : 'chat-message-list__bubble--ai',
-                )}
-              >
-                {isUser && msg.attachment && (
-                  <div className="chat-message-list__attachment">
-                    <FileText size={12} strokeWidth={2} />
-                    <span>{msg.attachment.name}</span>
-                  </div>
-                )}
-                <MarkdownContent content={msg.content} />
-              </div>
+              {isUser || msg.content?.trim() ? (
+                <div
+                  className={cx(
+                    'chat-message-list__bubble',
+                    isUser ? 'chat-message-list__bubble--user' : 'chat-message-list__bubble--ai',
+                  )}
+                >
+                  {isUser && msg.attachment && (
+                    <div className="chat-message-list__attachment">
+                      <FileText size={12} strokeWidth={2} />
+                      <span>{msg.attachment.name}</span>
+                    </div>
+                  )}
+                  <MarkdownContent content={msg.content} />
+                </div>
+              ) : null}
             </div>
           </div>
         )

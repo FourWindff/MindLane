@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatMessage, ChatToolCallStep, DocumentRef } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
@@ -33,6 +33,9 @@ export interface ToolCard {
   status: 'running' | 'success' | 'error' | 'canceled'
   /** Current subgraph stage (subgraph virtual tools only, consumed by slice 05). */
   step?: StreamStep
+  /** Accumulated live subgraph stages (same source as step events), so the
+   * running card can show the full sequence instead of only the latest step. */
+  stages?: ChatToolCallStep[]
   completed?: number
   total?: number
 }
@@ -677,6 +680,28 @@ function markRunningCardsCanceled(toolCards: ToolCard[]): ToolCard[] {
   )
 }
 
+/**
+ * Append a stage to the running card's accumulated trace: a new step appends,
+ * a repeat of the current step only updates its counts (e.g. extracting n/m).
+ */
+function pushStage(
+  stages: ChatToolCallStep[] | undefined,
+  stage: ChatToolCallStep,
+): ChatToolCallStep[] {
+  const current = stages ?? []
+  const last = current[current.length - 1]
+  if (last && last.step === stage.step) {
+    const updated = [...current]
+    updated[updated.length - 1] = {
+      ...last,
+      ...(stage.completed !== undefined ? { completed: stage.completed } : {}),
+      ...(stage.total !== undefined ? { total: stage.total } : {}),
+    }
+    return updated
+  }
+  return [...current, stage]
+}
+
 export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): FileChatState {
   switch (event.type) {
     case 'token':
@@ -717,6 +742,11 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
       )
       if (runningSubgraph.length === 0) return { ...chat, step }
       const target = runningSubgraph[runningSubgraph.length - 1]!
+      const stage: ChatToolCallStep = {
+        step,
+        ...(typeof completed === 'number' ? { completed } : {}),
+        ...(typeof total === 'number' ? { total } : {}),
+      }
       return {
         ...chat,
         step,
@@ -725,6 +755,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
             ? {
                 ...card,
                 step,
+                stages: pushStage(card.stages, stage),
                 ...(typeof completed === 'number' ? { completed } : {}),
                 ...(typeof total === 'number' ? { total } : {}),
               }

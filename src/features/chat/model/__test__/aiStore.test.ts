@@ -946,6 +946,46 @@ describe('reduceStreamEvent', () => {
     })
   })
 
+  it('accumulates the full stage sequence on the running subgraph card', () => {
+    const withSubgraph = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-3', name: 'generateMindmapFragment', input: {} },
+    })
+    const step1 = reduceStreamEvent(withSubgraph, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'reading-doc' },
+    })
+    const step2 = reduceStreamEvent(step1, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 1, total: 2 },
+    })
+    // A repeat of the current step only updates its counts, not the sequence.
+    const step3 = reduceStreamEvent(step2, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 2 },
+    })
+    const step4 = reduceStreamEvent(step3, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'finalizing' },
+    })
+    expect(step4.toolCards[0]?.stages).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 2, total: 2 },
+      { step: 'finalizing' },
+    ])
+    expect(step4.toolCards[0]?.step).toBe('finalizing')
+  })
+
   it('does not map steps onto non-subgraph cards but still updates the pipeline step', () => {
     const withWrite = reduceStreamEvent(base, {
       streamId: 's',

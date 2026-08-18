@@ -35,6 +35,32 @@ describe('ToolCardList rendering', () => {
     expect(html).toContain('chat-message-list__tool-card__stage')
   })
 
+  it('shows the full accumulated stage sequence on a running subgraph card', () => {
+    const html = ReactDOMServer.renderToString(
+      <ToolCardList
+        cards={[
+          card({
+            name: 'generateMindmapFragment',
+            status: 'running',
+            step: 'finalizing',
+            stages: [
+              { step: 'reading-doc' },
+              { step: 'extracting', completed: 2, total: 2 },
+              { step: 'merging' },
+              { step: 'finalizing' },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    expect(html).toContain('Reading doc')
+    expect(html).toContain('Extracting 2/2')
+    expect(html).toContain('Merging')
+    expect(html).toContain('Finalizing')
+    expect((html.match(/chat-message-list__tool-card__stage">/g) ?? []).length).toBe(4)
+  })
+
   it('auto-collapses a finished subgraph card to a single line with a check', () => {
     const html = ReactDOMServer.renderToString(
       <ToolCardList
