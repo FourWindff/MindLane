@@ -75,7 +75,8 @@ function createRuntime(options?: {
   capturedInputs?: Array<{ messages: BaseMessage[] }>
   omitAssistantState?: boolean
   includeToolState?: boolean
-  progressStep?: string
+  progress?: { step: string; completed?: number; total?: number }
+  toolEvents?: Array<Record<string, unknown>>
   messageChunks?: Array<{ id: string; content: string }>
 }): StreamRuntime {
   const registry = new ToolRegistry()
@@ -89,8 +90,11 @@ function createRuntime(options?: {
       const sessionId = config.configurable?.thread_id ?? ''
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
-      if (options?.progressStep) {
-        yield ['custom', { type: 'mindmap-progress', step: options.progressStep }]
+      if (options?.progress) {
+        yield ['custom', { type: 'mindmap-progress', ...options.progress }]
+      }
+      for (const toolEvent of options?.toolEvents ?? []) {
+        yield ['tools', toolEvent]
       }
       const messageChunks = options?.messageChunks ?? [
         {
@@ -215,7 +219,7 @@ describe('StreamManager + Runner', () => {
 
   it('emits mindmap pipeline progress', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
-    setRuntimeFactory(() => createRuntime({ progressStep: 'extracting' }))
+    setRuntimeFactory(() => createRuntime({ progress: { step: 'extracting' } }))
 
     const streamId = manager.startStream({
       sessionId: 'session-a',
@@ -228,7 +232,93 @@ describe('StreamManager + Runner', () => {
       streamId,
       sessionId: 'session-a',
       type: 'step',
-      payload: 'extracting',
+      payload: { step: 'extracting' },
+    })
+  })
+
+  it('passes completed/total counts through step events (counts are not dropped)', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({ progress: { step: 'extracting', completed: 3, total: 8 } }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 3, total: 8 },
+    })
+  })
+
+  it('emits tool-start with the tool call id and tool-end with id + status from the result', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            input: { xml: '<node/>' },
+          },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            output: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+          },
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-2',
+            name: 'updateMindmapNode',
+            input: {},
+          },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-2',
+            name: 'updateMindmapNode',
+            output: JSON.stringify({ ok: false, error: '[block_not_found] …' }),
+          },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-1', name: 'insertXmlFragment', input: { xml: '<node/>' } },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-1',
+        name: 'insertXmlFragment',
+        status: 'success',
+        output: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+      },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: expect.objectContaining({ id: 'call-2', status: 'error' }),
     })
   })
 

@@ -5,6 +5,7 @@
 
 export { MindmapXmlError, MINDLANE_XML_VERSION, NODE_TAG } from './types.js'
 export type { MindmapXmlErrorCode, MindlaneAsset, XmlElementLike } from './types.js'
+export { formatXmlError } from './errors.js'
 export { escapeXml, unescapeXml } from './escape.js'
 export { normalizeSelfClosingTags, findUnescapedInAttrValues } from './normalize.js'
 export { parseXmlStrict, parseXmlTolerant, topLevelElements } from './parser.js'

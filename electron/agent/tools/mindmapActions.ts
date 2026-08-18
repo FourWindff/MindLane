@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
 import {
-  MindmapXmlError,
+  formatXmlError,
   buildValidationContext,
   parseXmlFragment,
   validateFragmentForInsert,
@@ -20,26 +20,6 @@ import type { MindmapEditorSnapshot } from '../../ipc.js'
 
 /** 写工具校验用编辑器快照提供者（主进程装配时注入）。 */
 export type EditorSnapshotProvider = (fileUuid: string) => Promise<MindmapEditorSnapshot>
-
-/** 错误码 + 恢复策略（PRD 5.4：工具结果返回给 AI，提示词含恢复策略）。 */
-function xmlErrorResult(err: unknown): { ok: false; error: string } {
-  if (err instanceof MindmapXmlError) {
-    const recovery: Record<string, string> = {
-      xml_parse_error: '重写 XML 后重试',
-      empty_xml: '补充节点内容',
-      block_not_found: '先调用 readMindmap 重新定位后再操作',
-      invalid_type: '改用注册表中的节点类型',
-      text_unescaped: '把 & < > " \' 转义为实体后重试',
-      tree_invalid: '修正为纯树（去重 id、避开 root、目标不得在被移子树内）',
-      asset_not_found: '修正或去掉 asset 属性（asset 必须来自上下文）',
-    }
-    return {
-      ok: false,
-      error: `[${err.code}] ${err.message}。恢复策略：${recovery[err.code] ?? '重试'}`,
-    }
-  }
-  return { ok: false, error: err instanceof Error ? err.message : String(err) }
-}
 
 function hasNode(nodes: Set<string>, id: string | undefined): boolean {
   return id !== undefined && nodes.has(id)
@@ -82,7 +62,7 @@ export function createInsertXmlFragmentTool(provider: EditorSnapshotProvider) {
           data: { xml, parentId, position: pos, nodeCount: parsed.nodes.length },
         }
       } catch (err) {
-        return xmlErrorResult(err)
+        return { ok: false, error: formatXmlError(err) }
       }
     },
     {
@@ -153,7 +133,7 @@ export function createUpdateMindmapNodeTool(provider: EditorSnapshotProvider) {
           data: { xml, nodeId, nodeCount: parsed.nodes.length },
         }
       } catch (err) {
-        return xmlErrorResult(err)
+        return { ok: false, error: formatXmlError(err) }
       }
     },
     {
@@ -225,7 +205,7 @@ export function createMoveMindmapNodeTool(provider: EditorSnapshotProvider) {
           data: { nodeId, targetId: target, position: position ?? 'child' },
         }
       } catch (err) {
-        return xmlErrorResult(err)
+        return { ok: false, error: formatXmlError(err) }
       }
     },
     {

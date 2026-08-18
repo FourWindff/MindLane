@@ -93,10 +93,21 @@ export function migrateDocumentRef(doc: unknown): DocumentRef {
   }
 }
 
+/** One subgraph stage: step name + optional progress counts (same source as `step` stream events). */
+export interface ChatToolCallStep {
+  step: string
+  completed?: number
+  total?: number
+}
+
 export interface ChatToolCall {
   name: string
   args: Record<string, unknown>
   result: string
+  /** Optional: tool result status (inferred from the tool result `ok` field, persisted with history). Old sessions legitimately lack it. */
+  status?: 'running' | 'success' | 'error'
+  /** Optional: subgraph stage trace (subgraph tools only). Old sessions legitimately lack it. */
+  steps?: ChatToolCallStep[]
 }
 
 interface ChatMessageAttachment {

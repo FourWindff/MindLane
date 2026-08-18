@@ -1,6 +1,12 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import { IPC, type MindlaneBridge } from './ipc.js'
-import type { ChatStreamEvent, MindmapReadRequest, MindmapReadResponse } from './ipc.js'
+import type {
+  ChatStreamEvent,
+  MindmapReadRequest,
+  MindmapReadResponse,
+  MindmapWriteRequest,
+  MindmapWriteResponse,
+} from './ipc.js'
 
 const api: MindlaneBridge = {
   ai: {
@@ -15,6 +21,9 @@ const api: MindlaneBridge = {
     onMindmapReadRequest: onMindmapReadRequest,
     respondMindmapRead: (payload: MindmapReadResponse) =>
       ipcRenderer.invoke(IPC.AiMindmapReadRespond, payload),
+    onMindmapWriteRequest: onMindmapWriteRequest,
+    respondMindmapWrite: (payload: MindmapWriteResponse) =>
+      ipcRenderer.invoke(IPC.AiMindmapWriteRespond, payload),
     urlToDataUrl: (payload) => ipcRenderer.invoke(IPC.ImageUrlToDataUrl, payload),
   },
   file: {
@@ -92,6 +101,12 @@ function onMindmapReadRequest(callback: (request: MindmapReadRequest) => void): 
   const handler = (_event: unknown, request: MindmapReadRequest) => callback(request)
   ipcRenderer.on(IPC.AiMindmapReadRequest, handler)
   return () => ipcRenderer.off(IPC.AiMindmapReadRequest, handler)
+}
+
+function onMindmapWriteRequest(callback: (request: MindmapWriteRequest) => void): () => void {
+  const handler = (_event: unknown, request: MindmapWriteRequest) => callback(request)
+  ipcRenderer.on(IPC.AiMindmapWriteRequest, handler)
+  return () => ipcRenderer.off(IPC.AiMindmapWriteRequest, handler)
 }
 
 contextBridge.exposeInMainWorld('mindlane', api)

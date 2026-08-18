@@ -654,7 +654,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
       return { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
     }
     case 'step':
-      return { ...chat, step: event.payload }
+      return { ...chat, step: event.payload.step }
     case 'end': {
       const response = event.payload
       const messages = response.messages?.length

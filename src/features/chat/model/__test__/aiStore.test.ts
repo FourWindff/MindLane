@@ -233,7 +233,12 @@ describe('aiStore per-file chat state', () => {
       activeStreamIds: { 'session-a': 'stream-a' },
     })
 
-    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'step', payload: 'extracting' })
+    emit({
+      streamId: 'stream-a',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting' },
+    })
 
     expect(useAiStore.getState().fileChats['file-a']?.step).toBe('extracting')
   })
@@ -886,14 +891,14 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-start',
-      payload: { name: 'search', input: {} },
+      payload: { id: 'call-1', name: 'search', input: {} },
     })
     expect(started.activeTools).toEqual(['search'])
     const ended = reduceStreamEvent(started, {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-end',
-      payload: { name: 'search', output: 'ok' },
+      payload: { id: 'call-1', name: 'search', status: 'success', output: 'ok' },
     })
     expect(ended.activeTools).toEqual([])
   })
@@ -903,7 +908,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-start',
-      payload: { name: '', input: {} },
+      payload: { id: '', name: '', input: {} },
     })
     expect(next).toBe(base)
   })
@@ -913,7 +918,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'step',
-      payload: 'extracting',
+      payload: { step: 'extracting' },
     })
     expect(next.step).toBe('extracting')
   })

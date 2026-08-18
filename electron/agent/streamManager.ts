@@ -38,6 +38,17 @@ function summarizeToolResult(output: string): string {
   return `${size}, ${preview}`
 }
 
+/** Tool result status: write tools return an `{ok}` envelope; ok=false is an error, everything else succeeded. */
+function deriveToolStatus(output: string): 'success' | 'error' {
+  try {
+    const parsed = JSON.parse(output) as { ok?: unknown }
+    if (parsed.ok === false) return 'error'
+  } catch {
+    /* non-JSON output — completed normally */
+  }
+  return 'success'
+}
+
 export interface StreamRequest {
   sessionId: string
   message: string
@@ -158,13 +169,15 @@ export class Runner {
             name?: string
             input?: unknown
             output?: unknown
+            toolCallId?: string
           }
           if (event.event === 'on_tool_start') {
             if (event.name === 'insertXmlFragment' || event.name === 'generateMindmapFragment')
-              this.emit('step', 'generating-map')
+              this.emit('step', { step: 'generating-map' })
             runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
             runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
             this.emit('tool-start', {
+              id: event.toolCallId ?? '',
               name: event.name ?? 'unknown',
               input: (event.input ?? {}) as Record<string, unknown>,
             })
@@ -173,14 +186,26 @@ export class Runner {
               typeof event.output === 'string' ? event.output : JSON.stringify(event.output ?? '')
             runnerLog.info('tool 结果： %s, %s', event.name, summarizeToolResult(output))
             this.emit('tool-end', {
+              id: event.toolCallId ?? '',
               name: event.name ?? 'unknown',
+              status: deriveToolStatus(output),
               output,
             })
           }
         } else if (mode === 'custom') {
-          const event = payload as { type?: string; step?: string }
+          const event = payload as {
+            type?: string
+            step?: string
+            completed?: number
+            total?: number
+          }
           if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
-            this.emit('step', event.step)
+            // 契约：step payload 为 { step, completed?, total? }，计数必须透传（卡片渲染 n/m）。
+            this.emit('step', {
+              step: event.step,
+              ...(typeof event.completed === 'number' ? { completed: event.completed } : {}),
+              ...(typeof event.total === 'number' ? { total: event.total } : {}),
+            })
           }
         }
       }
