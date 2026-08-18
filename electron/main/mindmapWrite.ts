@@ -23,7 +23,7 @@ export class MindmapWriteRequester {
   constructor(getWindow: () => BrowserWindow | null) {
     this.inner = new RendererRequester<MindmapWriteRequest, MindmapWriteResponse>(
       getWindow,
-      IPC.AiMindmapWriteRequest,
+      (window, request) => window.webContents.send(IPC.AiMindmapWriteRequest, request),
       WRITE_TIMEOUT_MS,
       '落盘',
       '应答',

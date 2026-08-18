@@ -33,7 +33,7 @@ export class RendererRequester<TReq extends RequesterRequest, TRes extends Reque
 
   constructor(
     private readonly getWindow: () => BrowserWindow | null,
-    private readonly channel: string,
+    private readonly send: (window: BrowserWindow, request: TReq) => void,
     private readonly timeoutMs: number,
     private readonly verb: string,
     private readonly ackNoun: string,
@@ -62,7 +62,7 @@ export class RendererRequester<TReq extends RequesterRequest, TRes extends Reque
         timer,
       })
       const request = { requestId, ...buildRequest(requestId) } as TReq
-      window.webContents.send(this.channel, request)
+      this.send(window, request)
     })
   }
 

@@ -22,7 +22,7 @@ export class MindmapReadRequester {
   constructor(getWindow: () => BrowserWindow | null) {
     this.inner = new RendererRequester<MindmapReadRequest, MindmapReadResponse>(
       getWindow,
-      IPC.AiMindmapReadRequest,
+      (window, request) => window.webContents.send(IPC.AiMindmapReadRequest, request),
       READ_TIMEOUT_MS,
       '读取导图',
       '响应',
