@@ -66,6 +66,25 @@
 - 消息气泡为全宽矩形，所有气泡的左、右边缘对齐，文字全部左对齐。
 - 消息列表无背景；消息气泡使用半透明玻璃状背景。
 
+### 工具调用记录（Tool Call Log）
+
+- 渲染在每条 AI 消息气泡**上方**的工具块，一个工具调用一行，左对齐，文字流式显示在下方。
+- 每行展示工具显示名（`toolDisplayName`）与状态：进行中 spinner、成功 ✓、失败 ✗、停止后取消。
+- 只展示工具名，不展示参数摘要（`args` 可能含完整 XML 片段）；子图类工具（生成思维导图片段/记忆宫殿）的卡片内额外渲染执行过程（reading-doc → extracting n/m → merging → finalizing）：运行时展开（工具名行 + spinner + 下方逐阶段进度），执行完毕自动折叠为单行（工具名 + ✓），支持手动展开/收起；仅子图卡片可展开，写/读工具卡片保持单行。
+- 子图阶段轨迹经 `ToolMessage.additional_kwargs.toolSteps` 持久化（jsonl 往返不丢），重建时读入 `ChatToolCall.steps`；历史、会话加载、重启后展开均可见。
+- 每条 assistant 消息只携带自己那轮的工具调用（`ChatMessage.toolCalls`，含 `status` 字段）。
+- 历史消息与流式进行中遵循同一渲染规则；纯工具调用消息（无文字）的工具记录并入下一条有文字的 assistant 消息。
+- 工具显示优先：卡片置顶、文字在下，不抑制、不重排模型文字（放弃严格“先工具后文字”）。
+
+### 即时落盘（Live Apply）
+
+- 写工具（insertXmlFragment / updateMindmapNode / moveMindmapNode / deleteMindmapNode）的执行语义：主进程把工具参数转发给渲染层，渲染层用**活编辑器**原子校验+落图，返回结果即 ack，主进程将其作为工具结果回给模型，随后发 tool-end。
+- 渲染层是唯一写文件方；主进程不再对写工具做快照校验（`EditorSnapshotProvider` 随之移除），校验错误码格式由共享库提供。
+- 渲染层按 fileUuid 串行化落盘队列，避免并发工具调用交错。
+- 落盘失败 = 工具失败：错误结果回给模型（可 readMindmap 恢复），卡片 ✗，流不中断；超时按失败处理。
+- 读工具与子图虚拟工具不参与落盘握手，只展示卡片（子图卡片含进度）。
+- 停止语义：已落盘的工具保留，未执行的不执行，进行中卡片标记为取消。
+
 ### ChatCapsuleBar
 
 - 应用窗口右上方的文件级对话入口组件（原 `ActiveSessionsBar`）。
