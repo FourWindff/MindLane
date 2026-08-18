@@ -2,8 +2,6 @@ import { describe, it, expect, vi } from 'vitest'
 import { Document } from '@langchain/core/documents'
 import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
-import { extractYaml, sanitizeTreeCandidate, normalizeTree } from '../../../utils/yamlMindmap.js'
-import type { MindmapYamlNode } from '../../../utils/yamlMindmap.js'
 import { MindmapSubgraphState } from '../../../state.js'
 
 type InvokeMock = ReturnType<typeof vi.fn>
@@ -49,15 +47,19 @@ function baseInput(overrides: Record<string, unknown> = {}) {
   }
 }
 
-const VALID_TREE_YAML = `
-人工智能导论:
-  - 机器学习:
-    - 监督学习
-    - 无监督学习
-  - 深度学习:
-    - 神经网络
-    - 反向传播
-`
+const VALID_TREE_XML = `<node>人工智能导论
+  <node>机器学习
+    <node>监督学习</node>
+    <node>无监督学习</node>
+  </node>
+  <node>深度学习
+    <node>神经网络</node>
+    <node>反向传播</node>
+  </node>
+</node>`
+
+/** Invalid XML: unclosed tag → xml_parse_error with position. */
+const INVALID_TREE_XML = '<node>Root\n  <node>Child</node>'
 
 describe('mindmapGraph', () => {
   it('returns error when no input source is provided', async () => {
@@ -71,7 +73,7 @@ describe('mindmapGraph', () => {
   })
 
   it('precomputes documentBatches in the load node', async () => {
-    const provider = mockProvider(() => ({ content: VALID_TREE_YAML }))
+    const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
@@ -88,7 +90,7 @@ describe('mindmapGraph', () => {
   })
 
   it('sends a single-batch document straight to build_output without merging', async () => {
-    const provider = mockProvider(() => ({ content: VALID_TREE_YAML }))
+    const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
@@ -111,7 +113,9 @@ describe('mindmapGraph', () => {
   })
 
   it('streams the single-batch pipeline stages', async () => {
-    const provider = mockProvider(() => ({ content: 'Short Document:\n  - Summary\n' }))
+    const provider = mockProvider(() => ({
+      content: '<node>Short Document\n  <node>Summary</node>\n</node>',
+    }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const steps: string[] = []
@@ -140,9 +144,9 @@ describe('mindmapGraph', () => {
     const provider = mockProvider((messages) => {
       const systemPrompt = messages[0]?.content ?? ''
       if (systemPrompt.includes('merging assistant')) {
-        return { content: 'Merged Long Text:\n  - Preserved Tail\n' }
+        return { content: '<node>Merged Long Text\n  <node>Preserved Tail</node>\n</node>' }
       }
-      return { content: 'Leaf Tree:\n  - Extracted\n' }
+      return { content: '<node>Leaf Tree\n  <node>Extracted</node>\n</node>' }
     }, 512)
     const app = buildMindmapSubgraph({ provider }).compile()
 
@@ -181,8 +185,9 @@ describe('mindmapGraph', () => {
 
   it('grows batch size with the model context window', async () => {
     const longText = ['a'.repeat(1500), 'b'.repeat(1500), 'c'.repeat(1500)].join('\n\n')
-    const smallWindow = mockProvider(() => ({ content: 'Tree:\n  - X\n' }), 512)
-    const largeWindow = mockProvider(() => ({ content: 'Tree:\n  - X\n' }), 128_000)
+    const leafXml = '<node>Tree\n  <node>X</node>\n</node>'
+    const smallWindow = mockProvider(() => ({ content: leafXml }), 512)
+    const largeWindow = mockProvider(() => ({ content: leafXml }), 128_000)
 
     const smallResult = await buildMindmapSubgraph({ provider: smallWindow })
       .compile()
@@ -198,7 +203,9 @@ describe('mindmapGraph', () => {
 
   it('loads URL input through an injected loader', async () => {
     const urlLoader = vi.fn().mockResolvedValue([new Document({ pageContent: 'Loaded URL text' })])
-    const provider = mockProvider(() => ({ content: 'URL Root:\n  - Loaded URL text\n' }))
+    const provider = mockProvider(() => ({
+      content: '<node>URL Root\n  <node>Loaded URL text</node>\n</node>',
+    }))
     const app = buildMindmapSubgraph({
       provider,
       loaders: { url: urlLoader },
@@ -220,7 +227,9 @@ describe('mindmapGraph', () => {
 
   it('records file-backed document metadata through an injected office loader', async () => {
     const docxLoader = vi.fn().mockResolvedValue([new Document({ pageContent: 'Office text' })])
-    const provider = mockProvider(() => ({ content: 'Office Root:\n  - Office text\n' }))
+    const provider = mockProvider(() => ({
+      content: '<node>Office Root\n  <node>Office text</node>\n</node>',
+    }))
     const app = buildMindmapSubgraph({ provider, loaders: { docx: docxLoader } }).compile()
 
     const result = await app.invoke(
@@ -269,7 +278,9 @@ describe('mindmapGraph', () => {
   })
 
   it('clears stale mindmap run state before generating a new mindmap', async () => {
-    const provider = mockProvider(() => ({ content: 'Fresh Root:\n  - Fresh Child\n' }))
+    const provider = mockProvider(() => ({
+      content: '<node>Fresh Root\n  <node>Fresh Child</node>\n</node>',
+    }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
@@ -282,11 +293,13 @@ describe('mindmapGraph', () => {
         mindmapTitle: 'Stale Root',
         documentBatches: [[new Document({ pageContent: 'stale text' })]],
         batchIndex: 99,
-        leafResults: [{ batchIndex: 0, batchId: 'stale-batch', tree: { label: 'Stale Leaf' } }],
-        mergeInputs: [{ label: 'Stale Merge Input' }],
-        mergeGroup: { groupIndex: 0, trees: [{ label: 'Stale Group' }] },
-        mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge' } }],
-        finalTree: { label: 'Stale Final' },
+        leafResults: [
+          { batchIndex: 0, batchId: 'stale-batch', tree: { label: 'Stale Leaf', children: [] } },
+        ],
+        mergeInputs: [{ label: 'Stale Merge Input', children: [] }],
+        mergeGroup: { groupIndex: 0, trees: [{ label: 'Stale Group', children: [] }] },
+        mergeResults: [{ groupIndex: 0, tree: { label: 'Stale Merge', children: [] } }],
+        finalTree: { label: 'Stale Final', children: [] },
       }),
     )
 
@@ -312,11 +325,11 @@ describe('mindmapGraph', () => {
     expect(result.error).toContain('at') // stack trace
   })
 
-  it('retries leaf extraction when generated YAML is invalid', async () => {
+  it('retries leaf extraction when generated XML is invalid', async () => {
     const provider = mockProvider()
     invokeMock(provider)
-      .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
-      .mockResolvedValueOnce({ content: VALID_TREE_YAML })
+      .mockResolvedValueOnce({ content: INVALID_TREE_XML })
+      .mockResolvedValueOnce({ content: VALID_TREE_XML })
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
@@ -331,15 +344,16 @@ describe('mindmapGraph', () => {
     expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
 
-  it('returns an error after repeated invalid YAML output', async () => {
-    const provider = mockProvider(() => ({ content: 'mindmap: ":\n  - "unclosed' }))
+  it('returns an error after repeated invalid XML output', async () => {
+    const provider = mockProvider(() => ({ content: INVALID_TREE_XML }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
       baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
     )
 
-    expect(result.error).toContain('YAML 校验失败：Unexpected scalar at node end')
+    expect(result.error).toContain('XML 校验失败：[xml_parse_error]')
+    expect(result.error).toContain('标签 <node> 未闭合')
     expect(result.mindmapXml).toBe('')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
@@ -349,10 +363,12 @@ describe('mindmapGraph', () => {
     // small window puts each paragraph in its own batch
     const provider = mockProvider(undefined, 512)
     invokeMock(provider)
-      .mockResolvedValueOnce({ content: 'Leaf A:\n  - Child A\n' })
-      .mockResolvedValueOnce({ content: 'Leaf B:\n  - Child B\n' })
-      .mockResolvedValueOnce({ content: 'mindmap: ":\n  - "unclosed' })
-      .mockResolvedValueOnce({ content: 'Merged Root:\n  - Child A\n  - Child B\n' })
+      .mockResolvedValueOnce({ content: '<node>Leaf A\n  <node>Child A</node>\n</node>' })
+      .mockResolvedValueOnce({ content: '<node>Leaf B\n  <node>Child B</node>\n</node>' })
+      .mockResolvedValueOnce({ content: INVALID_TREE_XML })
+      .mockResolvedValueOnce({
+        content: '<node>Merged Root\n  <node>Child A</node>\n  <node>Child B</node>\n</node>',
+      })
     const app = buildMindmapSubgraph({ provider }).compile()
 
     const result = await app.invoke(
@@ -369,6 +385,48 @@ describe('mindmapGraph', () => {
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
 
+  it('wraps a multi-root leaf output in a synthetic batch root', async () => {
+    const provider = mockProvider(() => ({
+      content: '<node>Part A\n  <node>A1</node>\n</node>\n<node>Part B\n  <node>B1</node>\n</node>',
+    }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: 'some document text' },
+        mindmapInputTitle: 'AI 导论',
+      }),
+    )
+
+    expect(result.error).toBe('')
+    expect(result.mindmapXml).toContain('content="Batch 1"')
+    expect(result.mindmapXml).toContain('content="Part A"')
+    expect(result.mindmapXml).toContain('content="Part B"')
+    // 合成根 label 与旧 YAML 行为一致：包合成根的 label 成为标题
+    expect(result.mindmapTitle).toBe('Batch 1')
+  })
+
+  it('keeps special characters complete and escaped in the output fragment', async () => {
+    const provider = mockProvider(() => ({
+      content:
+        '<node>R&amp;D &lt;fast&gt;\n  <node>a &gt; b &amp; c</node>\n  <node>价格 100%</node>\n</node>',
+    }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: 'some document text' },
+        mindmapInputTitle: 'Special Doc',
+      }),
+    )
+
+    expect(result.error).toBe('')
+    expect(result.mindmapXml).toContain('content="R&amp;D &lt;fast&gt;"')
+    expect(result.mindmapXml).toContain('content="a &gt; b &amp; c"')
+    expect(result.mindmapXml).toContain('content="价格 100%"')
+    expect(result.mindmapXml).not.toContain('<node>R&D') // 模型原串不外泄
+  })
+
   it('extracts all leaf batches before any merge starts', async () => {
     // 9 paragraphs of ~1900 chars → 9 chunks; small window gives each its own batch
     const paragraphs = Array.from({ length: 9 }, (_, i) => `p${i}${'w'.repeat(1898)}`)
@@ -378,10 +436,10 @@ describe('mindmapGraph', () => {
       const systemPrompt = messages[0]?.content ?? ''
       if (systemPrompt.includes('merging assistant')) {
         events.push('merge')
-        return { content: `Merged ${events.length}:\n  - Combined\n` }
+        return { content: `<node>Merged ${events.length}\n  <node>Combined</node>\n</node>` }
       }
       events.push('leaf')
-      return { content: `Leaf ${events.length}:\n  - Extracted\n` }
+      return { content: `<node>Leaf ${events.length}\n  <node>Extracted</node>\n</node>` }
     }, 512)
     const app = buildMindmapSubgraph({ provider }).compile()
 
@@ -417,10 +475,10 @@ describe('mindmapGraph wave concurrency', () => {
       onInvoke?.(messages)
       const systemPrompt = messages[0]?.content ?? ''
       if (systemPrompt.includes('merging assistant')) {
-        return { content: 'Merged Root:\n  - Combined\n' }
+        return { content: '<node>Merged Root\n  <node>Combined</node>\n</node>' }
       }
       const marker = /p(\d+)/.exec(messages[1]?.content ?? '')?.[1] ?? 'x'
-      return { content: `Root p${marker}:\n  - item${marker}\n` }
+      return { content: `<node>Root p${marker}\n  <node>item${marker}</node>\n</node>` }
     }, 512)
   }
 
@@ -443,10 +501,10 @@ describe('mindmapGraph wave concurrency', () => {
         await new Promise((resolve) => setTimeout(resolve, 10))
         const systemPrompt = messages[0]?.content ?? ''
         if (systemPrompt.includes('merging assistant')) {
-          return { content: 'Merged Root:\n  - Combined\n' }
+          return { content: '<node>Merged Root\n  <node>Combined</node>\n</node>' }
         }
         const marker = /p(\d+)/.exec(messages[1]?.content ?? '')?.[1] ?? 'x'
-        return { content: `Root p${marker}:\n  - item${marker}\n` }
+        return { content: `<node>Root p${marker}\n  <node>item${marker}</node>\n</node>` }
       } finally {
         inFlight -= 1
       }
@@ -473,8 +531,10 @@ describe('mindmapGraph wave concurrency', () => {
       const user = messages[1]?.content ?? ''
       if (user.includes('p0')) return slow.promise // batch 0 finishes last
       const marker = /p(\d+)/.exec(user)?.[1]
-      if (marker) return { content: `Root p${marker}:\n  - item${marker}\n` }
-      return { content: 'Merged Root:\n  - Combined\n' }
+      if (marker) {
+        return { content: `<node>Root p${marker}\n  <node>item${marker}</node>\n</node>` }
+      }
+      return { content: '<node>Merged Root\n  <node>Combined</node>\n</node>' }
     }, 512)
     const app = buildMindmapSubgraph({ provider }).compile()
 
@@ -488,7 +548,7 @@ describe('mindmapGraph wave concurrency', () => {
 
     // let batches 1-3 complete, then release batch 0
     await vi.waitFor(() => expect(invokeMock(provider)).toHaveBeenCalledTimes(4))
-    slow.resolve({ content: 'Root p0:\n  - item0\n' })
+    slow.resolve({ content: '<node>Root p0\n  <node>item0</node>\n</node>' })
     const result = await resultPromise
 
     expect(result.error).toBe('')
@@ -511,7 +571,7 @@ describe('mindmapGraph wave concurrency', () => {
       const user = messages[1]?.content ?? ''
       if (user.includes('p1')) return Promise.reject(new Error('boom p1'))
       const marker = /p(\d+)/.exec(user)?.[1] ?? 'x'
-      return { content: `Root p${marker}:\n  - item${marker}\n` }
+      return { content: `<node>Root p${marker}\n  <node>item${marker}</node>\n</node>` }
     }, 512)
     const app = buildMindmapSubgraph({ provider }).compile()
 
@@ -554,6 +614,9 @@ describe('mindmapGraph wave concurrency', () => {
     expect(mergePrompts[1]).toContain('--- Tree 1 ---')
     expect(mergePrompts[1]).not.toContain('--- Tree 2 ---')
     expect(mergePrompts[2]).toContain('--- Tree 2 ---')
+    // merge input is model-dialect XML, one <node> root per tree
+    expect(mergePrompts[0]).toContain('<node>Root p1')
+    expect(mergePrompts[0]).not.toContain('content="')
     expect(result.mindmapXml).toContain('Merged Root')
   })
 
@@ -588,79 +651,5 @@ describe('mindmapGraph wave concurrency', () => {
     expect(merging).toHaveLength(2)
     expect(merging[0]?.completed).toBeUndefined()
     expect(merging[1]).toMatchObject({ completed: 1, total: 1 })
-  })
-})
-
-describe('mindmapGraph YAML parsing', () => {
-  it('parses outline-format YAML into structured tree', () => {
-    const parsed = extractYaml(VALID_TREE_YAML)
-    const tree = sanitizeTreeCandidate(parsed)
-
-    expect(tree).toMatchObject({
-      label: '人工智能导论',
-      children: expect.any(Array),
-    })
-    expect((tree as MindmapYamlNode).children).toHaveLength(2)
-    expect((tree as MindmapYamlNode).children![0]!.label).toBe('机器学习')
-    expect((tree as MindmapYamlNode).children![0]!.children).toHaveLength(2)
-  })
-
-  it('parses structured-format YAML', () => {
-    const yaml = `
-label: 人工智能导论
-children:
-  - label: 机器学习
-    children:
-      - label: 监督学习
-      - label: 无监督学习
-`
-    const parsed = extractYaml(yaml)
-    const tree = sanitizeTreeCandidate(parsed)
-
-    expect(tree).toMatchObject({
-      label: '人工智能导论',
-      children: expect.any(Array),
-    })
-    expect((tree as MindmapYamlNode).children).toHaveLength(1)
-  })
-
-  it('handles deeply nested outline format', () => {
-    const yaml = `
-Root:
-  - A:
-    - A1:
-      - A1a
-      - A1b
-    - A2
-  - B:
-    - B1
-`
-    const parsed = extractYaml(yaml)
-    const tree = sanitizeTreeCandidate(parsed) as MindmapYamlNode
-
-    expect(tree.label).toBe('Root')
-    expect(tree.children).toHaveLength(2)
-    expect(tree.children![0]!.children).toHaveLength(2)
-    expect(tree.children![0]!.children![0]!.children).toHaveLength(2)
-  })
-
-  it('handles single node without children', () => {
-    const yaml = 'Simple Topic:'
-    const parsed = extractYaml(yaml)
-    const tree = sanitizeTreeCandidate(parsed) as MindmapYamlNode
-
-    expect(tree.label).toBe('Simple Topic')
-    expect(tree.children).toEqual([])
-  })
-
-  it('normalizes tree with empty page_range and summary', () => {
-    const raw: MindmapYamlNode = {
-      label: '  Test  ',
-      page_range: '',
-      children: [{ label: 'Child', page_range: '', children: [] }],
-    }
-    const normalized = normalizeTree(raw, '')
-    expect(normalized.label).toBe('Test')
-    expect(normalized.page_range).toBe('')
   })
 })

@@ -111,7 +111,9 @@ describe('MindmapSubgraphState', () => {
   it('appends leafResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addLeaf', async () => {
-        return { leafResults: [{ batchIndex: 1, batchId: 'c2', tree: { root: 'b' } }] }
+        return {
+          leafResults: [{ batchIndex: 1, batchId: 'c2', tree: { label: 'b', children: [] } }],
+        }
       })
       .addEdge('__start__', 'addLeaf')
       .addEdge('addLeaf', '__end__')
@@ -130,7 +132,7 @@ describe('MindmapSubgraphState', () => {
       mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
+      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { label: 'a', children: [] } }],
       mergeInputs: [],
       mergeResults: [],
       documentRef: null,
@@ -163,7 +165,7 @@ describe('MindmapSubgraphState', () => {
       mindmapXml: '',
       mindmapTitle: '',
       documentBatches: [],
-      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { root: 'a' } }],
+      leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { label: 'a', children: [] } }],
       mergeInputs: [],
       mergeResults: [],
       documentRef: null,
@@ -175,7 +177,7 @@ describe('MindmapSubgraphState', () => {
   it('appends mergeResults via reducer', async () => {
     const graph = new StateGraph(MindmapSubgraphState)
       .addNode('addMerge', async () => {
-        return { mergeResults: [{ groupIndex: 1, tree: { root: 'b' } }] }
+        return { mergeResults: [{ groupIndex: 1, tree: { label: 'b', children: [] } }] }
       })
       .addEdge('__start__', 'addMerge')
       .addEdge('addMerge', '__end__')
@@ -196,7 +198,7 @@ describe('MindmapSubgraphState', () => {
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
-      mergeResults: [{ groupIndex: 0, tree: { root: 'a' } }],
+      mergeResults: [{ groupIndex: 0, tree: { label: 'a', children: [] } }],
       documentRef: null,
     })
 

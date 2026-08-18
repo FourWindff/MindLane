@@ -352,9 +352,9 @@
 
 ### Leaf 提取（Leaf Extraction）
 
-- 对一个 batch 调用聊天模型、产出一棵 YAML 结构树的过程，是导图生成的最小工作单元。
+- 对一个 batch 调用聊天模型、产出一棵 XML 结构树的过程，是导图生成的最小工作单元。
 - 多个 leaf 之间**无依赖、可并行**；结果按 `batchIndex` 排序后进入归并，文档叙事顺序不因完成顺序乱序而改变。
-- 单个 leaf 内部有 YAML 校验重试；重试耗尽即整轮 fail-fast，不存在"跳过失败 batch 继续生成"的降级路径。
+- 单个 leaf 内部有 XML 校验重试；重试耗尽即整轮 fail-fast，不存在"跳过失败 batch 继续生成"的降级路径。
 
 ### Wave（波）
 
@@ -367,6 +367,18 @@
 - 全部 leaf 完成后，把树按 8 棵一组分组、按 wave 机制并行合并的一轮；若一轮产出多棵树，则以产出为输入进入下一轮，直到收敛为单棵 `finalTree`。
 - 两阶段 map-reduce 的 reduce 阶段：leaf 全部完成前**不做**任何穿插式合并（旧的"攒够 8 棵就提前 merge"设计已废弃）。
 - 单个 leaf 的文档跳过整个归并阶段，其结果直接成为 `finalTree`。
+
+### 模型协议（Model Protocol）
+
+- mindmap 子图与模型之间的产出格式契约：leaf 提取、归并、修复循环中的模型输入输出都遵守同一形态——`<node>…</node>` XML 片段，元素文本承载内容，零属性、无 id。
+- 与子图输出是两层：模型协议是子图内部的中间契约，子图输出是喂回主图的最终 payload。
+- _Avoid_: 提取格式（与子图输出混用）、YAML（生成面已迁 XML，见 ADR-0016）
+
+### 子图输出（Subgraph Output）
+
+- mindmap/palace 子图执行完毕后由 `packageResult` 包装、以 ToolMessage 形式喂回主图 agent 的 payload。
+- mindmap 为 JSON 壳 `{ok, title, xmlFragment, documentRef}`，其中 `xmlFragment` 是存储方言的 XML 片段；palace 为 `{ok, label, stations, imageUrl, sourceNodeIds}`。
+- _Avoid_: 模型协议（子图内部契约，见上条）
 
 ## AI Provider
 

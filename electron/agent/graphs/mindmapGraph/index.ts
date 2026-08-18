@@ -2,15 +2,18 @@ import { StateGraph, START, END, Send, getWriter } from '@langchain/langgraph'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
-import { serializeXmlOutline, type MindmapYamlNode } from '../../utils/yamlMindmap.js'
-import { validateMindmapYaml } from '../../utils/yamlValidation.js'
+import {
+  parseOutlineXml,
+  serializeOutlineXml,
+  serializeStorageFragment,
+  type MindmapOutlineNode,
+} from '../../utils/mindmapOutline.js'
 import {
   createDefaultLoaders,
   computeBudgetChars,
   prepareDocument,
   type DocumentLoaderRegistry,
 } from '../../document/index.js'
-import { extractRootTree } from './shared/rootTree.js'
 import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
@@ -28,7 +31,7 @@ interface MindmapSubgraphOptions {
 }
 
 const MERGE_GROUP_SIZE = 8
-const YAML_GENERATION_ATTEMPTS = 3
+const XML_GENERATION_ATTEMPTS = 3
 /** Wave width: max parallel leaf/merge branches per super-step (ADR-0008). */
 const EXTRACT_CONCURRENCY = 4
 
@@ -47,14 +50,8 @@ function takeRunStart(): number | undefined {
   return start
 }
 
-function countTreeNodes(node: { children?: unknown[] }): number {
-  return (
-    1 +
-    (node.children ?? []).reduce(
-      (sum: number, child) => sum + countTreeNodes(child as { children?: unknown[] }),
-      0,
-    )
-  )
+function countTreeNodes(node: MindmapOutlineNode): number {
+  return 1 + node.children.reduce((sum: number, child) => sum + countTreeNodes(child), 0)
 }
 
 type PromptMessage = { role: string; content: string }
@@ -111,17 +108,20 @@ function buildLeafExtractPrompt(chunksText: string): PromptMessage[] {
       role: 'system',
       content: `You are a knowledge structure extraction assistant.
 Extract a hierarchical mindmap outline from the provided text.
-Output only YAML. Do not include JSON, Markdown, or explanations.
-Use "node:" format for parent nodes and "- child" for children.
+Output only XML. Do not include JSON, YAML, Markdown, or explanations.
+Use nested <node> elements: element text carries the label, zero attributes, no ids.
 Keep 2-3 levels deep, max 8 children per node.
 
 Example output format:
-Root Topic:
-  - Section A:
-    - Point 1
-    - Point 2
-  - Section B:
-    - Point 3`,
+<node>Root Topic
+  <node>Section A
+    <node>Point 1</node>
+    <node>Point 2</node>
+  </node>
+  <node>Section B
+    <node>Point 3</node>
+  </node>
+</node>`,
     },
     {
       role: 'user',
@@ -130,39 +130,36 @@ Root Topic:
   ]
 }
 
-function buildMergePrompt(treesYaml: string): PromptMessage[] {
+function buildMergePrompt(treesXml: string): PromptMessage[] {
   return [
     {
       role: 'system',
       content: `You are a knowledge structure merging assistant.
-Merge multiple YAML mindmap trees into one coherent, unified tree.
-Output only YAML. Do not include JSON, Markdown, or explanations.
-Use "node:" format for parent nodes and "- child" for children.
+Merge multiple XML mindmap trees into one coherent, unified tree.
+Output only XML. Do not include JSON, YAML, Markdown, or explanations.
+Use nested <node> elements: element text carries the label, zero attributes, no ids.
 Keep 2-3 levels deep, max 8 children per node.
 Remove duplicates and combine related topics.`,
     },
     {
       role: 'user',
-      content: `Merge the following YAML trees into one unified tree:\n\n${treesYaml}`,
+      content: `Merge the following XML trees into one unified tree:\n\n${treesXml}`,
     },
   ]
 }
 
-async function generateValidMindmapYaml(
+async function generateValidMindmapXml(
   provider: LLMProvider,
   initialMessages: PromptMessage[],
   fallbackTitle: string,
-): Promise<{ tree: MindmapYamlNode; attempts: number }> {
+): Promise<{ tree: MindmapOutlineNode; attempts: number }> {
   let messages = initialMessages
-  let lastReason = 'YAML 校验失败'
+  let lastReason = 'XML 校验失败'
 
-  for (let attempt = 1; attempt <= YAML_GENERATION_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= XML_GENERATION_ATTEMPTS; attempt += 1) {
     const response = await provider.model.invoke(messages)
     const content = extractTextContent(response.content)
-    const validation = validateMindmapYaml(content, {
-      mode: 'tree',
-      fallbackTitle,
-    })
+    const validation = parseOutlineXml(content, fallbackTitle)
 
     if (validation.ok) {
       return { tree: validation.tree, attempts: attempt }
@@ -170,25 +167,20 @@ async function generateValidMindmapYaml(
 
     lastReason = validation.reason
     log.warn(
-      'YAML 校验失败（attempt %d/%d，%s）：%s',
+      'XML 校验失败（attempt %d/%d，%s）：%s',
       attempt,
-      YAML_GENERATION_ATTEMPTS,
+      XML_GENERATION_ATTEMPTS,
       fallbackTitle,
       lastReason,
     )
-    messages = buildYamlRepairPrompt(initialMessages, content, lastReason)
+    messages = buildXmlRepairPrompt(initialMessages, content, lastReason)
   }
 
-  log.error(
-    'YAML 校验连续 %d 次失败（%s）：%s',
-    YAML_GENERATION_ATTEMPTS,
-    fallbackTitle,
-    lastReason,
-  )
-  throw new Error(`YAML 校验失败：${lastReason}`)
+  log.error('XML 校验连续 %d 次失败（%s）：%s', XML_GENERATION_ATTEMPTS, fallbackTitle, lastReason)
+  throw new Error(`XML 校验失败：${lastReason}`)
 }
 
-function buildYamlRepairPrompt(
+function buildXmlRepairPrompt(
   originalMessages: PromptMessage[],
   previousOutput: string,
   reason: string,
@@ -201,11 +193,12 @@ function buildYamlRepairPrompt(
     },
     {
       role: 'user',
-      content: `上一次输出的 YAML 无效，原因：${reason}
+      content: `上一次输出的 XML 无效，原因：${reason}
 
-请根据原始任务重新生成完整的 outline YAML。
-只输出 YAML，不要 JSON，不要 Markdown 解释，不要额外前后缀。
-使用缩进表达层级：有子节点的节点写成“节点内容:”，子节点在下一行缩进后用“- 节点内容”。`,
+请根据原始任务重新生成完整的 outline XML。
+只输出 XML，不要 JSON，不要 YAML，不要 Markdown 解释，不要额外前后缀。
+使用 <node> 嵌套表达层级：<node>节点内容</node>，子节点嵌套在父节点内部。
+所有 <node> 标签必须配对闭合；文本中的 & < > 需转义为 &amp; &lt; &gt;；标签上不要写任何属性。`,
     },
   ]
 }
@@ -317,7 +310,7 @@ async function leafExtractNode(
   const batchStart = Date.now()
 
   try {
-    const { tree, attempts } = await generateValidMindmapYaml(
+    const { tree, attempts } = await generateValidMindmapXml(
       options.provider,
       buildLeafExtractPrompt(chunksText),
       `Batch ${batchIndex + 1}`,
@@ -401,18 +394,15 @@ async function mergeTreesNode(
   }
 
   const totalGroups = group.groupCount
-  const treesYaml = group.trees
-    .map((tree, i) => {
-      const rootTree = extractRootTree(tree, `Tree ${i + 1}`)
-      return `--- Tree ${i + 1} ---\n${rootTree ? serializeXmlOutline(rootTree) : String(tree)}`
-    })
+  const treesXml = group.trees
+    .map((tree, i) => `--- Tree ${i + 1} ---\n${serializeOutlineXml(tree)}`)
     .join('\n\n')
 
   try {
     const groupStart = Date.now()
-    const { tree, attempts } = await generateValidMindmapYaml(
+    const { tree, attempts } = await generateValidMindmapXml(
       options.provider,
-      buildMergePrompt(treesYaml),
+      buildMergePrompt(treesXml),
       `Merged Tree ${group.groupIndex + 1}`,
     )
 
@@ -475,17 +465,9 @@ async function buildOutputNode(
     }
   }
 
-  const rootTree = extractRootTree(tree, title)
-  if (!rootTree) {
-    return {
-      error: 'AI 未返回有效的思维导图结构',
-      response: '生成思维导图失败：无法解析结构',
-    }
-  }
+  const finalTitle = tree.label.trim() || title
 
-  const finalTitle = rootTree.label || title
-
-  if (!rootTree.children || rootTree.children.length === 0) {
+  if (tree.children.length === 0) {
     return {
       error: '未提取到任何要点',
       response: '生成思维导图失败：未提取到任何要点',
@@ -495,14 +477,14 @@ async function buildOutputNode(
   log.info(
     '完成： 总耗时 %ss, 产出 %d 节点, 模型调用 %d 次, title=%s',
     runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
-    countTreeNodes(rootTree),
+    countTreeNodes(tree),
     takeModelCallCount(currentStreamId() ?? ''),
     finalTitle,
   )
 
   return {
     pendingSubgraph: null,
-    mindmapXml: serializeXmlOutline(rootTree),
+    mindmapXml: serializeStorageFragment(tree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
   }

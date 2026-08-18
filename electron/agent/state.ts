@@ -5,6 +5,7 @@ import type { DocumentRef } from '@/shared/lib/fileFormat'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { DetectedAnchor } from './providers/index.js'
 import type { ChatContext } from '../ipc.js'
+import type { MindmapOutlineNode } from './utils/mindmapOutline.js'
 
 export type { DocumentRef }
 export type { MindmapInputSource }
@@ -187,28 +188,32 @@ const MindmapStateAnnotations = {
     default: () => -1,
   }),
   leafResults: Annotation<
-    Array<{ batchIndex: number; batchId: string; tree: unknown }>,
-    Array<{ batchIndex: number; batchId: string; tree: unknown }> | null
+    Array<{ batchIndex: number; batchId: string; tree: MindmapOutlineNode }>,
+    Array<{ batchIndex: number; batchId: string; tree: MindmapOutlineNode }> | null
   >({
     reducer: appendReducer,
     default: () => [],
   }),
-  mergeInputs: Annotation<unknown[]>({
+  mergeInputs: Annotation<MindmapOutlineNode[]>({
     reducer: replaceReducer,
     default: () => [],
   }),
-  mergeGroup: Annotation<{ groupIndex: number; groupCount: number; trees: unknown[] } | null>({
+  mergeGroup: Annotation<{
+    groupIndex: number
+    groupCount: number
+    trees: MindmapOutlineNode[]
+  } | null>({
     reducer: replaceReducer,
     default: () => null,
   }),
   mergeResults: Annotation<
-    Array<{ groupIndex: number; tree: unknown }>,
-    Array<{ groupIndex: number; tree: unknown }> | null
+    Array<{ groupIndex: number; tree: MindmapOutlineNode }>,
+    Array<{ groupIndex: number; tree: MindmapOutlineNode }> | null
   >({
     reducer: appendReducer,
     default: () => [],
   }),
-  finalTree: Annotation<unknown | null>({
+  finalTree: Annotation<MindmapOutlineNode | null>({
     reducer: replaceReducer,
     default: () => null,
   }),
