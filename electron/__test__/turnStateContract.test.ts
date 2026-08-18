@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState, xmlEscape } from '../../ipc.js'
-import type { ChatContext, MindmapReadRequest, MindmapReadResponse } from '../../ipc.js'
+import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState, xmlEscape } from '../ipc.js'
+import type { ChatContext, MindmapReadRequest, MindmapReadResponse } from '../ipc.js'
 
 /** 最小上下文：文件身份 + 空选。 */
 function baseContext(overrides: Partial<ChatContext> = {}): ChatContext {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { splitCurrentTurn } from '../../ipc.js'
+import { splitCurrentTurn } from '../ipc.js'
 import { AIMessage, HumanMessage } from '@langchain/core/messages'
-import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage } from '../../src/shared/lib/fileFormat.js'
 
 describe('splitCurrentTurn', () => {
   it('splits BaseMessage (type) on the last human message, previous includes the boundary', () => {

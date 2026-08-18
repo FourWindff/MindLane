@@ -2,10 +2,10 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { IPC } from '../../ipc.js'
-import type { MindlaneBridge } from '../../ipc.js'
+import { IPC } from '../ipc.js'
+import type { MindlaneBridge } from '../ipc.js'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** Walk every .ts/.tsx file under `dir`, skipping node_modules/dist/__test__. */
 function walkSourceFiles(dir: string): string[] {

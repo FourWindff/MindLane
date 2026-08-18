@@ -6,7 +6,7 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['vitest.setup.ts'],
     include: [
-      'electron/**/*/__test__/**/*.test.ts',
+      'electron/**/__test__/**/*.test.ts',
       'src/**/__test__/**/*.test.ts',
       'src/**/__test__/**/*.test.tsx',
     ],
