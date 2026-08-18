@@ -33,10 +33,23 @@ describe('top toolbar layout', () => {
     expect(css).toMatch(
       /\.mindmap-header--capsule-expanded\s*{[^}]*right:\s*calc\(100vw - var\(--app-toolbar-right\)\)/s,
     )
-    expect(css).toMatch(
-      /\.mindmap-header__toolbar-viewport\s*{[^}]*min-width:\s*0[^}]*overflow:\s*hidden/s,
-    )
+    const viewportRule = css.match(/\.mindmap-header__toolbar-viewport\s*{[^}]*}/s)?.[0] ?? ''
+    expect(viewportRule).toMatch(/min-width:\s*0/)
+    // Regression guard: the viewport must not clip, or it cuts off the below-button tooltip.
+    expect(viewportRule).not.toMatch(/overflow:\s*hidden/)
     expect(css).not.toMatch(/scaleX\(/)
+  })
+
+  it('reveals the toolbar tooltip on hover (not clipped by the viewport)', () => {
+    const tooltipCss = fs.readFileSync(
+      path.resolve('src/features/mindmap/styles/tooltip.css'),
+      'utf8',
+    )
+
+    expect(tooltipCss).toMatch(
+      /\.float-toolbar__btn-wrap:hover \.float-toolbar__tooltip\s*{[^}]*opacity:\s*1/s,
+    )
+    expect(tooltipCss).not.toMatch(/overflow:\s*hidden/)
   })
 
   it('restores the mind map header when capsules collapse', () => {

@@ -42,10 +42,11 @@
   pointer-events: none;
 }
 
+/* ponytail: no overflow clip here — it would cut off the below-button tooltip.
+   The header squeeze is purely a `right` transition + fade, so clipping is not needed. */
 .mindmap-header__toolbar-viewport {
   display: inline-flex;
   min-width: 0;
-  overflow: hidden;
 }
 
 .float-toolbar {
