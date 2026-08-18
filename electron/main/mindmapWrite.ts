@@ -52,7 +52,9 @@ export class MindmapWriteRequester {
       entry.reject(new Error(payload.error))
       return
     }
-    entry.resolve(payload.data)
+    // 渲染层应答原样透出（requestId 是内部关联，不进工具结果）：
+    // 写工具把 {ok, action, data} 整体作为 ToolMessage 回给模型。
+    entry.resolve({ ok: true as const, action: payload.action, data: payload.data })
   }
 
   /** 当前未决请求数（测试与观测用）。 */

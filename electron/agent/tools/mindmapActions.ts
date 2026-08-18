@@ -1,28 +1,28 @@
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
-import {
-  formatXmlError,
-  buildValidationContext,
-  parseXmlFragment,
-  validateFragmentForInsert,
-} from '../../../src/shared/lib/mindmapXml/index.js'
-import type { MindmapEditorSnapshot } from '../../ipc.js'
 
 /**
  * AI 写工具集（固定 4 个，PRD 6.1）：insertXmlFragment / updateMindmapNode /
  * moveMindmapNode / deleteMindmapNode。工具集不随节点类型增长——类型知识走
  * 注册表校验 + 系统提示注入。
  *
- * 校验职责：主进程工具对 XML 做语法/类型/转义/纯树/存在性校验（错误码回传给 AI），
- * 返回 action 指令；渲染层执行器把校验通过的片段落图（编辑器是唯一写文件方）。
- * 快照提供者经反向 IPC 拉编辑器活状态（nodeIds/assetIds/parents）。
+ * 渲染层代理（ADR 0017 决策 1）：主进程工具不再做快照校验，而是把工具参数经
+ * 反向 IPC 转发给渲染层落盘应答器（活编辑器原子校验 + 落图），渲染层应答
+ * `{ok, action, data}` **原样**作为工具结果回给模型。渲染层无响应/超时按工具
+ * 失败处理（错误结果回模型，流不中断），不新增重试。工具名/描述/schema 等
+ * 模型可见契约不变。
  */
 
-/** 写工具校验用编辑器快照提供者（主进程装配时注入）。 */
-export type EditorSnapshotProvider = (fileUuid: string) => Promise<MindmapEditorSnapshot>
+/** 写工具渲染层代理：转发参数，返回渲染层的落盘应答（原样）。 */
+export type MindmapWriteProxy = (
+  fileUuid: string,
+  action: string,
+  args: Record<string, unknown>,
+) => Promise<unknown>
 
-function hasNode(nodes: Set<string>, id: string | undefined): boolean {
-  return id !== undefined && nodes.has(id)
+/** 统一错误包装：超时 / 渲染层 ok:false / 窗口不可用 → 工具失败结果。 */
+function asToolError(err: unknown): { ok: false; error: string } {
+  return { ok: false, error: err instanceof Error ? err.message : String(err) }
 }
 
 // ========== insertXmlFragment（统一写入口） ==========
@@ -30,39 +30,15 @@ function hasNode(nodes: Set<string>, id: string | undefined): boolean {
 /**
  * 创建统一写入口工具：任意位置插入嵌套 XML 片段（含批量子树生成）。
  * position: root=挂到根节点 / child=挂到 parentId 之下 / after|before=成为 parentId 兄弟。
- * parentId 省略时回退链：选中节点 → 根节点 root → 报错。
+ * 校验与落图都在渲染层应答器内完成（活编辑器原子操作）。
  */
-export function createInsertXmlFragmentTool(provider: EditorSnapshotProvider) {
+export function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, xml, parentId, position }) => {
       try {
-        const parsed = await parseXmlFragment(xml)
-        const snapshot = await provider(fileUuid ?? '')
-
-        const { ctx } = buildValidationContext(
-          snapshot.nodeIds.map((id) => ({ id })),
-          [],
-          snapshot.assetIds.map((id) => ({ id })),
-        )
-        validateFragmentForInsert(parsed, ctx)
-
-        const pos = position ?? 'child'
-        if (pos === 'child' || pos === 'after' || pos === 'before') {
-          if (parentId && !hasNode(ctx.nodeIds, parentId)) {
-            return {
-              ok: false,
-              error: `[block_not_found] 定位节点「${parentId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
-            }
-          }
-        }
-
-        return {
-          ok: true,
-          action: 'insertXmlFragment',
-          data: { xml, parentId, position: pos, nodeCount: parsed.nodes.length },
-        }
+        return await proxy(fileUuid ?? '', 'insertXmlFragment', { xml, parentId, position })
       } catch (err) {
-        return { ok: false, error: formatXmlError(err) }
+        return asToolError(err)
       }
     },
     {
@@ -87,53 +63,15 @@ export function createInsertXmlFragmentTool(provider: EditorSnapshotProvider) {
 // ========== updateMindmapNode（整体替换，参数改 XML） ==========
 
 /**
- * 创建更新工具：XML 参数整体替换节点（含子树）。片段根节点 id 必须存在
- * （block_not_found）；根节点不允许替换（tree_invalid）。
+ * 创建更新工具：XML 参数整体替换节点（含子树）。校验与落图在渲染层应答器内。
  */
-export function createUpdateMindmapNodeTool(provider: EditorSnapshotProvider) {
+export function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, xml }) => {
       try {
-        const parsed = await parseXmlFragment(xml)
-        const snapshot = await provider(fileUuid ?? '')
-        const existing = new Set(snapshot.nodeIds)
-
-        if (parsed.rootIds.length !== 1) {
-          return {
-            ok: false,
-            error:
-              '[tree_invalid] updateMindmapNode 必须提供恰好一个根 <node>（含子树）。恢复策略：用单个根节点重写',
-          }
-        }
-        const nodeId = parsed.rootIds[0]!
-        if (nodeId === 'root') {
-          return {
-            ok: false,
-            error: '[tree_invalid] root 是导图锚点，不可被替换。恢复策略：不要触碰 root',
-          }
-        }
-        if (!existing.has(nodeId)) {
-          return {
-            ok: false,
-            error: `[block_not_found] 节点「${nodeId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
-          }
-        }
-
-        // 子树内的新 id 不得与编辑器其它节点冲突（被替换节点自身除外）
-        const { ctx } = buildValidationContext(
-          snapshot.nodeIds.map((id) => ({ id })),
-          [],
-          snapshot.assetIds.map((id) => ({ id })),
-        )
-        validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
-
-        return {
-          ok: true,
-          action: 'updateMindmapNode',
-          data: { xml, nodeId, nodeCount: parsed.nodes.length },
-        }
+        return await proxy(fileUuid ?? '', 'updateMindmapNode', { xml })
       } catch (err) {
-        return { ok: false, error: formatXmlError(err) }
+        return asToolError(err)
       }
     },
     {
@@ -151,61 +89,15 @@ export function createUpdateMindmapNodeTool(provider: EditorSnapshotProvider) {
 
 /**
  * 创建移动工具：摘除子树 + 重挂 + 重布局（单条 batch 历史，原子）。
- * root 不可移动；目标不得位于被移子树内（环 → tree_invalid）。
+ * 校验（root 不可移、目标不得在被移子树内）在渲染层应答器内完成。
  */
-export function createMoveMindmapNodeTool(provider: EditorSnapshotProvider) {
+export function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, nodeId, targetId, position }) => {
       try {
-        const snapshot = await provider(fileUuid ?? '')
-        const existing = new Set(snapshot.nodeIds)
-
-        if (nodeId === 'root') {
-          return {
-            ok: false,
-            error: '[tree_invalid] root 是导图锚点，不可移动。恢复策略：不要触碰 root',
-          }
-        }
-        if (!existing.has(nodeId)) {
-          return {
-            ok: false,
-            error: `[block_not_found] 节点「${nodeId}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
-          }
-        }
-        const target = targetId ?? 'root'
-        if (target === nodeId) {
-          return {
-            ok: false,
-            error: '[tree_invalid] 目标节点不能是自身。恢复策略：改用其它目标',
-          }
-        }
-        if (!existing.has(target)) {
-          return {
-            ok: false,
-            error: `[block_not_found] 目标节点「${target}」不存在。恢复策略：先调用 readMindmap 重新定位后再操作`,
-          }
-        }
-
-        // 环检测：沿 parents 链从 target 向上走到根，命中 nodeId 即环
-        let current: string | undefined = snapshot.parents[target]
-        while (current) {
-          if (current === nodeId) {
-            return {
-              ok: false,
-              error:
-                '[tree_invalid] 不能把节点移动到它自己的子树内（会产生环）。恢复策略：改用其它目标',
-            }
-          }
-          current = snapshot.parents[current]
-        }
-
-        return {
-          ok: true,
-          action: 'moveMindmapNode',
-          data: { nodeId, targetId: target, position: position ?? 'child' },
-        }
+        return await proxy(fileUuid ?? '', 'moveMindmapNode', { nodeId, targetId, position })
       } catch (err) {
-        return { ok: false, error: formatXmlError(err) }
+        return asToolError(err)
       }
     },
     {
@@ -226,52 +118,45 @@ export function createMoveMindmapNodeTool(provider: EditorSnapshotProvider) {
 
 // ========== deleteMindmapNode（保留） ==========
 
-const deleteNodeTool = tool(
-  async ({ fileUuid, nodeId, confirmDeleteSubtree }) => {
-    if (!nodeId.trim()) {
-      return { ok: false, error: '节点ID不能为空' }
-    }
-    if (nodeId === 'root') {
-      return {
-        ok: false,
-        error: '[tree_invalid] root 是导图锚点，不可删除。恢复策略：不要触碰 root',
+/**
+ * 创建删除工具：删除指定节点（连同子树）。动作名沿用 `deleteNode`（渲染层
+ * 应答器按该动作名落图）。
+ */
+export function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
+  return tool(
+    async ({ fileUuid, nodeId, confirmDeleteSubtree }) => {
+      try {
+        return await proxy(fileUuid ?? '', 'deleteNode', { nodeId, confirmDeleteSubtree })
+      } catch (err) {
+        return asToolError(err)
       }
-    }
-    return {
-      ok: true,
-      action: 'deleteNode',
-      data: {
-        fileUuid,
-        nodeId,
-        confirmDeleteSubtree: confirmDeleteSubtree ?? true,
-      },
-    }
-  },
-  {
-    name: 'deleteMindmapNode',
-    description:
-      '删除指定的思维导图节点（连同其整棵子树）。nodeId 必须来自 readMindmap 提供的 id；root 不可删除。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。',
-    schema: z.object({
-      fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
-      nodeId: z.string().describe('要删除的节点ID（含子树）'),
-      confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
-    }),
-  },
-)
+    },
+    {
+      name: 'deleteMindmapNode',
+      description:
+        '删除指定的思维导图节点（连同其整棵子树）。nodeId 必须来自 readMindmap 提供的 id；root 不可删除。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。',
+      schema: z.object({
+        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
+        nodeId: z.string().describe('要删除的节点ID（含子树）'),
+        confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
+      }),
+    },
+  )
+}
 
 export interface MindmapWriteTools {
   insertXmlFragmentTool: ReturnType<typeof createInsertXmlFragmentTool>
   updateNodeTool: ReturnType<typeof createUpdateMindmapNodeTool>
   moveNodeTool: ReturnType<typeof createMoveMindmapNodeTool>
-  deleteNodeTool: typeof deleteNodeTool
+  deleteNodeTool: ReturnType<typeof createDeleteMindmapNodeTool>
 }
 
-/** 创建固定 4 写工具。 */
-export function createMindmapActionTools(provider: EditorSnapshotProvider): MindmapWriteTools {
+/** 创建固定 4 写工具（渲染层代理）。 */
+export function createMindmapActionTools(proxy: MindmapWriteProxy): MindmapWriteTools {
   return {
-    insertXmlFragmentTool: createInsertXmlFragmentTool(provider),
-    updateNodeTool: createUpdateMindmapNodeTool(provider),
-    moveNodeTool: createMoveMindmapNodeTool(provider),
-    deleteNodeTool,
+    insertXmlFragmentTool: createInsertXmlFragmentTool(proxy),
+    updateNodeTool: createUpdateMindmapNodeTool(proxy),
+    moveNodeTool: createMoveMindmapNodeTool(proxy),
+    deleteNodeTool: createDeleteMindmapNodeTool(proxy),
   }
 }

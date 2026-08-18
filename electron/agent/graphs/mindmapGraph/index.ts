@@ -18,6 +18,7 @@ import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
+import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
 import type { StreamStep } from '../../../ipc.js'
 
 const log = logger.withContext('mindmap')
@@ -59,8 +60,29 @@ type PromptMessage = { role: string; content: string }
 /** 导图进度词表是共享 StreamStep 的子集（不含 generating-map，它由工具事件触发）。 */
 type MindmapProgressStep = Exclude<StreamStep, 'generating-map'>
 
+/**
+ * 子图阶段轨迹（与 step 流事件同源），按 streamId 收集、build_output 收口。
+ * 与 itemProgressCounts 同生命周期：run 开始重置、build_output 消费。
+ */
+const stepTraces = new Map<string, ChatToolCallStep[]>()
+
+function pushStep(step: ChatToolCallStep): void {
+  const key = runKey()
+  const trace = stepTraces.get(key) ?? []
+  trace.push(step)
+  stepTraces.set(key, trace)
+}
+
+function takeStepTrace(): ChatToolCallStep[] | undefined {
+  const key = runKey()
+  const trace = stepTraces.get(key)
+  stepTraces.delete(key)
+  return trace
+}
+
 function emitProgress(step: MindmapProgressStep): void {
   getWriter()?.({ type: 'mindmap-progress', step })
+  pushStep({ step })
 }
 
 /**
@@ -81,6 +103,7 @@ function takeItemProgress(step: MindmapProgressStep, total: number): number {
   const completed = (itemProgressCounts.get(key) ?? 0) + 1
   itemProgressCounts.set(key, completed)
   getWriter()?.({ type: 'mindmap-progress', step, completed, total })
+  pushStep({ step, completed, total })
   return completed
 }
 
@@ -221,6 +244,8 @@ async function resolveInputNode(
 
   runStarts.set(runKey(), Date.now())
   resetItemProgress()
+  // 新一轮 run 开始：清空上一条遗留轨迹（build_output 已消费，这里仅兜底防泄漏）。
+  stepTraces.delete(runKey())
   log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
   return {
     ...reset,
@@ -449,6 +474,7 @@ async function buildOutputNode(
   // build_output always terminates a run — consume the run start and the item
   // progress counter here so failed runs don't leak entries in either map.
   const runStart = takeRunStart()
+  const toolSteps = takeStepTrace() ?? []
   resetItemProgress()
   // Preserve existing error
   if (state.error) {
@@ -487,6 +513,7 @@ async function buildOutputNode(
     mindmapXml: serializeStorageFragment(tree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
+    toolSteps,
   }
 }
 

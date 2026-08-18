@@ -89,6 +89,7 @@ export function packageResult(state: MainGraphStateType): SubgraphResultPayload 
         tool_call_id: toolCallId,
         name: toolName,
         content: JSON.stringify(content),
+        additional_kwargs: state.toolSteps?.length ? { toolSteps: state.toolSteps } : undefined,
       }),
     ],
     pendingSubgraph: null,

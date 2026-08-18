@@ -2,7 +2,6 @@ import crypto from 'node:crypto'
 import type { BrowserWindow } from 'electron'
 import {
   IPC,
-  type MindmapEditorSnapshot,
   type MindmapReadQuery,
   type MindmapReadRequest,
   type MindmapReadResponse,
@@ -13,8 +12,6 @@ const READ_TIMEOUT_MS = 3000
 interface PendingRequest {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
-  /** 请求模式：respond 据此还原渲染层应答的载荷形态（snapshot=JSON 字符串→对象）。 */
-  mode?: 'xml' | 'snapshot'
 }
 
 /**
@@ -24,9 +21,8 @@ interface PendingRequest {
  * requestId 关联并发 runner（多文件同时生成互不干扰），
  * 超时（约 3s）或缺窗口把缺失/挂起的响应转成明确的工具错误。
  *
- * 两种模式：
- * - `request`：readMindmap 读工具，返回 mindmap 节 XML 片段；
- * - `requestSnapshot`：写工具校验，返回 {nodeIds, assetIds, parents} 快照。
+ * 仅 `readMindmap` 读工具使用（返回 mindmap 节 XML 片段）；写工具的校验与落图
+ * 已随即时落盘移入渲染层（走 MindmapWriteRequester），不再需要快照模式。
  */
 export class MindmapReadRequester {
   private readonly pending = new Map<string, PendingRequest>()
@@ -37,14 +33,7 @@ export class MindmapReadRequester {
     return this.send<string>(fileUuid, { query })
   }
 
-  requestSnapshot(fileUuid: string): Promise<MindmapEditorSnapshot> {
-    return this.send<MindmapEditorSnapshot>(fileUuid, { mode: 'snapshot' })
-  }
-
-  private send<T>(
-    fileUuid: string,
-    extra: { query?: MindmapReadQuery; mode?: 'xml' | 'snapshot' },
-  ): Promise<T> {
+  private send<T>(fileUuid: string, extra: { query?: MindmapReadQuery }): Promise<T> {
     const window = this.getWindow()
     if (!window || window.isDestroyed()) {
       return Promise.reject(new Error('编辑器不可用（窗口已关闭），无法读取导图'))
@@ -61,13 +50,11 @@ export class MindmapReadRequester {
           clearTimeout(timer)
           reject(error)
         },
-        mode: extra.mode,
       })
       const request: MindmapReadRequest = {
         requestId,
         fileUuid,
         ...(extra.query && Object.keys(extra.query).length > 0 ? { query: extra.query } : {}),
-        ...(extra.mode ? { mode: extra.mode } : {}),
       }
       window.webContents.send(IPC.AiMindmapReadRequest, request)
     })
@@ -79,16 +66,6 @@ export class MindmapReadRequester {
     this.pending.delete(payload.requestId)
     if (!payload.ok) {
       entry.reject(new Error(payload.error))
-      return
-    }
-    // 快照模式：渲染层把 {nodeIds, assetIds, parents} JSON 序列化进 summary，
-    // 这里还原为对象，否则写工具会拿到字符串导致 nodeIds.map 崩溃。
-    if (entry.mode === 'snapshot') {
-      try {
-        entry.resolve(JSON.parse(payload.summary))
-      } catch {
-        entry.reject(new Error('渲染层返回的编辑器快照格式无效'))
-      }
       return
     }
     entry.resolve(payload.summary)

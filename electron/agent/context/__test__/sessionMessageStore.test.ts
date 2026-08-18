@@ -180,4 +180,37 @@ describe('SessionMessageStore', () => {
     expect(messages[0].getType()).toBe('ai')
     expect(messages[1].getType()).toBe('tool')
   })
+
+  it('round-trips ToolMessage additional_kwargs.toolSteps through jsonl', async () => {
+    await store.saveMessages(
+      'steps',
+      [
+        new AIMessage({
+          content: '',
+          tool_calls: [{ id: 'sc1', name: 'generateMindmapFragment', args: {} }],
+        }),
+        new ToolMessage({
+          tool_call_id: 'sc1',
+          name: 'generateMindmapFragment',
+          content: '{"ok":true}',
+          additional_kwargs: {
+            toolSteps: [
+              { step: 'reading-doc' },
+              { step: 'extracting', completed: 1, total: 2 },
+              { step: 'finalizing' },
+            ],
+          },
+        }),
+      ],
+      fileUuid,
+    )
+
+    const messages = await store.loadMessages('steps')
+    const toolMsg = messages.find((m) => m.getType() === 'tool') as ToolMessage
+    expect(toolMsg.additional_kwargs.toolSteps).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 1, total: 2 },
+      { step: 'finalizing' },
+    ])
+  })
 })

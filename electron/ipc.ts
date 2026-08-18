@@ -284,16 +284,6 @@ export interface MindmapReadRequest {
   requestId: string
   fileUuid: string
   query?: MindmapReadQuery
-  /** xml=mindmap 节 XML 片段（默认）；snapshot=写工具校验用节点/资源快照 */
-  mode?: 'xml' | 'snapshot'
-}
-
-/** 渲染层 → 主进程：写工具校验快照。 */
-export interface MindmapEditorSnapshot {
-  nodeIds: string[]
-  assetIds: string[]
-  /** target → source（纯树，每节点至多一个父） */
-  parents: Record<string, string>
 }
 
 /** 渲染层 → 主进程：读导图应答。 */

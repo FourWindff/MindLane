@@ -235,6 +235,33 @@ describe('SessionManager', () => {
     expect(loaded).toEqual(messages)
   })
 
+  it('round-trips subgraph tool steps through saveSession/loadSessionMessages', async () => {
+    const steps = [
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 1, total: 2 },
+      { step: 'finalizing' },
+    ]
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        content: '生成导图完成',
+        toolCalls: [
+          {
+            name: 'generateMindmapFragment',
+            args: {},
+            result: '{"ok":true}',
+            steps,
+          },
+        ],
+      },
+    ]
+
+    await manager.saveSession('session-steps', messages, fileUuid)
+
+    const loaded = await manager.loadSessionMessages('session-steps')
+    expect(loaded[0]!.toolCalls![0]!.steps).toEqual(steps)
+  })
+
   it('saveSession appends only new frontend messages without rewriting existing history', async () => {
     await manager.saveSession('session-replace', [{ role: 'user', content: 'first' }], fileUuid)
     await manager.saveSession(

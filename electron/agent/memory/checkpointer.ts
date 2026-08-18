@@ -4,17 +4,22 @@ import type { BaseMessage } from '@langchain/core/messages'
 import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import path from 'node:path'
 import fs from 'node:fs'
-import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage, ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 import { extractTextContent } from '../utils.js'
 
 export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): ChatMessage[] {
   const toolResults = new Map<string, string>()
+  const toolStepsByCall = new Map<string, ChatToolCallStep[]>()
 
   for (const msg of messages) {
     if (msg instanceof ToolMessage || msg.type === 'tool') {
       const toolMsg = msg as ToolMessage
       if (toolMsg.tool_call_id) {
         toolResults.set(toolMsg.tool_call_id, extractTextContent(toolMsg.content))
+        const toolSteps = toolMsg.additional_kwargs?.toolSteps
+        if (Array.isArray(toolSteps)) {
+          toolStepsByCall.set(toolMsg.tool_call_id, toolSteps)
+        }
       }
     }
   }
@@ -61,6 +66,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
         name: tc.name,
         args: tc.args as Record<string, unknown>,
         result: tc.id ? (toolResults.get(tc.id) ?? '') : '',
+        steps: tc.id ? toolStepsByCall.get(tc.id) : undefined,
       }))
 
       if (toolCalls && toolCalls.length > 0) {

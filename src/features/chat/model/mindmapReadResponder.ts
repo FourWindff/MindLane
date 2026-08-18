@@ -47,24 +47,6 @@ async function respondMindmapRead(request: MindmapReadRequest): Promise<void> {
 
   const query = (request.query ?? {}) as MindmapReadQuery
 
-  // 写工具校验快照：节点 id / asset id / 父关系（纯树）
-  if (request.mode === 'snapshot') {
-    const parents: Record<string, string> = {}
-    for (const edge of state.edges) {
-      parents[edge.target] = edge.source
-    }
-    await api.respondMindmapRead({
-      requestId: request.requestId,
-      ok: true,
-      summary: JSON.stringify({
-        nodeIds: state.nodes.map((n) => n.id),
-        assetIds: state.assets.map((a) => a.id),
-        parents,
-      }),
-    })
-    return
-  }
-
   const summary = serializeMindmapSection(state.nodes, state.edges, {
     ...(query.scope === 'subtree' && query.subtreeId ? { subtreeId: query.subtreeId } : {}),
     ...(query.type ? { type: query.type } : {}),

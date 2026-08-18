@@ -21,6 +21,22 @@ export type AiPipelineStep =
 
 export type { ChatMessage }
 
+/**
+ * Live tool card state for the streaming phase (id/name/status/step).
+ * History cards are rebuilt from `ChatToolCall` (name + optional status/steps)
+ * and rendered by the same component. Old sessions lack status/steps and render
+ * as finished (success).
+ */
+export interface ToolCard {
+  id: string
+  name: string
+  status: 'running' | 'success' | 'error' | 'canceled'
+  /** Current subgraph stage (subgraph virtual tools only, consumed by slice 05). */
+  step?: StreamStep
+  completed?: number
+  total?: number
+}
+
 export interface ChatSession {
   id: string
   fileUuid: string
@@ -38,7 +54,7 @@ export interface FileChatState {
   step: AiPipelineStep
   streamText: string
   errorMessage: string | null
-  activeTools: string[]
+  toolCards: ToolCard[]
   stopRequested: boolean
   lastUserMessageAt: number
 }
@@ -115,7 +131,7 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
     step: 'idle',
     streamText: '',
     errorMessage: null,
-    activeTools: [],
+    toolCards: [],
     stopRequested: false,
     lastUserMessageAt: 0,
   }
@@ -157,7 +173,7 @@ export function resetChatRetryStateForTests(): void {
 
 const EMPTY_CHAT_MESSAGES: ChatMessage[] = []
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
-const EMPTY_CHAT_ACTIVE_TOOLS: string[] = []
+const EMPTY_TOOL_CARDS: ToolCard[] = []
 
 function currentChat(state: AiState): FileChatState | undefined {
   return state.currentFileUuid ? state.fileChats[state.currentFileUuid] : undefined
@@ -187,8 +203,8 @@ export function selectCurrentChatChatMessages(state: AiState): ChatMessage[] {
 export function selectCurrentChatSessions(state: AiState): ChatSession[] {
   return currentChat(state)?.sessions ?? EMPTY_CHAT_SESSIONS
 }
-export function selectCurrentChatActiveTools(state: AiState): string[] {
-  return currentChat(state)?.activeTools ?? EMPTY_CHAT_ACTIVE_TOOLS
+export function selectCurrentChatToolCards(state: AiState): ToolCard[] {
+  return currentChat(state)?.toolCards ?? EMPTY_TOOL_CARDS
 }
 
 function pathBasename(filePath: string | null | undefined): string | null {
@@ -323,7 +339,7 @@ export const useAiStore = create<AiState>((set, get) => ({
         step: 'idle',
         streamText: '',
         errorMessage: null,
-        activeTools: [],
+        toolCards: [],
       })
     }),
   addChatMessage: (message) =>
@@ -365,7 +381,7 @@ export const useAiStore = create<AiState>((set, get) => ({
           step: 'idle',
           streamText: '',
           errorMessage: null,
-          activeTools: [],
+          toolCards: [],
         }),
         ...(current.currentFileUuid === fileUuid
           ? { showSessionList: false, attachedDocument: null }
@@ -503,7 +519,12 @@ export const useAiStore = create<AiState>((set, get) => ({
     set((state) => {
       const fileUuid = state.sessionFileUuids[sessionId]
       if (!fileUuid || !state.fileChats[fileUuid]) return state
-      return patchFileChat(state, fileUuid, { stopRequested: true })
+      const current = state.fileChats[fileUuid]
+      return patchFileChat(state, fileUuid, {
+        stopRequested: true,
+        // 停止：进行中卡片标记为取消（未执行的不执行，已落盘的保持原状）。
+        toolCards: markRunningCardsCanceled(current.toolCards),
+      })
     })
   },
 
@@ -633,6 +654,19 @@ async function persistActiveSession(
   })
 }
 
+/** 子图虚拟工具：`step` 事件映射到这些卡片的未完成实例（palace 无阶段过程，仅状态流转）。 */
+const SUBGRAPH_TOOLS = ['generateMindmapFragment', 'generatePalace']
+
+function isSubgraphTool(name: string): boolean {
+  return SUBGRAPH_TOOLS.includes(name)
+}
+
+function markRunningCardsCanceled(toolCards: ToolCard[]): ToolCard[] {
+  return toolCards.map((card) =>
+    card.status === 'running' ? { ...card, status: 'canceled' } : card,
+  )
+}
+
 export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): FileChatState {
   switch (event.type) {
     case 'token':
@@ -646,25 +680,66 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
           }
         : chat
     case 'tool-start': {
-      const name = event.payload.name
-      return name ? { ...chat, activeTools: [...chat.activeTools, name] } : chat
+      const { id, name } = event.payload
+      if (!name) return chat
+      const card: ToolCard = { id, name, status: 'running' }
+      const existingIndex = id ? chat.toolCards.findIndex((c) => c.id === id) : -1
+      if (existingIndex >= 0) {
+        const toolCards = [...chat.toolCards]
+        toolCards[existingIndex] = card
+        return { ...chat, toolCards }
+      }
+      return { ...chat, toolCards: [...chat.toolCards, card] }
     }
     case 'tool-end': {
-      const name = event.payload.name
-      return { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
+      const { id, name, status } = event.payload
+      const byId = id ? chat.toolCards.findIndex((card) => card.id === id) : -1
+      const index = byId >= 0 ? byId : chat.toolCards.findIndex((card) => card.name === name)
+      if (index < 0) return chat
+      const toolCards = [...chat.toolCards]
+      toolCards[index] = { ...toolCards[index]!, status }
+      return { ...chat, toolCards }
     }
-    case 'step':
-      return { ...chat, step: event.payload.step }
+    case 'step': {
+      const { step, completed, total } = event.payload
+      const runningSubgraph = chat.toolCards.filter(
+        (card) => card.status === 'running' && isSubgraphTool(card.name),
+      )
+      if (runningSubgraph.length === 0) return { ...chat, step }
+      const target = runningSubgraph[runningSubgraph.length - 1]!
+      return {
+        ...chat,
+        step,
+        toolCards: chat.toolCards.map((card) =>
+          card === target
+            ? {
+                ...card,
+                step,
+                ...(typeof completed === 'number' ? { completed } : {}),
+                ...(typeof total === 'number' ? { total } : {}),
+              }
+            : card,
+        ),
+      }
+    }
     case 'end': {
       const response = event.payload
+      // 停止（abort）时主进程只发 content 的 end：把未完成的流式卡片
+      // 标为取消并入最终消息，历史里保留"哪些工具没执行"。
+      const canceledCalls = response.toolCalls?.length
+        ? undefined
+        : chat.toolCards
+            .filter((card) => card.status !== 'success' && card.status !== 'error')
+            .map((card) => ({ name: card.name, args: {}, result: '', status: 'canceled' as const }))
+      const toolCalls = response.toolCalls ?? canceledCalls
       const messages = response.messages?.length
         ? response.messages
-        : response.content || chat.streamText
+        : response.content || chat.streamText || (toolCalls?.length ?? 0) > 0
           ? [
               {
                 role: 'assistant' as const,
                 content: response.content || chat.streamText,
-                toolCalls: response.toolCalls,
+                ...(toolCalls?.length ? { toolCalls } : {}),
               },
             ]
           : []
@@ -676,7 +751,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
         stopRequested: false,
         step: 'idle',
         streamText: '',
-        activeTools: [],
+        toolCards: [],
       }
     }
     case 'error':
@@ -686,7 +761,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
         stopRequested: false,
         step: 'idle',
         streamText: '',
-        activeTools: [],
+        toolCards: [],
         errorMessage: event.payload,
       }
   }

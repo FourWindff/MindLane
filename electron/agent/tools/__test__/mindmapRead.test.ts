@@ -78,13 +78,13 @@ describe('createReadMindmapTool', () => {
     expect(provider).toHaveBeenCalledWith('', { scope: 'whole' })
   })
 
-  it('documents the in-flight-writes semantic limit in the description', () => {
+  it('documents the live-apply semantic in the description', () => {
     const tool = createReadMindmapTool(async () => 'tree')
     const description = (tool as unknown as { description: string }).description
 
-    // 引导模型如何取 fileUuid，并注明「本轮在途写入不可见」的限制。
+    // 引导模型如何取 fileUuid，并注明「写工具执行即落盘」的语义。
     expect(description).toContain('file_uuid')
-    expect(description).toContain('流结束时才落图')
-    expect(description).toContain('不含')
+    expect(description).toContain('执行即落盘')
+    expect(description).toContain('恢复策略')
   })
 })

@@ -185,4 +185,54 @@ describe('checkpointMessagesToSessionMessages', () => {
       ],
     })
   })
+
+  it('rebuilds ChatToolCall.steps from ToolMessage additional_kwargs.toolSteps', () => {
+    const messages: BaseMessage[] = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'sc1', name: 'generateMindmapFragment', args: {} }],
+      }),
+      new ToolMessage({
+        content: '{"ok":true}',
+        tool_call_id: 'sc1',
+        additional_kwargs: {
+          toolSteps: [
+            { step: 'reading-doc' },
+            { step: 'extracting', completed: 1, total: 2 },
+            { step: 'merging' },
+            { step: 'finalizing' },
+          ],
+        },
+      }),
+      new AIMessage('Done.'),
+    ]
+    const result = checkpointMessagesToSessionMessages(messages)
+    expect(result).toHaveLength(1)
+    expect(result[0]!.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: '{"ok":true}',
+        steps: [
+          { step: 'reading-doc' },
+          { step: 'extracting', completed: 1, total: 2 },
+          { step: 'merging' },
+          { step: 'finalizing' },
+        ],
+      },
+    ])
+  })
+
+  it('leaves ChatToolCall.steps undefined for sessions without a trace', () => {
+    const messages: BaseMessage[] = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'sc1', name: 'generateMindmapFragment', args: {} }],
+      }),
+      new ToolMessage({ content: 'ok', tool_call_id: 'sc1' }),
+      new AIMessage('Done.'),
+    ]
+    const result = checkpointMessagesToSessionMessages(messages)
+    expect(result[0]!.toolCalls![0]!.steps).toBeUndefined()
+  })
 })

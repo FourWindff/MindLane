@@ -378,6 +378,7 @@ export function uiMessageToBaseMessages(msg: ChatMessage): BaseMessage[] {
             tool_call_id: tc.id,
             name: tc.name,
             content: original?.result ?? '',
+            additional_kwargs: tc.steps ? { toolSteps: tc.steps } : {},
           }),
         )
       }

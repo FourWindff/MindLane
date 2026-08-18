@@ -886,21 +886,81 @@ describe('reduceStreamEvent', () => {
     expect(next).toBe(base)
   })
 
-  it('tracks tool start and end in activeTools', () => {
+  it('adds a card on tool-start and settles its status on tool-end', () => {
     const started = reduceStreamEvent(base, {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-start',
-      payload: { id: 'call-1', name: 'search', input: {} },
+      payload: { id: 'call-1', name: 'insertXmlFragment', input: {} },
     })
-    expect(started.activeTools).toEqual(['search'])
+    expect(started.toolCards).toEqual([
+      { id: 'call-1', name: 'insertXmlFragment', status: 'running' },
+    ])
     const ended = reduceStreamEvent(started, {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-end',
-      payload: { id: 'call-1', name: 'search', status: 'success', output: 'ok' },
+      payload: { id: 'call-1', name: 'insertXmlFragment', status: 'success', output: 'ok' },
     })
-    expect(ended.activeTools).toEqual([])
+    expect(ended.toolCards).toEqual([
+      { id: 'call-1', name: 'insertXmlFragment', status: 'success' },
+    ])
+  })
+
+  it('settles a card as error when the tool result failed', () => {
+    const started = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-2', name: 'updateMindmapNode', input: {} },
+    })
+    const ended = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-2', name: 'updateMindmapNode', status: 'error', output: 'boom' },
+    })
+    expect(ended.toolCards[0]?.status).toBe('error')
+  })
+
+  it('maps a step event to the running subgraph card and forwards counts', () => {
+    const withSubgraph = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-3', name: 'generateMindmapFragment', input: {} },
+    })
+    const stepped = reduceStreamEvent(withSubgraph, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 5 },
+    })
+    expect(stepped.step).toBe('extracting')
+    expect(stepped.toolCards[0]).toMatchObject({
+      name: 'generateMindmapFragment',
+      status: 'running',
+      step: 'extracting',
+      completed: 2,
+      total: 5,
+    })
+  })
+
+  it('does not map steps onto non-subgraph cards but still updates the pipeline step', () => {
+    const withWrite = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-4', name: 'readMindmap', input: {} },
+    })
+    const stepped = reduceStreamEvent(withWrite, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'reading-doc' },
+    })
+    expect(stepped.step).toBe('reading-doc')
+    expect(stepped.toolCards[0]).not.toHaveProperty('step')
   })
 
   it('ignores tool-start with an empty name', () => {
@@ -944,7 +1004,64 @@ describe('reduceStreamEvent', () => {
     expect(ended.busy).toBe(false)
     expect(ended.stopRequested).toBe(false)
     expect(ended.step).toBe('idle')
-    expect(ended.activeTools).toEqual([])
+    expect(ended.toolCards).toEqual([])
+  })
+
+  it('rebuilds history cards with status and steps from the end payload toolCalls', () => {
+    const withRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-5', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: {
+        content: 'done',
+        toolCalls: [
+          {
+            name: 'generateMindmapFragment',
+            args: {},
+            result: 'ok',
+            status: 'success',
+            steps: [{ step: 'reading-doc' }, { step: 'extracting', completed: 2, total: 5 }],
+          },
+        ],
+      },
+    })
+    expect(ended.chatMessages[0]?.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: 'ok',
+        status: 'success',
+        steps: [{ step: 'reading-doc' }, { step: 'extracting', completed: 2, total: 5 }],
+      },
+    ])
+    expect(ended.toolCards).toEqual([])
+  })
+
+  it('attaches unfinished streaming cards as canceled when an aborted end carries no toolCalls', () => {
+    const withRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-6', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: '（已停止生成）' },
+    })
+    expect(ended.chatMessages[0]).toEqual({
+      role: 'assistant',
+      content: '（已停止生成）',
+      toolCalls: [{ name: 'generateMindmapFragment', args: {}, result: '', status: 'canceled' }],
+    })
+    expect(ended.toolCards).toEqual([])
   })
 
   it('falls back to content and then streamText for end messages', () => {
@@ -986,7 +1103,13 @@ describe('reduceStreamEvent', () => {
 
   it('writes an error and resets the chat state', () => {
     const started = reduceStreamEvent(
-      { ...base, busy: true, step: 'chatting', activeTools: ['search'], streamText: 'x' },
+      {
+        ...base,
+        busy: true,
+        step: 'chatting',
+        toolCards: [{ id: 'call-1', name: 'insertXmlFragment', status: 'running' }],
+        streamText: 'x',
+      },
       {
         streamId: 's',
         sessionId: 'session-a',
@@ -999,6 +1122,32 @@ describe('reduceStreamEvent', () => {
     expect(started.stopRequested).toBe(false)
     expect(started.step).toBe('idle')
     expect(started.streamText).toBe('')
-    expect(started.activeTools).toEqual([])
+    expect(started.toolCards).toEqual([])
+  })
+
+  it('marks running cards canceled when a stream is stopped', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': {
+          ...createFileChatState('session-a'),
+          busy: true,
+          toolCards: [
+            { id: 'call-1', name: 'generateMindmapFragment', status: 'running' },
+            { id: 'call-2', name: 'readMindmap', status: 'success' },
+          ],
+        },
+      },
+      sessionFileUuids: { 'session-a': 'file-a' },
+    })
+
+    useAiStore.getState().markStreamStopping('session-a')
+
+    const chat = useAiStore.getState().fileChats['file-a']
+    expect(chat?.stopRequested).toBe(true)
+    expect(chat?.toolCards).toEqual([
+      { id: 'call-1', name: 'generateMindmapFragment', status: 'canceled' },
+      { id: 'call-2', name: 'readMindmap', status: 'success' },
+    ])
   })
 })

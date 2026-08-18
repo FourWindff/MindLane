@@ -326,7 +326,8 @@ app.whenReady().then(async () => {
         userDataPath,
         messagePipeline,
         mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
-        mindmapSnapshotRequester: (fileUuid) => mindmapReadRequester.requestSnapshot(fileUuid),
+        mindmapWriteProxy: (fileUuid, action, args) =>
+          mindmapWriteRequester.request(fileUuid, action, args),
       })
     }
     return chatOrchestrator

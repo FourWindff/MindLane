@@ -31,6 +31,7 @@ function createMinimalState(overrides: Partial<MainGraphStateType> = {}): MainGr
     mergeResults: [],
     finalTree: null,
     documentRef: null,
+    toolSteps: [],
     palaceInputText: '',
     palaceInputNodes: [],
     palace: null,
@@ -137,6 +138,11 @@ describe('SubgraphRouter.packageResult', () => {
       pendingSubgraphToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
       mindmapTitle: '测试导图',
       mindmapXml: 'root:\n  - child',
+      toolSteps: [
+        { step: 'reading-doc' },
+        { step: 'extracting', completed: 1, total: 1 },
+        { step: 'finalizing' },
+      ],
     })
 
     const result = packageResult(state)
@@ -151,9 +157,28 @@ describe('SubgraphRouter.packageResult', () => {
       xmlFragment: 'root:\n  - child',
       documentRef: null,
     })
+    expect(toolMessage.additional_kwargs.toolSteps).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 1, total: 1 },
+      { step: 'finalizing' },
+    ])
     expect(result.pendingSubgraph).toBeNull()
     expect(result.pendingSubgraphToolCallId).toBe('')
     expect(result.pendingSubgraphToolName).toBe('')
+  })
+
+  it('palace 成功路径不带 toolSteps', () => {
+    const state = createMinimalState({
+      pendingSubgraph: 'palace',
+      pendingSubgraphToolCallId: 'call-palace',
+      pendingSubgraphToolName: GENERATE_PALACE_TOOL,
+      palace: { theme: '测试宫殿', stations: [] },
+      memoryRoute: [{ order: 1, content: '第一站', x: 0.1, y: 0.2 }],
+    })
+
+    const result = packageResult(state)
+
+    expect(result.messages[0].additional_kwargs.toolSteps).toBeUndefined()
   })
 
   it('palace 成功路径直接使用 state.imageUrls 中的 data URL', () => {

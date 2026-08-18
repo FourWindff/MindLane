@@ -26,10 +26,9 @@ import {
 } from '@/features/chat/model/aiStore'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
+import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
-import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
-import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
 import '@/features/workspace/workspace.css'
@@ -111,20 +110,10 @@ function AppContent() {
       },
       respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
     }).start()
-    const stopToolRouter = createMindmapToolCallRouter({
+    const stopToolRouter = createMindmapEndEffects({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
       getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
-      handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor),
-      persistFile: (fileUuid) => {
-        const instance = mindmapRegistry.getByFileUuid(fileUuid)
-        if (!instance) return
-        void saveMindmapInstance(instance, {
-          syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
-          onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
-        })
-      },
-      actionToolNames: MINDMAP_ACTION_TOOLS,
     }).start()
     return () => {
       stopToolRouter()

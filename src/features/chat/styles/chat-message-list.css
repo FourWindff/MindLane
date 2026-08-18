@@ -100,30 +100,115 @@
   color: #555;
 }
 
-/* ── Tool tags ── */
-.chat-message-list__tools {
+/* ── AI block: tool card area above the bubble ── */
+.chat-message-list__ai {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.35rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
 }
 
-.chat-message-list__tool {
+.chat-message-list__ai--user {
+  align-items: flex-end;
+}
+
+/* ── Tool cards ── */
+.chat-message-list__tool-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.chat-message-list__tool-card {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 5px;
-  font-size: 0.68rem;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
   font-weight: 600;
-  color: var(--ml-text-muted);
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  color: var(--ml-text);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.chat-message-list__tool--active {
+.chat-message-list__tool-card--active {
   border-style: dashed;
-  color: var(--ml-text);
+}
+
+.chat-message-list__tool-card--success {
+  color: #1a7f37;
+}
+
+.chat-message-list__tool-card--error {
+  color: var(--ml-danger);
+}
+
+.chat-message-list__tool-card--canceled {
+  color: var(--ml-text-muted);
+}
+
+.chat-message-list__tool-card__mark {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 0 0.3rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* 子图卡片：可展开，运行中显示逐阶段进度、完成后自动折叠为单行 */
+.chat-message-list__tool-card--subgraph {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.chat-message-list__tool-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.2rem 0.55rem;
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-message-list__tool-card__toggle:focus-visible {
+  outline: 1px solid var(--ml-info);
+  border-radius: 6px;
+}
+
+.chat-message-list__tool-card__chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.chat-message-list__tool-card__stages {
+  margin: 0;
+  padding: 0.25rem 0.55rem 0.3rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+  font-weight: 500;
+}
+
+.chat-message-list__tool-card__stage {
+  font-size: 0.66rem;
+  color: var(--ml-text-muted);
 }
 
 .chat-message-list__spinner {

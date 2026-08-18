@@ -9,6 +9,7 @@ import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
+import { isSubgraphCall } from './subgraphRouter.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
 import { isStreamStep, serializeTurnState, splitCurrentTurn } from '../ipc.js'
 
@@ -142,10 +143,46 @@ export class Runner {
 
         if (mode === 'messages') {
           const [message, metadata] = payload as [
-            { id?: string; content?: unknown },
+            {
+              id?: string
+              content?: unknown
+              type?: string
+              name?: string
+              tool_call_id?: string
+              tool_calls?: Array<{
+                id?: string
+                name?: string
+                args?: Record<string, unknown>
+              }>
+            },
             Record<string, unknown>,
           ]
+          // 子图 ToolMessage 到达（subgraphResult 节点产物，langgraph_node 非
+          // supervisor）：虚拟子图调用不走 ToolNode，tools 模式无事件，这里补发 tool-end。
+          if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {
+            const output =
+              typeof message.content === 'string'
+                ? message.content
+                : JSON.stringify(message.content ?? '')
+            this.emit('tool-end', {
+              id: message.tool_call_id ?? '',
+              name: message.name ?? 'unknown',
+              status: deriveToolStatus(output),
+              output,
+            })
+            continue
+          }
           if (metadata?.langgraph_node && metadata.langgraph_node !== 'supervisor') continue
+          // 子图虚拟调用补发 tool-start：supervisor 的 AI 消息 chunk 携带子图工具调用。
+          for (const toolCall of message.tool_calls ?? []) {
+            if (isSubgraphCall(toolCall.name ?? '')) {
+              this.emit('tool-start', {
+                id: toolCall.id ?? '',
+                name: toolCall.name ?? 'unknown',
+                input: (toolCall.args ?? {}) as Record<string, unknown>,
+              })
+            }
+          }
           const messageId = message.id ?? null
           if (
             messageId &&

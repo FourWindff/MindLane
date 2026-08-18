@@ -48,7 +48,7 @@ describe('MindmapWriteRequester', () => {
     vi.useRealTimers()
   })
 
-  it('sends the request with requestId + fileUuid + action + args and resolves with data', async () => {
+  it('sends the request with requestId + fileUuid + action + args and resolves the renderer ack as-is', async () => {
     const { window, sent } = fakeWindow()
     const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
 
@@ -64,7 +64,12 @@ describe('MindmapWriteRequester', () => {
       action: 'insertXmlFragment',
       data: { nodeCount: 1 },
     })
-    await expect(promise).resolves.toEqual({ nodeCount: 1 })
+    // 渲染层应答 {ok, action, data} 原样透出（requestId 是内部关联，不进结果）
+    await expect(promise).resolves.toEqual({
+      ok: true,
+      action: 'insertXmlFragment',
+      data: { nodeCount: 1 },
+    })
     expect(requester.pendingCount).toBe(0)
   })
 
@@ -96,7 +101,11 @@ describe('MindmapWriteRequester', () => {
       action: 'deleteMindmapNode',
       data: { deleted: true },
     })
-    await expect(promise).resolves.toEqual({ deleted: true })
+    await expect(promise).resolves.toEqual({
+      ok: true,
+      action: 'deleteMindmapNode',
+      data: { deleted: true },
+    })
   })
 
   it('correlates concurrent requests so parallel tools do not cross wires', async () => {
@@ -120,8 +129,16 @@ describe('MindmapWriteRequester', () => {
       data: { a: true },
     })
 
-    await expect(promiseA).resolves.toEqual({ a: true })
-    await expect(promiseB).resolves.toEqual({ b: true })
+    await expect(promiseA).resolves.toEqual({
+      ok: true,
+      action: 'insertXmlFragment',
+      data: { a: true },
+    })
+    await expect(promiseB).resolves.toEqual({
+      ok: true,
+      action: 'updateMindmapNode',
+      data: { b: true },
+    })
   })
 
   it('times out with a clear error', async () => {

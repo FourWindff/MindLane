@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { StateGraph, START, END, Annotation } from '@langchain/langgraph'
 import { Document } from '@langchain/core/documents'
 import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
@@ -43,6 +44,7 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     mergeResults: [],
     finalTree: null,
     documentRef: null,
+    toolSteps: [],
     ...overrides,
   }
 }
@@ -132,6 +134,42 @@ describe('mindmapGraph', () => {
     }
 
     expect(steps).toEqual(['reading-doc', 'extracting', 'extracting', 'finalizing'])
+  })
+
+  it('collects the stage trace into result.toolSteps (same source as step events)', async () => {
+    const tail = 'TAIL_MARKER'
+    const para1 = 'a'.repeat(1500)
+    const para2 = 'b'.repeat(1500)
+    const para3 = `${'c'.repeat(1490)}${tail}`
+    const longText = [para1, para2, para3].join('\n\n')
+    const provider = mockProvider((messages) => {
+      const systemPrompt = messages[0]?.content ?? ''
+      if (systemPrompt.includes('merging assistant')) {
+        return { content: '<node>Merged Long Text\n  <node>Preserved Tail</node>\n</node>' }
+      }
+      return { content: '<node>Leaf Tree\n  <node>Extracted</node>\n</node>' }
+    }, 512)
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    let result!: typeof MindmapSubgraphState.State
+    const stream = await app.stream(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: longText },
+        mindmapInputTitle: 'Long Text',
+      }),
+      { streamMode: ['custom', 'values'] },
+    )
+
+    for await (const [mode, event] of stream) {
+      if (mode === 'values') result = event as typeof MindmapSubgraphState.State
+    }
+
+    expect(result.error).toBe('')
+    expect(result.toolSteps[0]).toEqual({ step: 'reading-doc' })
+    // one phase-start entry plus one per completed batch
+    expect(result.toolSteps.filter((s) => s.step === 'extracting')).toHaveLength(4)
+    expect(result.toolSteps.some((s) => s.step === 'merging')).toBe(true)
+    expect(result.toolSteps.at(-1)).toEqual({ step: 'finalizing' })
   })
 
   it('routes a long document through leaf batches and a final merge', async () => {
@@ -460,6 +498,48 @@ describe('mindmapGraph', () => {
     expect(events.filter((e) => e === 'leaf')).toHaveLength(9)
     expect(events.filter((e) => e === 'merge')).toHaveLength(3)
     expect(events.indexOf('merge')).toBeGreaterThan(events.lastIndexOf('leaf'))
+  })
+})
+
+describe('mindmapGraph writer propagation', () => {
+  it('surfaces subgraph progress events through a nested invoke from an outer stream', async () => {
+    // 断点：外层 stream + 节点内嵌套 invoke 子图 → 进度事件必须能冒出。
+    // langgraph 的 pickRunnableConfigKeys 不透传 custom writer，orchestrator 的
+    // invokeSubgraph 经 configurable.writer 显式传播；本用例是修复的唯一验证点。
+    const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    // 最小外层图：节点内以 orchestrator 的方式嵌套 invoke 编译后的子图。
+    const S = Annotation.Root({
+      v: Annotation<number>({ reducer: (_prev: number, next: number) => next, default: () => 0 }),
+    })
+    const outer = new StateGraph(S)
+      .addNode('sub', async (state) => {
+        await app.invoke(
+          baseInput({
+            mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+            mindmapInputTitle: '人工智能导论',
+          }),
+          { recursionLimit: 25, callbacks: [] },
+        )
+        return { v: state.v + 1 }
+      })
+      .addEdge(START, 'sub')
+      .addEdge('sub', END)
+      .compile()
+
+    const steps: string[] = []
+    const stream = await outer.stream(
+      { v: 0 },
+      { streamMode: ['custom', 'values'], configurable: { thread_id: 't1' } },
+    )
+    for await (const [mode, payload] of stream) {
+      if (mode === 'custom') steps.push((payload as { step: string }).step)
+    }
+
+    expect(steps).toContain('reading-doc')
+    expect(steps).toContain('extracting')
+    expect(steps).toContain('finalizing')
   })
 })
 

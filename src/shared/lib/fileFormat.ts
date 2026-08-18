@@ -104,8 +104,8 @@ export interface ChatToolCall {
   name: string
   args: Record<string, unknown>
   result: string
-  /** Optional: tool result status (inferred from the tool result `ok` field, persisted with history). Old sessions legitimately lack it. */
-  status?: 'running' | 'success' | 'error'
+  /** Optional: tool result status (persisted with history). `running`/`success`/`error` are inferred from the tool result; `canceled` marks a tool left unfinished by a stop. Old sessions legitimately lack it. */
+  status?: 'running' | 'success' | 'error' | 'canceled'
   /** Optional: subgraph stage trace (subgraph tools only). Old sessions legitimately lack it. */
   steps?: ChatToolCallStep[]
 }
