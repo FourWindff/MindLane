@@ -87,7 +87,12 @@ function AppContent() {
 
   useEffect(() => {
     void loadSettingsFromBackend()
-    void window.mindlane?.ai.isReady().then(setAiReady)
+    void window.mindlane?.ai.isReady().then((ready) => {
+      setAiReady(ready)
+      // AI 服务就绪 = 会话服务可用：补刷一次胶囊条持久输入，
+      // 覆盖启动早期 refreshCapsuleData 遇 not-ready 后重试耗尽的情况。
+      if (ready) void useAiStore.getState().refreshCapsuleData()
+    })
     const disconnectAiStore = connectAiStore(mindmapRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
     const disconnectMindmapReadResponder = connectMindmapReadResponder()

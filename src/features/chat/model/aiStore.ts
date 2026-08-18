@@ -123,6 +123,22 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
 
 const fileChatLoads = new Map<string, Promise<void>>()
 
+// 胶囊条全量会话刷新：AI 服务未就绪时有限退避重试，避免启动早期
+// listSessions 返回 not-ready 后 allSessions 永久为空。
+const CAPSULE_REFRESH_RETRY_MAX = 5
+const CAPSULE_REFRESH_RETRY_DELAY_MS = 1000
+let capsuleRefreshRetryCount = 0
+let capsuleRefreshRetryTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleCapsuleRefreshRetry(): void {
+  if (capsuleRefreshRetryTimer || capsuleRefreshRetryCount >= CAPSULE_REFRESH_RETRY_MAX) return
+  capsuleRefreshRetryCount += 1
+  capsuleRefreshRetryTimer = setTimeout(() => {
+    capsuleRefreshRetryTimer = null
+    void useAiStore.getState().refreshCapsuleData()
+  }, CAPSULE_REFRESH_RETRY_DELAY_MS)
+}
+
 const EMPTY_CHAT_MESSAGES: ChatMessage[] = []
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
 const EMPTY_CHAT_ACTIVE_TOOLS: string[] = []
@@ -413,7 +429,16 @@ export const useAiStore = create<AiState>((set, get) => ({
       const result = await window.mindlane?.chat?.listSessions({
         workspacePath,
       })
-      if (result?.ok) allSessions = result.data.sessions
+      if (result?.ok) {
+        capsuleRefreshRetryCount = 0
+        allSessions = result.data.sessions
+      } else {
+        // 主进程 AI 服务可能尚未装配完成：先落映射，稍后重试拉会话，
+        // 不把已就绪的数据清空（allSessions 保持旧值）。
+        useAiStore.setState({ workspacePath, fileUuidPaths })
+        scheduleCapsuleRefreshRetry()
+        return
+      }
     }
     useAiStore.setState({ workspacePath, fileUuidPaths, allSessions })
   },
@@ -685,6 +710,11 @@ export function subscribeToChatStreamEvents(
 
 function dispatchStreamEvent(event: ChatStreamEvent): void {
   if (!routeStreamEvent(event)) return
+  // 流结束/出错时主进程已完成（或放弃）会话持久化：重拉全量会话，
+  // 让本启动内新建的对话立即出现在胶囊条，而不是等下次启动才补全。
+  if (event.type === 'end' || event.type === 'error') {
+    void useAiStore.getState().refreshCapsuleData()
+  }
   for (const listener of streamEventListeners) listener(event)
 }
 

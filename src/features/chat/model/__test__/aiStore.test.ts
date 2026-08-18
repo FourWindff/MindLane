@@ -426,6 +426,78 @@ describe('aiStore per-file chat state', () => {
     expect(derive().find((entry) => entry.fileUuid === 'file-a')?.status).toBe('idle')
   })
 
+  it('re-pulls the full session list when a stream ends so new conversations appear in the capsule bar', async () => {
+    const { chat, emit } = installApis()
+    vi.mocked(chat.listSessions).mockResolvedValue({
+      ok: true as const,
+      data: {
+        sessions: [
+          {
+            id: 'session-a',
+            fileUuid: 'file-a',
+            title: 'A',
+            createdAt: '2026-06-18T00:00:00.000Z',
+            updatedAt: '2026-06-18T00:05:00.000Z',
+            messageCount: 1,
+          } satisfies ChatSession,
+        ],
+      },
+    })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      currentFilePath: '/file-a.mindlane',
+      fileChats: { 'file-a': createFileChatState('session-a') },
+      sessionFileUuids: { 'session-a': 'file-a' },
+      allSessions: [],
+    })
+
+    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a')
+    emit({
+      streamId: 'stream-a',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: 'done' },
+    })
+
+    // 主进程在发 end 前已完成会话持久化，重拉后新会话进入胶囊条。
+    await vi.waitFor(() => expect(useAiStore.getState().allSessions).toHaveLength(1))
+    expect(useAiStore.getState().allSessions[0]?.fileUuid).toBe('file-a')
+  })
+
+  it('retries the capsule refresh while the AI service is not ready yet', async () => {
+    vi.useFakeTimers()
+    try {
+      const { chat } = installApis()
+      const session: ChatSession = {
+        id: 'session-a',
+        fileUuid: 'file-a',
+        title: 'A',
+        createdAt: '2026-06-18T00:00:00.000Z',
+        updatedAt: '2026-06-18T00:05:00.000Z',
+        messageCount: 1,
+      }
+      let calls = 0
+      vi.mocked(chat.listSessions).mockImplementation(async () => {
+        calls += 1
+        if (calls < 3) return { ok: false as const, error: 'AI service not initialized' }
+        return { ok: true as const, data: { sessions: [session] } }
+      })
+      useAiStore.setState({ workspacePath: '/workspace', allSessions: [] })
+
+      await useAiStore.getState().refreshCapsuleData()
+      expect(useAiStore.getState().allSessions).toEqual([])
+
+      await vi.advanceTimersByTimeAsync(1000)
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(useAiStore.getState().allSessions).toEqual([session])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('writes a stream startup error to its originating background file', () => {
     installApis()
     useAiStore.setState({

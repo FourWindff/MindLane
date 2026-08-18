@@ -8,6 +8,9 @@ function isDefaultWorkspaceState(state: WorkspaceState): boolean {
   return state.lastOpenedFilePath === null && state.recentFiles.length === 0
 }
 
+/** 已执行过会话文件索引 prune 的 workspace（进程内只跑一次，避免每次 getSession 都写盘）。 */
+const prunedFileUuidPathWorkspaces = new Set<string>()
+
 export async function getWorkspaceSessionForService(service: FileSystemService) {
   const launchResult = await service.appState.getLaunchSession()
   if (!launchResult.ok) {
@@ -43,7 +46,13 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     }
 
     // 恢复时 prune 一次会话文件索引，剔除路径已不存在的失效条目。
-    await service.workspace.pruneFileUuidPaths(workspacePath)
+    // 只在每个 workspace 首次恢复时执行：运行中的 getSession 会被
+    // 频繁调用（每次切文件），重复 prune 会写盘且可能与改名/移动的
+    // 映射更新竞态，把尚未回填的新路径误删。
+    if (!prunedFileUuidPathWorkspaces.has(workspacePath)) {
+      await service.workspace.pruneFileUuidPaths(workspacePath)
+      prunedFileUuidPathWorkspaces.add(workspacePath)
+    }
     const finalResult = await service.workspace.load(workspacePath)
     if (finalResult.ok) workspaceState = finalResult.data
 
