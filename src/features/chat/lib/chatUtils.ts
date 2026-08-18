@@ -86,15 +86,15 @@ export function extractNodeInfoCompact(
 
 export function toolDisplayName(name: string): string {
   const map = {
-    generateMindmap: '生成思维导图',
-    generateMindmapFragment: '生成思维导图片段',
-    generatePalace: '生成记忆宫殿',
-    readMindmap: '读取导图',
-    listWorkspaceFiles: '查看工作区文件',
-    insertXmlFragment: '插入 XML 片段',
-    updateMindmapNode: '更新节点',
-    moveMindmapNode: '移动节点',
-    deleteMindmapNode: '删除节点',
+    generateMindmap: 'Generate Mindmap',
+    generateMindmapFragment: 'Generate Mindmap Fragment',
+    generatePalace: 'Generate Memory Palace',
+    readMindmap: 'Read Mindmap',
+    listWorkspaceFiles: 'List Workspace Files',
+    insertXmlFragment: 'Insert XML Fragment',
+    updateMindmapNode: 'Update Node',
+    moveMindmapNode: 'Move Node',
+    deleteMindmapNode: 'Delete Node',
   } as const
   return map[name as keyof typeof map] ?? name
 }

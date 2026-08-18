@@ -190,8 +190,8 @@ describe('ChatMessageList', () => {
     expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('已插入'))
     expect(html).toContain('chat-message-list__tool-card--success')
     expect(html).toContain('chat-message-list__tool-card--error')
-    expect(html).toContain('插入 XML 片段')
-    expect(html).toContain('读取导图')
+    expect(html).toContain('Insert XML Fragment')
+    expect(html).toContain('Read Mindmap')
   })
 
   it('shows a spinner for running cards and a cancel mark for canceled cards', () => {
@@ -215,9 +215,9 @@ describe('ChatMessageList', () => {
     expect(html).toContain('chat-message-list__tool-card--running')
     expect(html).toContain('chat-message-list__spinner')
     expect(html).toContain('chat-message-list__tool-card--canceled')
-    expect(html).toContain('取消')
-    expect(html).toContain('生成思维导图片段')
-    expect(html).toContain('生成记忆宫殿')
+    expect(html).toContain('Canceled')
+    expect(html).toContain('Generate Mindmap Fragment')
+    expect(html).toContain('Generate Memory Palace')
   })
 
   it('renders old-session toolCalls without status as finished success cards (no spinner)', () => {
@@ -237,7 +237,7 @@ describe('ChatMessageList', () => {
 
     expect(html).toContain('chat-message-list__tool-card--success')
     expect(html).not.toContain('chat-message-list__spinner')
-    expect(html).toContain('更新节点')
+    expect(html).toContain('Update Node')
   })
 
   it('renders streaming tool cards with the same card component and rules', () => {
@@ -257,8 +257,8 @@ describe('ChatMessageList', () => {
     expect(html).toContain('chat-message-list__tool-card--running')
     expect(html).toContain('chat-message-list__tool-card--success')
     expect(html).toContain('chat-message-list__spinner')
-    expect(html).toContain('移动节点')
-    expect(html).toContain('删除节点')
+    expect(html).toContain('Move Node')
+    expect(html).toContain('Delete Node')
     // 流式卡片同样在正文之前
     expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('正在生成'))
   })
@@ -275,7 +275,7 @@ describe('ChatMessageList', () => {
     })
 
     expect(html).toContain('chat-message-list__tool-card--canceled')
-    expect(html).toContain('取消')
+    expect(html).toContain('Canceled')
     expect(html).not.toContain('chat-message-list__spinner')
   })
 
@@ -300,12 +300,12 @@ describe('ChatMessageList', () => {
     })
 
     // 消息倒序渲染：第二轮在前。各轮卡片紧跟各自的正文气泡（卡片先于正文）
-    const firstCards = html.match(/读取导图/g)
-    const secondCards = html.match(/插入 XML 片段/g)
+    const firstCards = html.match(/Read Mindmap/g)
+    const secondCards = html.match(/Insert XML Fragment/g)
     expect(firstCards).toHaveLength(1)
     expect(secondCards).toHaveLength(1)
-    expect(html.indexOf('插入 XML 片段')).toBeLessThan(html.indexOf('第二轮'))
-    expect(html.indexOf('读取导图')).toBeGreaterThan(html.indexOf('第二轮'))
-    expect(html.indexOf('读取导图')).toBeLessThan(html.indexOf('第一轮'))
+    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('第二轮'))
+    expect(html.indexOf('Read Mindmap')).toBeGreaterThan(html.indexOf('第二轮'))
+    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('第一轮'))
   })
 })

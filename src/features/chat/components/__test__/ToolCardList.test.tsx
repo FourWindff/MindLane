@@ -31,7 +31,7 @@ describe('ToolCardList rendering', () => {
     expect(html).toContain('chat-message-list__spinner')
     expect(html).toContain('aria-expanded="true"')
     // 计数来自 step payload 透传：extracting n/m
-    expect(html).toContain('提取要点 2/5')
+    expect(html).toContain('Extracting 2/5')
     expect(html).toContain('chat-message-list__tool-card__stage')
   })
 
@@ -52,7 +52,7 @@ describe('ToolCardList rendering', () => {
     expect(html).toContain('aria-expanded="false"')
     expect(html).not.toContain('chat-message-list__tool-card__stage')
     // 单行：工具名 + ✓，无 spinner
-    expect(html).toContain('生成思维导图片段')
+    expect(html).toContain('Generate Mindmap Fragment')
     expect(html).not.toContain('chat-message-list__spinner')
   })
 
@@ -93,7 +93,7 @@ describe('ToolCardList rendering', () => {
     expect(running).not.toContain('chat-message-list__tool-card__toggle')
     expect(running).not.toContain('chat-message-list__tool-card__stage')
     expect(done).not.toContain('chat-message-list__spinner')
-    expect(done).toContain('生成记忆宫殿')
+    expect(done).toContain('Generate Memory Palace')
   })
 
   it('keeps write/read tool cards single-line and non-expandable', () => {
@@ -168,7 +168,7 @@ describe('ToolCardList manual expand/collapse', () => {
     })
 
     // 完成态默认折叠：无阶段轨迹可见
-    expect(window.document.body.textContent).not.toContain('读取文档')
+    expect(window.document.body.textContent).not.toContain('Reading doc')
     const toggle = window.document.querySelector(
       'button.chat-message-list__tool-card__toggle',
     ) as HTMLButtonElement
@@ -176,13 +176,13 @@ describe('ToolCardList manual expand/collapse', () => {
 
     // 手动展开：阶段轨迹可见
     clickToggle()
-    expect(window.document.body.textContent).toContain('读取文档')
-    expect(window.document.body.textContent).toContain('提取要点 1/2')
+    expect(window.document.body.textContent).toContain('Reading doc')
+    expect(window.document.body.textContent).toContain('Extracting 1/2')
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
 
     // 手动收起：回到单行
     clickToggle()
-    expect(window.document.body.textContent).not.toContain('读取文档')
+    expect(window.document.body.textContent).not.toContain('Reading doc')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -208,13 +208,13 @@ describe('ToolCardList manual expand/collapse', () => {
     ) as HTMLButtonElement
     // 运行中默认展开
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(window.document.body.textContent).toContain('合并 1/2')
+    expect(window.document.body.textContent).toContain('Merging 1/2')
 
     clickToggle()
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(window.document.body.textContent).not.toContain('合并')
+    expect(window.document.body.textContent).not.toContain('Merging')
 
     clickToggle()
-    expect(window.document.body.textContent).toContain('合并 1/2')
+    expect(window.document.body.textContent).toContain('Merging 1/2')
   })
 })

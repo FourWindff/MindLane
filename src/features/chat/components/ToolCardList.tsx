@@ -26,10 +26,10 @@ function isSubgraphCard(name: string): boolean {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  'reading-doc': '读取文档',
-  extracting: '提取要点',
-  merging: '合并',
-  finalizing: '定稿',
+  'reading-doc': 'Reading doc',
+  extracting: 'Extracting',
+  merging: 'Merging',
+  finalizing: 'Finalizing',
 }
 
 function stageDisplayName(step: string, completed?: number, total?: number): string {
@@ -99,7 +99,7 @@ function SingleLineCard({ card }: { card: ToolCardItem & { status: ToolCardStatu
       <StatusGlyph status={card.status} />
       <span className="chat-message-list__tool-card__name">{toolDisplayName(card.name)}</span>
       {card.status === 'canceled' && (
-        <span className="chat-message-list__tool-card__mark">取消</span>
+        <span className="chat-message-list__tool-card__mark">Canceled</span>
       )}
     </span>
   )
@@ -122,12 +122,12 @@ function SubgraphCard({
         className="chat-message-list__tool-card__toggle"
         onClick={() => setExpanded(!showBody)}
         aria-expanded={showBody}
-        aria-label={`${toolDisplayName(card.name)} ${showBody ? '收起' : '展开'}`}
+        aria-label={`${toolDisplayName(card.name)} ${showBody ? 'Collapse' : 'Expand'}`}
       >
         <StatusGlyph status={card.status} />
         <span className="chat-message-list__tool-card__name">{toolDisplayName(card.name)}</span>
         {card.status === 'canceled' && (
-          <span className="chat-message-list__tool-card__mark">取消</span>
+          <span className="chat-message-list__tool-card__mark">Canceled</span>
         )}
         {showBody ? (
           <ChevronDown
