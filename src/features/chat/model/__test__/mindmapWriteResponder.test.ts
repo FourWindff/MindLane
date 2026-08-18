@@ -88,15 +88,23 @@ describe('MindmapWriteResponder', () => {
     stop()
   })
 
-  it('rejects validation failures with the shared error vocabulary and never touches the editor', async () => {
+  it('maps editor-side insert validation failures to the shared error vocabulary', async () => {
     const fake = createFakeEditor()
     fake.state.nodes = [
       { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
       { id: 'n1', type: 'text', position: { x: 200, y: 0 }, data: { label: 'N1' } },
     ]
-    const { send, respond, stop } = setupResponder({ 'file-a': asEditor(fake) })
+    // Structural validation lives in MindmapEditor.insertFromXml (the responder
+    // no longer pre-validates); the fake rejects with the shared error and the
+    // responder must surface it with the same vocabulary and no persist.
+    fake.editor.insertFromXml.mockRejectedValueOnce(
+      new MindmapXmlError(
+        'tree_invalid',
+        '节点 id「n1」已存在于导图中（纯树不允许重复 id，否则产生多父/环）',
+      ),
+    )
+    const { send, respond, persistFile, stop } = setupResponder({ 'file-a': asEditor(fake) })
 
-    // 片段 id 与现有节点冲突 → tree_invalid（共享库校验，与主进程同一错误码体系）
     send({
       requestId: 'r1',
       fileUuid: 'file-a',
@@ -105,7 +113,7 @@ describe('MindmapWriteResponder', () => {
     })
     await flush()
 
-    expect(fake.editor.insertFromXml).not.toHaveBeenCalled()
+    expect(persistFile).not.toHaveBeenCalled()
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,

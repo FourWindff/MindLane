@@ -4,7 +4,6 @@ import {
   buildValidationContext,
   formatXmlError,
   parseXmlFragment,
-  validateFragmentForInsert,
   validateMove,
 } from '@/shared/lib/mindmapXml'
 import type {
@@ -124,11 +123,12 @@ async function applyWriteAction(
       const parsed = await parseXmlFragment(xml)
       const state = editor.getState()
       const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
-      validateFragmentForInsert(parsed, ctx)
       const pos = position ?? DEFAULT_POSITION
       if (pos !== 'root' && parentId && !ctx.nodeIds.has(parentId)) {
         throw new MindmapXmlError('block_not_found', `定位节点「${parentId}」不存在`)
       }
+      // insertFromXml re-runs validateFragmentForInsert on the live editor state,
+      // so a structural failure surfaces as the same MindmapXmlError from there.
       await editor.insertFromXml(xml, { parentId, position: pos })
       return { nodeCount: parsed.nodes.length, parentId: parentId ?? null, position: pos }
     }
