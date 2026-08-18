@@ -33,9 +33,10 @@ export function serializeNodeElement(node: Node, childrenXml: string, depth: num
   const typeChildrenXml = descriptor?.writeChildren ? descriptor.writeChildren(node) : ''
   const attrs: Record<string, string> = { id: node.id, type: node.type ?? 'text', ...typeAttrs }
 
-  // 通用属性：collapsed（缺省不写 = 展开）
-  if ((node.data as Record<string, unknown>).collapsed === true) {
-    attrs.collapsed = 'true'
+  // Generic flags: collapsed / leftCollapsed / rightCollapsed (omitted by default = expanded)
+  const genericFlags = ['collapsed', 'leftCollapsed', 'rightCollapsed'] as const
+  for (const flag of genericFlags) {
+    if ((node.data as Record<string, unknown>)[flag] === true) attrs[flag] = 'true'
   }
 
   const attrText = Object.entries(attrs)

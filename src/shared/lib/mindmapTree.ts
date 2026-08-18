@@ -279,9 +279,14 @@ function layoutMindmap(
   handleMap.set(rootId, { source: Position.Right, target: Position.Left })
   metaMap.set(rootId, { depth: 0, branchIndex: -1 })
 
+  const rootData = root.data as {
+    collapsed?: boolean
+    leftCollapsed?: boolean
+    rightCollapsed?: boolean
+  }
   const children = getChildIdsOrdered(nodes, edges, rootId)
-  // 根节点折叠：整图只剩根（根的位置/手柄已在上方设置）
-  if (isNodeCollapsed(nodes, rootId)) return
+  // Root whole-map collapse: only the root stays (its position/handles are set above)
+  if (rootData.collapsed === true) return
 
   // 分侧持久化在 data.side 中，重新布局时保持不变，避免新增节点导致左右洗牌。
   // 未分侧的新节点分到数量较少的一侧（平局归右），全新导图效果即左右交替。
@@ -305,56 +310,60 @@ function layoutMindmap(
   const leftChildren = children.filter((cid) => sideOf.get(cid) === 'left')
   const branchIndexOf = assignStableBranchIndexes(children, nodes)
 
-  // 右侧展开
+  // Right branch (skipped entirely when side-collapsed; nodes keep stale positions and are hidden by the render layer)
   const rightHeights = rightChildren.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
   const rightTotalH = rightHeights.reduce((s, h) => s + h, 0) + (rightChildren.length - 1) * gapY
   let curRightY = root.position.y + rootH / 2 - rightTotalH / 2
-  rightChildren.forEach((cid, i) => {
-    const childH = rightHeights[i]!
-    const childSelfH = nodeHeight(cid, nodes)
-    layoutMindmapSide(
-      cid,
-      root.position.x + rootW + gapX,
-      curRightY + childH / 2 - childSelfH / 2,
-      1,
-      branchIndexOf.get(cid)!,
-      'right',
-      nodes,
-      edges,
-      gapX,
-      gapY,
-      positions,
-      handleMap,
-      metaMap,
-    )
-    curRightY += childH + gapY
-  })
+  if (rootData.rightCollapsed !== true) {
+    rightChildren.forEach((cid, i) => {
+      const childH = rightHeights[i]!
+      const childSelfH = nodeHeight(cid, nodes)
+      layoutMindmapSide(
+        cid,
+        root.position.x + rootW + gapX,
+        curRightY + childH / 2 - childSelfH / 2,
+        1,
+        branchIndexOf.get(cid)!,
+        'right',
+        nodes,
+        edges,
+        gapX,
+        gapY,
+        positions,
+        handleMap,
+        metaMap,
+      )
+      curRightY += childH + gapY
+    })
+  }
 
-  // 左侧展开
+  // Left branch (skipped entirely when side-collapsed)
   const leftHeights = leftChildren.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
   const leftTotalH = leftHeights.reduce((s, h) => s + h, 0) + (leftChildren.length - 1) * gapY
   let curLeftY = root.position.y + rootH / 2 - leftTotalH / 2
-  leftChildren.forEach((cid, i) => {
-    const childH = leftHeights[i]!
-    const childSelfH = nodeHeight(cid, nodes)
-    const childSelfW = nodeWidth(cid, nodes)
-    layoutMindmapSide(
-      cid,
-      root.position.x - gapX - childSelfW,
-      curLeftY + childH / 2 - childSelfH / 2,
-      1,
-      branchIndexOf.get(cid)!,
-      'left',
-      nodes,
-      edges,
-      gapX,
-      gapY,
-      positions,
-      handleMap,
-      metaMap,
-    )
-    curLeftY += childH + gapY
-  })
+  if (rootData.leftCollapsed !== true) {
+    leftChildren.forEach((cid, i) => {
+      const childH = leftHeights[i]!
+      const childSelfH = nodeHeight(cid, nodes)
+      const childSelfW = nodeWidth(cid, nodes)
+      layoutMindmapSide(
+        cid,
+        root.position.x - gapX - childSelfW,
+        curLeftY + childH / 2 - childSelfH / 2,
+        1,
+        branchIndexOf.get(cid)!,
+        'left',
+        nodes,
+        edges,
+        gapX,
+        gapY,
+        positions,
+        handleMap,
+        metaMap,
+      )
+      curLeftY += childH + gapY
+    })
+  }
 }
 
 // ─── 公开 API ──────────────────────────────────────────────────────────────────

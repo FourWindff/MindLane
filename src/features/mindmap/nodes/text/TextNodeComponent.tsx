@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
@@ -14,6 +14,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const editor = useActiveMindmapEditor()
   const instance = useActiveMindmapInstance()
   const edges = useActiveMindmapStore((state) => state.edges)
+  const nodes = useActiveMindmapStore((state) => state.nodes)
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const aiBusy = useAiStore(selectCurrentChatBusy)
@@ -26,6 +27,24 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   // 折叠控件：节点有子节点时显示（子节点由边派生）
   const hasChildren = edges.some((e) => e.source === id)
 
+  // Root node in bilateral layout: one collapse button per side, folding/expanding each branch independently
+  const isMindmapRoot = structureType === 'mindmap' && !edges.some((e) => e.target === id)
+  const sideChildren = useMemo(() => {
+    if (!isMindmapRoot) return null
+    let left = 0
+    let right = 0
+    for (const edge of edges) {
+      if (edge.source !== id) continue
+      const child = nodes.find((n) => n.id === edge.target)
+      const side = (child?.data as TextNodeData | undefined)?.side
+      if (side === 'left') left++
+      else if (side === 'right') right++
+    }
+    return { left, right }
+  }, [edges, id, isMindmapRoot, nodes])
+  const leftCollapsed = collapsed || data.leftCollapsed === true
+  const rightCollapsed = collapsed || data.rightCollapsed === true
+
   const toggleCollapsed = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -33,6 +52,16 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       editor.setNodeCollapsed(id, !collapsed)
     },
     [aiBusy, collapsed, editor, id],
+  )
+
+  const toggleSideCollapsed = useCallback(
+    (side: 'left' | 'right', e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (aiBusy) return
+      const effective = side === 'left' ? leftCollapsed : rightCollapsed
+      editor.setNodeSideCollapsed(id, side, !effective)
+    },
+    [aiBusy, editor, id, leftCollapsed, rightCollapsed],
   )
 
   const clearEditing = useCallback(() => {
@@ -152,26 +181,64 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
       ) : (
         <span className="text-node__label">{label}</span>
       )}
-      {!editing && hasChildren && (
-        <button
-          type="button"
-          className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}${leftSide ? ' text-node__collapse-btn--left' : ''}`}
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? '展开子树' : '折叠子树'}
-          title={collapsed ? '展开子树' : '折叠子树'}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          {collapsed ? (
-            leftSide ? (
-              <ChevronLeft size={14} strokeWidth={2} />
-            ) : (
-              <ChevronRight size={14} strokeWidth={2} />
-            )
-          ) : (
-            <ChevronDown size={14} strokeWidth={2} />
-          )}
-        </button>
-      )}
+      {!editing &&
+        (isMindmapRoot ? (
+          <>
+            {sideChildren && sideChildren.right > 0 && (
+              <button
+                type="button"
+                className={`text-node__collapse-btn${rightCollapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+                onClick={(e) => toggleSideCollapsed('right', e)}
+                aria-label={rightCollapsed ? '展开右侧分支' : '收起右侧分支'}
+                title={rightCollapsed ? '展开右侧分支' : '收起右侧分支'}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {rightCollapsed ? (
+                  <ChevronRight size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={14} strokeWidth={2} />
+                )}
+              </button>
+            )}
+            {sideChildren && sideChildren.left > 0 && (
+              <button
+                type="button"
+                className={`text-node__collapse-btn text-node__collapse-btn--left${leftCollapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+                onClick={(e) => toggleSideCollapsed('left', e)}
+                aria-label={leftCollapsed ? '展开左侧分支' : '收起左侧分支'}
+                title={leftCollapsed ? '展开左侧分支' : '收起左侧分支'}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {leftCollapsed ? (
+                  <ChevronLeft size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={14} strokeWidth={2} />
+                )}
+              </button>
+            )}
+          </>
+        ) : (
+          hasChildren && (
+            <button
+              type="button"
+              className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}${leftSide ? ' text-node__collapse-btn--left' : ''}`}
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? '展开子树' : '折叠子树'}
+              title={collapsed ? '展开子树' : '折叠子树'}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {collapsed ? (
+                leftSide ? (
+                  <ChevronLeft size={14} strokeWidth={2} />
+                ) : (
+                  <ChevronRight size={14} strokeWidth={2} />
+                )
+              ) : (
+                <ChevronDown size={14} strokeWidth={2} />
+              )}
+            </button>
+          )
+        ))}
     </div>
   )
 }

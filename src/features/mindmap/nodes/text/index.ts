@@ -15,6 +15,8 @@ class TextDescriptor extends NodeTypeDescriptor<TextNodeData> {
       ...(data.summary != null && { summary: data.summary }),
       // 布局产物（depth/branchIndex/side）不落盘（PRD 2.2），打开时布局重算
       ...(data.collapsed === true && { collapsed: true }),
+      ...(data.leftCollapsed === true && { leftCollapsed: true }),
+      ...(data.rightCollapsed === true && { rightCollapsed: true }),
     }
   }
 }

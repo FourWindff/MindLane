@@ -251,6 +251,48 @@ describe('MindmapEditor', () => {
     })
   })
 
+  describe('collapse', () => {
+    it('setNodeCollapsed toggles the generic collapsed flag with undo/redo', () => {
+      editor.addChild(rootId())
+      editor.setNodeCollapsed(rootId(), true)
+      expect(store.getState().nodes[0]!.data.collapsed).toBe(true)
+      expect(store.getState().canUndo).toBe(true)
+
+      editor.undo()
+      expect(store.getState().nodes[0]!.data.collapsed).toBeUndefined()
+      editor.redo()
+      expect(store.getState().nodes[0]!.data.collapsed).toBe(true)
+    })
+
+    it('setNodeSideCollapsed toggles only the requested side flag', () => {
+      editor.setStructureType('mindmap')
+      editor.addChild(rootId())
+      editor.addChild(rootId())
+
+      editor.setNodeSideCollapsed(rootId(), 'left', true)
+      const data = store.getState().nodes[0]!.data as Record<string, unknown>
+      expect(data.leftCollapsed).toBe(true)
+      expect(data.rightCollapsed).toBeUndefined()
+
+      editor.undo()
+      expect(store.getState().nodes[0]!.data.leftCollapsed).toBeUndefined()
+    })
+
+    it('expanding one side of a whole-collapsed root clears collapsed and keeps the other side folded via its flag', () => {
+      editor.setStructureType('mindmap')
+      editor.addChild(rootId())
+      editor.addChild(rootId())
+      editor.setNodeCollapsed(rootId(), true)
+      expect(store.getState().nodes[0]!.data.collapsed).toBe(true)
+
+      editor.setNodeSideCollapsed(rootId(), 'left', false)
+      const data = store.getState().nodes[0]!.data as Record<string, unknown>
+      expect(data.collapsed).toBeUndefined()
+      expect(data.leftCollapsed).toBeUndefined()
+      expect(data.rightCollapsed).toBe(true)
+    })
+  })
+
   describe('reset', () => {
     it('should reset graph and clear history', () => {
       editor.addChild(rootId())

@@ -219,6 +219,27 @@ export class MindmapEditor {
   }
 
   /**
+   * Side collapse for the root node in bilateral layout: folds only the root's left
+   * or right branch (that side's direct children and their subtrees).
+   * When the whole map is collapsed via `collapsed`, expanding one side clears
+   * `collapsed` and keeps the other side folded via its side flag; otherwise only
+   * the matching leftCollapsed / rightCollapsed flag is toggled.
+   */
+  setNodeSideCollapsed(nodeId: string, side: 'left' | 'right', collapsed: boolean): void {
+    const data = this.state.nodes.find((n) => n.id === nodeId)?.data ?? {}
+    if (data.collapsed === true) {
+      this.updateNodeData(nodeId, {
+        collapsed: undefined,
+        leftCollapsed: side === 'left' ? undefined : true,
+        rightCollapsed: side === 'right' ? undefined : true,
+      })
+      return
+    }
+    const flag = side === 'left' ? 'leftCollapsed' : 'rightCollapsed'
+    this.updateNodeData(nodeId, { [flag]: collapsed ? true : undefined })
+  }
+
+  /**
    * 移动子树到新位置（摘除 + 重挂 + 重布局，单条 batch 历史，原子）。
    * position: child=挂到 targetId 之下（默认）；after/before=成为 targetId 兄弟的前/后。
    * root 不可移动；目标不得位于被移子树内（环）。

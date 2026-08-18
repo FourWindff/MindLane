@@ -6,6 +6,7 @@ import {
   collectDescendantIds,
   createInitialEdges,
   createInitialNodes,
+  reflowChildren,
   withNewChild,
 } from '../mindmapTree'
 
@@ -182,6 +183,107 @@ describe('mindmap 布局左右分侧', () => {
     const children = tree.nodes.filter((n) => n.id !== 'root')
     for (const child of children) {
       expect(sideOf(tree.nodes, child.id)).toBe('right')
+    }
+  })
+})
+
+describe('mindmap 布局根节点分侧折叠', () => {
+  function reflow(tree: Tree): Node[] {
+    return reflowChildren('root', tree.nodes, tree.edges, CHILD_OFFSET_X, CHILD_GAP_Y, 'mindmap')
+  }
+
+  function buildTreeWithSides(): Tree {
+    let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
+    for (let i = 0; i < 4; i++) {
+      tree = addChild(tree, 'root', `n${i}`)
+    }
+    return tree
+  }
+
+  it('leaves the left branch untouched in layout when root.leftCollapsed is set (stale positions kept), right branch lays out normally', () => {
+    const tree = buildTreeWithSides()
+    const leftIds = tree.nodes
+      .filter((n) => n.id !== 'root' && sideOf(tree.nodes, n.id) === 'left')
+      .map((n) => n.id)
+    // Tamper with the left nodes' positions to prove reflow never touches them
+    const tampered = tree.nodes.map((n) =>
+      leftIds.includes(n.id) ? { ...n, position: { x: 555, y: 555 } } : n,
+    )
+    const root = tampered.find((n) => n.id === 'root')!
+    const result = reflow({
+      nodes: tampered.map((n) =>
+        n.id === 'root' ? { ...n, data: { ...root.data, leftCollapsed: true } } : n,
+      ),
+      edges: tree.edges,
+    })
+
+    for (const id of leftIds) {
+      expect(result.find((n) => n.id === id)!.position).toEqual({ x: 555, y: 555 })
+    }
+    // Right branch lays out to the right of the root (gapX=40, node width 160 → x=200)
+    const rightNodes = result.filter((n) => n.id !== 'root' && !leftIds.includes(n.id))
+    expect(rightNodes.every((n) => n.position.x === 200)).toBe(true)
+    expect(new Set(rightNodes.map((n) => n.position.y)).size).toBe(rightNodes.length)
+  })
+
+  it('leaves the right branch untouched in layout when root.rightCollapsed is set, left branch lays out normally', () => {
+    const tree = buildTreeWithSides()
+    const rightIds = tree.nodes
+      .filter((n) => n.id !== 'root' && sideOf(tree.nodes, n.id) === 'right')
+      .map((n) => n.id)
+    const tampered = tree.nodes.map((n) =>
+      rightIds.includes(n.id) ? { ...n, position: { x: 555, y: 555 } } : n,
+    )
+    const root = tampered.find((n) => n.id === 'root')!
+    const result = reflow({
+      nodes: tampered.map((n) =>
+        n.id === 'root' ? { ...n, data: { ...root.data, rightCollapsed: true } } : n,
+      ),
+      edges: tree.edges,
+    })
+
+    for (const id of rightIds) {
+      expect(result.find((n) => n.id === id)!.position).toEqual({ x: 555, y: 555 })
+    }
+    // Left branch lays out to the left of the root (x = 0 - 40 - 160 = -200)
+    const leftNodes = result.filter((n) => n.id !== 'root' && !rightIds.includes(n.id))
+    expect(leftNodes.every((n) => n.position.x === -200)).toBe(true)
+    expect(new Set(leftNodes.map((n) => n.position.y)).size).toBe(leftNodes.length)
+  })
+
+  it('keeps side assignment and branchIndex stable across side collapse (restores unchanged on expand)', () => {
+    const tree = buildTreeWithSides()
+    const before = tree.nodes
+      .filter((n) => n.id !== 'root')
+      .map((n) => ({ id: n.id, side: n.data.side, branchIndex: n.data.branchIndex }))
+
+    const result = reflow({
+      nodes: tree.nodes.map((n) =>
+        n.id === 'root'
+          ? { ...n, data: { ...n.data, leftCollapsed: true, rightCollapsed: true } }
+          : n,
+      ),
+      edges: tree.edges,
+    })
+
+    const after = result
+      .filter((n) => n.id !== 'root')
+      .map((n) => ({ id: n.id, side: n.data.side, branchIndex: n.data.branchIndex }))
+    expect(after).toEqual(before)
+  })
+
+  it('root.collapsed still collapses the whole map (neither side lays out)', () => {
+    const tree = buildTreeWithSides()
+    const tampered = tree.nodes.map((n) =>
+      n.id === 'root'
+        ? { ...n, data: { ...n.data, collapsed: true } }
+        : { ...n, position: { x: 777, y: 777 } },
+    )
+    const result = reflow({ nodes: tampered, edges: tree.edges })
+
+    for (const n of result) {
+      if (n.id === 'root') continue
+      expect(n.position).toEqual({ x: 777, y: 777 })
     }
   })
 })

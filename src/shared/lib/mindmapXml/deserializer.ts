@@ -102,6 +102,8 @@ function nodeFromElement(
   const data = descriptor.read({ attrs, elements: typeElements })
 
   if (attrOf(attrs, 'collapsed') === 'true') data.collapsed = true
+  if (attrOf(attrs, 'leftCollapsed') === 'true') data.leftCollapsed = true
+  if (attrOf(attrs, 'rightCollapsed') === 'true') data.rightCollapsed = true
 
   // image 节点必须引用 asset（外部 URL 禁用）
   if (type === 'image' && !attrOf(attrs, 'asset')) {

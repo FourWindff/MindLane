@@ -25,7 +25,7 @@ import { usePalaceGeneration } from './usePalaceGeneration'
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { isDefaultViewport } from '@/shared/lib/fileFormat'
-import { collectDescendantIds, findParentId } from '@/shared/lib/mindmapTree'
+import { collectDescendantIds, collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
 import type { ContextMenuState } from '@/features/mindmap/components/MindMapContextMenu'
@@ -89,12 +89,38 @@ export function useMindmapOperationController() {
   const hiddenNodeIds = useMemo(() => {
     const hidden = new Set<string>()
     for (const node of nodes) {
-      if ((node.data as { collapsed?: boolean }).collapsed === true) {
+      const data = node.data as {
+        collapsed?: boolean
+        leftCollapsed?: boolean
+        rightCollapsed?: boolean
+      }
+      if (data.collapsed === true) {
         for (const id of collectDescendantIds(edges, node.id)) hidden.add(id)
+      }
+      // Root side collapse in bilateral layout: hide the whole side branch
+      // (direct children and their subtrees). Only applies to the root node in
+      // mindmap layout; logic layout is side-agnostic (all children take part in
+      // layout), so the flags are kept but nothing is hidden to avoid gaps.
+      const isRoot = !edges.some((e) => e.target === node.id)
+      if (
+        structureType === 'mindmap' &&
+        isRoot &&
+        (data.leftCollapsed === true || data.rightCollapsed === true)
+      ) {
+        for (const edge of edges) {
+          if (edge.source !== node.id) continue
+          const child = nodes.find((n) => n.id === edge.target)
+          const childSide = (child?.data as { side?: 'left' | 'right' } | undefined)?.side
+          const sideMatches =
+            (data.leftCollapsed === true && childSide === 'left') ||
+            (data.rightCollapsed === true && childSide === 'right')
+          if (!sideMatches) continue
+          for (const id of collectSubtreeIds(edges, edge.target)) hidden.add(id)
+        }
       }
     }
     return hidden
-  }, [edges, nodes])
+  }, [edges, nodes, structureType])
   const canvasNodes = useMemo(
     () =>
       nodes.map((n) =>

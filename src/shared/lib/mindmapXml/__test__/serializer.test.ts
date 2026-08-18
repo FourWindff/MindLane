@@ -93,6 +93,9 @@ describe('serializeMindlaneFile', () => {
       { id: 'e-r-b1', source: 'root', target: 'b1', type: 'mindmap' },
     ]
     ;(nodes[1]!.data as Record<string, unknown>).collapsed = true
+    // Root side-collapse flags roundtrip as well
+    ;(nodes[0]!.data as Record<string, unknown>).leftCollapsed = true
+    ;(nodes[0]!.data as Record<string, unknown>).rightCollapsed = true
     file.mindmap.nodes = nodes as MindLaneFile['mindmap']['nodes']
     file.mindmap.edges = edges
     file.mindmap.viewport = { x: 12, y: -3, zoom: 0.7 }
@@ -130,6 +133,12 @@ describe('serializeMindlaneFile', () => {
     expect(
       (parsed.mindmap.nodes.find((n) => n.id === 'a1')!.data as { collapsed?: boolean }).collapsed,
     ).toBe(true)
+    const rootData = parsed.mindmap.nodes.find((n) => n.id === 'root')!.data as {
+      leftCollapsed?: boolean
+      rightCollapsed?: boolean
+    }
+    expect(rootData.leftCollapsed).toBe(true)
+    expect(rootData.rightCollapsed).toBe(true)
 
     // 同一输入 → 同一输出（确定性）
     const parsedBack = await deserializeMindlaneFile(xml1)

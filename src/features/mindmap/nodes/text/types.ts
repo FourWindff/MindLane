@@ -5,6 +5,10 @@ export type TextNodeData = {
   summary?: string
   /** 通用折叠属性：折叠该节点后的整棵子树；缺省展开，只影响展示 */
   collapsed?: boolean
+  /** Root-only, bilateral layout: collapse the root's left branch (direct left children and their subtrees); expanded by default */
+  leftCollapsed?: boolean
+  /** Root-only, bilateral layout: collapse the root's right branch (direct right children and their subtrees); expanded by default */
+  rightCollapsed?: boolean
   justAdded?: boolean
   exiting?: boolean
   editing?: boolean
