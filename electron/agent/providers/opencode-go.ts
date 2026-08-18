@@ -30,12 +30,12 @@ export class OpenCodeGoProvider extends LLMProvider {
     { id: 'deepseek-v4-flash', displayName: 'DeepSeek V4 Flash', contextWindow: 1_000_000 },
     { id: 'mimo-v2.5', displayName: 'MiMo-V2.5', contextWindow: 131_072 },
     { id: 'mimo-v2.5-pro', displayName: 'MiMo-V2.5-Pro', contextWindow: 131_072 },
-    { id: 'hy3', displayName: 'Hy3', contextWindow: 131_072 },
+    { id: 'hy3', displayName: 'Hunyuan 3', contextWindow: 131_072 },
   ]
 
   constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()
-    if (!key) throw new Error('未填写 API Key')
+    if (!key) throw new Error('API key is required')
 
     const baseURL = config.baseUrl?.trim() || OPENCODE_GO_BASE_URL
     const chatModelId = config.chatModel.trim()
