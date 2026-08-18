@@ -23,6 +23,7 @@ import { createReadFileTool } from './tools/readFile.js'
 import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
+import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
 import {
   GENERATE_PALACE_TOOL,
@@ -505,11 +506,13 @@ export class AgentOrchestrator {
           additional_kwargs?: Record<string, unknown>
         }
         const toolSteps = toolMsg.additional_kwargs?.toolSteps
+        const result =
+          typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content)
         toolCalls.unshift({
           name: toolMsg.name ?? 'unknown',
           args: {},
-          result:
-            typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content),
+          result,
+          status: deriveToolStatus(result),
           steps: Array.isArray(toolSteps) ? toolSteps : undefined,
         })
       }

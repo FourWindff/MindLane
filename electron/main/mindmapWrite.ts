@@ -11,11 +11,14 @@ interface PendingRequest {
 }
 
 /**
- * 主进程 → 渲染层的落盘请求器（复用 mindmap-read 通道模式）。
+ * Main-process → renderer write requester (reuses the mindmap-read channel
+ * pattern).
  *
- * 经 `webContents.send` 发出请求事件、经 `ipcMain.handle` 接收渲染层应答 invoke；
- * requestId 关联并发 runner；超时或未知 requestId 按失败处理（错误回模型，不重试）。
- * 渲染层应答 `{ok, action, data}` 原样透出，`ok: false` 转成工具错误。
+ * The request is sent via `webContents.send`; the renderer ack is received via
+ * `ipcMain.handle`. requestId correlates concurrent runners; a timeout or an
+ * unknown requestId is treated as failure (the error is returned to the model,
+ * no retry). The renderer ack `{ok, action, data}` is passed through as-is;
+ * `ok: false` becomes a tool error.
  */
 export class MindmapWriteRequester {
   private readonly pending = new Map<string, PendingRequest>()
@@ -52,12 +55,13 @@ export class MindmapWriteRequester {
       entry.reject(new Error(payload.error))
       return
     }
-    // 渲染层应答原样透出（requestId 是内部关联，不进工具结果）：
-    // 写工具把 {ok, action, data} 整体作为 ToolMessage 回给模型。
+    // The renderer ack passes through as-is (requestId is an internal
+    // correlation id and never enters the tool result):
+    // write tools return the whole {ok, action, data} envelope as the ToolMessage.
     entry.resolve({ ok: true as const, action: payload.action, data: payload.data })
   }
 
-  /** 当前未决请求数（测试与观测用）。 */
+  /** Number of pending requests (test/observation helper). */
   get pendingCount(): number {
     return this.pending.size
   }

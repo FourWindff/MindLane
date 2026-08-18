@@ -1064,6 +1064,39 @@ describe('reduceStreamEvent', () => {
     expect(ended.toolCards).toEqual([])
   })
 
+  it('keeps finished cards with their real status when an aborted end arrives', () => {
+    const withCards = reduceStreamEvent(
+      reduceStreamEvent(base, {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'tool-start',
+        payload: { id: 'call-a', name: 'readMindmap', input: {} },
+      }),
+      {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'tool-end',
+        payload: { id: 'call-a', name: 'readMindmap', status: 'success', output: 'ok' },
+      },
+    )
+    const withRunning = reduceStreamEvent(withCards, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-b', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: '（已停止生成）' },
+    })
+    expect(ended.chatMessages[0]?.toolCalls).toEqual([
+      { name: 'readMindmap', args: {}, result: '', status: 'success' },
+      { name: 'generateMindmapFragment', args: {}, result: '', status: 'canceled' },
+    ])
+  })
+
   it('falls back to content and then streamText for end messages', () => {
     const fromContent = reduceStreamEvent(base, {
       streamId: 's',

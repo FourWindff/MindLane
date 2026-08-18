@@ -151,7 +151,8 @@ describe('AgentOrchestrator contextCompact node', () => {
 describe('AgentOrchestrator extractToolCalls', () => {
   let extractToolCalls: (
     msgs: BaseMessage[],
-  ) => Array<{ name: string; result: string; steps?: ChatToolCallStep[] }> | undefined
+  ) =>
+    Array<{ name: string; result: string; status?: string; steps?: ChatToolCallStep[] }> | undefined
 
   beforeEach(() => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
@@ -232,5 +233,30 @@ describe('AgentOrchestrator extractToolCalls', () => {
 
     const result = extractToolCalls(messages)
     expect(result![0].steps).toBeUndefined()
+  })
+
+  it('derives ChatToolCall.status from the tool result ok flag', () => {
+    const ok = extractToolCalls([
+      new ToolMessage({
+        content: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: { nodeCount: 1 } }),
+        tool_call_id: 'call-ok',
+        name: 'insertXmlFragment',
+      }),
+    ])
+    expect(ok![0].status).toBe('success')
+
+    const failed = extractToolCalls([
+      new ToolMessage({
+        content: JSON.stringify({ ok: false, error: '[block_not_found] 节点不存在' }),
+        tool_call_id: 'call-fail',
+        name: 'updateMindmapNode',
+      }),
+    ])
+    expect(failed![0].status).toBe('error')
+
+    const freeText = extractToolCalls([
+      new ToolMessage({ content: '导图已生成', tool_call_id: 'call-txt', name: 'readMindmap' }),
+    ])
+    expect(freeText![0].status).toBe('success')
   })
 })

@@ -6,6 +6,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import type { ChatMessage, ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 import { extractTextContent } from '../utils.js'
+import { deriveToolStatus } from '../toolStatus.js'
 
 export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): ChatMessage[] {
   const toolResults = new Map<string, string>()
@@ -62,12 +63,16 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
     if (type === 'ai') {
       const aiMsg = msg as AIMessage
       const content = extractTextContent(aiMsg.content)
-      const toolCalls = aiMsg.tool_calls?.map((tc) => ({
-        name: tc.name,
-        args: tc.args as Record<string, unknown>,
-        result: tc.id ? (toolResults.get(tc.id) ?? '') : '',
-        steps: tc.id ? toolStepsByCall.get(tc.id) : undefined,
-      }))
+      const toolCalls = aiMsg.tool_calls?.map((tc) => {
+        const result = tc.id ? (toolResults.get(tc.id) ?? '') : ''
+        return {
+          name: tc.name,
+          args: tc.args as Record<string, unknown>,
+          result,
+          ...(result ? { status: deriveToolStatus(result) } : {}),
+          steps: tc.id ? toolStepsByCall.get(tc.id) : undefined,
+        }
+      })
 
       if (toolCalls && toolCalls.length > 0) {
         pendingToolCalls.push(...toolCalls)

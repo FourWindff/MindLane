@@ -2,35 +2,39 @@ import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
 
 /**
- * AI 写工具集（固定 4 个，PRD 6.1）：insertXmlFragment / updateMindmapNode /
- * moveMindmapNode / deleteMindmapNode。工具集不随节点类型增长——类型知识走
- * 注册表校验 + 系统提示注入。
+ * AI write tool set (fixed 4, PRD 6.1): insertXmlFragment / updateMindmapNode /
+ * moveMindmapNode / deleteMindmapNode. The set does not grow with node types —
+ * type knowledge lives in the registry validation + system-prompt injection.
  *
- * 渲染层代理（ADR 0017 决策 1）：主进程工具不再做快照校验，而是把工具参数经
- * 反向 IPC 转发给渲染层落盘应答器（活编辑器原子校验 + 落图），渲染层应答
- * `{ok, action, data}` **原样**作为工具结果回给模型。渲染层无响应/超时按工具
- * 失败处理（错误结果回模型，流不中断），不新增重试。工具名/描述/schema 等
- * 模型可见契约不变。
+ * Renderer proxy (ADR 0017 decision 1): the main-process tools no longer do
+ * snapshot validation; they forward the tool args over reverse IPC to the
+ * renderer write responder (live-editor atomic validation + apply) and return
+ * the renderer ack `{ok, action, data}` **as-is** as the tool result. No
+ * renderer response / timeout is treated as tool failure (error goes back to
+ * the model, the stream continues), with no added retry. Model-visible
+ * contracts (tool name/description/schema) stay unchanged.
  */
 
-/** 写工具渲染层代理：转发参数，返回渲染层的落盘应答（原样）。 */
+/** Write-tool renderer proxy: forwards args and returns the renderer's write ack (as-is). */
 export type MindmapWriteProxy = (
   fileUuid: string,
   action: string,
   args: Record<string, unknown>,
 ) => Promise<unknown>
 
-/** 统一错误包装：超时 / 渲染层 ok:false / 窗口不可用 → 工具失败结果。 */
+/** Unified error wrapping: timeout / renderer ok:false / unavailable window → tool failure result. */
 function asToolError(err: unknown): { ok: false; error: string } {
   return { ok: false, error: err instanceof Error ? err.message : String(err) }
 }
 
-// ========== insertXmlFragment（统一写入口） ==========
+// ========== insertXmlFragment (unified write entry) ==========
 
 /**
- * 创建统一写入口工具：任意位置插入嵌套 XML 片段（含批量子树生成）。
- * position: root=挂到根节点 / child=挂到 parentId 之下 / after|before=成为 parentId 兄弟。
- * 校验与落图都在渲染层应答器内完成（活编辑器原子操作）。
+ * Creates the unified write-entry tool: inserts a nested XML fragment at any
+ * position (including batched subtree generation).
+ * position: root=attach under the root / child=attach under parentId /
+ * after|before=become a sibling of parentId.
+ * Validation and apply both happen inside the renderer responder (atomic live-editor op).
  */
 export function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
@@ -60,10 +64,11 @@ export function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   )
 }
 
-// ========== updateMindmapNode（整体替换，参数改 XML） ==========
+// ========== updateMindmapNode (whole replacement, args switched to XML) ==========
 
 /**
- * 创建更新工具：XML 参数整体替换节点（含子树）。校验与落图在渲染层应答器内。
+ * Creates the update tool: replaces the node wholesale (with subtree) from an
+ * XML arg. Validation and apply happen inside the renderer responder.
  */
 export function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
@@ -85,11 +90,12 @@ export function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
   )
 }
 
-// ========== moveMindmapNode（摘除 + 重挂 + 重布局） ==========
+// ========== moveMindmapNode (detach + re-attach + re-layout) ==========
 
 /**
- * 创建移动工具：摘除子树 + 重挂 + 重布局（单条 batch 历史，原子）。
- * 校验（root 不可移、目标不得在被移子树内）在渲染层应答器内完成。
+ * Creates the move tool: detaches the subtree, re-attaches it and re-layouts
+ * (single batch history entry, atomic). Validation (root immovable; target
+ * must not live inside the moved subtree) happens in the renderer responder.
  */
 export function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
@@ -116,11 +122,11 @@ export function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
   )
 }
 
-// ========== deleteMindmapNode（保留） ==========
+// ========== deleteMindmapNode (kept) ==========
 
 /**
- * 创建删除工具：删除指定节点（连同子树）。动作名沿用 `deleteNode`（渲染层
- * 应答器按该动作名落图）。
+ * Creates the delete tool: deletes the node (with its subtree). The action
+ * name stays `deleteNode` (the renderer responder applies by that name).
  */
 export function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
@@ -151,7 +157,7 @@ export interface MindmapWriteTools {
   deleteNodeTool: ReturnType<typeof createDeleteMindmapNodeTool>
 }
 
-/** 创建固定 4 写工具（渲染层代理）。 */
+/** Creates the fixed 4 write tools (renderer proxies). */
 export function createMindmapActionTools(proxy: MindmapWriteProxy): MindmapWriteTools {
   return {
     insertXmlFragmentTool: createInsertXmlFragmentTool(proxy),

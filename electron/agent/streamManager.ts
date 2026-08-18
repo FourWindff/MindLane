@@ -10,6 +10,7 @@ import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import { isSubgraphCall } from './subgraphRouter.js'
+import { deriveToolStatus } from './toolStatus.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
 import { isStreamStep, serializeTurnState, splitCurrentTurn } from '../ipc.js'
 
@@ -39,17 +40,6 @@ function summarizeToolResult(output: string): string {
   return `${size}, ${preview}`
 }
 
-/** Tool result status: write tools return an `{ok}` envelope; ok=false is an error, everything else succeeded. */
-function deriveToolStatus(output: string): 'success' | 'error' {
-  try {
-    const parsed = JSON.parse(output) as { ok?: unknown }
-    if (parsed.ok === false) return 'error'
-  } catch {
-    /* non-JSON output — completed normally */
-  }
-  return 'success'
-}
-
 export interface StreamRequest {
   sessionId: string
   message: string
@@ -59,9 +49,10 @@ export interface StreamRequest {
 }
 
 /**
- * 运行时所需的 graph 最小面。stream 的元组对齐 LangGraph 实际输出
- * （只读元组 [mode, payload]）；编译期无法与 LangGraph 泛型 stream 完全
- * 结构匹配，由 orchestrator 装配时做一次局部强转并注释原因。
+ * The minimal graph surface the runtime needs. The stream tuples align with
+ * LangGraph's actual output (read-only tuples [mode, payload]); the compiler
+ * cannot fully match LangGraph's generic stream signatures, so the orchestrator
+ * does one local cast at assembly time and documents why.
  */
 export interface StreamGraph {
   stream: (
@@ -107,7 +98,7 @@ export class Runner {
   async run(): Promise<void> {
     const { sessionManager } = this.options
     const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
-    // 契约：SessionManager 在应用启动时装配完成，无需 isReady 守卫。
+    // Contract: SessionManager is assembled at app startup; no isReady guard needed.
     return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
   }
 
@@ -157,8 +148,9 @@ export class Runner {
             },
             Record<string, unknown>,
           ]
-          // 子图 ToolMessage 到达（subgraphResult 节点产物，langgraph_node 非
-          // supervisor）：虚拟子图调用不走 ToolNode，tools 模式无事件，这里补发 tool-end。
+          // A subgraph ToolMessage arrived (subgraphResult node output,
+          // langgraph_node != supervisor): virtual subgraph calls do not go
+          // through ToolNode, so tools mode emits nothing; re-emit tool-end here.
           if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {
             const output =
               typeof message.content === 'string'
@@ -173,7 +165,8 @@ export class Runner {
             continue
           }
           if (metadata?.langgraph_node && metadata.langgraph_node !== 'supervisor') continue
-          // 子图虚拟调用补发 tool-start：supervisor 的 AI 消息 chunk 携带子图工具调用。
+          // Virtual subgraph calls get a synthetic tool-start: the supervisor's
+          // AI message chunk carries the subgraph tool call.
           for (const toolCall of message.tool_calls ?? []) {
             if (isSubgraphCall(toolCall.name ?? '')) {
               this.emit('tool-start', {
@@ -251,7 +244,8 @@ export class Runner {
             total?: number
           }
           if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
-            // 契约：step payload 为 { step, completed?, total? }，计数必须透传（卡片渲染 n/m）。
+            // Contract: the step payload is { step, completed?, total? }; counts
+            // must pass through (cards render n/m).
             this.emit('step', {
               step: event.step,
               ...(typeof event.completed === 'number' ? { completed: event.completed } : {}),
@@ -286,9 +280,11 @@ export class Runner {
 
   private async prepareHistory(): Promise<BaseMessage[]> {
     const { request, sessionManager } = this.options
-    // 轮次状态：主进程在持久化时把编辑器状态序列化为 `<EDITOR_STATE>` 块，
-    // 附加到该轮用户消息末尾（`问题\n<EDITOR_STATE>…</EDITOR_STATE>`）再保存。
-    // 模型输入、checkpointer 不过滤；展示 / 滚动摘要 / 记忆提取在各自入口剥离。
+    // Turn state: on persist, the main process serializes the editor state into
+    // an `<EDITOR_STATE>` block appended to the end of that turn's user message
+    // (`question\n<EDITOR_STATE>…</EDITOR_STATE>`) before saving. Model input and
+    // the checkpointer do not filter it; display / scroll summary / memory
+    // extraction strip it at their own entry points.
     const turnState = serializeTurnState(request.context)
     const persistedContent = request.message ? `${request.message}\n${turnState}` : turnState
     const humanMessage = new HumanMessage({

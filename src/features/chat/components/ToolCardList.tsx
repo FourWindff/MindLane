@@ -5,21 +5,22 @@ import { toolDisplayName } from '@/features/chat/lib/chatUtils'
 
 export type ToolCardStatus = NonNullable<ChatToolCall['status']>
 
-/** 归一化卡片：流式（ToolCard）与历史（ChatToolCall）共用同一渲染规则。 */
+/** Normalized card: streaming (ToolCard) and history (ChatToolCall) share one render contract. */
 export interface ToolCardItem {
   name: string
   status?: ToolCardStatus
-  /** 流式子图阶段（实时，来自 step 事件透传的计数）。 */
+  /** Streaming subgraph stage (live, counts passed through from step events). */
   step?: string
   completed?: number
   total?: number
-  /** 历史子图阶段轨迹（持久化，ChatToolCall.steps）。 */
+  /** Historical subgraph stage trace (persisted, ChatToolCall.steps). */
   steps?: ChatToolCallStep[]
 }
 
 /**
- * 仅思维导图子图卡片（generateMindmapFragment）有阶段进度、可展开；
- * palace 子图无阶段事件、写/读工具卡片保持单行。
+ * Only the mindmap subgraph card (generateMindmapFragment) has stage progress
+ * and can expand; the palace subgraph emits no stage events, and write/read
+ * tool cards stay single-line.
  */
 function isSubgraphCard(name: string): boolean {
   return name === 'generateMindmapFragment'
@@ -44,9 +45,11 @@ function cx(...classes: (string | false | undefined)[]) {
 }
 
 /**
- * 工具卡片区：AI 气泡上方的独立区域，一个工具调用一行、左对齐。
- * 流式进行中与历史消息走同一组件；历史卡片无 status（旧会话）时推断为已结束（✓）。
- * 子图卡片运行中默认展开显示逐阶段进度，完成后自动折叠，支持手动展开/收起。
+ * Tool card region: an area above the AI bubble, one tool call per line,
+ * left-aligned. Streaming and history messages share the same component;
+ * history cards without a status (old sessions) are inferred as finished (✓).
+ * Subgraph cards expand by default while running to show stage progress and
+ * auto-collapse when done; manual expand/collapse is supported.
  */
 export function ToolCardList({ cards }: { cards: ToolCardItem[] }) {
   return (
@@ -112,7 +115,8 @@ function SubgraphCard({
   card: ToolCardItem & { status: ToolCardStatus }
   stages: Array<{ step: string; completed?: number; total?: number }>
 }) {
-  // 手动展开/收起：null 跟随默认（运行中展开、完成后折叠）。
+  // Manual expand/collapse: null follows the default (expanded while running,
+  // collapsed when done).
   const [expanded, setExpanded] = useState<boolean | null>(null)
   const showBody = expanded ?? card.status === 'running'
   return (

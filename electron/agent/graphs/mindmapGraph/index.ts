@@ -23,7 +23,7 @@ import type { StreamStep } from '../../../ipc.js'
 
 const log = logger.withContext('mindmap')
 
-// ===== 配置选项 =====
+// ===== Configuration options =====
 
 interface MindmapSubgraphOptions {
   provider: LLMProvider
@@ -57,12 +57,13 @@ function countTreeNodes(node: MindmapOutlineNode): number {
 
 type PromptMessage = { role: string; content: string }
 
-/** 导图进度词表是共享 StreamStep 的子集（不含 generating-map，它由工具事件触发）。 */
+/** The mindmap progress vocabulary is a subset of the shared StreamStep (without generating-map, which tool events trigger). */
 type MindmapProgressStep = Exclude<StreamStep, 'generating-map'>
 
 /**
- * 子图阶段轨迹（与 step 流事件同源），按 streamId 收集、build_output 收口。
- * 与 itemProgressCounts 同生命周期：run 开始重置、build_output 消费。
+ * Subgraph stage trace (same source as step stream events), collected per
+ * streamId and closed out by build_output. Same lifecycle as
+ * itemProgressCounts: reset at run start, consumed by build_output.
  */
 const stepTraces = new Map<string, ChatToolCallStep[]>()
 
@@ -244,7 +245,8 @@ async function resolveInputNode(
 
   runStarts.set(runKey(), Date.now())
   resetItemProgress()
-  // 新一轮 run 开始：清空上一条遗留轨迹（build_output 已消费，这里仅兜底防泄漏）。
+  // A new run starts: clear the previous leftover trace (build_output already
+  // consumed it; this is a leak safety net).
   stepTraces.delete(runKey())
   log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
   return {
@@ -594,7 +596,7 @@ function routeAfterMergeGate(state: typeof MindmapSubgraphState.State): string |
   return 'start_merge_round'
 }
 
-// ===== Subgraph 构建器 =====
+// ===== Subgraph builder =====
 
 /**
  * Build the Mindmap Subgraph
