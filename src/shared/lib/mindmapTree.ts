@@ -1,6 +1,20 @@
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
-import { Position, type Edge, type Node } from '@xyflow/react'
 import { defaultNodeSize } from './nodeSize'
+import type { Edge, Node, Position as XyflowPosition } from '@xyflow/react'
+
+/**
+ * Position values used by the layout engine (handle / source / target sides).
+ * Mirrors xyflow's Position enum with identical string values, so this shared
+ * module only needs the xyflow *types* (erased at build time) and never pulls
+ * the xyflow runtime into the Electron main-process bundle.
+ */
+export type Position = XyflowPosition
+export const Position = {
+  Top: 'top' as Position,
+  Bottom: 'bottom' as Position,
+  Left: 'left' as Position,
+  Right: 'right' as Position,
+}
 
 export const CHILD_OFFSET_X = 200
 export const CHILD_GAP_Y = 12
