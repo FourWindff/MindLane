@@ -224,7 +224,9 @@ describe('SessionManager', () => {
       {
         role: 'assistant',
         content: 'Done',
-        toolCalls: [{ name: 'batchAddMindmapNodes', args: { count: 1 }, result: 'ok' }],
+        toolCalls: [
+          { name: 'batchAddMindmapNodes', args: { count: 1 }, result: 'ok', status: 'success' },
+        ],
         timestamp: '2024-01-01T00:00:01Z',
       },
     ]
