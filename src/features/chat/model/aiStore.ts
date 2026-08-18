@@ -123,20 +123,36 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
 
 const fileChatLoads = new Map<string, Promise<void>>()
 
-// 胶囊条全量会话刷新：AI 服务未就绪时有限退避重试，避免启动早期
-// listSessions 返回 not-ready 后 allSessions 永久为空。
-const CAPSULE_REFRESH_RETRY_MAX = 5
-const CAPSULE_REFRESH_RETRY_DELAY_MS = 1000
-let capsuleRefreshRetryCount = 0
-let capsuleRefreshRetryTimer: ReturnType<typeof setTimeout> | null = null
+// 读侧 IPC 的有限退避重试：AI 服务未就绪时 listSessions/loadSession 会返回
+// not-ready，延迟重试避免启动早期拿到空结果后永久空白。按 key 计数，成功即清零。
+const RETRY_MAX = 5
+const RETRY_DELAY_MS = 1000
+const retryCounts = new Map<string, number>()
+const pendingRetries = new Map<string, () => void>()
+let retryTimer: ReturnType<typeof setTimeout> | null = null
 
-function scheduleCapsuleRefreshRetry(): void {
-  if (capsuleRefreshRetryTimer || capsuleRefreshRetryCount >= CAPSULE_REFRESH_RETRY_MAX) return
-  capsuleRefreshRetryCount += 1
-  capsuleRefreshRetryTimer = setTimeout(() => {
-    capsuleRefreshRetryTimer = null
-    void useAiStore.getState().refreshCapsuleData()
-  }, CAPSULE_REFRESH_RETRY_DELAY_MS)
+function scheduleRetry(key: string, run: () => void): void {
+  const count = retryCounts.get(key) ?? 0
+  if (count >= RETRY_MAX) return
+  retryCounts.set(key, count + 1)
+  pendingRetries.set(key, run)
+  if (retryTimer) return
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    const entries = [...pendingRetries.entries()]
+    pendingRetries.clear()
+    for (const [, run] of entries) run()
+  }, RETRY_DELAY_MS)
+}
+
+/** 仅测试用：清空退避重试的模块级状态，避免真实 timer 跨测试泄漏。 */
+export function resetChatRetryStateForTests(): void {
+  if (retryTimer) {
+    clearTimeout(retryTimer)
+    retryTimer = null
+  }
+  pendingRetries.clear()
+  retryCounts.clear()
 }
 
 const EMPTY_CHAT_MESSAGES: ChatMessage[] = []
@@ -430,13 +446,15 @@ export const useAiStore = create<AiState>((set, get) => ({
         workspacePath,
       })
       if (result?.ok) {
-        capsuleRefreshRetryCount = 0
+        retryCounts.delete('capsule')
         allSessions = result.data.sessions
       } else {
         // 主进程 AI 服务可能尚未装配完成：先落映射，稍后重试拉会话，
         // 不把已就绪的数据清空（allSessions 保持旧值）。
         useAiStore.setState({ workspacePath, fileUuidPaths })
-        scheduleCapsuleRefreshRetry()
+        scheduleRetry('capsule', () => {
+          void useAiStore.getState().refreshCapsuleData()
+        })
         return
       }
     }
@@ -557,7 +575,16 @@ async function loadFileChat(fileUuid: string): Promise<void> {
   ])
   // 查询失败时直接放弃：此时无法区分"会话不存在"与"查询出错"，
   // 继续往下走会生成幻影 id 并覆写 state.json 中仍然有效的映射。
-  if (!sessionsResult?.ok) return
+  // AI 未就绪（not-ready）属于"查询出错"：延迟重试，避免打开文件后历史永久空白。
+  if (!sessionsResult?.ok) {
+    scheduleRetry(`${workspacePath}\0${fileUuid}`, () => {
+      // 已切换 workspace 的旧请求作废，避免把新 workspace 的数据拉错。
+      if (useAiStore.getState().workspacePath !== workspacePath) return
+      void useAiStore.getState().loadFileChat(fileUuid)
+    })
+    return
+  }
+  retryCounts.delete(`${workspacePath}\0${fileUuid}`)
   const sessions = sessionsResult.data.sessions
   const restoredSessionId = workspaceSession?.activeSessionIds?.[fileUuid]
   // state.json 可能指向从未写入消息的幻影会话（如新建对话后未发言就退出），

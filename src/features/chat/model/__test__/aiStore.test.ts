@@ -4,6 +4,7 @@ import {
   createFileChatState,
   deriveChatCapsuleEntries,
   reduceStreamEvent,
+  resetChatRetryStateForTests,
   selectCurrentChatHasFile,
   useAiStore,
   type ChatSession,
@@ -102,6 +103,10 @@ function createRegistryHarness() {
   }
 }
 
+beforeEach(() => {
+  resetChatRetryStateForTests()
+})
+
 describe('aiStore per-file chat state', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
@@ -157,6 +162,31 @@ describe('aiStore per-file chat state', () => {
 
     expect(chat.listSessions).toHaveBeenCalledTimes(1)
     expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true)
+  })
+
+  it('retries the file chat load while the AI service is not ready yet', async () => {
+    vi.useFakeTimers()
+    try {
+      const { chat } = installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+      let calls = 0
+      vi.mocked(chat.listSessions).mockImplementation(async () => {
+        calls += 1
+        if (calls < 3) return { ok: false as const, error: 'AI service not initialized' }
+        return { ok: true as const, data: { sessions: [sessions[0]!] } }
+      })
+      useAiStore.setState({ workspacePath: '/workspace' })
+
+      await useAiStore.getState().loadFileChat('file-a')
+      expect(useAiStore.getState().loadedFileChats['file-a']).toBeUndefined()
+
+      await vi.advanceTimersByTimeAsync(1000)
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true)
+      expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-restored')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('updates active-session navigation metadata after a file move', () => {

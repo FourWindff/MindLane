@@ -3,6 +3,7 @@ import {
   connectAiStore,
   createFileChatState,
   deriveChatCapsuleEntries,
+  resetChatRetryStateForTests,
   useAiStore,
   type ChatStreamEvent,
   type FileChatState,
@@ -97,6 +98,10 @@ function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
     sessionFileUuids: { 'session-a': fileUuid },
   })
 }
+
+beforeEach(() => {
+  resetChatRetryStateForTests()
+})
 
 describe('sendChatMessage handshake', () => {
   beforeEach(() => {
