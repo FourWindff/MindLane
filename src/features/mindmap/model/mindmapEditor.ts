@@ -47,6 +47,11 @@ export class MindmapEditor {
     return this.store.getState()
   }
 
+  /** 只读当前编辑器状态（校验场景用，如落盘应答器按活状态做存在性/纯树校验）。 */
+  getState(): MindmapState {
+    return this.state
+  }
+
   // ─── 历史操作 ───
 
   undo(): void {

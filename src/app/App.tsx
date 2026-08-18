@@ -25,6 +25,7 @@ import {
   useAiStore,
 } from '@/features/chat/model/aiStore'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
+import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
@@ -96,6 +97,20 @@ function AppContent() {
     const disconnectAiStore = connectAiStore(mindmapRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
+    // 落盘应答器：主进程转发写工具参数，这里按 fileUuid 串行化校验+落图并回 ack。
+    const stopWriteResponder = createMindmapWriteResponder({
+      subscribe: (listener) => window.mindlane?.ai.onMindmapWriteRequest(listener) ?? (() => {}),
+      resolveEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
+      persistFile: (fileUuid) => {
+        const instance = mindmapRegistry.getByFileUuid(fileUuid)
+        if (!instance) return
+        void saveMindmapInstance(instance, {
+          syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
+          onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
+        })
+      },
+      respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
+    }).start()
     const stopToolRouter = createMindmapToolCallRouter({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
@@ -113,6 +128,7 @@ function AppContent() {
     }).start()
     return () => {
       stopToolRouter()
+      stopWriteResponder()
       disconnectAiStore()
       disconnectMindmapReadResponder()
     }
