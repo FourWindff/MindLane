@@ -329,7 +329,7 @@ export function useMindmapOperationController() {
     group: 'mindmap',
     preventWhenTyping: true,
     enabled: () => shortcutsEnabled() && canAddSibling,
-    handler: controller.addSibling,
+    handler: () => controller.addSibling(),
   })
   useShortcut({
     id: 'mindmap.delete',
@@ -475,6 +475,7 @@ export function useMindmapOperationController() {
     hasDocumentRefs: documentRefs.length > 0,
     canAddChild: hasSelection,
     canAddSibling,
+    canAddParent: canAddSibling,
     canRemove,
     canUndo,
     canRedo,
@@ -494,6 +495,7 @@ export function useMindmapOperationController() {
     actions: {
       addChild: controller.addChild,
       addSibling: controller.addSibling,
+      addParent: controller.addParent,
       removeSelected: controller.removeSelected,
       reset: controller.reset,
       undo: controller.undo,

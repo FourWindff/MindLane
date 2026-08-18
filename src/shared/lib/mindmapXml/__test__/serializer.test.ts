@@ -298,3 +298,42 @@ describe('serializeMindmapSection', () => {
     expect(xml).not.toContain('id="n3"')
   })
 })
+
+describe('visual sibling order (edge order may diverge)', () => {
+  // edge array order: [root->a, root->b, root->above]; visual (y) order: a < above < b.
+  // Simulates addSibling(b, 'above') where the new edge is appended last.
+  const nodes: Node[] = [
+    { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: '中心' } },
+    { id: 'a', type: 'text', position: { x: 200, y: 0 }, data: { label: 'a' } },
+    { id: 'above', type: 'text', position: { x: 200, y: 50 }, data: { label: 'above' } },
+    { id: 'b', type: 'text', position: { x: 200, y: 100 }, data: { label: 'b' } },
+  ]
+  const edges: Edge[] = [
+    { id: 'eA', source: 'root', target: 'a', type: 'mindmap' },
+    { id: 'eB', source: 'root', target: 'b', type: 'mindmap' },
+    { id: 'eAbove', source: 'root', target: 'above', type: 'mindmap' },
+  ]
+
+  it('serializeMindmapSection emits children in visual order', () => {
+    const xml = serializeMindmapSection(nodes, edges)
+    expect(xml.indexOf('content="a"')).toBeLessThan(xml.indexOf('content="above"'))
+    expect(xml.indexOf('content="above"')).toBeLessThan(xml.indexOf('content="b"'))
+  })
+
+  it('serializeTreeFragment emits children in visual order', () => {
+    const xml = serializeTreeFragment(nodes, edges)
+    expect(xml.indexOf('content="a"')).toBeLessThan(xml.indexOf('content="above"'))
+    expect(xml.indexOf('content="above"')).toBeLessThan(xml.indexOf('content="b"'))
+  })
+
+  it('save -> load round-trip keeps visual order (position is not persisted)', async () => {
+    const file = createEmptyFile('测试')
+    file.mindmap.nodes = nodes as unknown as MindLaneFile['mindmap']['nodes']
+    file.mindmap.edges = edges as unknown as MindLaneFile['mindmap']['edges']
+    const xml = serializeMindlaneFile(file)
+    const reloaded = await deserializeMindlaneFile(xml)
+    // child order on disk follows visual order, so the reloaded edge order matches it
+    const rootEdges = reloaded.mindmap.edges.filter((e) => e.source === 'root')
+    expect(rootEdges.map((e) => e.target)).toEqual(['a', 'above', 'b'])
+  })
+})

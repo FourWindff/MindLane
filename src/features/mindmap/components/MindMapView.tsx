@@ -86,11 +86,13 @@ function MindMapWorkspace({
           onClose={view.actions.closeContextMenu}
           onAddChild={view.actions.addChild}
           onAddSibling={view.actions.addSibling}
+          onAddParent={view.actions.addParent}
           onRemove={view.actions.removeSelected}
           onReset={view.actions.reset}
           onGeneratePalace={view.actions.generatePalace}
           onInsertImage={view.actions.insertImage}
           canAddSibling={view.canAddSibling}
+          canAddParent={view.canAddParent}
           canRemove={view.canRemove}
           aiBusy={view.aiBusy}
           selectedCount={view.selectedTopicCount || 1}

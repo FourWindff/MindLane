@@ -34,6 +34,7 @@ describe('MindmapOperationController', () => {
     editor = {
       addChild: vi.fn(),
       addSibling: vi.fn(),
+      addParent: vi.fn(),
       deleteSubtrees: vi.fn(),
       applyNativeNodeChanges: vi.fn(),
       applyNativeEdgeChanges: vi.fn(),

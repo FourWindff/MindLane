@@ -8,12 +8,14 @@ type ContextMenuProps = {
   menuRef: RefObject<HTMLDivElement>
   onClose: () => void
   onAddChild: () => void
-  onAddSibling: () => void
+  onAddSibling: (mode: 'above' | 'below' | 'end') => void
+  onAddParent: () => void
   onRemove: () => void
   onReset: () => void
   onGeneratePalace?: () => void
   onInsertImage?: () => void
   canAddSibling: boolean
+  canAddParent: boolean
   canRemove: boolean
   aiBusy: boolean
   selectedCount: number
@@ -26,11 +28,13 @@ export function MindMapContextMenu({
   onClose,
   onAddChild,
   onAddSibling,
+  onAddParent,
   onRemove,
   onReset,
   onGeneratePalace,
   onInsertImage,
   canAddSibling,
+  canAddParent,
   canRemove,
   aiBusy,
   selectedCount,
@@ -46,7 +50,7 @@ export function MindMapContextMenu({
   const vw = typeof window !== 'undefined' ? window.innerWidth : 0
   const vh = typeof window !== 'undefined' ? window.innerHeight : 0
   const menuW = 200
-  const menuH = 280
+  const menuH = 400
   const left = Math.min(menu.clientX, Math.max(8, vw - menuW - 8))
   const top = Math.min(menu.clientY, Math.max(8, vh - menuH - 8))
 
@@ -71,10 +75,37 @@ export function MindMapContextMenu({
         type="button"
         className="mindmap-ctx__item"
         role="menuitem"
-        onClick={() => run(onAddSibling)}
+        onClick={() => run(onAddParent)}
+        disabled={!canAddParent || aiBusy}
+      >
+        添加父节点
+      </button>
+      <button
+        type="button"
+        className="mindmap-ctx__item"
+        role="menuitem"
+        onClick={() => run(() => onAddSibling('above'))}
         disabled={!canAddSibling || aiBusy}
       >
-        同级
+        在上面插入同级
+      </button>
+      <button
+        type="button"
+        className="mindmap-ctx__item"
+        role="menuitem"
+        onClick={() => run(() => onAddSibling('below'))}
+        disabled={!canAddSibling || aiBusy}
+      >
+        在下面插入同级
+      </button>
+      <button
+        type="button"
+        className="mindmap-ctx__item"
+        role="menuitem"
+        onClick={() => run(() => onAddSibling('end'))}
+        disabled={!canAddSibling || aiBusy}
+      >
+        插入同级（末尾）
       </button>
       <button
         type="button"

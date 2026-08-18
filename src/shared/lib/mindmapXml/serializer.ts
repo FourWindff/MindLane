@@ -8,14 +8,21 @@ import type { MindLaneFile } from '../fileFormat.js'
 import { escapeXml } from './escape.js'
 import { xmlNodeTypeRegistry } from './registry.js'
 import { MINDLANE_XML_VERSION, MINDLANE_ROOT_TAG, NODE_TAG } from './types.js'
+import { getChildIdsOrdered } from '../mindmapTree'
 
-/** 子节点顺序：按 edges 数组顺序（父→子边即兄弟顺序）。 */
-function buildChildrenMap(edges: Edge[]): Map<string, string[]> {
+/**
+ * 子节点顺序：视觉顺序（position.y 升序，同 getChildIdsOrdered），保证序列化的
+ * 同级顺序与界面一致，避免边数组顺序与视觉顺序漂移。
+ */
+function buildChildrenMap(nodes: Node[], edges: Edge[]): Map<string, string[]> {
   const map = new Map<string, string[]>()
   for (const edge of edges) {
     const list = map.get(edge.source)
     if (list) list.push(edge.target)
     else map.set(edge.source, [edge.target])
+  }
+  for (const parentId of map.keys()) {
+    map.set(parentId, getChildIdsOrdered(nodes, edges, parentId))
   }
   return map
 }
@@ -77,7 +84,7 @@ function serializeSubtree(
  */
 export function serializeTreeFragment(nodes: Node[], edges: Edge[]): string {
   const nodesById = new Map(nodes.map((n) => [n.id, n]))
-  const childrenOf = buildChildrenMap(edges)
+  const childrenOf = buildChildrenMap(nodes, edges)
   const roots = findRootIds(nodes, edges)
   return roots.map((rid) => serializeSubtree(rid, nodesById, childrenOf, 0)).join('\n')
 }
@@ -112,7 +119,7 @@ export function serializeMindmapSection(
   query: MindmapSectionQuery = {},
 ): string {
   const nodesById = new Map(nodes.map((n) => [n.id, n]))
-  const childrenOf = buildChildrenMap(edges)
+  const childrenOf = buildChildrenMap(nodes, edges)
   const roots = query.subtreeId ? [query.subtreeId] : findRootIds(nodes, edges)
 
   const hasTypeFilter = query.type !== undefined
@@ -211,7 +218,7 @@ function serializeDocuments(file: MindLaneFile): string {
  */
 export function serializeMindlaneFile(file: MindLaneFile): string {
   const nodesById = new Map(file.mindmap.nodes.map((n) => [n.id, n]))
-  const childrenOf = buildChildrenMap(file.mindmap.edges)
+  const childrenOf = buildChildrenMap(file.mindmap.nodes as Node[], file.mindmap.edges)
   const roots = findRootIds(file.mindmap.nodes as Node[], file.mindmap.edges)
   const mindmapXml = roots.map((rid) => serializeSubtree(rid, nodesById, childrenOf, 2)).join('\n')
 

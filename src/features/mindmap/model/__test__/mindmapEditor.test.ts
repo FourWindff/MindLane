@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMindmapStore } from '../mindmapStore'
 import { MindmapHistory } from '../mindmapHistory'
 import { MindmapEditor } from '../mindmapEditor'
+import { getChildIdsOrdered } from '@/shared/lib/mindmapTree'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 
 describe('MindmapEditor', () => {
@@ -18,6 +19,11 @@ describe('MindmapEditor', () => {
 
   function rootId(): string {
     return store.getState().nodes[0]!.id
+  }
+
+  function childOrder(parentId: string): string[] {
+    const { nodes, edges } = store.getState()
+    return getChildIdsOrdered(nodes, edges, parentId)
   }
 
   describe('addNode / addChild / addSibling', () => {
@@ -66,6 +72,85 @@ describe('MindmapEditor', () => {
     it('should return null when adding sibling to root', () => {
       const result = editor.addSibling(rootId())
       expect(result).toBeNull()
+    })
+  })
+
+  describe('sibling insertion position', () => {
+    it('inserts a child at the end of the existing children', () => {
+      editor.addChild(rootId())
+      editor.addChild(rootId())
+      const before = childOrder(rootId())
+      const { nodeId } = editor.addChild(rootId())
+      expect(childOrder(rootId())).toEqual([...before, nodeId])
+    })
+
+    it('inserts a sibling at the end of all siblings by default', () => {
+      editor.addChild(rootId())
+      const b = editor.addChild(rootId()).nodeId
+      editor.addChild(rootId())
+      const { nodeId } = editor.addSibling(b)!
+      expect(childOrder(rootId()).at(-1)).toBe(nodeId)
+    })
+
+    it('inserts a sibling above the selected node', () => {
+      const a = editor.addChild(rootId()).nodeId
+      const b = editor.addChild(rootId()).nodeId
+      const { nodeId } = editor.addSibling(b, undefined, 'above')!
+      expect(childOrder(rootId())).toEqual([a, nodeId, b])
+    })
+
+    it('inserts a sibling below the selected node', () => {
+      const a = editor.addChild(rootId()).nodeId
+      const b = editor.addChild(rootId()).nodeId
+      const c = editor.addChild(rootId()).nodeId
+      const { nodeId } = editor.addSibling(b, undefined, 'below')!
+      expect(childOrder(rootId())).toEqual([a, b, nodeId, c])
+    })
+  })
+
+  describe('addParent', () => {
+    it('creates a parent above the node and re-parents the node under it', () => {
+      const a = editor.addChild(rootId()).nodeId
+      const b = editor.addChild(rootId()).nodeId
+      const { nodeId: parent } = editor.addParent(b)!
+      const { nodes, edges } = store.getState()
+      expect(edges.find((e) => e.target === parent)?.source).toBe(rootId())
+      expect(edges.find((e) => e.target === b)?.source).toBe(parent)
+      expect(childOrder(rootId())).toEqual([a, parent])
+      expect(nodes.find((n) => n.id === parent)?.data.label).toBe('新主题')
+    })
+
+    it('returns null for root and supports undo/redo', () => {
+      expect(editor.addParent(rootId())).toBeNull()
+      const a = editor.addChild(rootId()).nodeId
+      const nodeCount = store.getState().nodes.length
+
+      editor.addParent(a)
+      expect(store.getState().canUndo).toBe(true)
+      expect(store.getState().edges.find((e) => e.target === a)?.source).not.toBe(rootId())
+
+      editor.undo()
+      expect(store.getState().edges.find((e) => e.target === a)?.source).toBe(rootId())
+      expect(store.getState().nodes.length).toBe(nodeCount)
+
+      editor.redo()
+      expect(store.getState().edges.find((e) => e.target === a)?.source).not.toBe(rootId())
+    })
+
+    it('keeps the branch color (branchIndex) when adding a parent to a root child', () => {
+      editor.addChild(rootId())
+      const b = editor.addChild(rootId()).nodeId
+      const branchOf = (id: string) =>
+        store.getState().nodes.find((n) => n.id === id)?.data.branchIndex
+      const bBranch = branchOf(b) as number
+      expect(typeof bBranch).toBe('number')
+
+      const parent = editor.addParent(b)!.nodeId
+
+      // The new parent takes over the branch head, inheriting the same branchIndex;
+      // the original node keeps the same branch too (just one level deeper).
+      expect(branchOf(parent)).toBe(bBranch)
+      expect(branchOf(b)).toBe(bBranch)
     })
   })
 

@@ -7,11 +7,13 @@ import {
   findRootNode,
   getChildIdsOrdered,
 } from '@/shared/lib/mindmapTree'
+import type { SiblingInsertMode } from './mindmapEditor'
 
 type OperationEditor = Pick<
   MindmapEditor,
   | 'addChild'
   | 'addSibling'
+  | 'addParent'
   | 'deleteSubtrees'
   | 'applyNativeNodeChanges'
   | 'applyNativeEdgeChanges'
@@ -94,10 +96,16 @@ export function createMindmapOperationController({
       editor.addChild(state.selectedId ?? 'root')
     },
 
-    addSibling() {
+    addSibling(mode: SiblingInsertMode = 'end') {
       const state = getState()
       if (state.aiBusy || !state.selectedId) return
-      editor.addSibling(state.selectedId)
+      editor.addSibling(state.selectedId, undefined, mode)
+    },
+
+    addParent() {
+      const state = getState()
+      if (state.aiBusy || !state.selectedId) return
+      editor.addParent(state.selectedId)
     },
 
     removeSelected() {

@@ -14,6 +14,7 @@ import {
   createInitialNodes,
   findParentId,
   findRootNode,
+  getChildIdsOrdered,
   newId,
 } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
@@ -29,6 +30,9 @@ import {
 } from './types'
 
 const NODE_EXIT_MS = 300
+
+/** Sibling insertion position: end of all siblings / above / below the selected sibling. */
+export type SiblingInsertMode = 'end' | 'above' | 'below'
 
 /**
  * 导图编辑器的唯一公共入口。所有结构变更（增删改、拖拽、连接、AI 批量插入）
@@ -152,7 +156,10 @@ export class MindmapEditor {
     const position =
       options.position ??
       (parentNode
-        ? { x: parentNode.position.x + offsetX, y: parentNode.position.y }
+        ? {
+            x: parentNode.position.x + offsetX,
+            y: this.endChildY(parentId, parentNode, nodes, edges),
+          }
         : { x: 0, y: 0 })
 
     const data = options.data
@@ -179,6 +186,22 @@ export class MindmapEditor {
     return { nodeId }
   }
 
+  /**
+   * Initial y for a new child: below all existing siblings so the layout's y-ordering
+   * (getChildIdsOrdered) places it last. Falls back to the parent's y when it has no children.
+   */
+  private endChildY(parentId: string, parent: Node, nodes: Node[], edges: Edge[]): number {
+    const siblings = getChildIdsOrdered(nodes, edges, parentId)
+    if (siblings.length === 0) return parent.position.y
+    const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+    let maxY = -Infinity
+    for (const id of siblings) {
+      const y = nodes.find((n) => n.id === id)?.position.y
+      if (y !== undefined && y > maxY) maxY = y
+    }
+    return maxY + gapY
+  }
+
   addChild(parentId: string, data?: { label?: string }): { nodeId: string } {
     return this.addNode({
       type: 'text',
@@ -187,14 +210,99 @@ export class MindmapEditor {
     })
   }
 
-  addSibling(siblingId: string, data?: { label?: string }): { nodeId: string } | null {
+  /**
+   * Add a sibling of siblingId. mode 'above'/'below' insert right above/below the selected
+   * sibling; 'end' (default) adds it as the last sibling. The new node inherits the sibling's
+   * side so it stays on the same root branch.
+   */
+  addSibling(
+    siblingId: string,
+    data?: { label?: string },
+    mode: SiblingInsertMode = 'end',
+  ): { nodeId: string } | null {
     const parentId = findParentId(this.state.edges, siblingId)
     if (!parentId) return null
+    const sibling = this.state.nodes.find((n) => n.id === siblingId)
+    const parent = this.state.nodes.find((n) => n.id === parentId)
+    const side = sibling?.data?.side
+    let position: { x: number; y: number } | undefined
+    if (sibling && mode !== 'end') {
+      const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+      const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+      position = {
+        x: (parent?.position.x ?? sibling.position.x) + offsetX,
+        y: sibling.position.y + (mode === 'above' ? -gapY : gapY),
+      }
+    }
     return this.addNode({
       type: 'text',
-      data: { label: data?.label ?? '新主题' },
+      data: { label: data?.label ?? '新主题', ...(side ? { side } : {}) },
       parentId,
+      position,
     })
+  }
+
+  /**
+   * Add a parent above the node: a sibling node placed right above it, which the node is then
+   * re-parented under. One batched history record (undo restores the whole change). Root cannot
+   * get a parent. Returns null when the node has no parent.
+   */
+  addParent(nodeId: string, data?: { label?: string }): { nodeId: string } | null {
+    const nodes = this.state.nodes
+    const edges = this.state.edges
+    const parentId = findParentId(edges, nodeId)
+    const parent = parentId ? nodes.find((n) => n.id === parentId) : undefined
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!parentId || !parent || !node || nodeId === 'root') return null
+
+    const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+    const newNodeId = newId()
+    const newNode: Node = {
+      id: newNodeId,
+      type: 'text',
+      position: {
+        x: parent.position.x + offsetX,
+        y: node.position.y - gapY,
+      },
+      data: {
+        label: data?.label ?? '新主题',
+        justAdded: true,
+        ...(node.data.side ? { side: node.data.side } : {}),
+        // Inherit the node's branchIndex so the branch keeps its color: the new parent
+        // replaces the node as the branch head (the node just moves one level deeper).
+        ...(typeof node.data.branchIndex === 'number'
+          ? { branchIndex: node.data.branchIndex }
+          : {}),
+      },
+    }
+    const commands: MindmapCommand[] = [
+      {
+        type: 'addNode',
+        node: newNode,
+        edge: {
+          id: `e_${parentId}_${newNodeId}`,
+          source: parentId,
+          target: newNodeId,
+          type: 'mindmap',
+          className: 'mindmap-edge',
+        },
+      },
+    ]
+    const incomingEdge = edges.find((e) => e.target === nodeId)
+    if (incomingEdge) commands.push({ type: 'removeEdge', edgeId: incomingEdge.id })
+    commands.push({
+      type: 'addEdge',
+      edge: {
+        id: `e_${newNodeId}_${nodeId}`,
+        source: newNodeId,
+        target: nodeId,
+        type: 'mindmap',
+        className: 'mindmap-edge',
+      },
+    })
+    this.batch(commands)
+    return { nodeId: newNodeId }
   }
 
   updateNode(nodeId: string, patch: (node: Node) => Node): void {

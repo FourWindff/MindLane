@@ -286,6 +286,18 @@
 - 注册表定义的导图节点种类（text / image / palace / …），每种类型自带名称、描述与 XML 形状。
 - 系统启动时把全部类型的描述注入系统提示；新增类型不改工具集。
 
+### 视觉顺序（Visual Order）
+
+- 同级兄弟节点的视觉顺序 = `position.y` 升序，由布局器 `getChildIdsOrdered` 以 y 坐标排序决定（插入、序列化、AI 读图、保存重载全部以此为准）。
+- 插入子主题/同级时通过控制新节点初始 y 达成目标位置：末尾 = `max(兄弟 y) + gapY`；上方/下方 = `选中节点.y ∓ gapY`。
+- 由于**位置不落盘**（文件不存 position），兄弟顺序的唯一持久化通道是 XML 文档顺序：序列化（`buildChildrenMap`）按视觉顺序输出子节点，加载时按文档顺序重排，保证保存 → 重载后顺序与视觉一致。
+
+### 禁止拖拽（No Node Dragging）
+
+- 导图设计**不允许用户拖拽节点**：`MindmapCanvas` 固定 `nodesDraggable={false}`，节点位置完全由确定性布局算法计算（内存态），不存在手绘任意位置/手动重排兄弟的交互路径。
+- 因此 `getChildIdsOrdered` 的 y 排序假设（兄弟位置连续、不重叠）始终成立，插入同级的「上方/下方」定位依赖该假设。
+- `moveNode` / `applyNativeNodeChanges` 的 position 通道仅供内部命令使用（`moveSubtree` 等），不与用户拖拽交互。
+
 ## 文件生命周期与聊天状态
 
 ### rename / move
