@@ -21,6 +21,25 @@ type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
 
 const runnerLog = logger.withContext('runner')
 
+/**
+ * Resolve the tool-event id. LangGraph reliable supplies toolCallId; when it is
+ * missing this is a contract violation, so it is logged loudly instead of
+ * silently degrading every card to the shared `''` id (which would collide if a
+ * renderer ever keys on id). The `''` sentinel is kept so the event still flows
+ * and name-based matching still works — a skipped start/end would leave a card
+ * stuck running forever.
+ */
+function toolEventId(id: string | undefined, name: string | undefined, phase: string): string {
+  if (!id) {
+    runnerLog.error(
+      '%s 缺少 toolCallId（langgraph 契约违例）：%s，卡片将退化为按 name 匹配',
+      phase,
+      name ?? 'unknown',
+    )
+  }
+  return id ?? ''
+}
+
 /** One-line preview of tool args for info logs; full payload goes to debug. */
 function summarizeToolPayload(payload: unknown): string {
   const text = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {})
@@ -157,7 +176,7 @@ export class Runner {
                 ? message.content
                 : JSON.stringify(message.content ?? '')
             this.emit('tool-end', {
-              id: message.tool_call_id ?? '',
+              id: toolEventId(message.tool_call_id, message.name, 'subgraph tool-end'),
               name: message.name ?? 'unknown',
               status: deriveToolStatus(output),
               output,
@@ -170,7 +189,7 @@ export class Runner {
           for (const toolCall of message.tool_calls ?? []) {
             if (isSubgraphCall(toolCall.name ?? '')) {
               this.emit('tool-start', {
-                id: toolCall.id ?? '',
+                id: toolEventId(toolCall.id, toolCall.name, 'subgraph tool-start'),
                 name: toolCall.name ?? 'unknown',
                 input: (toolCall.args ?? {}) as Record<string, unknown>,
               })
@@ -208,7 +227,7 @@ export class Runner {
             runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
             runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
             this.emit('tool-start', {
-              id: event.toolCallId ?? '',
+              id: toolEventId(event.toolCallId, event.name, 'tool-start'),
               name: event.name ?? 'unknown',
               input: (event.input ?? {}) as Record<string, unknown>,
             })
@@ -217,7 +236,7 @@ export class Runner {
               typeof event.output === 'string' ? event.output : JSON.stringify(event.output ?? '')
             runnerLog.info('tool 结果： %s, %s', event.name, summarizeToolResult(output))
             this.emit('tool-end', {
-              id: event.toolCallId ?? '',
+              id: toolEventId(event.toolCallId, event.name, 'tool-end'),
               name: event.name ?? 'unknown',
               status: deriveToolStatus(output),
               output,
@@ -230,7 +249,7 @@ export class Runner {
               typeof err === 'string' ? err : err instanceof Error ? err.message : String(err ?? '')
             runnerLog.error('tool 错误： %s, %s', event.name, output)
             this.emit('tool-end', {
-              id: event.toolCallId ?? '',
+              id: toolEventId(event.toolCallId, event.name, 'tool-error'),
               name: event.name ?? 'unknown',
               status: 'error',
               output,

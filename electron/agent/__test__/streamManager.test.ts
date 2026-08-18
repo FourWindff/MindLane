@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StreamManager, type StreamRuntime } from '../streamManager.js'
 import type { SessionManager } from '../context/sessionManager.js'
 import { ToolRegistry } from '../tools/registry.js'
+import { logger, type LogSink } from '../../shared/logger.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -400,6 +401,54 @@ describe('StreamManager + Runner', () => {
       type: 'tool-end',
       payload: { id: 'call-err', name: 'insertXmlFragment', status: 'error', output: 'boom' },
     })
+  })
+
+  it('logs loudly when a tool event lacks toolCallId but still emits for name matching', async () => {
+    const errors: string[] = []
+    const sink: LogSink = { write: (line) => errors.push(line) }
+    logger.setSink(sink)
+    try {
+      const { manager, events, setRuntimeFactory } = createHarness()
+      setRuntimeFactory(() =>
+        createRuntime({
+          toolEvents: [
+            {
+              event: 'on_tool_start',
+              name: 'insertXmlFragment',
+              input: { xml: '<node/>' },
+            },
+            {
+              event: 'on_tool_end',
+              name: 'insertXmlFragment',
+              output: '{"ok":true}',
+            },
+          ],
+        }),
+      )
+
+      const streamId = manager.startStream({
+        sessionId: 'session-a',
+        message: 'question',
+        ...defaultRequestFields,
+      })
+      await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+      expect(errors.some((line) => line.includes('[ERROR]'))).toBe(true)
+      expect(events).toContainEqual({
+        streamId,
+        sessionId: 'session-a',
+        type: 'tool-start',
+        payload: { id: '', name: 'insertXmlFragment', input: { xml: '<node/>' } },
+      })
+      expect(events).toContainEqual({
+        streamId,
+        sessionId: 'session-a',
+        type: 'tool-end',
+        payload: { id: '', name: 'insertXmlFragment', status: 'success', output: '{"ok":true}' },
+      })
+    } finally {
+      logger.setSink(null)
+    }
   })
 
   it('re-emits subgraph tool-start/tool-end from messages-mode chunks', async () => {
