@@ -631,6 +631,89 @@ describe('StreamManager + Runner', () => {
     expect(subgraphEvents).toEqual([])
   })
 
+  it('does not create the subgraph card at declaration time, only when it executes', async () => {
+    // A supervisor AI chunk declares generateMindmapFragment, but the subgraph
+    // never runs (no progress, no ToolMessage): the card must NOT appear, so a
+    // later tool can never be pushed below a phantom subgraph card.
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          { event: 'on_tool_start', toolCallId: 'call-read', name: 'readMindmap', input: {} },
+          { event: 'on_tool_end', toolCallId: 'call-read', name: 'readMindmap', output: 'ok' },
+        ],
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub', name: 'generateMindmapFragment', args: { doc: 'x' } }],
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+
+    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    const subgraphStarts = events.filter(
+      (e) =>
+        e.type === 'tool-start' &&
+        (e.payload as { name?: string }).name === 'generateMindmapFragment',
+    )
+    expect(subgraphStarts).toEqual([])
+  })
+
+  it('anchors the subgraph card after an earlier real tool, matching final history order', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    const subgraphResult = JSON.stringify({ ok: true, title: 'T', xmlFragment: 'root:' })
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          { event: 'on_tool_start', toolCallId: 'call-read', name: 'readMindmap', input: {} },
+          { event: 'on_tool_end', toolCallId: 'call-read', name: 'readMindmap', output: 'ok' },
+        ],
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub', name: 'generateMindmapFragment', args: { doc: 'x' } }],
+          },
+          {
+            id: 'm1',
+            content: subgraphResult,
+            type: 'tool',
+            name: 'generateMindmapFragment',
+            toolCallId: 'call-sub',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    const names = events
+      .filter((e) => e.type === 'tool-start')
+      .map((e) => (e.payload as { name?: string }).name)
+    expect(names).toEqual(['readMindmap', 'generateMindmapFragment'])
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-sub',
+        name: 'generateMindmapFragment',
+        status: 'success',
+        output: subgraphResult,
+      },
+    })
+  })
+
   it('starts a new assistant segment when the streamed message ID changes', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() =>

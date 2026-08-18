@@ -126,6 +126,13 @@ export class Runner {
     let fullContent = ''
     let currentSegmentContent = ''
     let currentMessageId: string | null = null
+    // Subgraph calls declared by the supervisor but not yet executed. The card
+    // is created when the subgraph actually starts running (first progress step
+    // or its ToolMessage), so streaming order matches the final history order.
+    const pendingSubgraphStarts = new Map<
+      string,
+      { name: string; input: Record<string, unknown> }
+    >()
 
     try {
       const history = await this.prepareHistory()
@@ -170,7 +177,19 @@ export class Runner {
           // A subgraph ToolMessage arrived (subgraphResult node output,
           // langgraph_node != supervisor): virtual subgraph calls do not go
           // through ToolNode, so tools mode emits nothing; re-emit tool-end here.
+          // Progress-less runs also get their tool-start anchored here (before
+          // the end), so the card is never declared at supervisor-chunk time.
           if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {
+            const subgraphId = message.tool_call_id ?? ''
+            const pending = subgraphId ? pendingSubgraphStarts.get(subgraphId) : undefined
+            if (pending) {
+              pendingSubgraphStarts.delete(subgraphId)
+              this.emit('tool-start', {
+                id: toolEventId(subgraphId, pending.name, 'subgraph tool-start'),
+                name: pending.name,
+                input: pending.input,
+              })
+            }
             const output =
               typeof message.content === 'string'
                 ? message.content
@@ -184,12 +203,17 @@ export class Runner {
             continue
           }
           if (metadata?.langgraph_node && metadata.langgraph_node !== 'supervisor') continue
-          // Virtual subgraph calls get a synthetic tool-start: the supervisor's
-          // AI message chunk carries the subgraph tool call.
+          // Virtual subgraph calls are not executed through ToolNode, so tools
+          // mode emits no event for them. Their card is created when the
+          // subgraph actually starts executing — first progress step, or its
+          // ToolMessage — NOT when the supervisor declares the call. A single AI
+          // message can declare [readMindmap, generateMindmapFragment]; creating
+          // the card at declaration time would place it above readMindmap even
+          // though read runs first in the final history. Stash the declaration
+          // here and let the progress/ToolMessage handlers anchor it.
           for (const toolCall of message.tool_calls ?? []) {
             if (isSubgraphCall(toolCall.name ?? '')) {
-              this.emit('tool-start', {
-                id: toolEventId(toolCall.id, toolCall.name, 'subgraph tool-start'),
+              pendingSubgraphStarts.set(toolCall.id ?? '', {
                 name: toolCall.name ?? 'unknown',
                 input: (toolCall.args ?? {}) as Record<string, unknown>,
               })
@@ -263,6 +287,21 @@ export class Runner {
             total?: number
           }
           if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
+            // First subgraph activity: create the pending subgraph card here, so
+            // it is ordered by execution time (after any earlier tool) and stays
+            // ahead of later tools in the stream.
+            if (pendingSubgraphStarts.size > 0) {
+              const [pendingId, pending] = pendingSubgraphStarts.entries().next().value as [
+                string,
+                { name: string; input: Record<string, unknown> },
+              ]
+              pendingSubgraphStarts.delete(pendingId)
+              this.emit('tool-start', {
+                id: toolEventId(pendingId, pending.name, 'subgraph tool-start'),
+                name: pending.name,
+                input: pending.input,
+              })
+            }
             // Contract: the step payload is { step, completed?, total? }; counts
             // must pass through (cards render n/m).
             this.emit('step', {
