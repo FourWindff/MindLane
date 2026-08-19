@@ -11,6 +11,23 @@
   color: var(--ml-text-muted);
 }
 
+.panel-field__input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-field__input-row .panel-field__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-server__form-error {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ml-danger);
+}
+
 /* ====== Settings Page Layout ====== */
 .settings-page {
   display: flex;

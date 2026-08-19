@@ -48,6 +48,8 @@ function McpIntegrationsSection() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formOpenId, setFormOpenId] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [busyUat, setBusyUat] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     void refresh()
@@ -77,10 +79,40 @@ function McpIntegrationsSection() {
       if (res?.ok) {
         setFormOpenId(null)
         setFormValues({})
+        setFormError(null)
+      } else {
+        setFormError(res?.error ?? '连接失败')
       }
     } finally {
       await refresh()
       setBusyId(null)
+    }
+  }
+
+  /** 一键获取飞书 UAT：打开授权页，成功后回填 uat 字段 */
+  const acquireUat = async (server: McpServerStatusInfo) => {
+    const appId = (formValues['appId'] ?? '').trim()
+    const appSecret = (formValues['appSecret'] ?? '').trim()
+    if (!appId || !appSecret) {
+      setFormError('请先填写 App ID 与 App Secret 再获取 UAT')
+      return
+    }
+    setBusyUat(true)
+    setFormError(null)
+    try {
+      const res = await window.mindlane?.settings.mcpAuthorizeUat({
+        serverId: server.id,
+        appId,
+        appSecret,
+      })
+      if (res?.ok) {
+        setFormValues((v) => ({ ...v, uat: res.data.uat }))
+        setFormError('UAT 获取成功，已自动填入；请点击“确认连接”')
+      } else {
+        setFormError(res?.error ?? '获取 UAT 失败')
+      }
+    } finally {
+      setBusyUat(false)
     }
   }
 
@@ -137,18 +169,34 @@ function McpIntegrationsSection() {
                 {server.credentialFields?.map((field) => (
                   <label className="panel-field" key={field.id}>
                     <span className="panel-field__label">{field.label}</span>
-                    <input
-                      className="panel-field__input"
-                      type={field.secret ? 'password' : 'text'}
-                      value={formValues[field.id] ?? ''}
-                      onChange={(e) => setFormValues((v) => ({ ...v, [field.id]: e.target.value }))}
-                    />
+                    <span className="panel-field__input-row">
+                      <input
+                        className="panel-field__input"
+                        type={field.secret ? 'password' : 'text'}
+                        value={formValues[field.id] ?? ''}
+                        onChange={(e) => {
+                          setFormValues((v) => ({ ...v, [field.id]: e.target.value }))
+                          setFormError(null)
+                        }}
+                      />
+                      {server.id === 'feishu' && field.id === 'uat' && (
+                        <button
+                          type="button"
+                          className="panel-btn"
+                          disabled={busyUat}
+                          onClick={() => void acquireUat(server)}
+                        >
+                          {busyUat ? '获取中…' : '一键获取'}
+                        </button>
+                      )}
+                    </span>
                   </label>
                 ))}
+                {formError && <div className="mcp-server__form-error">{formError}</div>}
                 <button
                   type="button"
                   className="panel-btn panel-btn--primary"
-                  disabled={busy}
+                  disabled={busy || busyUat}
                   onClick={() => void submitForm(server)}
                 >
                   确认连接

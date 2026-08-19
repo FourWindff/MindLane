@@ -1,6 +1,7 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import type { McpServerStatus } from '../../mcp/types.js'
-import { IPC, type McpConnectPayload } from '../../ipc.js'
+import { acquireFeishuUat } from '../../mcp/feishuUat.js'
+import { IPC, type McpConnectPayload, type McpAuthorizeUatPayload } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { HandlerContext } from './context.js'
@@ -58,5 +59,24 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(IPC.McpStatus, async () => {
     return { ok: true, data: ctx.getMcpManager()?.getStatuses() ?? [] }
+  })
+
+  ipcMain.handle(IPC.McpAuthorizeUat, async (_e, payload: McpAuthorizeUatPayload) => {
+    try {
+      if (payload.serverId !== 'feishu') {
+        return { ok: false, error: '该 server 不支持 UAT 一键授权' }
+      }
+      if (!payload.appId?.trim() || !payload.appSecret?.trim()) {
+        return { ok: false, error: '请先填写 App ID 与 App Secret 再获取 UAT' }
+      }
+      const result = await acquireFeishuUat({
+        appId: payload.appId.trim(),
+        appSecret: payload.appSecret.trim(),
+        openBrowser: (url) => void shell.openExternal(url),
+      })
+      return { ok: true, data: { uat: result.uat, expiresIn: result.expiresIn } }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
   })
 }

@@ -57,6 +57,7 @@ export enum IPC {
   McpConnect = 'mcp:connect',
   McpDisconnect = 'mcp:disconnect',
   McpStatus = 'mcp:status',
+  McpAuthorizeUat = 'mcp:authorize-uat',
 
   ShellOpenDocumentRef = 'shell:open-document-ref',
   ShellOpenLogs = 'shell:open-logs',
@@ -82,6 +83,13 @@ export interface McpConnectPayload {
   serverId: string
   /** 非 OAuth server 的表单凭据（按定义的 credentialFields 校验），OAuth server 省略 */
   credentials?: Record<string, string>
+}
+
+/** mcp:authorize-uat 载荷：飞书一键授权的 app 凭证（用于发起 OAuth 与换 token） */
+export interface McpAuthorizeUatPayload {
+  serverId: string
+  appId: string
+  appSecret: string
 }
 
 export interface RecentFileEntry {
@@ -524,6 +532,15 @@ export interface MindlaneBridge {
     mcpDisconnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
     mcpStatus: () => Promise<
       { ok: true; data: McpServerStatusInfo[] } | { ok: false; error: string }
+    >
+    /** 一键获取飞书用户 UAT：拉起授权页，成功后把 uat 回填到连接表单 */
+    mcpAuthorizeUat: (payload: {
+      serverId: string
+      appId: string
+      appSecret: string
+    }) => Promise<
+      | { ok: true; data: { uat: string; expiresIn: number } }
+      | { ok: false; error: string }
     >
   }
   window: {
