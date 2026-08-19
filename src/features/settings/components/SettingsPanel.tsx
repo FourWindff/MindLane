@@ -163,16 +163,6 @@ function McpIntegrationsSection() {
                 aria-label={statusLabel}
                 title={statusLabel}
               />
-              {hasForm && !formOpen && (
-                <button
-                  type="button"
-                  className="panel-btn"
-                  disabled={busy}
-                  onClick={() => void openFormPrefilled(server)}
-                >
-                  显示配置
-                </button>
-              )}
               <button
                 type="button"
                 className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
@@ -189,6 +179,16 @@ function McpIntegrationsSection() {
               >
                 {busy ? '处理中…' : connected ? '断开' : formOpen ? '取消' : '连接'}
               </button>
+              {hasForm && (
+                <button
+                  type="button"
+                  className="panel-btn"
+                  disabled={busy}
+                  onClick={() => void openFormPrefilled(server)}
+                >
+                  显示配置
+                </button>
+              )}
             </div>
             {formOpen && hasForm && (
               <div className="mcp-server__form">
