@@ -99,8 +99,9 @@ export interface LoopbackCallbackServer {
 /**
  * 在 127.0.0.1 上启动临时 HTTP 服务接收 OAuth 回调（RFC 8252 loopback）。
  * 回调可能在 waitForCallback 被调用前到达，因此先缓存结果。
+ * port 缺省时随机选择；传入固定 port 用于需要预先注册回调地址的场景（如飞书 UAT）。
  */
-export async function startLoopbackCallbackServer(): Promise<LoopbackCallbackServer> {
+export async function startLoopbackCallbackServer(opts?: { port?: number }): Promise<LoopbackCallbackServer> {
   type CallbackResult = { code?: string; state?: string; error?: string }
   let received: CallbackResult | null = null
   let notify: (() => void) | null = null
@@ -129,7 +130,7 @@ export async function startLoopbackCallbackServer(): Promise<LoopbackCallbackSer
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => resolve())
+    server.listen(opts?.port ?? 0, '127.0.0.1', () => resolve())
   })
   const { port } = server.address() as AddressInfo
 

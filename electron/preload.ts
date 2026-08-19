@@ -58,9 +58,12 @@ const api: MindlaneBridge = {
   settings: {
     load: () => ipcRenderer.invoke(IPC.FileSettingsLoad),
     update: (partial) => ipcRenderer.invoke(IPC.FileSettingsUpdate, partial),
-    mcpConnect: (serverId) => ipcRenderer.invoke(IPC.McpConnect, { serverId }),
+    mcpConnect: (serverId, credentials) =>
+      ipcRenderer.invoke(IPC.McpConnect, { serverId, credentials }),
     mcpDisconnect: (serverId) => ipcRenderer.invoke(IPC.McpDisconnect, { serverId }),
     mcpStatus: () => ipcRenderer.invoke(IPC.McpStatus),
+    mcpAuthorizeUat: (payload) => ipcRenderer.invoke(IPC.McpAuthorizeUat, payload),
+    mcpGetCredentials: (serverId) => ipcRenderer.invoke(IPC.McpGetCredentials, { serverId }),
   },
   window: {
     minimize: () => ipcRenderer.invoke(IPC.WindowMinimize),
@@ -85,6 +88,7 @@ const api: MindlaneBridge = {
   shell: {
     openDocumentRef: (doc) => ipcRenderer.invoke(IPC.ShellOpenDocumentRef, doc),
     openLogs: () => ipcRenderer.invoke(IPC.ShellOpenLogs),
+    openExternal: (url) => ipcRenderer.invoke(IPC.ShellOpenExternal, { url }),
   },
   editlog: {
     append: (payload) => ipcRenderer.send(IPC.EditlogAppend, payload),

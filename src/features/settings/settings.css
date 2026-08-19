@@ -11,6 +11,23 @@
   color: var(--ml-text-muted);
 }
 
+.panel-field__input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.panel-field__input-row .panel-field__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcp-server__form-error {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ml-danger);
+}
+
 /* ====== Settings Page Layout ====== */
 .settings-page {
   display: flex;
@@ -167,9 +184,88 @@
   color: var(--ml-text-muted);
 }
 
+.mcp-server {
+  flex-wrap: wrap;
+}
+
 .mcp-server__text {
   flex: 1;
   min-width: 0;
+}
+
+.mcp-server__label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* 悬浮感叹号：展示连接教程气泡；不改光标，关闭带 250ms 延迟避免移动时闪断 */
+.mcp-tutorial-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ml-text-muted);
+}
+
+.mcp-tutorial-bubble {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 40;
+  min-width: 260px;
+  max-width: 340px;
+  margin-top: 4px;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--ml-bg-elevated, #fff);
+  border: 1px solid var(--ml-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: var(--ml-text);
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease,
+    visibility 0s linear 0.25s;
+}
+
+.mcp-tutorial-tip:hover .mcp-tutorial-bubble {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease,
+    visibility 0s linear 0s;
+}
+
+.mcp-tutorial-step {
+  margin: 0 0 0.1rem;
+}
+
+.mcp-tutorial-links {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.mcp-tutorial-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ml-accent, var(--ml-text));
+  cursor: pointer;
+}
+
+.mcp-tutorial-link:hover {
+  text-decoration: underline;
 }
 
 .mcp-server__actions {
@@ -189,6 +285,16 @@
 
 .mcp-status-dot--on {
   background: var(--ml-success);
+}
+
+/* 凭据表单：占据整行，从 flex 行内折到下一行 */
+.mcp-server > .mcp-server__form {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--ml-border);
 }
 
 .settings-card__switch {

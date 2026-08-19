@@ -3,7 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC } from '../ipc.js'
-import type { MindlaneBridge } from '../ipc.js'
+import type { MindlaneBridge, McpConnectPayload } from '../ipc.js'
+import type { McpCredentialField, McpServerStatusInfo } from '../mcp/types.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -170,5 +171,29 @@ describe('IPC seam contract', () => {
   it('declares Window.mindlane as the same type as MindlaneBridge', () => {
     expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindlaneBridge>()
     expectTypeOf<MindlaneBridge>().toMatchTypeOf<Window['mindlane']>()
+  })
+
+  it('McpConnect 契约：payload 支持携带凭据，状态信息携带表单字段元数据与失败指引', () => {
+    // payload：非 OAuth server 可通过 credentials 附带表单凭据（OAuth server 省略）
+    expectTypeOf<McpConnectPayload>().toMatchTypeOf<{
+      serverId: string
+      credentials?: Record<string, string>
+    }>()
+    const withCredentials: McpConnectPayload = {
+      serverId: 'obsidian',
+      credentials: { apiKey: 'k' },
+    }
+    expectTypeOf(withCredentials).toMatchTypeOf<McpConnectPayload>()
+    // 状态信息：非 OAuth server 暴露 credentialFields / failureHint 给渲染层画表单、显示指引
+    expectTypeOf<McpServerStatusInfo>().toMatchTypeOf<{
+      credentialFields?: McpCredentialField[]
+      failureHint?: string
+    }>()
+    expectTypeOf<McpCredentialField>().toMatchTypeOf<{
+      id: string
+      label: string
+      required?: boolean
+      secret?: boolean
+    }>()
   })
 })

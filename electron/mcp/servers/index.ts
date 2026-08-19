@@ -1,5 +1,7 @@
 import type { McpServerDefinition } from '../types.js'
 import { notionServer } from './notion.js'
+import { obsidianServer } from './obsidian.js'
+import { feishuServer } from './feishu.js'
 
 /** 内置 MCP catalog：新增 server = 在这里加一条定义 */
-export const MCP_SERVERS: McpServerDefinition[] = [notionServer]
+export const MCP_SERVERS: McpServerDefinition[] = [notionServer, obsidianServer, feishuServer]

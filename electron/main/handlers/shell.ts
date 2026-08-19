@@ -36,4 +36,19 @@ export function registerShellHandlers(ctx: HandlerContext): void {
     shell.showItemInFolder(path.join(ctx.userDataPath, 'logs', 'mindlane.log'))
     return { ok: true }
   })
+
+  ipcMain.handle(IPC.ShellOpenExternal, (_e, payload: { url: string }) => {
+    // 只放行 http/https，防止渲染层把任意指令塞给 openExternal
+    let url: URL
+    try {
+      url = new URL(payload.url)
+    } catch {
+      return { ok: false, error: '链接无效' }
+    }
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return { ok: false, error: '仅支持打开 http/https 链接' }
+    }
+    void shell.openExternal(url.toString())
+    return { ok: true }
+  })
 }

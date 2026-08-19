@@ -76,22 +76,31 @@ export class McpManager {
     await Promise.allSettled(authorized.map((serverId) => this.connectServer(serverId, false)))
   }
 
-  /** 交互式连接（设置面板"连接"按钮）：需要时触发浏览器 OAuth 授权 */
-  async connect(serverId: string): Promise<McpServerStatus> {
-    await this.connectServer(serverId, true)
+  /** 交互式连接（设置面板“连接”按钮）：OAuth server 触发浏览器授权，非 OAuth server 用随凭据直接连接 */
+  async connect(serverId: string, credentials?: Record<string, string>): Promise<McpServerStatus> {
+    await this.connectServer(serverId, true, credentials)
     return this.statuses.get(serverId) ?? { state: 'failed', error: '未知的 MCP server' }
   }
 
-  /** 断开：移除工具、关闭连接、删除凭据 */
+  /** 断开：移除工具、关闭连接。
+   *  OAuth server 同时删除已存 token；表单配置类 server（obsidian/feishu）**保留**
+   *  凭据，方便重连时直接修改上次配置而不用从零填写。 */
   async disconnect(serverId: string): Promise<void> {
     this.bumpToken(serverId)
     const client = this.clients.get(serverId)
     this.clients.delete(serverId)
     this.toolsByServer.delete(serverId)
     if (client) await client.close().catch(() => {})
-    this.getCredentialStore(serverId).clear()
+    if (this.servers.get(serverId)?.createAuthProvider) {
+      this.getCredentialStore(serverId).clear()
+    }
     this.setStatus(serverId, { state: 'disconnected' })
     this.emitToolsChanged()
+  }
+
+  /** 返回表单配置类 server 已保存的凭据键值（供设置面板“显示配置”回填；无则空对象） */
+  getSecrets(serverId: string): Record<string, string> {
+    return this.getCredentialStore(serverId).load().secrets ?? {}
   }
 
   /** 当前已注入的全部 MCP 工具（已加 server 前缀） */
@@ -99,16 +108,30 @@ export class McpManager {
     return [...this.toolsByServer.values()].flat()
   }
 
+  /**
+   * 非表单来源的追加凭据写入（如一键获取的 refresh_token），merge 进该 server 的凭据存储。
+   * 供 handler 在 UAT 授权完成后落盘，连接时 createAuthHeaders 可据此自动续期。
+   */
+  persistSecrets(serverId: string, secrets: Record<string, string>): void {
+    this.getCredentialStore(serverId).saveSecrets(secrets)
+  }
+
   getStatuses(): McpServerStatusInfo[] {
     return [...this.servers.values()].map((def) => ({
       id: def.id,
       displayName: def.displayName,
       description: def.description,
+      ...(def.credentialFields ? { credentialFields: def.credentialFields } : {}),
+      ...(def.failureHint ? { failureHint: def.failureHint } : {}),
       ...(this.statuses.get(def.id) ?? { state: 'disconnected' as const }),
     }))
   }
 
-  private async connectServer(serverId: string, interactive: boolean): Promise<void> {
+  private async connectServer(
+    serverId: string,
+    interactive: boolean,
+    credentials?: Record<string, string>,
+  ): Promise<void> {
     const def = this.servers.get(serverId)
     if (!def) {
       logger.withContext('mcp').warn('unknown server: %s', serverId)
@@ -117,6 +140,7 @@ export class McpManager {
     const token = this.bumpToken(serverId)
     this.setStatus(serverId, { state: 'connecting' })
     try {
+      if (!(await this.applyCredentials(def, credentials))) return
       const { client, tools } = await this.establish(def, interactive)
       if (!this.isCurrent(serverId, token)) {
         await client.close().catch(() => {})
@@ -127,8 +151,12 @@ export class McpManager {
         ?.close()
         .catch(() => {})
       this.clients.set(serverId, client)
-      for (const tool of tools) tool.name = `${def.id}__${tool.name}`
-      this.toolsByServer.set(serverId, tools)
+      // allowlist 裁剪先于加前缀与注册：破坏性/副作用工具永远不进入 ToolRegistry
+      const exclude = def.excludeTools
+      const toolsToRegister =
+        exclude && exclude.length > 0 ? tools.filter((tool) => !exclude.includes(tool.name)) : tools
+      for (const tool of toolsToRegister) tool.name = `${def.id}__${tool.name}`
+      this.toolsByServer.set(serverId, toolsToRegister)
 
       let workspaceName = this.statuses.get(serverId)?.workspaceName
       if (interactive && def.fetchWorkspaceName) {
@@ -142,8 +170,36 @@ export class McpManager {
       if (!this.isCurrent(serverId, token)) return
       const message = err instanceof Error ? err.message : String(err)
       logger.withContext('mcp').warn('server %s connect failed: %s', serverId, message)
-      this.setStatus(serverId, { state: 'failed', error: message })
+      const hint = def.failureHint ? ` ${def.failureHint}` : ''
+      this.setStatus(serverId, { state: 'failed', error: message + hint })
     }
+  }
+
+  /**
+   * 表单凭据：按定义的 credentialFields 校验必填项后写入凭据存储；
+   * 校验失败时置 failed 并返回 false 中止连接（不发起任何请求）。
+   */
+  private async applyCredentials(
+    def: McpServerDefinition,
+    credentials?: Record<string, string>,
+  ): Promise<boolean> {
+    if (credentials === undefined) return true
+    const fields = def.credentialFields ?? []
+    const missing = fields.filter((f) => f.required).filter((f) => !credentials[f.id]?.trim())
+    if (missing.length > 0) {
+      const hint = def.failureHint ? ` ${def.failureHint}` : ''
+      this.setStatus(def.id, {
+        state: 'failed',
+        error: `缺少必填连接凭据：${missing.map((f) => f.label).join('、')}${hint}`,
+      })
+      return false
+    }
+    // 只写入定义声明过的字段，避免未知键混入加密文件
+    const known = Object.fromEntries(
+      fields.map((f) => [f.id, credentials[f.id]]).filter(([, v]) => v != null),
+    )
+    if (Object.keys(known).length > 0) this.getCredentialStore(def.id).saveSecrets(known)
+    return true
   }
 
   /**
@@ -168,12 +224,14 @@ export class McpManager {
           openBrowser: this.options.openBrowser ?? (() => {}),
         })
       }
+      // 非 OAuth 模式：从凭据存储解析认证头，注入 client 工厂（经 http transport 透传）
+      const headers = def.createAuthProvider ? undefined : await def.createAuthHeaders?.(store)
 
       const attempt = async (): Promise<{
         client: McpClientLike
         tools: StructuredToolInterface[]
       }> => {
-        const client = this.options.createClient(def, provider)
+        const client = this.options.createClient(def, provider, headers)
         try {
           const tools = await withTimeout(
             client.getTools(),

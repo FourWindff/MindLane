@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plug } from 'lucide-react'
+import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
@@ -39,11 +39,45 @@ const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
 // Brand icons live in public/assets, keyed by server id; unknown ids fall back to a generic plug icon.
 const MCP_ICONS: Record<string, string> = {
   notion: '/assets/notion.svg',
+  obsidian: '/assets/obsidian.svg',
+  feishu: '/assets/feishu.svg',
+}
+
+/** 各 MCP 的简短连接教程：steps 每行一步，悬浮感叹号气泡展示；链接走 shell.openExternal */
+const MCP_TUTORIAL: Record<
+  string,
+  { steps: string[]; links: { label: string; url: string }[] }
+> = {
+  obsidian: {
+    steps: [
+      '插件仓库：github.com/coddingtonbear/obsidian-local-rest-api（自带 MCP 服务）',
+      'Obsidian → 设置 → 第三方插件：安装并启用 “Local REST API with MCP”',
+      '在插件设置中开启加密端口（HTTPS 27124）',
+      '把插件里的 API Key 粘贴到表单，确认连接',
+    ],
+    links: [{ label: '打开插件仓库', url: 'https://github.com/coddingtonbear/obsidian-local-rest-api' }],
+  },
+  feishu: {
+    steps: [
+      '在开放平台创建自建应用，开通文档搜索/读取/wiki 权限',
+      '「安全设置 → 重定向 URL」登记 http://127.0.0.1:44664/callback',
+      '填入 App ID / App Secret；▾ 展开可用一键获取 UAT',
+      '确认连接后，AI 即可搜索并读取你的云文档',
+    ],
+    links: [
+      { label: '接入教程', url: 'https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server' },
+      { label: '获取 UAT', url: 'https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3' },
+    ],
+  },
 }
 
 function McpIntegrationsSection() {
   const [servers, setServers] = useState<McpServerStatusInfo[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [formOpenId, setFormOpenId] = useState<string | null>(null)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [busyUat, setBusyUat] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     void refresh()
@@ -66,6 +100,79 @@ function McpIntegrationsSection() {
     }
   }
 
+  /** 打开配置表单并回填已保存的凭据（只回填本 server 声明的字段） */
+  const openFormPrefilled = async (server: McpServerStatusInfo) => {
+    let secrets: Record<string, string> = {}
+    try {
+      const res = await window.mindlane?.settings.mcpGetCredentials(server.id)
+      if (res?.ok) secrets = res.data
+    } catch {
+      // 主进程尚未注册该 handler（如重载后未重启主进程）时降级为空表单，不阻断编辑
+      secrets = {}
+    }
+    const ids = new Set((server.credentialFields ?? []).map((f) => f.id))
+    const prefilled: Record<string, string> = {}
+    for (const [k, v] of Object.entries(secrets)) if (ids.has(k)) prefilled[k] = v
+    setFormValues(prefilled)
+    setFormError(null)
+    setFormOpenId(server.id)
+  }
+
+  /** 显示配置 toggle：开→关，关→开（打开时回填已保存凭据） */
+  const toggleForm = (server: McpServerStatusInfo) => {
+    if (formOpenId === server.id) {
+      setFormOpenId(null)
+      setFormValues({})
+      setFormError(null)
+    } else {
+      void openFormPrefilled(server)
+    }
+  }
+
+  const submitForm = async (server: McpServerStatusInfo) => {
+    setBusyId(server.id)
+    try {
+      const res = await window.mindlane?.settings.mcpConnect(server.id, formValues)
+      if (res?.ok) {
+        setFormOpenId(null)
+        setFormValues({})
+        setFormError(null)
+      } else {
+        setFormError(res?.error ?? '连接失败')
+      }
+    } finally {
+      await refresh()
+      setBusyId(null)
+    }
+  }
+
+  /** 一键获取飞书 UAT：打开授权页，成功后回填 uat 字段 */
+  const acquireUat = async (server: McpServerStatusInfo) => {
+    const appId = (formValues['appId'] ?? '').trim()
+    const appSecret = (formValues['appSecret'] ?? '').trim()
+    if (!appId || !appSecret) {
+      setFormError('请先填写 App ID 与 App Secret 再获取 UAT')
+      return
+    }
+    setBusyUat(true)
+    setFormError(null)
+    try {
+      const res = await window.mindlane?.settings.mcpAuthorizeUat({
+        serverId: server.id,
+        appId,
+        appSecret,
+      })
+      if (res?.ok) {
+        setFormValues((v) => ({ ...v, uat: res.data.uat }))
+        setFormError('UAT 获取成功，已自动填入；请点击“确认连接”')
+      } else {
+        setFormError(res?.error ?? '获取 UAT 失败')
+      }
+    } finally {
+      setBusyUat(false)
+    }
+  }
+
   if (servers.length === 0) return null
 
   return (
@@ -74,18 +181,51 @@ function McpIntegrationsSection() {
         const iconSrc = MCP_ICONS[server.id]
         const connected = server.state === 'connected'
         const busy = busyId === server.id || server.state === 'connecting'
+        const hasForm = (server.credentialFields?.length ?? 0) > 0
+        const formOpen = formOpenId === server.id
         const statusLabel =
           MCP_STATE_LABELS[server.state] +
           (connected && server.workspaceName ? ` · ${server.workspaceName}` : '')
         return (
-          <div className="settings-card__row" key={server.id}>
+          <div className="settings-card__row mcp-server" key={server.id}>
             {iconSrc ? <img src={iconSrc} alt="" width={28} height={28} /> : <Plug size={28} />}
-            <div className="mcp-server__text">
-              <div className="settings-card__label">{server.displayName}</div>
-              <div className="settings-card__hint">
-                {server.state === 'failed' && server.error ? server.error : server.description}
+              <div className="mcp-server__text">
+                <div className="settings-card__label mcp-server__label">
+                  {server.displayName}
+                  {MCP_TUTORIAL[server.id] && (
+                    <span className="mcp-tutorial-tip" role="note">
+                      <CircleAlert size={14} />
+                      <span className="mcp-tutorial-bubble">
+                        {MCP_TUTORIAL[server.id].steps.map((step, i) => (
+                          <div className="mcp-tutorial-step" key={i}>
+                            {i + 1}. {step}
+                          </div>
+                        ))}
+                        {MCP_TUTORIAL[server.id].links.length > 0 && (
+                          <div className="mcp-tutorial-links">
+                            {MCP_TUTORIAL[server.id].links.map((link) => (
+                              <button
+                                type="button"
+                                key={link.url}
+                                className="mcp-tutorial-link"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  void window.mindlane?.shell.openExternal(link.url)
+                                }}
+                              >
+                                {link.label} ↗
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </span>
+                    </span>
+                  )}
+                </div>
+                <div className="settings-card__hint">
+                  {server.state === 'failed' && server.error ? server.error : server.description}
+                </div>
               </div>
-            </div>
             <div className="mcp-server__actions">
               <span
                 className={`mcp-status-dot${connected ? ' mcp-status-dot--on' : ''}`}
@@ -97,11 +237,77 @@ function McpIntegrationsSection() {
                 type="button"
                 className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
                 disabled={busy}
-                onClick={() => void runAction(server.id, !connected)}
+                onClick={() => {
+                  if (busy) return
+                  if (connected) void runAction(server.id, false)
+                  else if (hasForm && !formOpen) void openFormPrefilled(server)
+                  else if (hasForm && formOpen) {
+                    setFormOpenId(null)
+                    setFormValues({})
+                  } else void runAction(server.id, true)
+                }}
               >
-                {busy ? '处理中…' : connected ? '断开' : '连接'}
+                {busy ? '处理中…' : connected ? '断开' : formOpen ? '取消' : '连接'}
               </button>
+              {hasForm && (
+                <button
+                  type="button"
+                  className="panel-btn"
+                  disabled={busy}
+                  aria-expanded={formOpen}
+                  aria-label="配置"
+                  title={formOpen ? '收起配置' : '显示配置'}
+                  onClick={() => toggleForm(server)}
+                >
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: formOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.15s ease',
+                    }}
+                  />
+                </button>
+              )}
             </div>
+            {formOpen && hasForm && (
+              <div className="mcp-server__form">
+                {server.credentialFields?.map((field) => (
+                  <label className="panel-field" key={field.id}>
+                    <span className="panel-field__label">{field.label}</span>
+                    <span className="panel-field__input-row">
+                      <input
+                        className="panel-field__input"
+                        type={field.secret ? 'password' : 'text'}
+                        value={formValues[field.id] ?? ''}
+                        onChange={(e) => {
+                          setFormValues((v) => ({ ...v, [field.id]: e.target.value }))
+                          setFormError(null)
+                        }}
+                      />
+                      {server.id === 'feishu' && field.id === 'uat' && (
+                        <button
+                          type="button"
+                          className="panel-btn"
+                          disabled={busyUat}
+                          onClick={() => void acquireUat(server)}
+                        >
+                          {busyUat ? '获取中…' : '一键获取'}
+                        </button>
+                      )}
+                    </span>
+                  </label>
+                ))}
+                {formError && <div className="mcp-server__form-error">{formError}</div>}
+                <button
+                  type="button"
+                  className="panel-btn panel-btn--primary"
+                  disabled={busy || busyUat}
+                  onClick={() => void submitForm(server)}
+                >
+                  确认连接
+                </button>
+              </div>
+            )}
           </div>
         )
       })}

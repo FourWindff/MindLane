@@ -59,9 +59,12 @@ export enum IPC {
   McpConnect = 'mcp:connect',
   McpDisconnect = 'mcp:disconnect',
   McpStatus = 'mcp:status',
+  McpAuthorizeUat = 'mcp:authorize-uat',
+  McpGetCredentials = 'mcp:get-credentials',
 
   ShellOpenDocumentRef = 'shell:open-document-ref',
   ShellOpenLogs = 'shell:open-logs',
+  ShellOpenExternal = 'shell:open-external',
 
   EditlogAppend = 'editlog:append',
 
@@ -78,6 +81,20 @@ export enum IPC {
 export type IpcResult<T = void> = { ok: true; data: T } | { ok: false; error: string }
 
 // ---- 边界 DTO（Boundary DTOs） ----
+
+/** mcp:connect 载荷：OAuth server 只带 serverId，非 OAuth server 附带表单凭据 */
+export interface McpConnectPayload {
+  serverId: string
+  /** 非 OAuth server 的表单凭据（按定义的 credentialFields 校验），OAuth server 省略 */
+  credentials?: Record<string, string>
+}
+
+/** mcp:authorize-uat 载荷：飞书一键授权的 app 凭证（用于发起 OAuth 与换 token） */
+export interface McpAuthorizeUatPayload {
+  serverId: string
+  appId: string
+  appSecret: string
+}
 
 export interface RecentFileEntry {
   filePath: string
@@ -549,10 +566,27 @@ export interface MindlaneBridge {
   settings: {
     load: () => Promise<AppSettings>
     update: (partial: Record<string, unknown>) => Promise<void>
-    mcpConnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+    mcpConnect: (
+      serverId: string,
+      credentials?: Record<string, string>,
+    ) => Promise<{ ok: true } | { ok: false; error: string }>
     mcpDisconnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
     mcpStatus: () => Promise<
       { ok: true; data: McpServerStatusInfo[] } | { ok: false; error: string }
+    >
+    /** 一键获取飞书用户 UAT：拉起授权页，成功后把 uat 回填到连接表单 */
+    mcpAuthorizeUat: (payload: {
+      serverId: string
+      appId: string
+      appSecret: string
+    }) => Promise<
+      | { ok: true; data: { uat: string; expiresIn: number } }
+      | { ok: false; error: string }
+    >
+    /** 读取表单配置类 server 已保存的凭据（非 OAuth 连接配置），用于“显示配置”回填 */
+    mcpGetCredentials: (serverId: string) => Promise<
+      | { ok: true; data: Record<string, string> }
+      | { ok: false; error: string }
     >
   }
   window: {
@@ -566,6 +600,8 @@ export interface MindlaneBridge {
   shell: {
     openDocumentRef: (doc: DocumentRef) => Promise<{ ok: true } | { ok: false; error: string }>
     openLogs: () => Promise<{ ok: true }>
+    /** 用系统默认浏览器打开外链（仅 http/https，防指令注入） */
+    openExternal: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>
   }
   editlog: {
     /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */
