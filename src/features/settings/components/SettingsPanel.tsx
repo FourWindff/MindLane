@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plug, Eye, EyeOff } from 'lucide-react'
+import { Plug, ChevronDown } from 'lucide-react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
@@ -195,11 +195,18 @@ function McpIntegrationsSection() {
                   type="button"
                   className="panel-btn"
                   disabled={busy}
+                  aria-expanded={formOpen}
+                  aria-label="配置"
+                  title={formOpen ? '收起配置' : '显示配置'}
                   onClick={() => toggleForm(server)}
-                  aria-label={formOpen ? '隐藏配置' : '显示配置'}
-                  title={formOpen ? '隐藏配置' : '显示配置'}
                 >
-                  {formOpen ? <EyeOff size={14} /> : <Eye size={14} />}
+                  <ChevronDown
+                    size={14}
+                    style={{
+                      transform: formOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.15s ease',
+                    }}
+                  />
                 </button>
               )}
             </div>
