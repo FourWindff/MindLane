@@ -20,8 +20,9 @@ export type FeishuUatExchanger = (
 ) => Promise<FeishuUatResult>
 
 /** 生产实现：调用飞书开放平台接口，用授权码换用户身份 token
- *  注意：文档预告 v3（user_access_token/internal），但线上实测 v3 返回 404，
- *  现行可用的是 v1/access_token；平台切换 v3 时只需改这里。 */
+ *  注意：文档预告 v3（user_access_token/internal，body 用 client_id/client_secret），
+ *  但线上实测 v3 返回 404；现行 v1/access_token 的 body 字段名是 app_id/app_secret（
+ *  实测用 client_id 会报 20025 missing app id or app secret）。平台切换 v3 时只需改这里。 */
 export async function exchangeFeishuUat(
   appId: string,
   appSecret: string,
@@ -32,7 +33,7 @@ export async function exchangeFeishuUat(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: appId, client_secret: appSecret }),
+      body: JSON.stringify({ grant_type: 'authorization_code', code, app_id: appId, app_secret: appSecret }),
       // 默认 fetch 无超时，这里 20s 兜底——宁可失败提示也不要“获取中”卡死
       signal: AbortSignal.timeout(20_000),
     },
