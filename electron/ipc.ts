@@ -58,6 +58,7 @@ export enum IPC {
   McpDisconnect = 'mcp:disconnect',
   McpStatus = 'mcp:status',
   McpAuthorizeUat = 'mcp:authorize-uat',
+  McpGetCredentials = 'mcp:get-credentials',
 
   ShellOpenDocumentRef = 'shell:open-document-ref',
   ShellOpenLogs = 'shell:open-logs',
@@ -540,6 +541,11 @@ export interface MindlaneBridge {
       appSecret: string
     }) => Promise<
       | { ok: true; data: { uat: string; expiresIn: number } }
+      | { ok: false; error: string }
+    >
+    /** 读取表单配置类 server 已保存的凭据（非 OAuth 连接配置），用于“显示配置”回填 */
+    mcpGetCredentials: (serverId: string) => Promise<
+      | { ok: true; data: Record<string, string> }
       | { ok: false; error: string }
     >
   }

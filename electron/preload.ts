@@ -54,6 +54,7 @@ const api: MindlaneBridge = {
     mcpDisconnect: (serverId) => ipcRenderer.invoke(IPC.McpDisconnect, { serverId }),
     mcpStatus: () => ipcRenderer.invoke(IPC.McpStatus),
     mcpAuthorizeUat: (payload) => ipcRenderer.invoke(IPC.McpAuthorizeUat, payload),
+    mcpGetCredentials: (serverId) => ipcRenderer.invoke(IPC.McpGetCredentials, { serverId }),
   },
   window: {
     minimize: () => ipcRenderer.invoke(IPC.WindowMinimize),

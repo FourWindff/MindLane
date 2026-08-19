@@ -61,6 +61,12 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
     return { ok: true, data: ctx.getMcpManager()?.getStatuses() ?? [] }
   })
 
+  ipcMain.handle(IPC.McpGetCredentials, async (_e, payload: { serverId: string }) => {
+    const manager = ctx.getMcpManager()
+    if (!manager) return { ok: false, error: 'MCP 模块未初始化' }
+    return { ok: true, data: manager.getSecrets(payload.serverId) }
+  })
+
   ipcMain.handle(IPC.McpAuthorizeUat, async (_e, payload: McpAuthorizeUatPayload) => {
     try {
       if (payload.serverId !== 'feishu') {

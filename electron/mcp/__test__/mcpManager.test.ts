@@ -134,8 +134,13 @@ describe('McpManager', () => {
     expect(manager.getTools()).toEqual([])
   })
 
-  it('disconnect 后工具移除、凭据删除、状态回到 disconnected', async () => {
-    const { manager } = createManager({ credentialCrypto: testCrypto })
+  it('断开后工具移除、OAuth 凭据删除、状态回到 disconnected', async () => {
+    // OAuth server：断开仍删除已存 token（与非 OAuth 表单配置保留的规则相反）
+    const makeOAuthDef = (id: string) =>
+      makeDef(id, {
+        createAuthProvider: (() => ({ authRedirected: false })) as unknown as McpServerDefinition['createAuthProvider'],
+      })
+    const { manager } = createManager({ credentialCrypto: testCrypto, servers: [makeOAuthDef('notion')] })
     const credPath = path.join(userDataPath, 'mcp-credentials', 'notion.json')
     fs.mkdirSync(path.dirname(credPath), { recursive: true })
     fs.writeFileSync(
@@ -298,7 +303,7 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0].error).toContain('请打开 Obsidian 并启用 Local REST API 插件')
   })
 
-  it('断开后 secrets 凭据文件删除，工具清空', async () => {
+  it('断开后移除工具但保留 secrets 配置（表单配置可编辑复用）', async () => {
     const { manager } = createManager({
       credentialCrypto: testCrypto,
       servers: [obsidianDef()],
@@ -312,7 +317,7 @@ describe('McpManager', () => {
     await manager.disconnect('obsidian')
 
     expect(manager.getTools()).toEqual([])
-    expect(fs.existsSync(credPath)).toBe(false)
+    expect(fs.existsSync(credPath)).toBe(true)
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
   })
 
@@ -411,14 +416,17 @@ describe('McpManager', () => {
     }
   })
 
-  it('断开后删除全部凭据，状态回到 disconnected', async () => {
+  it('断开后工具移除、配置保留，状态回到 disconnected（表单配置可编辑复用）', async () => {
     const { manager } = makeFeishuManager()
     await manager.connect('feishu', { appId: 'a', appSecret: 's', uat: 'u' })
     expect(manager.getTools().length).toBe(3)
+    expect(manager.getSecrets('feishu')).toEqual({ appId: 'a', appSecret: 's', uat: 'u' })
 
     await manager.disconnect('feishu')
 
     expect(manager.getTools()).toEqual([])
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
+    // 表单配置类 server 断开后保留凭据，方便修改后重连
+    expect(manager.getSecrets('feishu')).toEqual({ appId: 'a', appSecret: 's', uat: 'u' })
   })
 })

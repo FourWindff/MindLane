@@ -72,6 +72,18 @@ function McpIntegrationsSection() {
     }
   }
 
+  /** 打开配置表单并回填已保存的凭据（只回填本 server 声明的字段） */
+  const openFormPrefilled = async (server: McpServerStatusInfo) => {
+    const res = await window.mindlane?.settings.mcpGetCredentials(server.id)
+    const secrets = res?.ok ? res.data : {}
+    const ids = new Set((server.credentialFields ?? []).map((f) => f.id))
+    const prefilled: Record<string, string> = {}
+    for (const [k, v] of Object.entries(secrets)) if (ids.has(k)) prefilled[k] = v
+    setFormValues(prefilled)
+    setFormError(null)
+    setFormOpenId(server.id)
+  }
+
   const submitForm = async (server: McpServerStatusInfo) => {
     setBusyId(server.id)
     try {
@@ -145,6 +157,16 @@ function McpIntegrationsSection() {
                 aria-label={statusLabel}
                 title={statusLabel}
               />
+              {hasForm && !formOpen && (
+                <button
+                  type="button"
+                  className="panel-btn"
+                  disabled={busy}
+                  onClick={() => void openFormPrefilled(server)}
+                >
+                  显示配置
+                </button>
+              )}
               <button
                 type="button"
                 className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
@@ -152,10 +174,8 @@ function McpIntegrationsSection() {
                 onClick={() => {
                   if (busy) return
                   if (connected) void runAction(server.id, false)
-                  else if (hasForm && !formOpen) {
-                    setFormValues({})
-                    setFormOpenId(server.id)
-                  } else if (hasForm && formOpen) {
+                  else if (hasForm && !formOpen) void openFormPrefilled(server)
+                  else if (hasForm && formOpen) {
                     setFormOpenId(null)
                     setFormValues({})
                   } else void runAction(server.id, true)

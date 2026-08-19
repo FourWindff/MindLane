@@ -82,16 +82,25 @@ export class McpManager {
     return this.statuses.get(serverId) ?? { state: 'failed', error: '未知的 MCP server' }
   }
 
-  /** 断开：移除工具、关闭连接、删除凭据 */
+  /** 断开：移除工具、关闭连接。
+   *  OAuth server 同时删除已存 token；表单配置类 server（obsidian/feishu）**保留**
+   *  凭据，方便重连时直接修改上次配置而不用从零填写。 */
   async disconnect(serverId: string): Promise<void> {
     this.bumpToken(serverId)
     const client = this.clients.get(serverId)
     this.clients.delete(serverId)
     this.toolsByServer.delete(serverId)
     if (client) await client.close().catch(() => {})
-    this.getCredentialStore(serverId).clear()
+    if (this.servers.get(serverId)?.createAuthProvider) {
+      this.getCredentialStore(serverId).clear()
+    }
     this.setStatus(serverId, { state: 'disconnected' })
     this.emitToolsChanged()
+  }
+
+  /** 返回表单配置类 server 已保存的凭据键值（供设置面板“显示配置”回填；无则空对象） */
+  getSecrets(serverId: string): Record<string, string> {
+    return this.getCredentialStore(serverId).load().secrets ?? {}
   }
 
   /** 当前已注入的全部 MCP 工具（已加 server 前缀） */
