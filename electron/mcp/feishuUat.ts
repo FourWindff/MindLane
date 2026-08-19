@@ -19,17 +19,26 @@ export type FeishuUatExchanger = (
   code: string,
 ) => Promise<FeishuUatResult>
 
-/** 生产实现：调用飞书开放平台 v3 接口，用授权码换用户身份 token */
+/** 生产实现：调用飞书开放平台接口，用授权码换用户身份 token
+ *  注意：文档预告 v3（user_access_token/internal），但线上实测 v3 返回 404，
+ *  现行可用的是 v1/access_token；平台切换 v3 时只需改这里。 */
 async function exchangeUat(appId: string, appSecret: string, code: string): Promise<FeishuUatResult> {
-  const res = await fetch('https://open.feishu.cn/open-apis/authen/v3/user_access_token/internal', {
+  const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: appId, client_secret: appSecret }),
   })
-  const data = (await res.json()) as {
+  let data: {
     code?: number
     msg?: string
     data?: { access_token?: string; refresh_token?: string; expires_in?: number }
+  }
+  try {
+    data = (await res.json()) as typeof data
+  } catch {
+    // 非 JSON 响应（如网关 404 页面）时把原始内容带进错误，便于定位
+    const raw = await res.text().catch(() => '')
+    throw new Error(`授权码换取 user_access_token 响应异常：${res.status} ${raw.slice(0, 200)}`)
   }
   if (!res.ok || data.code !== 0 || !data.data?.access_token) {
     throw new Error(`授权码换取 user_access_token 失败：${data.code ?? res.status} ${data.msg ?? ''}`)
