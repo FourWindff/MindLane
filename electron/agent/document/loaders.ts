@@ -17,12 +17,9 @@ export type DocumentLoader = (source: DocumentSource) => Promise<Document[]>
 
 export type DocumentLoaderRegistry = Partial<Record<DocumentSource['type'], DocumentLoader>>
 
-async function loadPdf(source: DocumentSource): Promise<Document[]> {
-  if (!source.path) {
-    throw new Error('PDF source requires a path')
-  }
-  const file = await readFile(source.path)
-  const parser = new PDFParse({ data: file })
+/** Shared PDF buffer parsing: local files and PDF-url bodies use the same semantic. */
+async function parsePdfBuffer(data: Buffer, sourceLabel: string): Promise<Document[]> {
+  const parser = new PDFParse({ data })
 
   try {
     const textResult = await parser.getText()
@@ -36,7 +33,7 @@ async function loadPdf(source: DocumentSource): Promise<Document[]> {
           new Document({
             pageContent: page.text,
             metadata: {
-              source: source.path,
+              source: sourceLabel,
               pdf: {
                 version: format,
                 info: infoResult.info,
@@ -52,19 +49,69 @@ async function loadPdf(source: DocumentSource): Promise<Document[]> {
   }
 }
 
+async function loadPdf(source: DocumentSource): Promise<Document[]> {
+  if (!source.path) {
+    throw new Error('PDF source requires a path')
+  }
+  const file = await readFile(source.path)
+  return parsePdfBuffer(file, source.path)
+}
+
+/**
+ * Trust boundary: main process re-validates the protocol before fetching, so
+ * a compromised renderer cannot smuggle in a non-http(s) scheme.
+ */
+function assertHttpUrl(url: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error('无效的链接地址。')
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('仅支持 http:// 与 https:// 链接。')
+  }
+}
+
 async function loadUrl(source: DocumentSource): Promise<Document[]> {
   if (!source.url) {
     throw new Error('URL source requires a url')
   }
-  const response = await fetch(source.url, { signal: AbortSignal.timeout(10_000) })
-  const $ = loadHtml(await response.text())
+  assertHttpUrl(source.url)
 
-  return [
-    new Document({
-      pageContent: $('body').text(),
-      metadata: { source: source.url, title: $('title').text() },
-    }),
-  ]
+  let response: Response
+  try {
+    response = await fetch(source.url, { signal: AbortSignal.timeout(10_000) })
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    const message =
+      error instanceof Error && error.name === 'TimeoutError'
+        ? `抓取链接超时(10秒)。`
+        : `抓取链接失败: ${reason}`
+    throw new Error(message, { cause: error })
+  }
+  if (!response.ok) {
+    throw new Error(`链接返回 HTTP ${response.status},无法读取。`)
+  }
+
+  // Dispatch on Content-Type so binary payloads never pass through cheerio.
+  const mime = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
+  if (mime === 'text/html') {
+    const $ = loadHtml(await response.text())
+    return [
+      new Document({
+        pageContent: $('body').text(),
+        metadata: { source: source.url, title: $('title').text() },
+      }),
+    ]
+  }
+  if (mime === 'application/pdf') {
+    const data = Buffer.from(await response.arrayBuffer())
+    return parsePdfBuffer(data, source.url)
+  }
+  throw new Error(
+    `暂不支持的链接类型: ${mime || '未知'}。仅支持网页(text/html)与 PDF(application/pdf)。`,
+  )
 }
 
 async function loadText(source: DocumentSource): Promise<Document[]> {

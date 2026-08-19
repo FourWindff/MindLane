@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { Document } from '@langchain/core/documents'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -11,6 +11,12 @@ import {
   createPptxFixture,
   createXlsxFixture,
 } from './fixtures/officeFixtures.js'
+
+// Repeated vi.spyOn on the same prototype method (PDFParse) accumulates spy call
+// counts across tests; restore all spies after each test to isolate them.
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function fakeRegistry(): DocumentLoaderRegistry & {
   pdf: ReturnType<typeof vi.fn>
@@ -195,6 +201,7 @@ describe('default file loaders', () => {
       .mockResolvedValue(
         new Response(
           '<html><head><title>Example</title></head><body><main>Hello web</main></body></html>',
+          { headers: { 'Content-Type': 'text/html' } },
         ),
       )
     vi.stubGlobal('fetch', fetchMock)
@@ -228,5 +235,97 @@ describe('default file loaders', () => {
     await expect(loadDocument({ type: 'markdown', path: filePath })).rejects.toThrow(
       'Markdown 文档未包含文本内容。',
     )
+  })
+})
+
+describe('default URL loader', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubFetchWith(
+    body: string,
+    status: number,
+    contentType?: string,
+  ): ReturnType<typeof vi.fn> {
+    const init: { status: number; headers?: Record<string, string> } = { status }
+    if (contentType) init.headers = { 'Content-Type': contentType }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body, init))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('dispatches text/html to cheerio extraction with title metadata', async () => {
+    stubFetchWith(
+      '<html><head><title>Page</title></head><body><article>Body text</article></body></html>',
+      200,
+      'text/html; charset=utf-8',
+    )
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/a' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Body text',
+        metadata: { source: 'https://example.test/a', title: 'Page' },
+      }),
+    ])
+  })
+
+  it('dispatches application/pdf to the shared pdf parser', async () => {
+    const getText = vi.spyOn(PDFParse.prototype, 'getText').mockResolvedValue({
+      pages: [{ num: 1, text: 'Page one' }],
+      total: 1,
+    } as never)
+    const getInfo = vi.spyOn(PDFParse.prototype, 'getInfo').mockResolvedValue({
+      info: { Title: 'Paper' },
+      metadata: { format: 'PDF 1.7' },
+    } as never)
+    const destroy = vi.spyOn(PDFParse.prototype, 'destroy').mockResolvedValue()
+    stubFetchWith('fake-pdf-bytes', 200, 'application/pdf')
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/paper.pdf' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Page one',
+        metadata: expect.objectContaining({
+          source: 'https://example.test/paper.pdf',
+          pdf: expect.objectContaining({ info: { Title: 'Paper' } }),
+        }),
+      }),
+    ])
+    expect(getText).toHaveBeenCalledOnce()
+    expect(getInfo).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
+  it('rejects unsupported content types clearly', async () => {
+    stubFetchWith('x', 200, 'image/png')
+
+    await expect(
+      loadDocument({ type: 'url', url: 'https://example.test/img.png' }),
+    ).rejects.toThrow('暂不支持的链接类型: image/png')
+  })
+
+  it('reports non-2xx responses clearly', async () => {
+    stubFetchWith('Not Found', 404)
+
+    await expect(
+      loadDocument({ type: 'url', url: 'https://example.test/missing' }),
+    ).rejects.toThrow('链接返回 HTTP 404')
+  })
+
+  it('rejects non-http(s) protocols before fetching', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loadDocument({ type: 'url', url: 'file:///etc/passwd' })).rejects.toThrow(
+      '仅支持 http:// 与 https://',
+    )
+    await expect(loadDocument({ type: 'url', url: 'javascript:alert(1)' })).rejects.toThrow(
+      '仅支持 http:// 与 https://',
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

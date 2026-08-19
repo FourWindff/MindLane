@@ -38,6 +38,14 @@ export async function prepareDocument(input: PrepareDocumentInput): Promise<Prep
   const batches = batchDocuments(chunks, budgetChars)
   const text = docs.map((doc) => doc.pageContent).join('\n\n')
 
+  // Title backfill: page <title> (in metadata) wins over the generic filename
+  // fallback; existing ref titles stay untouched.
+  const firstDoc = docs[0]
+  const loadedTitle =
+    firstDoc && typeof firstDoc.metadata?.title === 'string' && firstDoc.metadata.title.trim()
+      ? firstDoc.metadata.title
+      : undefined
+
   let hash: string
   let baseFilename: string
   let persistedSource: string
@@ -96,7 +104,9 @@ export async function prepareDocument(input: PrepareDocumentInput): Promise<Prep
     source: persistedSource,
     filename,
     importedAt: existingRef?.importedAt || new Date().toISOString(),
-    title: existingRef?.title,
+    // url sources with no page title fall back to the url itself as the title.
+    title:
+      existingRef?.title || loadedTitle || (source.type === 'url' ? persistedSource : undefined),
     pageCount: existingRef?.pageCount,
     textPath,
     sha256: hash,

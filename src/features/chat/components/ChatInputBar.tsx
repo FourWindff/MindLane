@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Square, Send, Plus, SlidersHorizontal, Mic, CircleDot, FileText } from 'lucide-react'
+import {
+  X,
+  Square,
+  Send,
+  Plus,
+  SlidersHorizontal,
+  Mic,
+  CircleDot,
+  FileText,
+  Link,
+} from 'lucide-react'
 import {
   useAiStore,
   selectCurrentChatBusy,
@@ -8,6 +18,7 @@ import {
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
+import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
 
 import '../styles/chat-input-bar.css'
 
@@ -89,6 +100,83 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     setAttachedDocument(null)
   }, [setAttachedDocument])
 
+  // Attachment menu + paste-link panel. URL and file attachments share the
+  // single attachedDocument slot.
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const [urlMode, setUrlMode] = useState(false)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const attachMenuRef = useRef<HTMLDivElement>(null)
+  const urlInputRef = useRef<HTMLInputElement>(null)
+  const urlPanelRef = useRef<HTMLDivElement>(null)
+
+  const closeAttachMenu = useCallback(() => {
+    setAttachMenuOpen(false)
+    setUrlMode(false)
+    setUrlDraft('')
+    setUrlError(null)
+  }, [])
+
+  useEffect(() => {
+    if (!attachMenuOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node
+      const inMenu = attachMenuRef.current?.contains(target)
+      // The url panel lives outside the attach button in the input wrap, so
+      // clicking it must not count as an outside click (that would clear the
+      // draft and close the panel before the confirm click lands).
+      const inUrlPanel = urlPanelRef.current?.contains(target)
+      if (!inMenu && !inUrlPanel) {
+        closeAttachMenu()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [attachMenuOpen, closeAttachMenu])
+
+  useEffect(() => {
+    if (urlMode) urlInputRef.current?.focus()
+  }, [urlMode])
+
+  const handleAttachFile = useCallback(async () => {
+    setAttachMenuOpen(false)
+    await handleSelectAttachment()
+  }, [handleSelectAttachment])
+
+  const handleOpenUrlMode = useCallback(() => {
+    setUrlMode(true)
+  }, [])
+
+  const handleUrlDraftChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const draft = e.target.value
+    setUrlDraft(draft)
+    setUrlError(
+      draft.trim() ? (validateUrl(draft) ? null : '请输入有效的 http:// 或 https:// 链接') : null,
+    )
+  }, [])
+
+  const handleUrlConfirm = useCallback(() => {
+    const url = validateUrl(urlDraft)
+    if (!url) {
+      setUrlError('请输入有效的 http:// 或 https:// 链接')
+      return
+    }
+    setAttachedDocument(createUrlDocumentRef(url))
+    closeAttachMenu()
+  }, [urlDraft, setAttachedDocument, closeAttachMenu])
+
+  const handleUrlKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleUrlConfirm()
+      } else if (e.key === 'Escape') {
+        closeAttachMenu()
+      }
+    },
+    [handleUrlConfirm, closeAttachMenu],
+  )
+
   const send = useCallback(async () => {
     const text = inputRef.current?.value.trim() || ''
     const accepted = await sendChatMessage(text)
@@ -129,6 +217,40 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
         </div>
       )}
       <div className="chat-input-bar__wrap">
+        {urlMode && (
+          <div className="chat-input-bar__url" ref={urlPanelRef}>
+            <span className="chat-input-bar__url-icon">
+              <Link size={12} strokeWidth={2} />
+            </span>
+            <input
+              ref={urlInputRef}
+              className="chat-input-bar__url-input"
+              value={urlDraft}
+              onChange={handleUrlDraftChange}
+              onKeyDown={handleUrlKeyDown}
+              placeholder="粘贴链接，仅支持 http/https"
+              aria-label="粘贴链接"
+              spellCheck={false}
+            />
+            <button
+              type="button"
+              className="chat-input-bar__url-btn"
+              onClick={handleUrlConfirm}
+              aria-label="添加链接"
+            >
+              添加
+            </button>
+            <button
+              type="button"
+              className="chat-input-bar__url-btn chat-input-bar__url-btn--ghost"
+              onClick={closeAttachMenu}
+              aria-label="取消粘贴链接"
+            >
+              取消
+            </button>
+            {urlError && <span className="chat-input-bar__url-error">{urlError}</span>}
+          </div>
+        )}
         {(selectedNodes.length > 0 || attachedDocument) && (
           <div className="chat-input-bar__tags">
             {selectedNodes.length > 0 && (
@@ -147,7 +269,11 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             )}
             {attachedDocument && (
               <span className="chat-input-bar__tag">
-                <FileText size={12} strokeWidth={2} />
+                {attachedDocument.type === 'url' ? (
+                  <Link size={12} strokeWidth={2} />
+                ) : (
+                  <FileText size={12} strokeWidth={2} />
+                )}
                 {attachedDocument.filename}
                 <button
                   type="button"
@@ -196,16 +322,30 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
         </div>
         <div className="chat-input-bar__toolbar">
           <div className="chat-input-bar__toolbar-left">
-            <button
-              type="button"
-              className="chat-input-bar__tool"
-              title="添加附件"
-              aria-label="添加附件"
-              onClick={() => void handleSelectAttachment()}
-              disabled={busy || !inputEnabled}
-            >
-              <Plus size={14} strokeWidth={2} />
-            </button>
+            <div className="chat-input-bar__attach" ref={attachMenuRef}>
+              <button
+                type="button"
+                className="chat-input-bar__tool"
+                title="添加附件"
+                aria-label="添加附件"
+                onClick={() => setAttachMenuOpen((open) => !open)}
+                disabled={busy || !inputEnabled}
+              >
+                <Plus size={14} strokeWidth={2} />
+              </button>
+              {attachMenuOpen && !urlMode && (
+                <div className="chat-input-bar__menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => void handleAttachFile()}>
+                    <FileText size={13} strokeWidth={2} />
+                    添加文件
+                  </button>
+                  <button type="button" role="menuitem" onClick={handleOpenUrlMode}>
+                    <Link size={13} strokeWidth={2} />
+                    粘贴链接
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               className="chat-input-bar__tool"
