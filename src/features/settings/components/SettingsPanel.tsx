@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Plug } from 'lucide-react'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
@@ -122,7 +121,6 @@ export function SettingsPanel() {
   const providers = useSettingsStore((s) => s.providers)
   const activeChatProvider = useSettingsStore((s) => s.activeChatProvider)
   const setActiveChatProvider = useSettingsStore((s) => s.setActiveChatProvider)
-  const currentFilePath = useActiveMindmapStore((s) => s.filePath)
   const activeInstance = useActiveMindmapInstance()
   const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
   const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
@@ -356,9 +354,6 @@ export function SettingsPanel() {
                 {!imageGenEnabled && ' | 文生图不可用'}
               </div>
             )}
-            <div className="settings-card__hint">
-              当前文件：{currentFilePath ?? '未绑定文件'}，AI 流程会优先使用这里配置的模型。
-            </div>
           </section>
 
           <section
