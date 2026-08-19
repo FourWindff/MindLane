@@ -580,14 +580,12 @@ export interface MindlaneBridge {
       appId: string
       appSecret: string
     }) => Promise<
-      | { ok: true; data: { uat: string; expiresIn: number } }
-      | { ok: false; error: string }
+      { ok: true; data: { uat: string; expiresIn: number } } | { ok: false; error: string }
     >
     /** 读取表单配置类 server 已保存的凭据（非 OAuth 连接配置），用于“显示配置”回填 */
-    mcpGetCredentials: (serverId: string) => Promise<
-      | { ok: true; data: Record<string, string> }
-      | { ok: false; error: string }
-    >
+    mcpGetCredentials: (
+      serverId: string,
+    ) => Promise<{ ok: true; data: Record<string, string> } | { ok: false; error: string }>
   }
   window: {
     minimize: () => Promise<void>

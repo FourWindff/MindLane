@@ -101,7 +101,9 @@ export interface LoopbackCallbackServer {
  * 回调可能在 waitForCallback 被调用前到达，因此先缓存结果。
  * port 缺省时随机选择；传入固定 port 用于需要预先注册回调地址的场景（如飞书 UAT）。
  */
-export async function startLoopbackCallbackServer(opts?: { port?: number }): Promise<LoopbackCallbackServer> {
+export async function startLoopbackCallbackServer(opts?: {
+  port?: number
+}): Promise<LoopbackCallbackServer> {
   type CallbackResult = { code?: string; state?: string; error?: string }
   let received: CallbackResult | null = null
   let notify: (() => void) | null = null
