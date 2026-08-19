@@ -22,12 +22,21 @@ export type FeishuUatExchanger = (
 /** 生产实现：调用飞书开放平台接口，用授权码换用户身份 token
  *  注意：文档预告 v3（user_access_token/internal），但线上实测 v3 返回 404，
  *  现行可用的是 v1/access_token；平台切换 v3 时只需改这里。 */
-async function exchangeUat(appId: string, appSecret: string, code: string): Promise<FeishuUatResult> {
-  const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/access_token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: appId, client_secret: appSecret }),
-  })
+export async function exchangeFeishuUat(
+  appId: string,
+  appSecret: string,
+  code: string,
+): Promise<FeishuUatResult> {
+  const res = await fetch(
+    'https://open.feishu.cn/open-apis/authen/v1/access_token',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: appId, client_secret: appSecret }),
+      // 默认 fetch 无超时，这里 20s 兜底——宁可失败提示也不要“获取中”卡死
+      signal: AbortSignal.timeout(20_000),
+    },
+  )
   let data: {
     code?: number
     msg?: string
@@ -67,7 +76,7 @@ export async function acquireFeishuUat(opts: {
   exchange?: FeishuUatExchanger
 }): Promise<FeishuUatResult> {
   const { appId, appSecret, openBrowser, timeoutMs = 5 * 60_000 } = opts
-  const exchange = opts.exchange ?? exchangeUat
+  const exchange = opts.exchange ?? exchangeFeishuUat
   const loopback = await startLoopbackCallbackServer({ port: opts.port ?? FEISHU_UAT_CALLBACK_PORT })
   try {
     const state = crypto.randomUUID()

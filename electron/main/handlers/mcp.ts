@@ -1,6 +1,6 @@
 import { ipcMain, shell } from 'electron'
 import type { McpServerStatus } from '../../mcp/types.js'
-import { acquireFeishuUat } from '../../mcp/feishuUat.js'
+import { acquireFeishuUat, exchangeFeishuUat } from '../../mcp/feishuUat.js'
 import { IPC, type McpConnectPayload, type McpAuthorizeUatPayload } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import type { FileSystemService } from '../../fs/index.js'
@@ -69,13 +69,28 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
       if (!payload.appId?.trim() || !payload.appSecret?.trim()) {
         return { ok: false, error: '请先填写 App ID 与 App Secret 再获取 UAT' }
       }
+      const appId = payload.appId.trim()
+      const appSecret = payload.appSecret.trim()
+      mcpLog.info('authorize-uat: start on port 44664')
       const result = await acquireFeishuUat({
-        appId: payload.appId.trim(),
-        appSecret: payload.appSecret.trim(),
-        openBrowser: (url) => void shell.openExternal(url),
+        appId,
+        appSecret,
+        openBrowser: (url) => {
+          mcpLog.info('authorize-uat: opened browser, waiting callback')
+          void shell.openExternal(url)
+        },
+        // 回调后每一步都打日志，便于定位卡在哪一帧
+        exchange: async (a, s, code) => {
+          mcpLog.info('authorize-uat: callback received, exchanging token')
+          const r = await exchangeFeishuUat(a, s, code)
+          mcpLog.info('authorize-uat: got uat')
+          return r
+        },
+        timeoutMs: 3 * 60_000,
       })
       return { ok: true, data: { uat: result.uat, expiresIn: result.expiresIn } }
     } catch (err) {
+      mcpLog.warn('authorize-uat: failed: %s', err instanceof Error ? err.message : String(err))
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
