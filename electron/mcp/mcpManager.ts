@@ -99,6 +99,14 @@ export class McpManager {
     return [...this.toolsByServer.values()].flat()
   }
 
+  /**
+   * 非表单来源的追加凭据写入（如一键获取的 refresh_token），merge 进该 server 的凭据存储。
+   * 供 handler 在 UAT 授权完成后落盘，连接时 createAuthHeaders 可据此自动续期。
+   */
+  persistSecrets(serverId: string, secrets: Record<string, string>): void {
+    this.getCredentialStore(serverId).saveSecrets(secrets)
+  }
+
   getStatuses(): McpServerStatusInfo[] {
     return [...this.servers.values()].map((def) => ({
       id: def.id,

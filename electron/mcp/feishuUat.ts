@@ -12,6 +12,24 @@ export interface FeishuUatResult {
   expiresIn: number
 }
 
+/** 解析飞书 token 类接口响应：code!==0 或非 JSON 时抛出带原始信息的错误 */
+async function readFeishuTokenBody(
+  res: Response,
+  what: string,
+): Promise<{ access_token?: string; refresh_token?: string; expires_in?: number }> {
+  let body: { code?: number; msg?: string; data?: { access_token?: string; refresh_token?: string; expires_in?: number } }
+  try {
+    body = (await res.json()) as typeof body
+  } catch {
+    const raw = await res.text().catch(() => '')
+    throw new Error(`${what}响应异常：${res.status} ${raw.slice(0, 200)}`)
+  }
+  if (!res.ok || body.code !== 0 || !body.data?.access_token) {
+    throw new Error(`${what}失败：${body.code ?? res.status} ${body.msg ?? ''}`)
+  }
+  return body.data
+}
+
 /** token 交换器抽象，测试可注入 mock */
 export type FeishuUatExchanger = (
   appId: string,
@@ -38,27 +56,33 @@ export async function exchangeFeishuUat(
       signal: AbortSignal.timeout(20_000),
     },
   )
-  let data: {
-    code?: number
-    msg?: string
-    data?: { access_token?: string; refresh_token?: string; expires_in?: number }
-  }
-  try {
-    data = (await res.json()) as typeof data
-  } catch {
-    // 非 JSON 响应（如网关 404 页面）时把原始内容带进错误，便于定位
-    const raw = await res.text().catch(() => '')
-    throw new Error(`授权码换取 user_access_token 响应异常：${res.status} ${raw.slice(0, 200)}`)
-  }
-  if (!res.ok || data.code !== 0 || !data.data?.access_token) {
-    throw new Error(`授权码换取 user_access_token 失败：${data.code ?? res.status} ${data.msg ?? ''}`)
-  }
-  const uat = data.data.access_token
+  const data = await readFeishuTokenBody(res, '授权码换取 user_access_token')
   // 仅返回 uat 等非敏感展示信息；refresh_token 由 app 侧持有，不落盘。
   return {
-    uat,
-    refreshToken: data.data.refresh_token ?? '',
-    expiresIn: data.data.expires_in ?? 7200,
+    uat: data.access_token ?? '',
+    refreshToken: data.refresh_token ?? '',
+    expiresIn: data.expires_in ?? 7200,
+  }
+}
+
+/** 用 refresh_token 换新 UAT（约 30 天内可反复续期）；返回新的 uat 与新的 refresh_token */
+export async function refreshFeishuUat(
+  appId: string,
+  appSecret: string,
+  refreshToken: string,
+): Promise<FeishuUatResult> {
+  const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/refresh_access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken, app_id: appId, app_secret: appSecret }),
+    // 默认 fetch 无超时，20s 兜底——失败提示好过连接卡住
+    signal: AbortSignal.timeout(20_000),
+  })
+  const data = await readFeishuTokenBody(res, '刷新 user_access_token')
+  return {
+    uat: data.access_token ?? '',
+    refreshToken: data.refresh_token ?? '',
+    expiresIn: data.expires_in ?? 7200,
   }
 }
 

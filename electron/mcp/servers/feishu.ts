@@ -1,4 +1,5 @@
 import type { McpServerDefinition } from '../types.js'
+import { refreshFeishuUat } from '../feishuUat.js'
 
 /** 飞书开发者远程模式默认端点（实测存活，见 ADR-0019）。 */
 export const FEISHU_DEFAULT_ENDPOINT = 'https://mcp.feishu.cn/mcp'
@@ -39,17 +40,26 @@ async function exchangeTenantToken(appId: string, appSecret: string): Promise<st
   return data.tenant_access_token
 }
 
+/** 用 refresh_token 换新 UAT 的抽象；生产走真实接口，测试注入 mock */
+export type FeishuUatRefresher = (
+  appId: string,
+  appSecret: string,
+  refreshToken: string,
+) => Promise<{ uat: string; refreshToken: string; expiresIn: number }>
+
 /**
  * 飞书（开发者远程模式，自定义头认证）。
  * 有 UAT 时以用户身份（X-Lark-MCP-UAT）读搜个人文档；缺省用 app 凭证现换
  * tenant token 发 X-Lark-MCP-TAT（应用身份退化）。两个分支都附
  * X-Lark-MCP-Allowed-Tools 头收敛工具面，客户端 allowlist 再兜底裁剪。
+ * UAT 过期（凭据存储里带 refreshToken 时）自动用 refresh_token 续期并回写新值。
  * 详见 docs/adr/0018.md、docs/adr/0019.md。
  */
 export function createFeishuServer(
-  opts: { exchangeTenantToken?: FeishuTokenExchanger } = {},
+  opts: { exchangeTenantToken?: FeishuTokenExchanger; refreshUat?: FeishuUatRefresher } = {},
 ): McpServerDefinition {
   const exchange = opts.exchangeTenantToken ?? exchangeTenantToken
+  const refreshUat = opts.refreshUat ?? refreshFeishuUat
   return {
     id: 'feishu',
     displayName: '飞书',
@@ -66,8 +76,29 @@ export function createFeishuServer(
     createAuthHeaders: async (store) => {
       const allowed = { 'X-Lark-MCP-Allowed-Tools': FEISHU_ALLOWED_TOOLS }
       const secrets = store.load().secrets ?? {}
+      if (secrets.refreshToken?.trim()) {
+        // 用户身份 + 自动续期：过期则用 refresh_token 换新并回写存储
+        let uat = secrets.uat?.trim() ?? ''
+        let refreshToken = secrets.refreshToken.trim()
+        const expiresAt = Number(secrets.uatExpiresAt ?? 0)
+        if (!uat || Date.now() >= expiresAt) {
+          const fresh = await refreshUat(secrets.appId ?? '', secrets.appSecret ?? '', refreshToken)
+          if (!fresh.uat) {
+            throw new Error('刷新 user_access_token 返回空 token，请重新授权')
+          }
+          uat = fresh.uat
+          refreshToken = fresh.refreshToken || refreshToken
+          store.saveSecrets({
+            uat,
+            refreshToken,
+            uatExpiresAt: String(Date.now() + fresh.expiresIn * 1000),
+          })
+        }
+        return { 'X-Lark-MCP-UAT': uat, ...allowed }
+      }
       if (secrets.uat?.trim()) {
-        return { 'X-Lark-MCP-UAT': secrets.uat, ...allowed }
+        // 手动粘贴的 UAT（无 refresh_token）：不刷新，过期后按 failureHint 重新获取
+        return { 'X-Lark-MCP-UAT': secrets.uat.trim(), ...allowed }
       }
       const tat = await exchange(secrets.appId ?? '', secrets.appSecret ?? '')
       return { 'X-Lark-MCP-TAT': tat, ...allowed }
