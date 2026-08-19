@@ -77,6 +77,13 @@ export type IpcResult<T = void> = { ok: true; data: T } | { ok: false; error: st
 
 // ---- 边界 DTO（Boundary DTOs） ----
 
+/** mcp:connect 载荷：OAuth server 只带 serverId，非 OAuth server 附带表单凭据 */
+export interface McpConnectPayload {
+  serverId: string
+  /** 非 OAuth server 的表单凭据（按定义的 credentialFields 校验），OAuth server 省略 */
+  credentials?: Record<string, string>
+}
+
 export interface RecentFileEntry {
   filePath: string
   title: string
@@ -510,7 +517,10 @@ export interface MindlaneBridge {
   settings: {
     load: () => Promise<AppSettings>
     update: (partial: Record<string, unknown>) => Promise<void>
-    mcpConnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+    mcpConnect: (
+      serverId: string,
+      credentials?: Record<string, string>,
+    ) => Promise<{ ok: true } | { ok: false; error: string }>
     mcpDisconnect: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
     mcpStatus: () => Promise<
       { ok: true; data: McpServerStatusInfo[] } | { ok: false; error: string }

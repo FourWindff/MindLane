@@ -17,13 +17,14 @@ function createMockTool(name: string): DynamicStructuredTool {
   })
 }
 
-function makeDef(id: string): McpServerDefinition {
+function makeDef(id: string, extra: Partial<McpServerDefinition> = {}): McpServerDefinition {
   return {
     id,
     displayName: id.toUpperCase(),
     description: `Mock server ${id}`,
     transport: 'http',
     connection: { url: `https://mcp.example.com/${id}` },
+    ...extra,
   }
 }
 
@@ -183,5 +184,148 @@ describe('McpManager', () => {
 
     expect(manager.getTools()).toEqual([])
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
+  })
+
+  // ---- 非 OAuth header 认证（Obsidian 类 server） ----
+
+  const obsidianDef = (extra: Partial<McpServerDefinition> = {}) =>
+    makeDef('obsidian', {
+      credentialFields: [{ id: 'apiKey', label: 'API Key', required: true, secret: true }],
+      createAuthHeaders: async (store) => ({
+        Authorization: `Bearer ${store.load().secrets?.apiKey ?? ''}`,
+      }),
+      ...extra,
+    })
+
+  it('表单凭据经 createAuthHeaders 解析为认证头，注入 client 工厂', async () => {
+    let receivedHeaders: Record<string, string> | undefined
+    const { manager } = createManager({
+      servers: [obsidianDef()],
+      createClient: (_def, _authProvider, headers) => {
+        receivedHeaders = headers
+        return makeClient(['read_file'])
+      },
+    })
+
+    await manager.connect('obsidian', { apiKey: 'k-123' })
+
+    expect(receivedHeaders).toEqual({ Authorization: 'Bearer k-123' })
+    expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'connected' }))
+  })
+
+  it('启动静默重连时从持久化 secrets 解析认证头，无需重新填表', async () => {
+    let receivedHeaders: Record<string, string> | undefined
+    const { manager } = createManager({
+      credentialCrypto: testCrypto,
+      servers: [obsidianDef()],
+      createClient: (_def, _authProvider, headers) => {
+        receivedHeaders = headers
+        return makeClient(['read_file'])
+      },
+    })
+    // 模拟上次连接写入的加密凭据文件
+    const credPath = path.join(userDataPath, 'mcp-credentials', 'obsidian.json')
+    fs.mkdirSync(path.dirname(credPath), { recursive: true })
+    fs.writeFileSync(
+      credPath,
+      testCrypto.encrypt(JSON.stringify({ secrets: { apiKey: 'stored-key' } })),
+    )
+
+    await manager.start({ obsidian: { state: 'connected' } })
+
+    expect(receivedHeaders).toEqual({ Authorization: 'Bearer stored-key' })
+    expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'connected' }))
+  })
+
+  it('allowlist 裁剪先于注册：16 个工具注册为 13 个，破坏性工具被剔除', async () => {
+    const { manager } = createManager({
+      servers: [obsidianDef({ excludeTools: ['vault_delete', 'command_execute', 'open_file'] })],
+      createClient: () =>
+        makeClient([
+          'select',
+          'append_content',
+          'batch_create',
+          'create',
+          'delete',
+          'search',
+          'read_file',
+          'write_file',
+          'patch_content',
+          'get_context',
+          'list_files',
+          'read_dir',
+          'get_tags',
+          'vault_delete',
+          'command_execute',
+          'open_file',
+        ]),
+    })
+
+    await manager.start({ obsidian: { state: 'connected' } })
+
+    const names = manager.getTools().map((t) => t.name)
+    expect(names).toHaveLength(13)
+    expect(names.every((n) => n.startsWith('obsidian__'))).toBe(true)
+    for (const forbidden of ['vault_delete', 'command_execute', 'open_file']) {
+      expect(names.some((n) => n.includes(forbidden))).toBe(false)
+    }
+  })
+
+  it('缺少必填表单字段时连接失败，错误信息含字段标签与指引文案', async () => {
+    const { manager } = createManager({
+      servers: [obsidianDef({ failureHint: '请打开 Obsidian 并启用 Local REST API 插件' })],
+      createClient: () => makeClient(['read_file']),
+    })
+
+    const status = await manager.connect('obsidian', {})
+
+    expect(status.state).toBe('failed')
+    expect(status.error).toContain('API Key')
+    expect(status.error).toContain('请打开 Obsidian 并启用 Local REST API 插件')
+    expect(manager.getTools()).toEqual([])
+  })
+
+  it('连接失败时状态含指引文案', async () => {
+    const { manager } = createManager({
+      servers: [obsidianDef({ failureHint: '请打开 Obsidian 并启用 Local REST API 插件' })],
+      createClient: () => makeFailingClient(new Error('连接被拒绝')),
+    })
+
+    await manager.connect('obsidian', { apiKey: 'k' })
+
+    expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'failed' }))
+    expect(manager.getStatuses()[0].error).toContain('请打开 Obsidian 并启用 Local REST API 插件')
+  })
+
+  it('断开后 secrets 凭据文件删除，工具清空', async () => {
+    const { manager } = createManager({
+      credentialCrypto: testCrypto,
+      servers: [obsidianDef()],
+      createClient: () => makeClient(['read_file']),
+    })
+    await manager.connect('obsidian', { apiKey: 'k' })
+    const credPath = path.join(userDataPath, 'mcp-credentials', 'obsidian.json')
+    expect(manager.getTools().length).toBe(1)
+    expect(fs.existsSync(credPath)).toBe(true)
+
+    await manager.disconnect('obsidian')
+
+    expect(manager.getTools()).toEqual([])
+    expect(fs.existsSync(credPath)).toBe(false)
+    expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
+  })
+
+  it('状态信息携带表单字段元数据与失败指引', async () => {
+    const { manager } = createManager({
+      servers: [obsidianDef({ failureHint: '请打开 Obsidian' })],
+      createClient: () => makeClient(['read_file']),
+    })
+
+    const [status] = manager.getStatuses()
+
+    expect(status.credentialFields).toEqual([
+      { id: 'apiKey', label: 'API Key', required: true, secret: true },
+    ])
+    expect(status.failureHint).toBe('请打开 Obsidian')
   })
 })

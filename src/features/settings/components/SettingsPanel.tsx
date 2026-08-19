@@ -39,11 +39,14 @@ const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
 // Brand icons live in public/assets, keyed by server id; unknown ids fall back to a generic plug icon.
 const MCP_ICONS: Record<string, string> = {
   notion: '/assets/notion.svg',
+  obsidian: '/assets/obsidian.svg',
 }
 
 function McpIntegrationsSection() {
   const [servers, setServers] = useState<McpServerStatusInfo[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [formOpenId, setFormOpenId] = useState<string | null>(null)
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
 
   useEffect(() => {
     void refresh()
@@ -66,6 +69,20 @@ function McpIntegrationsSection() {
     }
   }
 
+  const submitForm = async (server: McpServerStatusInfo) => {
+    setBusyId(server.id)
+    try {
+      const res = await window.mindlane?.settings.mcpConnect(server.id, formValues)
+      if (res?.ok) {
+        setFormOpenId(null)
+        setFormValues({})
+      }
+    } finally {
+      await refresh()
+      setBusyId(null)
+    }
+  }
+
   if (servers.length === 0) return null
 
   return (
@@ -74,11 +91,13 @@ function McpIntegrationsSection() {
         const iconSrc = MCP_ICONS[server.id]
         const connected = server.state === 'connected'
         const busy = busyId === server.id || server.state === 'connecting'
+        const hasForm = (server.credentialFields?.length ?? 0) > 0
+        const formOpen = formOpenId === server.id
         const statusLabel =
           MCP_STATE_LABELS[server.state] +
           (connected && server.workspaceName ? ` · ${server.workspaceName}` : '')
         return (
-          <div className="settings-card__row" key={server.id}>
+          <div className="settings-card__row mcp-server" key={server.id}>
             {iconSrc ? <img src={iconSrc} alt="" width={28} height={28} /> : <Plug size={28} />}
             <div className="mcp-server__text">
               <div className="settings-card__label">{server.displayName}</div>
@@ -97,11 +116,44 @@ function McpIntegrationsSection() {
                 type="button"
                 className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
                 disabled={busy}
-                onClick={() => void runAction(server.id, !connected)}
+                onClick={() => {
+                  if (busy) return
+                  if (connected) void runAction(server.id, false)
+                  else if (hasForm && !formOpen) {
+                    setFormValues({})
+                    setFormOpenId(server.id)
+                  } else if (hasForm && formOpen) {
+                    setFormOpenId(null)
+                    setFormValues({})
+                  } else void runAction(server.id, true)
+                }}
               >
-                {busy ? '处理中…' : connected ? '断开' : '连接'}
+                {busy ? '处理中…' : connected ? '断开' : formOpen ? '取消' : '连接'}
               </button>
             </div>
+            {formOpen && hasForm && (
+              <div className="mcp-server__form">
+                {server.credentialFields?.map((field) => (
+                  <label className="panel-field" key={field.id}>
+                    <span className="panel-field__label">{field.label}</span>
+                    <input
+                      className="panel-field__input"
+                      type={field.secret ? 'password' : 'text'}
+                      value={formValues[field.id] ?? ''}
+                      onChange={(e) => setFormValues((v) => ({ ...v, [field.id]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  className="panel-btn panel-btn--primary"
+                  disabled={busy}
+                  onClick={() => void submitForm(server)}
+                >
+                  确认连接
+                </button>
+              </div>
+            )}
           </div>
         )
       })}

@@ -191,6 +191,16 @@
   background: var(--ml-success);
 }
 
+/* 凭据表单：占据整行，从 flex 行内折到下一行 */
+.mcp-server > .mcp-server__form {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--ml-border);
+}
+
 .settings-card__switch {
   display: inline-flex;
   align-items: center;

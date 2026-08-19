@@ -16,6 +16,8 @@ export interface McpStoredCredentials {
   /** DCR 动态注册拿到的 client 凭据（必须持久化，重复注册会使既有授权成为孤儿） */
   clientInformation?: OAuthClientInformationMixed
   tokens?: OAuthTokens
+  /** 非 OAuth 连接凭据（MCP 连接凭据）：表单填写的密钥，加密存于 userData 独立文件，不进 settings.json */
+  secrets?: Record<string, string>
 }
 
 /**
@@ -54,6 +56,10 @@ export class McpCredentialStore {
 
   saveTokens(tokens: OAuthTokens): void {
     this.merge({ tokens })
+  }
+
+  saveSecrets(secrets: Record<string, string>): void {
+    this.merge({ secrets: { ...this.load().secrets, ...secrets } })
   }
 
   clear(): void {

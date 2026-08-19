@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import type { McpServerStatus } from '../../mcp/types.js'
-import { IPC } from '../../ipc.js'
+import { IPC, type McpConnectPayload } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { HandlerContext } from './context.js'
@@ -35,11 +35,11 @@ export async function persistMcpStatus(
 }
 
 export function registerMcpHandlers(ctx: HandlerContext): void {
-  ipcMain.handle(IPC.McpConnect, async (_e, payload: { serverId: string }) => {
+  ipcMain.handle(IPC.McpConnect, async (_e, payload: McpConnectPayload) => {
     const manager = ctx.getMcpManager()
     if (!manager) return { ok: false, error: 'MCP 模块未初始化' }
     try {
-      const status = await manager.connect(payload.serverId)
+      const status = await manager.connect(payload.serverId, payload.credentials)
       if (status.state !== 'connected') {
         return { ok: false, error: status.error ?? '连接失败' }
       }

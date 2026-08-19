@@ -18,11 +18,27 @@ export interface McpServerStatus {
   error?: string
 }
 
+/** 非 OAuth server 连接表单的字段元数据；渲染层据此画表单，主进程按定义校验 */
+export interface McpCredentialField {
+  /** 表单字段 id（同时是凭据存储 secrets 中的键） */
+  id: string
+  /** 表单中的展示标签 */
+  label: string
+  /** 必填字段；缺失时连接直接失败，不发起请求 */
+  required?: boolean
+  /** 敏感字段：渲染为密码输入框，明文只经凭据存储加密落盘 */
+  secret?: boolean
+}
+
 /** 合并 catalog 元数据后的完整状态，供 mcp:status 返回给渲染层 */
 export interface McpServerStatusInfo extends McpServerStatus {
   id: string
   displayName: string
   description: string
+  /** 非 OAuth server 的连接表单字段元数据（OAuth server 省略） */
+  credentialFields?: McpCredentialField[]
+  /** 失败指引文案（如“打开 Obsidian 并启用 Local REST API 插件”） */
+  failureHint?: string
 }
 
 /** 传给 server 授权工厂的上下文 */
@@ -48,8 +64,22 @@ export interface McpServerDefinition {
     args?: string[]
     env?: Record<string, string>
   }
-  /** 授权工厂（如 OAuth）；无认证的 server 省略 */
+  /**
+   * OAuth 模式授权工厂；与 createAuthHeaders 互斥，定义内二选一。
+   * 设置面板对这种 server 走浏览器授权交互。
+   */
   createAuthProvider?: (ctx: McpAuthContext) => LoopbackOAuthProvider
+  /**
+   * 非 OAuth 模式：从凭据存储解析要注入 HTTP 请求头的键值对（如 Authorization: Bearer）；
+   * 与 createAuthProvider 互斥。设置面板对这种 server 走凭据表单交互。
+   */
+  createAuthHeaders?: (store: McpCredentialStore) => Promise<Record<string, string>>
+  /** 连接表单字段元数据（非 OAuth server 声明；渲染层据元数据画表单） */
+  credentialFields?: McpCredentialField[]
+  /** 失败指引文案；连接失败时追加到错误信息 */
+  failureHint?: string
+  /** 注册进 ToolRegistry 之前剔除的工具名（如 Obsidian 的破坏性工具） */
+  excludeTools?: string[]
   /** 连接成功后从 server 工具集中拉取展示信息（如 workspace 名）；失败应返回 undefined */
   fetchWorkspaceName?: (tools: StructuredToolInterface[]) => Promise<string | undefined>
 }
@@ -63,4 +93,6 @@ export interface McpClientLike {
 export type McpClientFactory = (
   serverDef: McpServerDefinition,
   authProvider?: LoopbackOAuthProvider,
+  /** 非 OAuth 模式：createAuthHeaders 解析出的认证头，透传到 http transport */
+  headers?: Record<string, string>,
 ) => McpClientLike

@@ -49,7 +49,8 @@ const api: MindlaneBridge = {
   settings: {
     load: () => ipcRenderer.invoke(IPC.FileSettingsLoad),
     update: (partial) => ipcRenderer.invoke(IPC.FileSettingsUpdate, partial),
-    mcpConnect: (serverId) => ipcRenderer.invoke(IPC.McpConnect, { serverId }),
+    mcpConnect: (serverId, credentials) =>
+      ipcRenderer.invoke(IPC.McpConnect, { serverId, credentials }),
     mcpDisconnect: (serverId) => ipcRenderer.invoke(IPC.McpDisconnect, { serverId }),
     mcpStatus: () => ipcRenderer.invoke(IPC.McpStatus),
   },

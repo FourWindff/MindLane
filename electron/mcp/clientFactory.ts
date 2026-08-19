@@ -6,7 +6,7 @@ import type { McpClientFactory } from './types.js'
  * 生产环境的 client 工厂：按 catalog 定义构建 MultiServerMCPClient。
  * automaticSSEFallback 关闭——避免 401 时 SSE 回退触发第二次浏览器授权。
  */
-export const createMcpClient: McpClientFactory = (serverDef, authProvider) => {
+export const createMcpClient: McpClientFactory = (serverDef, authProvider, headers) => {
   const connection: Connection =
     serverDef.transport === 'stdio'
       ? {
@@ -19,6 +19,7 @@ export const createMcpClient: McpClientFactory = (serverDef, authProvider) => {
           type: serverDef.transport,
           url: serverDef.connection.url ?? '',
           ...(authProvider ? { authProvider } : {}),
+          ...(headers ? { headers } : {}),
           automaticSSEFallback: false,
         }
 
