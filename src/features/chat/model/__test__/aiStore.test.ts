@@ -886,6 +886,182 @@ describe('reduceStreamEvent', () => {
     expect(next).toBe(base)
   })
 
+  it('anchors the current round tool cards to the flushed segment and resets the live cards', () => {
+    // Text segment streams, then its tools run, then the next segment boundary
+    // fires message-start: the cards must be attached ABOVE the flushed message
+    // and cleared from the live row, so mid-stream matches the final grouping
+    // instead of leaving the cards floating below the newest message.
+    const prepared = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: '我来读取导图',
+    })
+    const withTools = reduceStreamEvent(prepared, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-read', name: 'readMindmap', input: {} },
+    })
+    const settled = reduceStreamEvent(withTools, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-read', name: 'readMindmap', status: 'success', output: 'ok' },
+    })
+    const next = reduceStreamEvent(settled, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+
+    expect(next.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: '我来读取导图',
+        toolCalls: [{ name: 'readMindmap', args: {}, result: '', status: 'success' }],
+      },
+    ])
+    expect(next.streamText).toBe('')
+    expect(next.toolCards).toEqual([])
+  })
+
+  it('marks an in-flight card canceled when anchored to a flushed segment and keeps subgraph stages', () => {
+    const prepared = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: '文本',
+    })
+    const started = reduceStreamEvent(prepared, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-sub', name: 'generateMindmapFragment', input: {} },
+    })
+    const stepped = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 5 },
+    })
+    const next = reduceStreamEvent(stepped, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+
+    expect(next.chatMessages[0]?.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: '',
+        status: 'canceled',
+        steps: [{ step: 'extracting', completed: 2, total: 5 }],
+      },
+    ])
+    expect(next.toolCards).toEqual([])
+  })
+
+  it('keeps each streaming round anchored to its own segment, matching the end rebuild', () => {
+    // Real event order: text1 tokens → tools A,B run → boundary to text2 flushes
+    // text1 with its cards → text2 tokens → boundary to tool C flushes text2
+    // (no cards) → tool C runs → text3 streams live above card C.
+    let chat = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'text1',
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-a', name: 'readMindmap', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-a', name: 'readMindmap', status: 'success', output: 'ok' },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-b', name: 'insertXmlFragment', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-b', name: 'insertXmlFragment', status: 'success', output: 'ok' },
+    })
+    // First boundary (m1 → m2): text1 joins the list carrying round A/B's cards.
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(chat.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: 'text1',
+        toolCalls: [
+          { name: 'readMindmap', args: {}, result: '', status: 'success' },
+          { name: 'insertXmlFragment', args: {}, result: '', status: 'success' },
+        ],
+      },
+    ])
+    // text2 streams, then its own tool C runs and settles in the live row.
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'text2',
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-c', name: 'moveMindmapNode', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-c', name: 'moveMindmapNode', status: 'success', output: 'ok' },
+    })
+    // Second boundary (m2 → m3): text2 joins carrying round C's card — the same
+    // grouping the final checkpoint produces (m2 declares C, so C attaches to
+    // text2). The live row is empty for the next round.
+    const final = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(final.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: 'text1',
+        toolCalls: [
+          { name: 'readMindmap', args: {}, result: '', status: 'success' },
+          { name: 'insertXmlFragment', args: {}, result: '', status: 'success' },
+        ],
+      },
+      {
+        role: 'assistant',
+        content: 'text2',
+        toolCalls: [{ name: 'moveMindmapNode', args: {}, result: '', status: 'success' }],
+      },
+    ])
+    expect(final.toolCards).toEqual([])
+  })
+
   it('adds a card on tool-start and settles its status on tool-end', () => {
     const started = reduceStreamEvent(base, {
       streamId: 's',

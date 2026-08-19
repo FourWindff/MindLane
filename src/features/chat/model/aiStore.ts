@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import type { ChatMessage, ChatToolCallStep, DocumentRef } from '@/shared/lib/fileFormat'
+import type {
+  ChatMessage,
+  ChatToolCall,
+  ChatToolCallStep,
+  DocumentRef,
+} from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
@@ -681,6 +686,24 @@ function markRunningCardsCanceled(toolCards: ToolCard[]): ToolCard[] {
 }
 
 /**
+ * Snapshot live tool cards into a committed `ChatToolCall[]`. Cards that are
+ * still running when flushed are marked canceled: once attached to a committed
+ * message the card is no longer tracked by `toolCards`, so a later tool-end
+ * could never settle it — canceling avoids a permanently stuck spinner. The
+ * subgraph stage trace is carried over (`stages` → `steps`) so the committed
+ * message renders the full progress history.
+ */
+function toolCallsFromCards(cards: ToolCard[]): ChatToolCall[] {
+  return cards.map((card) => ({
+    name: card.name,
+    args: {},
+    result: '',
+    ...(card.status === 'running' ? { status: 'canceled' as const } : { status: card.status }),
+    ...(card.stages?.length ? { steps: card.stages } : {}),
+  }))
+}
+
+/**
  * Append a stage to the running card's accumulated trace: a new step appends,
  * a repeat of the current step only updates its counts (e.g. extracting n/m).
  */
@@ -706,14 +729,26 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
   switch (event.type) {
     case 'token':
       return { ...chat, streamText: chat.streamText + event.payload }
-    case 'message-start':
-      return chat.streamText.trim()
-        ? {
-            ...chat,
-            chatMessages: [...chat.chatMessages, { role: 'assistant', content: chat.streamText }],
-            streamText: '',
-          }
-        : chat
+    case 'message-start': {
+      if (!chat.streamText.trim()) return chat
+      // Flush the segment into its own message together with the tool cards
+      // accumulated since the previous segment. Without this, cards rendered in
+      // the live bottom row stay separated from the message that declared them
+      // ("following" the newest message) and only snap above it when `end`
+      // rebuilds the turn — the mid-stream position then disagrees with the
+      // final history. Clearing toolCards anchors each round's cards above its
+      // own text, matching the final checkpoint grouping.
+      const toolCalls = chat.toolCards.length ? toolCallsFromCards(chat.toolCards) : undefined
+      return {
+        ...chat,
+        chatMessages: [
+          ...chat.chatMessages,
+          { role: 'assistant', content: chat.streamText, ...(toolCalls ? { toolCalls } : {}) },
+        ],
+        streamText: '',
+        toolCards: [],
+      }
+    }
     case 'tool-start': {
       const { id, name } = event.payload
       if (!name) return chat
@@ -770,14 +805,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
       // canceled — so the history records which tools ran before the stop.
       const canceledCalls = response.toolCalls?.length
         ? undefined
-        : chat.toolCards.map((card) => ({
-            name: card.name,
-            args: {},
-            result: '',
-            ...(card.status === 'running'
-              ? { status: 'canceled' as const }
-              : { status: card.status }),
-          }))
+        : toolCallsFromCards(chat.toolCards)
       const toolCalls = response.toolCalls ?? canceledCalls
       const messages = response.messages?.length
         ? response.messages

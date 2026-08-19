@@ -311,6 +311,36 @@ describe('ChatMessageList', () => {
     expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('正在生成'))
   })
 
+  it('anchors each streaming round cards above its own segment instead of below the newest message', () => {
+    // During a multi-round turn, a flushed segment ("读取完成") owns its cards
+    // already committed via message-start; the live row only holds the current
+    // round (insertXmlFragment + its streaming text). No tool block floats below
+    // the newest committed message.
+    const html = renderMessageList({
+      fileChats: {
+        'file-a': fileChat({
+          busy: true,
+          streamText: '开始生成',
+          toolCards: [{ id: 'call-b', name: 'insertXmlFragment', status: 'success' }],
+          chatMessages: [
+            {
+              role: 'assistant',
+              content: '读取完成',
+              toolCalls: [{ name: 'readMindmap', status: 'success' }],
+            },
+          ],
+        }),
+      },
+    })
+
+    // The streaming row renders first in DOM (column-reverse flips visual order):
+    // within each block cards sit above their own text, and the committed
+    // segment sits between the two card groups — no card floats below it.
+    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('读取完成'))
+    expect(html.indexOf('读取完成')).toBeGreaterThan(html.indexOf('Insert XML Fragment'))
+    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('开始生成'))
+  })
+
   it('renders canceled cards for a stopped stream without spinners', () => {
     const html = renderMessageList({
       fileChats: {
