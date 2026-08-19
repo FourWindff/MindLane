@@ -74,8 +74,14 @@ function McpIntegrationsSection() {
 
   /** 打开配置表单并回填已保存的凭据（只回填本 server 声明的字段） */
   const openFormPrefilled = async (server: McpServerStatusInfo) => {
-    const res = await window.mindlane?.settings.mcpGetCredentials(server.id)
-    const secrets = res?.ok ? res.data : {}
+    let secrets: Record<string, string> = {}
+    try {
+      const res = await window.mindlane?.settings.mcpGetCredentials(server.id)
+      if (res?.ok) secrets = res.data
+    } catch {
+      // 主进程尚未注册该 handler（如重载后未重启主进程）时降级为空表单，不阻断编辑
+      secrets = {}
+    }
     const ids = new Set((server.credentialFields ?? []).map((f) => f.id))
     const prefilled: Record<string, string> = {}
     for (const [k, v] of Object.entries(secrets)) if (ids.has(k)) prefilled[k] = v
