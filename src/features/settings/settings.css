@@ -167,6 +167,10 @@
   color: var(--ml-text-muted);
 }
 
+.mcp-server {
+  flex-wrap: wrap;
+}
+
 .mcp-server__text {
   flex: 1;
   min-width: 0;
