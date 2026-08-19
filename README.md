@@ -15,6 +15,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" />
   <img alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white" />
   <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-1C3C3C?logo=langchain&logoColor=white" />
+  <a href="https://fourwindff.github.io/MindLane/"><img alt="Website" src="https://img.shields.io/badge/Website-fourwindff.github.io%2FMindLane-0B6BCB?logo=githubpages&logoColor=white" /></a>
 </p>
 
 ---
@@ -45,17 +46,23 @@ A fast, free-form canvas built on React Flow. Drag nodes anywhere, restyle them 
 
 Bring your own API key — switch providers without changing how you work.
 
-- Anthropic
-- OpenAI
-- Kimi
-- MiniMax
-- DashScope
+| Provider        | Models                                        | Extras                    |
+| --------------- | --------------------------------------------- | ------------------------- |
+| 通义千问 (百炼) | qwen-turbo / qwen-plus / qwen-max / qwen-long | vision + image generation |
+| Kimi Code       | Kimi K2.5 / Kimi K2                           | —                         |
+| MiniMax         | MiniMax M2.7 / M2.5 / M2.1 / M2               | image generation          |
+| DeepSeek (V4)   | DeepSeek V4 Flash / V4 Pro                    | —                         |
+| OpenCode Go     | GLM-5.x · Kimi K2.7 Code · Kimi K2.6 …        | —                         |
 
 ### 🧩 MCP Extensions
 
-Extend what the assistant can reach through the **Model Context Protocol**. A built-in server catalog, extensible via `settings.json`:
+Extend what the assistant can reach through the **Model Context Protocol** — a built-in server catalog with brand icons, extensible via `settings.json`:
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="https://cdn.simpleicons.org/notion/white" /><img alt="Notion" src="https://cdn.simpleicons.org/notion/black" height="16" /></picture>&nbsp; **Notion** — hosted remote server, one-click OAuth
+| Server                                               | Connection                                   | Auth                                                                      |
+| ---------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| ![Notion](public/assets/notion.svg) **Notion**       | hosted remote server                         | one-click OAuth 2.0/PKCE                                                  |
+| ![Obsidian](public/assets/obsidian.svg) **Obsidian** | local encrypted endpoint (`127.0.0.1:27124`) | API Key                                                                   |
+| ![Feishu](public/assets/feishu.svg) **飞书**         | Lark MCP HTTP endpoint                       | App ID/Secret + UAT — one-click loopback OAuth with silent 30-day refresh |
 
 ---
 
@@ -72,5 +79,6 @@ Then open **Settings**, pick a provider, and paste in your API key.
 ---
 
 <p align="center">
-  <a href="https://github.com/FourWindff/MindLane">github.com/FourWindff/MindLane</a>
+  <a href="https://github.com/FourWindff/MindLane">github.com/FourWindff/MindLane</a> ·
+  <a href="https://fourwindff.github.io/MindLane/">fourwindff.github.io/MindLane</a>
 </p>
