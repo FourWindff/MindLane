@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plug } from 'lucide-react'
+import { Plug, SlidersHorizontal } from 'lucide-react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
@@ -185,7 +185,9 @@ function McpIntegrationsSection() {
                   className="panel-btn"
                   disabled={busy}
                   onClick={() => void openFormPrefilled(server)}
+                  aria-label="显示配置"
                 >
+                  <SlidersHorizontal size={14} />
                   显示配置
                 </button>
               )}
