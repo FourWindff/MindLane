@@ -199,27 +199,22 @@
   gap: 0.35rem;
 }
 
-/* 悬浮感叹号：展示连接教程气泡 */
+/* 悬浮感叹号：展示连接教程气泡；不改光标，关闭带 250ms 延迟避免移动时闪断 */
 .mcp-tutorial-tip {
   position: relative;
   display: inline-flex;
   align-items: center;
   color: var(--ml-text-muted);
-  cursor: help;
-}
-
-.mcp-tutorial-tip:hover {
-  color: var(--ml-text);
 }
 
 .mcp-tutorial-bubble {
-  display: none;
   position: absolute;
   left: 0;
-  top: calc(100% + 8px);
+  top: 100%;
   z-index: 40;
   min-width: 260px;
   max-width: 340px;
+  margin-top: 4px;
   padding: 0.6rem 0.75rem;
   border-radius: 8px;
   background: var(--ml-bg-elevated, #fff);
@@ -228,10 +223,23 @@
   font-size: 0.74rem;
   line-height: 1.55;
   color: var(--ml-text);
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease,
+    visibility 0s linear 0.25s;
 }
 
 .mcp-tutorial-tip:hover .mcp-tutorial-bubble {
-  display: block;
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease,
+    visibility 0s linear 0s;
 }
 
 .mcp-tutorial-step {
