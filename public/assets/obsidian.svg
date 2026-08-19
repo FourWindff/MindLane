@@ -1,13 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 100">
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black rounded square bg + official purple obsidian gem, matching Obsidian's app icon. -->
   <defs>
     <linearGradient id="obsidian-gem" x1="82.85" y1="30.41" x2="51.26" y2="105.9" gradientTransform="matrix(1,0,0,-1,-22.41,110.97)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#6c56cc"/>
       <stop offset="1" stop-color="#9785e5"/>
     </linearGradient>
   </defs>
-  <polygon points="0,45.45 19.57,90.47 47.35,100 52.44,89.8 63,26.39 44.61,0 12.91,17.52" fill="#34208c"/>
-  <polygon points="16.43,35.7 47.35,100 52.44,89.8 63,26.39 43.44,14.41" fill="url(#obsidian-gem)"/>
-  <polygon points="44.61,0 43.44,14.41 63,26.39" fill="#af9ff4"/>
-  <polygon points="12.91,17.52 16.43,35.7 43.44,14.41 44.61,0" fill="#4a37a0"/>
-  <polygon points="47.35,100 16.43,35.7 19.57,90.47" fill="#4a37a0"/>
+  <rect x="0" y="0" width="24" height="24" rx="5" fill="#131313"/>
+  <!-- Official gem: viewBox 0 0 63 100, scaled to height 19 (aspect 0.63 → w 12), centered at x=6 -->
+  <g transform="translate(6 2.5) scale(0.19)">
+    <polygon points="0,45.45 19.57,90.47 47.35,100 52.44,89.8 63,26.39 44.61,0 12.91,17.52" fill="#34208c"/>
+    <polygon points="16.43,35.7 47.35,100 52.44,89.8 63,26.39 43.44,14.41" fill="url(#obsidian-gem)"/>
+    <polygon points="44.61,0 43.44,14.41 63,26.39" fill="#af9ff4"/>
+    <polygon points="12.91,17.52 16.43,35.7 43.44,14.41 44.61,0" fill="#4a37a0"/>
+    <polygon points="47.35,100 16.43,35.7 19.57,90.47" fill="#4a37a0"/>
+  </g>
 </svg>
