@@ -193,26 +193,59 @@
   min-width: 0;
 }
 
-.mcp-server__tutorial {
-  margin-top: 0.4rem;
+.mcp-server__label {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 0.35rem;
 }
 
-.mcp-server__tutorial-hint {
-  font-size: 0.72rem;
-  line-height: 1.5;
+/* 悬浮感叹号：展示连接教程气泡 */
+.mcp-tutorial-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   color: var(--ml-text-muted);
+  cursor: help;
 }
 
-.mcp-server__tutorial-links {
+.mcp-tutorial-tip:hover {
+  color: var(--ml-text);
+}
+
+.mcp-tutorial-bubble {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  min-width: 260px;
+  max-width: 340px;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--ml-bg-elevated, #fff);
+  border: 1px solid var(--ml-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-size: 0.74rem;
+  line-height: 1.55;
+  color: var(--ml-text);
+}
+
+.mcp-tutorial-tip:hover .mcp-tutorial-bubble {
+  display: block;
+}
+
+.mcp-tutorial-step {
+  margin: 0 0 0.1rem;
+}
+
+.mcp-tutorial-links {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.6rem;
+  margin-top: 0.35rem;
   flex-wrap: wrap;
 }
 
-.mcp-server__tutorial-link {
+.mcp-tutorial-link {
   border: 0;
   padding: 0;
   background: none;
@@ -223,7 +256,7 @@
   cursor: pointer;
 }
 
-.mcp-server__tutorial-link:hover {
+.mcp-tutorial-link:hover {
   text-decoration: underline;
 }
 
