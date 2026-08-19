@@ -44,6 +44,57 @@ describe('prepareDocument DocumentRef assembly', () => {
     expect(documentRef.filename).toContain('URL来源')
   })
 
+  it('backfills the title from loaded metadata.title when absent', async () => {
+    const { documentRef } = await prepareDocument({
+      source: { type: 'url', url: 'https://example.test/a' },
+      loaders: {
+        url: vi
+          .fn()
+          .mockResolvedValue([
+            new Document({ pageContent: 'body', metadata: { title: 'Page Title' } }),
+          ]),
+      },
+      budgetChars: 1000,
+    })
+
+    expect(documentRef.title).toBe('Page Title')
+  })
+
+  it('falls back to the url as title when the page has no title', async () => {
+    const { documentRef } = await prepareDocument({
+      source: { type: 'url', url: 'https://example.test/a' },
+      loaders: { url: vi.fn().mockResolvedValue([new Document({ pageContent: 'body' })]) },
+      budgetChars: 1000,
+    })
+
+    expect(documentRef.title).toBe('https://example.test/a')
+  })
+
+  it('keeps the existing ref title over a loaded title', async () => {
+    const { documentRef } = await prepareDocument({
+      source: { type: 'url', url: 'https://example.test/a' },
+      loaders: {
+        url: vi
+          .fn()
+          .mockResolvedValue([
+            new Document({ pageContent: 'body', metadata: { title: 'Page Title' } }),
+          ]),
+      },
+      budgetChars: 1000,
+      existingRef: {
+        id: 'old',
+        type: 'url',
+        source: 'https://example.test/a',
+        filename: 'old.txt',
+        importedAt: '2026-01-01T00:00:00.000Z',
+        title: 'Kept',
+        sha256: 'kept-hash',
+      },
+    })
+
+    expect(documentRef.title).toBe('Kept')
+  })
+
   it('builds a file ref hashed from file bytes with basename filename', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'mindlane-prepare-'))
     const filePath = path.join(directory, 'notes.md')
