@@ -3,19 +3,23 @@ import type { McpServerDefinition } from '../types.js'
 /** 飞书开发者远程模式默认端点（实测存活，见 ADR-0019）。 */
 export const FEISHU_DEFAULT_ENDPOINT = 'https://mcp.feishu.cn/mcp'
 
-/** 用 `X-Lark-MCP-Allowed-Tools` 头把服务端工具面收敛到文档搜索/读取/wiki 检索。 */
-export const FEISHU_ALLOWED_TOOLS = 'doc_search,doc_read,docs_search,wiki_search'
+/** 用 `X-Lark-MCP-Allowed-Tools` 头把服务端工具面收敛到文档搜索/读取/wiki 检索。
+ * 名称必须与飞书开发者远程模式官方工具集一致——tools/list 按此名单过滤，
+ * 写错名称会导致 0 工具（实测踩坑：曾用 doc_search 等臆造名，全部被过滤）。 */
+export const FEISHU_ALLOWED_TOOLS = 'search-doc,fetch-doc,list-docs'
 
 /**
- * 客户端侧 allowlist 双保险：注册前剔除消息/多维表格/日历等非文档工具。
- * 名称与飞书官方 MCP Beta 工具保持一致；平台工具面演进时在此追加/调整。
+ * 客户端侧 allowlist 双保险：注册前剔除创建/更新/评论等写操作与通用工具。
+ * 名称与飞书官方工具集保持一致；平台工具面演进时在此追加/调整。
  */
 export const FEISHU_EXCLUDE_TOOLS = [
-  'im_message',
-  'im_chat',
-  'bitable_record',
-  'bitable_table',
-  'calendar_event',
+  'search-user',
+  'get-user',
+  'fetch-file',
+  'create-doc',
+  'update-doc',
+  'get-comments',
+  'add-comments',
 ]
 
 /** 用 app 凭证现换 tenant access token 的抽象；生产走真实 API，测试注入 mock。 */

@@ -334,7 +334,7 @@ describe('McpManager', () => {
 
   function makeFeishuManager(
     exchange?: (appId: string, appSecret: string) => Promise<string>,
-    tools: string[] = ['doc_search', 'doc_read', 'wiki_search'],
+    tools: string[] = ['fetch-doc', 'search-doc', 'list-docs'],
   ) {
     let receivedHeaders: Record<string, string> | undefined
     const manager = new McpManager({
@@ -391,21 +391,22 @@ describe('McpManager', () => {
     expect(manager.getTools()).toEqual([])
   })
 
-  it('客户端 allowlist 再收敛：剔除消息/多维表格/日历工具，保留文档工具', async () => {
+  it('客户端 allowlist 再收敛：剔除写操作/通用工具，保留文档工具', async () => {
     const { manager } = makeFeishuManager(async () => 'app-token', [
-      'doc_search',
-      'doc_read',
-      'wiki_search',
-      'im_message',
-      'bitable_record',
-      'calendar_event',
+      'fetch-doc',
+      'search-doc',
+      'list-docs',
+      'create-doc',
+      'update-doc',
+      'get-comments',
+      'search-user',
     ])
 
     await manager.start({ feishu: { state: 'connected' } })
 
     const names = manager.getTools().map((t) => t.name)
-    expect(names).toEqual(['feishu__doc_search', 'feishu__doc_read', 'feishu__wiki_search'])
-    for (const forbidden of ['im_', 'bitable_', 'calendar_']) {
+    expect(names).toEqual(['feishu__fetch-doc', 'feishu__search-doc', 'feishu__list-docs'])
+    for (const forbidden of ['create-doc', 'update-doc', 'comment', 'search-user']) {
       expect(names.some((n) => n.includes(forbidden))).toBe(false)
     }
   })
