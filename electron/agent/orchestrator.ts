@@ -1,9 +1,8 @@
 import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { END, START, StateGraph } from '@langchain/langgraph'
+import { END, START, StateGraph, getWriter } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import type { MindmapEditorSnapshot } from '../ipc.js'
 import { type LLMProvider, ProviderCapability } from './providers/index.js'
 import type { AgentServices } from './service.js'
 import type {
@@ -19,11 +18,12 @@ import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/lib/fileFormat.js'
 import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import { createMindmapActionTools, type EditorSnapshotProvider } from './tools/mindmapActions.js'
+import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
 import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
+import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
 import {
   GENERATE_PALACE_TOOL,
@@ -69,8 +69,8 @@ interface AgentOrchestratorOptions {
   messagePipeline?: MessagePipelineConfig
   /** 按需读导图快照提供者：主进程装配时注入（经反向 IPC 向渲染层拉取）。 */
   mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
-  /** 写工具校验快照提供者（节点/资源/父关系）。 */
-  mindmapSnapshotRequester?: (fileUuid: string) => Promise<MindmapEditorSnapshot>
+  /** 写工具渲染层代理：转发参数、返回渲染层落盘应答（原样）。 */
+  mindmapWriteProxy?: MindmapWriteProxy
 }
 
 interface PalaceFromNodesResult {
@@ -155,15 +155,15 @@ export class AgentOrchestrator {
    * XML 写工具（固定 4 个）先注册，随后是路由工具。
    */
   private registerDefaultTools(options: { hasPalace: boolean }): void {
-    // 写工具校验依赖编辑器活状态快照（反向 IPC）；未装配 provider 时校验退化为仅语法层
-    const editorSnapshotProvider: EditorSnapshotProvider = (fileUuid) => {
-      const requester = this.options.mindmapSnapshotRequester
-      if (!requester) {
-        return Promise.reject(new Error('编辑器快照通道不可用，无法校验写操作'))
+    // 写工具渲染层代理：参数转发给渲染层落盘应答器；未装配代理时调用即报错
+    const writeProxy: MindmapWriteProxy = (fileUuid, action, args) => {
+      const proxy = this.options.mindmapWriteProxy
+      if (!proxy) {
+        return Promise.reject(new Error('落盘通道不可用，无法执行写操作'))
       }
-      return requester(fileUuid)
+      return proxy(fileUuid, action, args)
     }
-    const actionTools = createMindmapActionTools(editorSnapshotProvider)
+    const actionTools = createMindmapActionTools(writeProxy)
 
     this.toolRegistry.registerTool(actionTools.insertXmlFragmentTool)
     this.toolRegistry.registerTool(actionTools.updateNodeTool)
@@ -304,14 +304,22 @@ export class AgentOrchestrator {
       subgraph: {
         invoke: (
           state: MainGraphStateType,
-          config: { recursionLimit: number; callbacks: [] },
+          config: {
+            recursionLimit: number
+            callbacks: []
+            configurable?: { writer?: unknown }
+          },
         ) => Promise<T>
       },
       state: MainGraphStateType,
     ): Promise<Partial<MainGraphStateType>> => {
+      // langgraph 的 pickRunnableConfigKeys 不透传 custom writer：把外层 getWriter()
+      // 显式经 configurable.writer 传入子图，子图节点内的 getWriter() 才能继续发进度事件。
+      const writer = getWriter()
       const result = await subgraph.invoke(state, {
         recursionLimit: AGENT_LIMITS.recursionLimit,
         callbacks: [],
+        ...(writer ? { configurable: { writer } } : {}),
       })
       const updates = { ...(result as MainGraphStateType & T) }
       delete (updates as Record<string, unknown>).messages
@@ -495,12 +503,17 @@ export class AgentOrchestrator {
         const toolMsg = msg as BaseMessage & {
           name?: string
           content: unknown
+          additional_kwargs?: Record<string, unknown>
         }
+        const toolSteps = toolMsg.additional_kwargs?.toolSteps
+        const result =
+          typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content)
         toolCalls.unshift({
           name: toolMsg.name ?? 'unknown',
           args: {},
-          result:
-            typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content),
+          result,
+          status: deriveToolStatus(result),
+          steps: Array.isArray(toolSteps) ? toolSteps : undefined,
         })
       }
     }

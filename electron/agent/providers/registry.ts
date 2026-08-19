@@ -87,8 +87,10 @@ import { DashScopeProvider } from './dashscope.js'
 import { KimiCodeProvider } from './kimi-code.js'
 import { MiniMaxProvider } from './minimax.js'
 import { DeepSeekProvider } from './deepseek.js'
+import { OpenCodeGoProvider } from './opencode-go.js'
 
 registerProvider(DashScopeProvider)
 registerProvider(KimiCodeProvider)
 registerProvider(MiniMaxProvider)
 registerProvider(DeepSeekProvider)
+registerProvider(OpenCodeGoProvider)

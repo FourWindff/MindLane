@@ -8,7 +8,7 @@ import {
 } from '../../agent/providers/index.js'
 import type { SelectedNodeContent } from '../../agent/state.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
-import type { ChatContext, MindmapReadResponse } from '../../ipc.js'
+import type { ChatContext, MindmapReadResponse, MindmapWriteResponse } from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { aiNotReadyResponse } from './helpers.js'
@@ -85,6 +85,12 @@ export function registerAiHandlers(ctx: HandlerContext): void {
   // 未知 requestId（已超时/已应答）是 no-op。
   ipcMain.handle(IPC.AiMindmapReadRespond, (_e, payload: MindmapReadResponse) => {
     ctx.mindmapReadRequester.respond(payload)
+  })
+
+  // 渲染层 → 主进程：落盘应答（反向通道的 invoke 侧，同读导图模式）。
+  // 未知 requestId（已超时/已应答）是 no-op。
+  ipcMain.handle(IPC.AiMindmapWriteRespond, (_e, payload: MindmapWriteResponse) => {
+    ctx.mindmapWriteRequester.respond(payload)
   })
 
   // One-way (send, not invoke): renderer never awaits. Resolve workspaceUuid

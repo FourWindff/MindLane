@@ -233,7 +233,12 @@ describe('aiStore per-file chat state', () => {
       activeStreamIds: { 'session-a': 'stream-a' },
     })
 
-    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'step', payload: 'extracting' })
+    emit({
+      streamId: 'stream-a',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting' },
+    })
 
     expect(useAiStore.getState().fileChats['file-a']?.step).toBe('extracting')
   })
@@ -881,21 +886,297 @@ describe('reduceStreamEvent', () => {
     expect(next).toBe(base)
   })
 
-  it('tracks tool start and end in activeTools', () => {
+  it('anchors the current round tool cards to the flushed segment and resets the live cards', () => {
+    // Text segment streams, then its tools run, then the next segment boundary
+    // fires message-start: the cards must be attached ABOVE the flushed message
+    // and cleared from the live row, so mid-stream matches the final grouping
+    // instead of leaving the cards floating below the newest message.
+    const prepared = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: '我来读取导图',
+    })
+    const withTools = reduceStreamEvent(prepared, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-read', name: 'readMindmap', input: {} },
+    })
+    const settled = reduceStreamEvent(withTools, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-read', name: 'readMindmap', status: 'success', output: 'ok' },
+    })
+    const next = reduceStreamEvent(settled, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+
+    expect(next.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: '我来读取导图',
+        toolCalls: [{ name: 'readMindmap', args: {}, result: '', status: 'success' }],
+      },
+    ])
+    expect(next.streamText).toBe('')
+    expect(next.toolCards).toEqual([])
+  })
+
+  it('marks an in-flight card canceled when anchored to a flushed segment and keeps subgraph stages', () => {
+    const prepared = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: '文本',
+    })
+    const started = reduceStreamEvent(prepared, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-sub', name: 'generateMindmapFragment', input: {} },
+    })
+    const stepped = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 5 },
+    })
+    const next = reduceStreamEvent(stepped, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+
+    expect(next.chatMessages[0]?.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: '',
+        status: 'canceled',
+        steps: [{ step: 'extracting', completed: 2, total: 5 }],
+      },
+    ])
+    expect(next.toolCards).toEqual([])
+  })
+
+  it('keeps each streaming round anchored to its own segment, matching the end rebuild', () => {
+    // Real event order: text1 tokens → tools A,B run → boundary to text2 flushes
+    // text1 with its cards → text2 tokens → boundary to tool C flushes text2
+    // (no cards) → tool C runs → text3 streams live above card C.
+    let chat = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'text1',
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-a', name: 'readMindmap', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-a', name: 'readMindmap', status: 'success', output: 'ok' },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-b', name: 'insertXmlFragment', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-b', name: 'insertXmlFragment', status: 'success', output: 'ok' },
+    })
+    // First boundary (m1 → m2): text1 joins the list carrying round A/B's cards.
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(chat.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: 'text1',
+        toolCalls: [
+          { name: 'readMindmap', args: {}, result: '', status: 'success' },
+          { name: 'insertXmlFragment', args: {}, result: '', status: 'success' },
+        ],
+      },
+    ])
+    // text2 streams, then its own tool C runs and settles in the live row.
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'token',
+      payload: 'text2',
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-c', name: 'moveMindmapNode', input: {} },
+    })
+    chat = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-c', name: 'moveMindmapNode', status: 'success', output: 'ok' },
+    })
+    // Second boundary (m2 → m3): text2 joins carrying round C's card — the same
+    // grouping the final checkpoint produces (m2 declares C, so C attaches to
+    // text2). The live row is empty for the next round.
+    const final = reduceStreamEvent(chat, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'message-start',
+      payload: null,
+    })
+    expect(final.chatMessages).toEqual([
+      {
+        role: 'assistant',
+        content: 'text1',
+        toolCalls: [
+          { name: 'readMindmap', args: {}, result: '', status: 'success' },
+          { name: 'insertXmlFragment', args: {}, result: '', status: 'success' },
+        ],
+      },
+      {
+        role: 'assistant',
+        content: 'text2',
+        toolCalls: [{ name: 'moveMindmapNode', args: {}, result: '', status: 'success' }],
+      },
+    ])
+    expect(final.toolCards).toEqual([])
+  })
+
+  it('adds a card on tool-start and settles its status on tool-end', () => {
     const started = reduceStreamEvent(base, {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-start',
-      payload: { name: 'search', input: {} },
+      payload: { id: 'call-1', name: 'insertXmlFragment', input: {} },
     })
-    expect(started.activeTools).toEqual(['search'])
+    expect(started.toolCards).toEqual([
+      { id: 'call-1', name: 'insertXmlFragment', status: 'running' },
+    ])
     const ended = reduceStreamEvent(started, {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-end',
-      payload: { name: 'search', output: 'ok' },
+      payload: { id: 'call-1', name: 'insertXmlFragment', status: 'success', output: 'ok' },
     })
-    expect(ended.activeTools).toEqual([])
+    expect(ended.toolCards).toEqual([
+      { id: 'call-1', name: 'insertXmlFragment', status: 'success' },
+    ])
+  })
+
+  it('settles a card as error when the tool result failed', () => {
+    const started = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-2', name: 'updateMindmapNode', input: {} },
+    })
+    const ended = reduceStreamEvent(started, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-2', name: 'updateMindmapNode', status: 'error', output: 'boom' },
+    })
+    expect(ended.toolCards[0]?.status).toBe('error')
+  })
+
+  it('maps a step event to the running subgraph card and forwards counts', () => {
+    const withSubgraph = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-3', name: 'generateMindmapFragment', input: {} },
+    })
+    const stepped = reduceStreamEvent(withSubgraph, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 5 },
+    })
+    expect(stepped.step).toBe('extracting')
+    expect(stepped.toolCards[0]).toMatchObject({
+      name: 'generateMindmapFragment',
+      status: 'running',
+      step: 'extracting',
+      completed: 2,
+      total: 5,
+    })
+  })
+
+  it('accumulates the full stage sequence on the running subgraph card', () => {
+    const withSubgraph = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-3', name: 'generateMindmapFragment', input: {} },
+    })
+    const step1 = reduceStreamEvent(withSubgraph, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'reading-doc' },
+    })
+    const step2 = reduceStreamEvent(step1, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 1, total: 2 },
+    })
+    // A repeat of the current step only updates its counts, not the sequence.
+    const step3 = reduceStreamEvent(step2, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 2, total: 2 },
+    })
+    const step4 = reduceStreamEvent(step3, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'finalizing' },
+    })
+    expect(step4.toolCards[0]?.stages).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 2, total: 2 },
+      { step: 'finalizing' },
+    ])
+    expect(step4.toolCards[0]?.step).toBe('finalizing')
+  })
+
+  it('does not map steps onto non-subgraph cards but still updates the pipeline step', () => {
+    const withWrite = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-4', name: 'readMindmap', input: {} },
+    })
+    const stepped = reduceStreamEvent(withWrite, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'reading-doc' },
+    })
+    expect(stepped.step).toBe('reading-doc')
+    expect(stepped.toolCards[0]).not.toHaveProperty('step')
   })
 
   it('ignores tool-start with an empty name', () => {
@@ -903,7 +1184,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'tool-start',
-      payload: { name: '', input: {} },
+      payload: { id: '', name: '', input: {} },
     })
     expect(next).toBe(base)
   })
@@ -913,7 +1194,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'step',
-      payload: 'extracting',
+      payload: { step: 'extracting' },
     })
     expect(next.step).toBe('extracting')
   })
@@ -939,7 +1220,97 @@ describe('reduceStreamEvent', () => {
     expect(ended.busy).toBe(false)
     expect(ended.stopRequested).toBe(false)
     expect(ended.step).toBe('idle')
-    expect(ended.activeTools).toEqual([])
+    expect(ended.toolCards).toEqual([])
+  })
+
+  it('rebuilds history cards with status and steps from the end payload toolCalls', () => {
+    const withRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-5', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: {
+        content: 'done',
+        toolCalls: [
+          {
+            name: 'generateMindmapFragment',
+            args: {},
+            result: 'ok',
+            status: 'success',
+            steps: [{ step: 'reading-doc' }, { step: 'extracting', completed: 2, total: 5 }],
+          },
+        ],
+      },
+    })
+    expect(ended.chatMessages[0]?.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: 'ok',
+        status: 'success',
+        steps: [{ step: 'reading-doc' }, { step: 'extracting', completed: 2, total: 5 }],
+      },
+    ])
+    expect(ended.toolCards).toEqual([])
+  })
+
+  it('attaches unfinished streaming cards as canceled when an aborted end carries no toolCalls', () => {
+    const withRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-6', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: '（已停止生成）' },
+    })
+    expect(ended.chatMessages[0]).toEqual({
+      role: 'assistant',
+      content: '（已停止生成）',
+      toolCalls: [{ name: 'generateMindmapFragment', args: {}, result: '', status: 'canceled' }],
+    })
+    expect(ended.toolCards).toEqual([])
+  })
+
+  it('keeps finished cards with their real status when an aborted end arrives', () => {
+    const withCards = reduceStreamEvent(
+      reduceStreamEvent(base, {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'tool-start',
+        payload: { id: 'call-a', name: 'readMindmap', input: {} },
+      }),
+      {
+        streamId: 's',
+        sessionId: 'session-a',
+        type: 'tool-end',
+        payload: { id: 'call-a', name: 'readMindmap', status: 'success', output: 'ok' },
+      },
+    )
+    const withRunning = reduceStreamEvent(withCards, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-b', name: 'generateMindmapFragment', input: {} },
+    })
+    const ended = reduceStreamEvent(withRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'end',
+      payload: { content: '（已停止生成）' },
+    })
+    expect(ended.chatMessages[0]?.toolCalls).toEqual([
+      { name: 'readMindmap', args: {}, result: '', status: 'success' },
+      { name: 'generateMindmapFragment', args: {}, result: '', status: 'canceled' },
+    ])
   })
 
   it('falls back to content and then streamText for end messages', () => {
@@ -981,7 +1352,13 @@ describe('reduceStreamEvent', () => {
 
   it('writes an error and resets the chat state', () => {
     const started = reduceStreamEvent(
-      { ...base, busy: true, step: 'chatting', activeTools: ['search'], streamText: 'x' },
+      {
+        ...base,
+        busy: true,
+        step: 'chatting',
+        toolCards: [{ id: 'call-1', name: 'insertXmlFragment', status: 'running' }],
+        streamText: 'x',
+      },
       {
         streamId: 's',
         sessionId: 'session-a',
@@ -994,6 +1371,32 @@ describe('reduceStreamEvent', () => {
     expect(started.stopRequested).toBe(false)
     expect(started.step).toBe('idle')
     expect(started.streamText).toBe('')
-    expect(started.activeTools).toEqual([])
+    expect(started.toolCards).toEqual([])
+  })
+
+  it('marks running cards canceled when a stream is stopped', () => {
+    useAiStore.setState({
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': {
+          ...createFileChatState('session-a'),
+          busy: true,
+          toolCards: [
+            { id: 'call-1', name: 'generateMindmapFragment', status: 'running' },
+            { id: 'call-2', name: 'readMindmap', status: 'success' },
+          ],
+        },
+      },
+      sessionFileUuids: { 'session-a': 'file-a' },
+    })
+
+    useAiStore.getState().markStreamStopping('session-a')
+
+    const chat = useAiStore.getState().fileChats['file-a']
+    expect(chat?.stopRequested).toBe(true)
+    expect(chat?.toolCards).toEqual([
+      { id: 'call-1', name: 'generateMindmapFragment', status: 'canceled' },
+      { id: 'call-2', name: 'readMindmap', status: 'success' },
+    ])
   })
 })

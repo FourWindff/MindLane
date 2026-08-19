@@ -25,7 +25,8 @@ describe('MindmapCanvas', () => {
     reactFlowProps = null
   })
 
-  it('disables all editing callbacks while disabled', () => {
+  it('keeps onNodesChange wired while disabled so dimensions still reach the editor', () => {
+    const onNodesChange = vi.fn()
     renderToString(
       <MindmapCanvas
         nodes={[]}
@@ -33,14 +34,16 @@ describe('MindmapCanvas', () => {
         nodeTypes={{}}
         edgeTypes={{}}
         disabled
-        onNodesChange={vi.fn()}
+        onNodesChange={onNodesChange}
         onEdgesChange={vi.fn()}
         onConnect={vi.fn()}
         onSelectionChange={vi.fn()}
       />,
     )
 
-    expect(reactFlowProps?.onNodesChange).toBeUndefined()
+    // Node dimension measurements must flow during an AI stream or edges stay
+    // connected at stale default sizes; only interaction callbacks are cut.
+    expect(reactFlowProps?.onNodesChange).toBe(onNodesChange)
     expect(reactFlowProps?.onEdgesChange).toBeUndefined()
     expect(reactFlowProps?.onConnect).toBeUndefined()
     expect(reactFlowProps?.nodesDraggable).toBe(false)

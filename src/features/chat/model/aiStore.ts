@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import type { ChatMessage, DocumentRef } from '@/shared/lib/fileFormat'
+import type {
+  ChatMessage,
+  ChatToolCall,
+  ChatToolCallStep,
+  DocumentRef,
+} from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
@@ -21,6 +26,25 @@ export type AiPipelineStep =
 
 export type { ChatMessage }
 
+/**
+ * Live tool card state for the streaming phase (id/name/status/step).
+ * History cards are rebuilt from `ChatToolCall` (name + optional status/steps)
+ * and rendered by the same component. Old sessions lack status/steps and render
+ * as finished (success).
+ */
+export interface ToolCard {
+  id: string
+  name: string
+  status: 'running' | 'success' | 'error' | 'canceled'
+  /** Current subgraph stage (subgraph virtual tools only, consumed by slice 05). */
+  step?: StreamStep
+  /** Accumulated live subgraph stages (same source as step events), so the
+   * running card can show the full sequence instead of only the latest step. */
+  stages?: ChatToolCallStep[]
+  completed?: number
+  total?: number
+}
+
 export interface ChatSession {
   id: string
   fileUuid: string
@@ -38,7 +62,7 @@ export interface FileChatState {
   step: AiPipelineStep
   streamText: string
   errorMessage: string | null
-  activeTools: string[]
+  toolCards: ToolCard[]
   stopRequested: boolean
   lastUserMessageAt: number
 }
@@ -49,7 +73,7 @@ export interface ChatCapsuleEntry {
   fileUuid: string
   fileName: string
   status: 'generating' | 'stopping' | 'idle'
-  /** 该文件最近一次会话的 updatedAt（毫秒），胶囊排序依据；无会话时为 0。 */
+  /** updatedAt (ms) of the file's most recent session; capsule sort key; 0 when none. */
   lastActivityAt: number
 }
 
@@ -69,9 +93,9 @@ interface AiState {
   currentFilePath: string | null
   fileChats: Record<string, FileChatState>
   filePaths: Record<string, string>
-  /** 会话文件索引（持久映射）：fileUuid -> filePath，跨启动渲染胶囊条用。 */
+  /** Session-file index (persisted mapping): fileUuid -> filePath, used across restarts to render the capsule bar. */
   fileUuidPaths: Record<string, string>
-  /** 当前 workspace 全量会话列表（无 fileUuid 的全量拉取），胶囊条成员与排序依据。 */
+  /** Full session list of the current workspace (pull without fileUuid); capsule bar membership and sort key. */
   allSessions: ChatSession[]
   loadedFileChats: Record<string, boolean>
   sessionFileUuids: Record<string, string>
@@ -96,13 +120,13 @@ interface AiState {
   setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
   updateFileLocation: (fileUuid: string, filePath: string) => void
-  /** 改名/移动后同步内存与持久映射（调用方另经桥落盘）。 */
+  /** Sync the in-memory and persisted mapping after rename/move (caller persists via the bridge). */
   updateFileUuidPath: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string) => void
   markStreamStopping: (sessionId: string) => void
   sendChatMessage: (text: string) => Promise<boolean>
   stopChatStream: () => void
-  /** 恢复/切换 workspace 与 deleteSession 成功后重拉胶囊条持久输入（全量会话 + 映射）。 */
+  /** Re-pull the capsule bar's persisted inputs (full session list + mapping) after workspace restore/switch or deleteSession. */
   refreshCapsuleData: () => Promise<void>
 }
 
@@ -115,7 +139,7 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
     step: 'idle',
     streamText: '',
     errorMessage: null,
-    activeTools: [],
+    toolCards: [],
     stopRequested: false,
     lastUserMessageAt: 0,
   }
@@ -123,8 +147,9 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
 
 const fileChatLoads = new Map<string, Promise<void>>()
 
-// 读侧 IPC 的有限退避重试：AI 服务未就绪时 listSessions/loadSession 会返回
-// not-ready，延迟重试避免启动早期拿到空结果后永久空白。按 key 计数，成功即清零。
+// Bounded backoff retry for the read-side IPC: listSessions/loadSession return
+// not-ready while the AI service is still starting; retry with a delay avoids a
+// permanently blank list when the app boots. Counted per key, reset on success.
 const RETRY_MAX = 5
 const RETRY_DELAY_MS = 1000
 const retryCounts = new Map<string, number>()
@@ -145,7 +170,7 @@ function scheduleRetry(key: string, run: () => void): void {
   }, RETRY_DELAY_MS)
 }
 
-/** 仅测试用：清空退避重试的模块级状态，避免真实 timer 跨测试泄漏。 */
+/** Test-only: clear the module-level backoff state so real timers do not leak across tests. */
 export function resetChatRetryStateForTests(): void {
   if (retryTimer) {
     clearTimeout(retryTimer)
@@ -157,7 +182,7 @@ export function resetChatRetryStateForTests(): void {
 
 const EMPTY_CHAT_MESSAGES: ChatMessage[] = []
 const EMPTY_CHAT_SESSIONS: ChatSession[] = []
-const EMPTY_CHAT_ACTIVE_TOOLS: string[] = []
+const EMPTY_TOOL_CARDS: ToolCard[] = []
 
 function currentChat(state: AiState): FileChatState | undefined {
   return state.currentFileUuid ? state.fileChats[state.currentFileUuid] : undefined
@@ -187,8 +212,8 @@ export function selectCurrentChatChatMessages(state: AiState): ChatMessage[] {
 export function selectCurrentChatSessions(state: AiState): ChatSession[] {
   return currentChat(state)?.sessions ?? EMPTY_CHAT_SESSIONS
 }
-export function selectCurrentChatActiveTools(state: AiState): string[] {
-  return currentChat(state)?.activeTools ?? EMPTY_CHAT_ACTIVE_TOOLS
+export function selectCurrentChatToolCards(state: AiState): ToolCard[] {
+  return currentChat(state)?.toolCards ?? EMPTY_TOOL_CARDS
 }
 
 function pathBasename(filePath: string | null | undefined): string | null {
@@ -197,8 +222,9 @@ function pathBasename(filePath: string | null | undefined): string | null {
 }
 
 /**
- * 展示剥离：会话加载到 UI 时去掉用户消息末尾的 `<EDITOR_STATE>` 块，
- * 让重载后的聊天历史干净可读。旧消息无块时原样返回（no-op）。
+ * Display stripping: strip the trailing `<EDITOR_STATE>` block from user
+ * messages when a session loads into the UI, so the reloaded history reads
+ * clean. Messages without the block pass through unchanged (no-op).
  */
 function stripTurnStateFromMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((message) => {
@@ -209,9 +235,11 @@ function stripTurnStateFromMessages(messages: ChatMessage[]): ChatMessage[] {
 }
 
 /**
- * 胶囊条读时投影：成员 = 有会话记录（且映射中有路径）∪ 流进行中 ∪ 当前文件；
- * 排序 = 当前文件置顶，其余按该文件最近一次会话的 updatedAt 降序。
- * 内存 `fileChats` 仅投影状态（busy/stopping/generating），不再单独决定成员。
+ * Capsule-bar read projection: members = files with session records (whose
+ * mapping has a path) ∪ streaming in-progress ∪ current file;
+ * sort = current file first, then by that file's most recent session updatedAt
+ * descending. The in-memory `fileChats` holds only projected state
+ * (busy/stopping/generating); it no longer decides membership on its own.
  */
 export function deriveChatCapsuleEntries(
   fileChats: Record<string, FileChatState>,
@@ -243,7 +271,7 @@ export function deriveChatCapsuleEntries(
     const chat = fileChats[fileUuid]
     const isCurrent = fileUuid === currentFileUuid
     const isStreaming = Boolean(chat?.busy || chat?.stopRequested)
-    // 有会话但映射中无路径（文件已删/升级前从未打开过）的文件不显示。
+    // Files with sessions but no mapped path (deleted / never opened before the upgrade) stay hidden.
     const hasSessionWithPath = Boolean(sessionsByFile.has(fileUuid) && fileUuidPaths[fileUuid])
     if (!(isCurrent || isStreaming || hasSessionWithPath)) continue
     const filePath =
@@ -323,7 +351,7 @@ export const useAiStore = create<AiState>((set, get) => ({
         step: 'idle',
         streamText: '',
         errorMessage: null,
-        activeTools: [],
+        toolCards: [],
       })
     }),
   addChatMessage: (message) =>
@@ -365,7 +393,7 @@ export const useAiStore = create<AiState>((set, get) => ({
           step: 'idle',
           streamText: '',
           errorMessage: null,
-          activeTools: [],
+          toolCards: [],
         }),
         ...(current.currentFileUuid === fileUuid
           ? { showSessionList: false, attachedDocument: null }
@@ -420,7 +448,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
     if (replacementSessionId)
       await persistActiveSession(state.workspacePath, fileUuid, replacementSessionId)
-    // 删除会话可能让文件失去全部会话：重拉全量会话刷新胶囊条。
+    // Deleting a session may remove the file's last session: re-pull the full list to refresh the capsule bar.
     void useAiStore.getState().refreshCapsuleData()
   },
 
@@ -449,8 +477,9 @@ export const useAiStore = create<AiState>((set, get) => ({
         retryCounts.delete('capsule')
         allSessions = result.data.sessions
       } else {
-        // 主进程 AI 服务可能尚未装配完成：先落映射，稍后重试拉会话，
-        // 不把已就绪的数据清空（allSessions 保持旧值）。
+        // The main-process AI service may not be assembled yet: persist the
+        // mapping first and retry the session pull later; never clear data that
+        // is already ready (allSessions keeps its old value).
         useAiStore.setState({ workspacePath, fileUuidPaths })
         scheduleRetry('capsule', () => {
           void useAiStore.getState().refreshCapsuleData()
@@ -466,7 +495,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       filePaths: { ...state.filePaths, [fileUuid]: filePath },
     })),
 
-  /** 持久映射 + 内存路径同步更新（改名/移动后由 workspace store 经桥调用）。 */
+  /** Persisted mapping + in-memory path updated together (called via the bridge by the workspace store after rename/move). */
   updateFileUuidPath: (fileUuid, filePath) =>
     set((state) => ({
       ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
@@ -503,7 +532,13 @@ export const useAiStore = create<AiState>((set, get) => ({
     set((state) => {
       const fileUuid = state.sessionFileUuids[sessionId]
       if (!fileUuid || !state.fileChats[fileUuid]) return state
-      return patchFileChat(state, fileUuid, { stopRequested: true })
+      const current = state.fileChats[fileUuid]
+      return patchFileChat(state, fileUuid, {
+        stopRequested: true,
+        // Stop: in-flight cards are marked canceled (unexecuted ones stay
+        // unexecuted; already-applied ones keep their state).
+        toolCards: markRunningCardsCanceled(current.toolCards),
+      })
     })
   },
 
@@ -573,12 +608,15 @@ async function loadFileChat(fileUuid: string): Promise<void> {
     window.mindlane?.workspace.getSession(),
     window.mindlane?.chat?.listSessions({ workspacePath, fileUuid, limit: 20, offset: 0 }),
   ])
-  // 查询失败时直接放弃：此时无法区分"会话不存在"与"查询出错"，
-  // 继续往下走会生成幻影 id 并覆写 state.json 中仍然有效的映射。
-  // AI 未就绪（not-ready）属于"查询出错"：延迟重试，避免打开文件后历史永久空白。
+  // On query failure we give up: at that point it is impossible to tell
+  // "session does not exist" from "query error", and continuing would fabricate
+  // a phantom id and overwrite a still-valid mapping in state.json.
+  // AI not ready (not-ready) counts as a query error: retry with a delay so the
+  // history does not stay permanently blank after opening a file.
   if (!sessionsResult?.ok) {
     scheduleRetry(`${workspacePath}\0${fileUuid}`, () => {
-      // 已切换 workspace 的旧请求作废，避免把新 workspace 的数据拉错。
+      // A stale request from a switched workspace is voided, so data from the
+      // new workspace is never pulled in by mistake.
       if (useAiStore.getState().workspacePath !== workspacePath) return
       void useAiStore.getState().loadFileChat(fileUuid)
     })
@@ -587,8 +625,9 @@ async function loadFileChat(fileUuid: string): Promise<void> {
   retryCounts.delete(`${workspacePath}\0${fileUuid}`)
   const sessions = sessionsResult.data.sessions
   const restoredSessionId = workspaceSession?.activeSessionIds?.[fileUuid]
-  // state.json 可能指向从未写入消息的幻影会话（如新建对话后未发言就退出），
-  // 此时回退到最近的现有会话，而不是再生成一个新幻影。
+  // state.json may point at a phantom session that never received a message
+  // (e.g. a new conversation closed without chatting); fall back to the most
+  // recent existing session instead of minting a new phantom.
   const activeSessionId =
     restoredSessionId && sessions.some((session) => session.id === restoredSessionId)
       ? restoredSessionId
@@ -633,38 +672,149 @@ async function persistActiveSession(
   })
 }
 
+/** Subgraph virtual tools: `step` events map to the unfinished instances of these cards (palace has no stage process, only status transitions). */
+const SUBGRAPH_TOOLS = ['generateMindmapFragment', 'generatePalace']
+
+function isSubgraphTool(name: string): boolean {
+  return SUBGRAPH_TOOLS.includes(name)
+}
+
+function markRunningCardsCanceled(toolCards: ToolCard[]): ToolCard[] {
+  return toolCards.map((card) =>
+    card.status === 'running' ? { ...card, status: 'canceled' } : card,
+  )
+}
+
+/**
+ * Snapshot live tool cards into a committed `ChatToolCall[]`. Cards that are
+ * still running when flushed are marked canceled: once attached to a committed
+ * message the card is no longer tracked by `toolCards`, so a later tool-end
+ * could never settle it — canceling avoids a permanently stuck spinner. The
+ * subgraph stage trace is carried over (`stages` → `steps`) so the committed
+ * message renders the full progress history.
+ */
+function toolCallsFromCards(cards: ToolCard[]): ChatToolCall[] {
+  return cards.map((card) => ({
+    name: card.name,
+    args: {},
+    result: '',
+    ...(card.status === 'running' ? { status: 'canceled' as const } : { status: card.status }),
+    ...(card.stages?.length ? { steps: card.stages } : {}),
+  }))
+}
+
+/**
+ * Append a stage to the running card's accumulated trace: a new step appends,
+ * a repeat of the current step only updates its counts (e.g. extracting n/m).
+ */
+function pushStage(
+  stages: ChatToolCallStep[] | undefined,
+  stage: ChatToolCallStep,
+): ChatToolCallStep[] {
+  const current = stages ?? []
+  const last = current[current.length - 1]
+  if (last && last.step === stage.step) {
+    const updated = [...current]
+    updated[updated.length - 1] = {
+      ...last,
+      ...(stage.completed !== undefined ? { completed: stage.completed } : {}),
+      ...(stage.total !== undefined ? { total: stage.total } : {}),
+    }
+    return updated
+  }
+  return [...current, stage]
+}
+
 export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): FileChatState {
   switch (event.type) {
     case 'token':
       return { ...chat, streamText: chat.streamText + event.payload }
-    case 'message-start':
-      return chat.streamText.trim()
-        ? {
-            ...chat,
-            chatMessages: [...chat.chatMessages, { role: 'assistant', content: chat.streamText }],
-            streamText: '',
-          }
-        : chat
+    case 'message-start': {
+      if (!chat.streamText.trim()) return chat
+      // Flush the segment into its own message together with the tool cards
+      // accumulated since the previous segment. Without this, cards rendered in
+      // the live bottom row stay separated from the message that declared them
+      // ("following" the newest message) and only snap above it when `end`
+      // rebuilds the turn — the mid-stream position then disagrees with the
+      // final history. Clearing toolCards anchors each round's cards above its
+      // own text, matching the final checkpoint grouping.
+      const toolCalls = chat.toolCards.length ? toolCallsFromCards(chat.toolCards) : undefined
+      return {
+        ...chat,
+        chatMessages: [
+          ...chat.chatMessages,
+          { role: 'assistant', content: chat.streamText, ...(toolCalls ? { toolCalls } : {}) },
+        ],
+        streamText: '',
+        toolCards: [],
+      }
+    }
     case 'tool-start': {
-      const name = event.payload.name
-      return name ? { ...chat, activeTools: [...chat.activeTools, name] } : chat
+      const { id, name } = event.payload
+      if (!name) return chat
+      const card: ToolCard = { id, name, status: 'running' }
+      const existingIndex = id ? chat.toolCards.findIndex((c) => c.id === id) : -1
+      if (existingIndex >= 0) {
+        const toolCards = [...chat.toolCards]
+        toolCards[existingIndex] = card
+        return { ...chat, toolCards }
+      }
+      return { ...chat, toolCards: [...chat.toolCards, card] }
     }
     case 'tool-end': {
-      const name = event.payload.name
-      return { ...chat, activeTools: chat.activeTools.filter((tool) => tool !== name) }
+      const { id, name, status } = event.payload
+      const byId = id ? chat.toolCards.findIndex((card) => card.id === id) : -1
+      const index = byId >= 0 ? byId : chat.toolCards.findIndex((card) => card.name === name)
+      if (index < 0) return chat
+      const toolCards = [...chat.toolCards]
+      toolCards[index] = { ...toolCards[index]!, status }
+      return { ...chat, toolCards }
     }
-    case 'step':
-      return { ...chat, step: event.payload }
+    case 'step': {
+      const { step, completed, total } = event.payload
+      const runningSubgraph = chat.toolCards.filter(
+        (card) => card.status === 'running' && isSubgraphTool(card.name),
+      )
+      if (runningSubgraph.length === 0) return { ...chat, step }
+      const target = runningSubgraph[runningSubgraph.length - 1]!
+      const stage: ChatToolCallStep = {
+        step,
+        ...(typeof completed === 'number' ? { completed } : {}),
+        ...(typeof total === 'number' ? { total } : {}),
+      }
+      return {
+        ...chat,
+        step,
+        toolCards: chat.toolCards.map((card) =>
+          card === target
+            ? {
+                ...card,
+                step,
+                stages: pushStage(card.stages, stage),
+                ...(typeof completed === 'number' ? { completed } : {}),
+                ...(typeof total === 'number' ? { total } : {}),
+              }
+            : card,
+        ),
+      }
+    }
     case 'end': {
       const response = event.payload
+      // Aborted ends carry content only: keep every streamed card in the final
+      // message — finished ones with their real status, in-flight ones as
+      // canceled — so the history records which tools ran before the stop.
+      const canceledCalls = response.toolCalls?.length
+        ? undefined
+        : toolCallsFromCards(chat.toolCards)
+      const toolCalls = response.toolCalls ?? canceledCalls
       const messages = response.messages?.length
         ? response.messages
-        : response.content || chat.streamText
+        : response.content || chat.streamText || (toolCalls?.length ?? 0) > 0
           ? [
               {
                 role: 'assistant' as const,
                 content: response.content || chat.streamText,
-                toolCalls: response.toolCalls,
+                ...(toolCalls?.length ? { toolCalls } : {}),
               },
             ]
           : []
@@ -676,7 +826,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
         stopRequested: false,
         step: 'idle',
         streamText: '',
-        activeTools: [],
+        toolCards: [],
       }
     }
     case 'error':
@@ -686,7 +836,7 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
         stopRequested: false,
         step: 'idle',
         streamText: '',
-        activeTools: [],
+        toolCards: [],
         errorMessage: event.payload,
       }
   }
@@ -737,8 +887,10 @@ export function subscribeToChatStreamEvents(
 
 function dispatchStreamEvent(event: ChatStreamEvent): void {
   if (!routeStreamEvent(event)) return
-  // 流结束/出错时主进程已完成（或放弃）会话持久化：重拉全量会话，
-  // 让本启动内新建的对话立即出现在胶囊条，而不是等下次启动才补全。
+  // By the time the stream ends or fails, the main process has already
+  // persisted (or abandoned) the session: re-pull the full list so
+  // conversations created this launch appear in the capsule bar immediately
+  // instead of waiting for the next launch.
   if (event.type === 'end' || event.type === 'error') {
     void useAiStore.getState().refreshCapsuleData()
   }

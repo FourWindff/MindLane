@@ -1,24 +1,23 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createMindmapActionTools, type EditorSnapshotProvider } from '../mindmapActions.js'
-import type { MindmapEditorSnapshot } from '../../../ipc.js'
+import { createMindmapActionTools, type MindmapWriteProxy } from '../mindmapActions.js'
 
-const SNAPSHOT: MindmapEditorSnapshot = {
-  nodeIds: ['root', 'n1', 'n2'],
-  assetIds: ['a1'],
-  parents: { n1: 'root', n2: 'root' },
-}
-
-function tools(overrides: Partial<MindmapEditorSnapshot> = {}): {
+/** 伪渲染层客户端：记录转发参数，默认回 `{ok: true, action, data}` 原样应答。 */
+function fakeProxy(overrides: { fail?: string } = {}): {
   tools: ReturnType<typeof createMindmapActionTools>
-  provider: ReturnType<typeof vi.fn<EditorSnapshotProvider>>
+  proxy: ReturnType<typeof vi.fn<MindmapWriteProxy>>
 } {
-  const provider = vi.fn<EditorSnapshotProvider>(async () => ({ ...SNAPSHOT, ...overrides }))
-  return { tools: createMindmapActionTools(provider), provider }
+  const proxy = vi.fn<MindmapWriteProxy>(async (_fileUuid, action, args) => {
+    if (overrides.fail) {
+      throw new Error(overrides.fail)
+    }
+    return { ok: true, action, data: args }
+  })
+  return { tools: createMindmapActionTools(proxy), proxy }
 }
 
 describe('createMindmapActionTools（固定 4 写工具）', () => {
   it('registers exactly the 4 write tools', () => {
-    const { tools: t } = tools()
+    const { tools: t } = fakeProxy()
     expect(Object.keys(t).sort()).toEqual([
       'deleteNodeTool',
       'insertXmlFragmentTool',
@@ -28,199 +27,120 @@ describe('createMindmapActionTools（固定 4 写工具）', () => {
   })
 })
 
-describe('insertXmlFragment', () => {
-  it('accepts a valid nested fragment and returns the action', async () => {
-    const { tools: t, provider } = tools()
+describe('insertXmlFragment（渲染层代理）', () => {
+  it('forwards args to the write channel and returns the renderer ack as-is', async () => {
+    const { tools: t, proxy } = fakeProxy()
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
       xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
       parentId: 'n1',
+      position: 'child',
     })
 
-    expect(result).toMatchObject({
+    expect(proxy).toHaveBeenCalledTimes(1)
+    expect(proxy).toHaveBeenCalledWith('file-a', 'insertXmlFragment', {
+      xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
+      parentId: 'n1',
+      position: 'child',
+    })
+    // 渲染层应答原样作为工具结果（模型视角契约：{ok, action, data}）
+    expect(result).toEqual({
       ok: true,
       action: 'insertXmlFragment',
-      data: { parentId: 'n1', position: 'child', nodeCount: 2 },
+      data: {
+        xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
+        parentId: 'n1',
+        position: 'child',
+      },
     })
-    expect(provider).toHaveBeenCalledWith('file-a')
   })
 
-  it('returns xml_parse_error for malformed XML', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="text" content="a"><node>`,
-    })
-    expect(result).toMatchObject({ ok: false })
-    expect((result as { error: string }).error).toContain('xml_parse_error')
-    expect((result as { error: string }).error).toContain('恢复策略')
-  })
-
-  it('returns text_unescaped for raw < in attribute values', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="text" content="a<b" />`,
-    })
-    expect((result as { error: string }).error).toContain('text_unescaped')
-  })
-
-  it('returns invalid_type for unknown types', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="video" content="x" />`,
-    })
-    expect((result as { error: string }).error).toContain('invalid_type')
-  })
-
-  it('returns tree_invalid when the fragment reuses an existing id', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node id="n1" type="text" content="x" />`,
-    })
-    expect((result as { error: string }).error).toContain('tree_invalid')
-  })
-
-  it('returns asset_not_found for missing asset references', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="image" asset="ghost" />`,
-    })
-    expect((result as { error: string }).error).toContain('asset_not_found')
-  })
-
-  it('accepts image nodes referencing existing assets', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="image" asset="a1" alt="图" />`,
-      parentId: 'n1',
-    })
-    expect(result).toMatchObject({ ok: true, action: 'insertXmlFragment' })
-  })
-
-  it('returns block_not_found for unknown parentId', async () => {
-    const { tools: t } = tools()
-    const result = await t.insertXmlFragmentTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node type="text" content="x" />`,
-      parentId: 'ghost',
-    })
-    expect((result as { error: string }).error).toContain('block_not_found')
+  it('forwards an empty fileUuid when absent', async () => {
+    const { tools: t, proxy } = fakeProxy()
+    await t.insertXmlFragmentTool.invoke({ xml: '<node type="text" content="x" />' })
+    expect(proxy).toHaveBeenCalledWith('', 'insertXmlFragment', expect.anything())
   })
 })
 
-describe('updateMindmapNode', () => {
-  it('accepts a single-root XML replacing an existing node', async () => {
-    const { tools: t } = tools()
+describe('updateMindmapNode（渲染层代理）', () => {
+  it('forwards xml to the update action', async () => {
+    const { tools: t, proxy } = fakeProxy()
     const result = await t.updateNodeTool.invoke({
       fileUuid: 'file-a',
-      xml: `<node id="n1" type="text" content="新内容"><node type="text" content="新子" /></node>`,
+      xml: `<node id="n1" type="text" content="新内容" />`,
     })
-    expect(result).toMatchObject({
+
+    expect(proxy).toHaveBeenCalledWith('file-a', 'updateMindmapNode', {
+      xml: `<node id="n1" type="text" content="新内容" />`,
+    })
+    expect(result).toEqual({
       ok: true,
       action: 'updateMindmapNode',
-      data: { nodeId: 'n1', nodeCount: 2 },
+      data: { xml: `<node id="n1" type="text" content="新内容" />` },
     })
-  })
-
-  it('returns block_not_found for unknown ids', async () => {
-    const { tools: t } = tools()
-    const result = await t.updateNodeTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node id="ghost" type="text" content="x" />`,
-    })
-    expect((result as { error: string }).error).toContain('block_not_found')
-  })
-
-  it('refuses to replace root', async () => {
-    const { tools: t } = tools()
-    const result = await t.updateNodeTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node id="root" type="text" content="x" />`,
-    })
-    expect((result as { error: string }).error).toContain('tree_invalid')
-  })
-
-  it('rejects multi-root update XML', async () => {
-    const { tools: t } = tools()
-    const result = await t.updateNodeTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node id="n1" type="text" content="a" /><node type="text" content="b" />`,
-    })
-    expect((result as { error: string }).error).toContain('tree_invalid')
-  })
-
-  it('rejects subtree ids colliding with other nodes', async () => {
-    const { tools: t } = tools()
-    const result = await t.updateNodeTool.invoke({
-      fileUuid: 'file-a',
-      xml: `<node id="n1" type="text" content="a"><node id="n2" type="text" content="b" /></node>`,
-    })
-    expect((result as { error: string }).error).toContain('tree_invalid')
   })
 })
 
-describe('moveMindmapNode', () => {
-  it('accepts child moves', async () => {
-    const { tools: t } = tools()
+describe('moveMindmapNode（渲染层代理）', () => {
+  it('forwards nodeId/targetId/position to the move action', async () => {
+    const { tools: t, proxy } = fakeProxy()
     const result = await t.moveNodeTool.invoke({
       fileUuid: 'file-a',
       nodeId: 'n1',
       targetId: 'n2',
+      position: 'after',
     })
-    expect(result).toMatchObject({
-      ok: true,
-      action: 'moveMindmapNode',
-      data: { nodeId: 'n1', targetId: 'n2', position: 'child' },
-    })
-  })
 
-  it('refuses to move root', async () => {
-    const { tools: t } = tools()
-    const result = await t.moveNodeTool.invoke({ fileUuid: 'file-a', nodeId: 'root' })
-    expect((result as { error: string }).error).toContain('tree_invalid')
-  })
-
-  it('returns block_not_found for unknown nodes', async () => {
-    const { tools: t } = tools()
-    const result = await t.moveNodeTool.invoke({
-      fileUuid: 'file-a',
-      nodeId: 'ghost',
-      targetId: 'n2',
-    })
-    expect((result as { error: string }).error).toContain('block_not_found')
-  })
-
-  it('detects cycles via the parents chain', async () => {
-    // n1 的子树包含 n2（parents: n2 → n1）
-    const { tools: t } = tools({ parents: { n1: 'root', n2: 'n1' } })
-    const result = await t.moveNodeTool.invoke({
-      fileUuid: 'file-a',
+    expect(proxy).toHaveBeenCalledWith('file-a', 'moveMindmapNode', {
       nodeId: 'n1',
       targetId: 'n2',
+      position: 'after',
     })
-    expect((result as { error: string }).error).toContain('tree_invalid')
-    expect((result as { error: string }).error).toContain('环')
+    expect(result).toMatchObject({ ok: true, action: 'moveMindmapNode' })
   })
 })
 
-describe('deleteMindmapNode', () => {
-  it('accepts deletion of a subtree root', async () => {
-    const { tools: t } = tools()
+describe('deleteMindmapNode（渲染层代理）', () => {
+  it('forwards to the deleteNode action the renderer responder applies', async () => {
+    const { tools: t, proxy } = fakeProxy()
     const result = await t.deleteNodeTool.invoke({
       fileUuid: 'file-a',
       nodeId: 'n1',
+      confirmDeleteSubtree: true,
     })
-    expect(result).toMatchObject({ ok: true, action: 'deleteNode', data: { nodeId: 'n1' } })
+
+    expect(proxy).toHaveBeenCalledWith('file-a', 'deleteNode', {
+      nodeId: 'n1',
+      confirmDeleteSubtree: true,
+    })
+    expect(result).toMatchObject({ ok: true, action: 'deleteNode' })
+  })
+})
+
+describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径）', () => {
+  it('returns the renderer error as a tool failure result', async () => {
+    const { tools: t } = fakeProxy({
+      fail: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+    })
+    const result = await t.insertXmlFragmentTool.invoke({
+      fileUuid: 'file-a',
+      xml: '<node type="text" content="x" />',
+    })
+    expect(result).toEqual({
+      ok: false,
+      error: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+    })
   })
 
-  it('refuses to delete root', async () => {
-    const { tools: t } = tools()
-    const result = await t.deleteNodeTool.invoke({ fileUuid: 'file-a', nodeId: 'root' })
-    expect((result as { error: string }).error).toContain('tree_invalid')
+  it('converts non-Error rejections to a string error', async () => {
+    const proxy = vi.fn<MindmapWriteProxy>(async () => {
+      throw 'boom'
+    })
+    const tools = createMindmapActionTools(proxy)
+    const result = await tools.insertXmlFragmentTool.invoke({
+      fileUuid: 'file-a',
+      xml: '<node type="text" content="x" />',
+    })
+    expect(result).toEqual({ ok: false, error: 'boom' })
   })
 })

@@ -74,7 +74,7 @@ describe('checkpointMessagesToSessionMessages', () => {
     expect(result[0]).toEqual({
       role: 'assistant',
       content: 'Done.',
-      toolCalls: [{ name: 'foo', args: { bar: 1 }, result: 'result-foo' }],
+      toolCalls: [{ name: 'foo', args: { bar: 1 }, result: 'result-foo', status: 'success' }],
     })
   })
 
@@ -110,8 +110,8 @@ describe('checkpointMessagesToSessionMessages', () => {
       role: 'assistant',
       content: 'Weather is good and it is 5km away.',
       toolCalls: [
-        { name: 'searchWeather', args: { city: 'Beijing' }, result: 'Sunny' },
-        { name: 'searchMap', args: { location: 'Beijing' }, result: '5km' },
+        { name: 'searchWeather', args: { city: 'Beijing' }, result: 'Sunny', status: 'success' },
+        { name: 'searchMap', args: { location: 'Beijing' }, result: '5km', status: 'success' },
       ],
     })
   })
@@ -134,7 +134,7 @@ describe('checkpointMessagesToSessionMessages', () => {
       role: 'assistant',
       content: 'Here is the result, let me save it.',
       toolCalls: [
-        { name: 'search', args: { query: 'foo' }, result: 'search-result' },
+        { name: 'search', args: { query: 'foo' }, result: 'search-result', status: 'success' },
         { name: 'save', args: { data: 'foo' }, result: '' },
       ],
     })
@@ -184,5 +184,72 @@ describe('checkpointMessagesToSessionMessages', () => {
         },
       ],
     })
+  })
+
+  it('rebuilds ChatToolCall.steps from ToolMessage additional_kwargs.toolSteps', () => {
+    const messages: BaseMessage[] = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'sc1', name: 'generateMindmapFragment', args: {} }],
+      }),
+      new ToolMessage({
+        content: '{"ok":true}',
+        tool_call_id: 'sc1',
+        additional_kwargs: {
+          toolSteps: [
+            { step: 'reading-doc' },
+            { step: 'extracting', completed: 1, total: 2 },
+            { step: 'merging' },
+            { step: 'finalizing' },
+          ],
+        },
+      }),
+      new AIMessage('Done.'),
+    ]
+    const result = checkpointMessagesToSessionMessages(messages)
+    expect(result).toHaveLength(1)
+    expect(result[0]!.toolCalls).toEqual([
+      {
+        name: 'generateMindmapFragment',
+        args: {},
+        result: '{"ok":true}',
+        status: 'success',
+        steps: [
+          { step: 'reading-doc' },
+          { step: 'extracting', completed: 1, total: 2 },
+          { step: 'merging' },
+          { step: 'finalizing' },
+        ],
+      },
+    ])
+  })
+
+  it('derives ChatToolCall.status from the tool result ok flag', () => {
+    const messages: BaseMessage[] = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'sc1', name: 'updateMindmapNode', args: {} }],
+      }),
+      new ToolMessage({
+        content: '{"ok":false,"error":"[block_not_found] 节点不存在"}',
+        tool_call_id: 'sc1',
+      }),
+      new AIMessage('Done.'),
+    ]
+    const result = checkpointMessagesToSessionMessages(messages)
+    expect(result[0]!.toolCalls![0]!.status).toBe('error')
+  })
+
+  it('leaves ChatToolCall.steps undefined for sessions without a trace', () => {
+    const messages: BaseMessage[] = [
+      new AIMessage({
+        content: '',
+        tool_calls: [{ id: 'sc1', name: 'generateMindmapFragment', args: {} }],
+      }),
+      new ToolMessage({ content: 'ok', tool_call_id: 'sc1' }),
+      new AIMessage('Done.'),
+    ]
+    const result = checkpointMessagesToSessionMessages(messages)
+    expect(result[0]!.toolCalls![0]!.steps).toBeUndefined()
   })
 })

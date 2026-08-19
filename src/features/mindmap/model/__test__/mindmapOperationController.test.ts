@@ -128,4 +128,21 @@ describe('MindmapOperationController', () => {
     expect(editor.undo).not.toHaveBeenCalled()
     expect(editor.redo).not.toHaveBeenCalled()
   })
+
+  it('forwards only dimension measurements to the editor while AI is busy', () => {
+    const controller = createController({ aiBusy: true })
+
+    controller.handleNodesChange([
+      { id: 'a', type: 'dimensions' as const, dimensions: { width: 80, height: 30 } },
+      { id: 'a', type: 'select' as const, selected: true },
+      { id: 'a', type: 'position' as const, position: { x: 999, y: 999 } },
+    ])
+
+    // Dimensions keep flowing so freshly inserted nodes get measured and their
+    // edges connect at real sizes mid-stream; interaction changes stay blocked.
+    expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(
+      [{ id: 'a', type: 'dimensions', dimensions: { width: 80, height: 30 } }],
+      'logic',
+    )
+  })
 })

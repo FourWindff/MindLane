@@ -18,11 +18,12 @@ import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
+import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
 import type { StreamStep } from '../../../ipc.js'
 
 const log = logger.withContext('mindmap')
 
-// ===== 配置选项 =====
+// ===== Configuration options =====
 
 interface MindmapSubgraphOptions {
   provider: LLMProvider
@@ -56,11 +57,33 @@ function countTreeNodes(node: MindmapOutlineNode): number {
 
 type PromptMessage = { role: string; content: string }
 
-/** 导图进度词表是共享 StreamStep 的子集（不含 generating-map，它由工具事件触发）。 */
+/** The mindmap progress vocabulary is a subset of the shared StreamStep (without generating-map, which tool events trigger). */
 type MindmapProgressStep = Exclude<StreamStep, 'generating-map'>
+
+/**
+ * Subgraph stage trace (same source as step stream events), collected per
+ * streamId and closed out by build_output. Same lifecycle as
+ * itemProgressCounts: reset at run start, consumed by build_output.
+ */
+const stepTraces = new Map<string, ChatToolCallStep[]>()
+
+function pushStep(step: ChatToolCallStep): void {
+  const key = runKey()
+  const trace = stepTraces.get(key) ?? []
+  trace.push(step)
+  stepTraces.set(key, trace)
+}
+
+function takeStepTrace(): ChatToolCallStep[] | undefined {
+  const key = runKey()
+  const trace = stepTraces.get(key)
+  stepTraces.delete(key)
+  return trace
+}
 
 function emitProgress(step: MindmapProgressStep): void {
   getWriter()?.({ type: 'mindmap-progress', step })
+  pushStep({ step })
 }
 
 /**
@@ -81,6 +104,7 @@ function takeItemProgress(step: MindmapProgressStep, total: number): number {
   const completed = (itemProgressCounts.get(key) ?? 0) + 1
   itemProgressCounts.set(key, completed)
   getWriter()?.({ type: 'mindmap-progress', step, completed, total })
+  pushStep({ step, completed, total })
   return completed
 }
 
@@ -221,6 +245,9 @@ async function resolveInputNode(
 
   runStarts.set(runKey(), Date.now())
   resetItemProgress()
+  // A new run starts: clear the previous leftover trace (build_output already
+  // consumed it; this is a leak safety net).
+  stepTraces.delete(runKey())
   log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
   return {
     ...reset,
@@ -449,6 +476,7 @@ async function buildOutputNode(
   // build_output always terminates a run — consume the run start and the item
   // progress counter here so failed runs don't leak entries in either map.
   const runStart = takeRunStart()
+  const toolSteps = takeStepTrace() ?? []
   resetItemProgress()
   // Preserve existing error
   if (state.error) {
@@ -487,6 +515,7 @@ async function buildOutputNode(
     mindmapXml: serializeStorageFragment(tree),
     mindmapTitle: finalTitle,
     response: `已生成思维导图「${finalTitle}」。`,
+    toolSteps,
   }
 }
 
@@ -567,7 +596,7 @@ function routeAfterMergeGate(state: typeof MindmapSubgraphState.State): string |
   return 'start_merge_round'
 }
 
-// ===== Subgraph 构建器 =====
+// ===== Subgraph builder =====
 
 /**
  * Build the Mindmap Subgraph

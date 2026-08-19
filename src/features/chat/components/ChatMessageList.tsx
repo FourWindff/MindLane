@@ -1,23 +1,60 @@
 import { useCallback } from 'react'
-import { Sparkles, Check, FileText, Trash2 } from 'lucide-react'
+import { Sparkles, FileText, Trash2 } from 'lucide-react'
 import {
   selectCurrentChatActiveSessionId,
-  selectCurrentChatActiveTools,
+  selectCurrentChatToolCards,
   selectCurrentChatBusy,
   selectCurrentChatChatMessages,
   selectCurrentChatSessions,
   selectCurrentChatStreamText,
   useAiStore,
+  type ChatMessage,
   type ChatSession,
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
-import { toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { ToolCardList } from './ToolCardList'
 
 import '../styles/chat-message-list.css'
 
 function cx(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ')
+}
+
+/**
+ * Fold pure-tool assistant messages (no text, only tool calls) into the next
+ * text-bearing assistant message instead of leaving an empty bubble. When no
+ * such message exists before a user boundary (or the end of the list), the
+ * cards are kept as a card-only entry so tool records are never dropped.
+ */
+function mergePureToolMessages(messages: ChatMessage[]): ChatMessage[] {
+  const merged: ChatMessage[] = []
+  let carried: ChatMessage['toolCalls'] | undefined
+  for (const msg of messages) {
+    if (msg.role === 'assistant') {
+      if (msg.content?.trim()) {
+        merged.push({
+          ...msg,
+          ...(carried?.length ? { toolCalls: [...carried, ...(msg.toolCalls ?? [])] } : {}),
+        })
+        carried = undefined
+        continue
+      }
+      if (msg.toolCalls?.length) {
+        carried = [...(carried ?? []), ...msg.toolCalls]
+        continue
+      }
+    } else if (carried?.length) {
+      // A user boundary with no intervening text: keep a card-only entry.
+      merged.push({ role: 'assistant', content: '', toolCalls: carried })
+      carried = undefined
+    }
+    merged.push(msg)
+  }
+  if (carried?.length) {
+    merged.push({ role: 'assistant', content: '', toolCalls: carried })
+  }
+  return merged
 }
 
 export function ChatMessageList() {
@@ -31,7 +68,7 @@ export function ChatMessageList() {
   const deleteSession = useAiStore((s) => s.deleteSession)
 
   const streamingText = useAiStore(selectCurrentChatStreamText)
-  const activeTools = useAiStore(selectCurrentChatActiveTools)
+  const toolCards = useAiStore(selectCurrentChatToolCards)
   const setInputDraft = useAiStore((s) => s.setInputDraft)
   const { emptyHint, quickActions } = useChatContext()
 
@@ -92,6 +129,11 @@ export function ChatMessageList() {
 
   const isEmpty = messages.length === 0 && !streamingText
 
+  // Pure-tool messages are merged forward so no empty bubble is rendered;
+  // the merge happens at the display boundary so live and loaded history
+  // share the same rule.
+  const renderedMessages = mergePureToolMessages(messages)
+
   return (
     <div
       className={cx('chat-message-list', isEmpty && 'chat-message-list--empty')}
@@ -100,69 +142,56 @@ export function ChatMessageList() {
     >
       {busy && (
         <div className="chat-message-list__row chat-message-list__row--ai">
-          <div className="chat-message-list__bubble chat-message-list__bubble--ai chat-message-list__bubble--streaming">
-            {activeTools.length > 0 && (
-              <div className="chat-message-list__tools">
-                {activeTools.map((name, i) => (
-                  <span
-                    key={`${name}-${i}`}
-                    className="chat-message-list__tool chat-message-list__tool--active"
-                  >
-                    <span className="chat-message-list__spinner" />
-                    {toolDisplayName(name)}
-                  </span>
-                ))}
-              </div>
-            )}
-            {streamingText ? (
-              <MarkdownContent content={streamingText} />
-            ) : (
-              <div className="chat-message-list__thinking">
-                <span />
-                <span />
-                <span />
-              </div>
-            )}
+          <div className="chat-message-list__ai">
+            {toolCards.length > 0 && <ToolCardList cards={toolCards} />}
+            <div className="chat-message-list__bubble chat-message-list__bubble--ai chat-message-list__bubble--streaming">
+              {streamingText ? (
+                <MarkdownContent content={streamingText} />
+              ) : (
+                <div className="chat-message-list__thinking">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {[...messages].reverse().map((msg, i) => (
-        <div
-          key={msg.timestamp || `${msg.role}-${messages.length - 1 - i}`}
-          className={cx(
-            'chat-message-list__row',
-            msg.role === 'user' ? 'chat-message-list__row--user' : 'chat-message-list__row--ai',
-          )}
-        >
+      {[...renderedMessages].reverse().map((msg, i) => {
+        const isUser = msg.role === 'user'
+        const toolCalls = msg.toolCalls && msg.toolCalls.length > 0 ? msg.toolCalls : undefined
+        return (
           <div
+            key={msg.timestamp || `${msg.role}-${messages.length - 1 - i}`}
             className={cx(
-              'chat-message-list__bubble',
-              msg.role === 'user'
-                ? 'chat-message-list__bubble--user'
-                : 'chat-message-list__bubble--ai',
+              'chat-message-list__row',
+              isUser ? 'chat-message-list__row--user' : 'chat-message-list__row--ai',
             )}
           >
-            {msg.role === 'user' && msg.attachment && (
-              <div className="chat-message-list__attachment">
-                <FileText size={12} strokeWidth={2} />
-                <span>{msg.attachment.name}</span>
-              </div>
-            )}
-            <MarkdownContent content={msg.content} />
-            {msg.role !== 'user' && msg.toolCalls && msg.toolCalls.length > 0 && (
-              <div className="chat-message-list__tools">
-                {msg.toolCalls.map((tc, j) => (
-                  <span key={j} className="chat-message-list__tool">
-                    <Check size={11} strokeWidth={2} />
-                    {toolDisplayName(tc.name)}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className={cx('chat-message-list__ai', isUser && 'chat-message-list__ai--user')}>
+              {!isUser && toolCalls && <ToolCardList cards={toolCalls} />}
+              {isUser || msg.content?.trim() ? (
+                <div
+                  className={cx(
+                    'chat-message-list__bubble',
+                    isUser ? 'chat-message-list__bubble--user' : 'chat-message-list__bubble--ai',
+                  )}
+                >
+                  {isUser && msg.attachment && (
+                    <div className="chat-message-list__attachment">
+                      <FileText size={12} strokeWidth={2} />
+                      <span>{msg.attachment.name}</span>
+                    </div>
+                  )}
+                  <MarkdownContent content={msg.content} />
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {isEmpty && (
         <div className="chat-message-list__empty">

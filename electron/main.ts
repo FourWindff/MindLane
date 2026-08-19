@@ -37,6 +37,7 @@ import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
 import { resolveMessagePipelineConfig } from './main/messagePipeline.js'
 import { MindmapReadRequester } from './main/mindmapRead.js'
+import { MindmapWriteRequester } from './main/mindmapWrite.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -310,6 +311,8 @@ app.whenReady().then(async () => {
   // 主进程 → 渲染层读导图请求器：`win` 是模块级可变引用（窗口可重建），
   // 经 getter 注入，窗口销毁时请求立即报错而非挂起。
   const mindmapReadRequester = new MindmapReadRequester(() => win)
+  // 主进程 → 渲染层落盘请求器：同读导图模式（requestId 关联 + 超时按失败处理）。
+  const mindmapWriteRequester = new MindmapWriteRequester(() => win)
 
   // 唯一装配点：惰性创建（或复用）当前 orchestrator。createRuntime 与
   // getChatOrchestrator 都从这里取，避免两条构造路径漂移。
@@ -323,7 +326,8 @@ app.whenReady().then(async () => {
         userDataPath,
         messagePipeline,
         mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
-        mindmapSnapshotRequester: (fileUuid) => mindmapReadRequester.requestSnapshot(fileUuid),
+        mindmapWriteProxy: (fileUuid, action, args) =>
+          mindmapWriteRequester.request(fileUuid, action, args),
       })
     }
     return chatOrchestrator
@@ -359,6 +363,7 @@ app.whenReady().then(async () => {
     editLogStore: services?.editLogStore ?? null,
     getWindow: () => win,
     mindmapReadRequester,
+    mindmapWriteRequester,
     getStreamManager: () => streamManager,
     getChatOrchestrator: async () => {
       if (!aiServiceReady) return null

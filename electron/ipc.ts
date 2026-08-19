@@ -18,6 +18,8 @@ export enum IPC {
   AiChatStreamEvent = 'ai:chat-stream-event',
   AiMindmapReadRequest = 'ai:mindmap-read-request',
   AiMindmapReadRespond = 'ai:mindmap-read-respond',
+  AiMindmapWriteRequest = 'ai:mindmap-write-request',
+  AiMindmapWriteRespond = 'ai:mindmap-write-respond',
   AiNodesToPalace = 'ai:nodes-to-palace',
   AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
@@ -282,21 +284,45 @@ export interface MindmapReadRequest {
   requestId: string
   fileUuid: string
   query?: MindmapReadQuery
-  /** xml=mindmap 节 XML 片段（默认）；snapshot=写工具校验用节点/资源快照 */
-  mode?: 'xml' | 'snapshot'
-}
-
-/** 渲染层 → 主进程：写工具校验快照。 */
-export interface MindmapEditorSnapshot {
-  nodeIds: string[]
-  assetIds: string[]
-  /** target → source（纯树，每节点至多一个父） */
-  parents: Record<string, string>
 }
 
 /** 渲染层 → 主进程：读导图应答。 */
 export type MindmapReadResponse =
   { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
+
+/** 写工具动作词表（渲染层落盘应答器按此分发）。 */
+export const WRITE_ACTIONS = [
+  'insertXmlFragment',
+  'updateMindmapNode',
+  'moveMindmapNode',
+  'deleteNode',
+] as const
+export type WriteAction = (typeof WRITE_ACTIONS)[number]
+
+/** 每个写动作的参数形状（IPC 边界仍为 Record<string,unknown>，渲染层按此解析）。 */
+export interface WriteActionArgs {
+  insertXmlFragment: {
+    xml: string
+    parentId?: string
+    position?: 'root' | 'child' | 'after' | 'before'
+  }
+  updateMindmapNode: { xml: string }
+  moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
+  deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
+}
+
+/** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 通道模式）。 */
+export interface MindmapWriteRequest {
+  requestId: string
+  fileUuid: string
+  action: WriteAction
+  args: Record<string, unknown>
+}
+
+/** 渲染层 → 主进程：落盘应答（{ok, action, data} 或错误；未知 requestId 为 no-op）。 */
+export type MindmapWriteResponse =
+  | { requestId: string; ok: true; action: string; data: unknown }
+  | { requestId: string; ok: false; error: string }
 
 /** 主进程经 `step` 事件可发出的步骤词表；渲染层 `AiPipelineStep` 是其超集。 */
 export const STREAM_STEPS = [
@@ -340,21 +366,30 @@ export interface StreamResponse {
   palaceData?: unknown
 }
 
+/**
+ * `step` 事件载荷：步骤名 + 可选进度计数（streamManager 必须透传，不得丢弃计数）。
+ */
+export interface StreamStepPayload {
+  step: StreamStep
+  completed?: number
+  total?: number
+}
+
 export type ChatStreamEvent =
   | { streamId: string; sessionId: string; type: 'message-start'; payload: null }
   | { streamId: string; sessionId: string; type: 'token'; payload: string }
-  | { streamId: string; sessionId: string; type: 'step'; payload: StreamStep }
+  | { streamId: string; sessionId: string; type: 'step'; payload: StreamStepPayload }
   | {
       streamId: string
       sessionId: string
       type: 'tool-start'
-      payload: { name: string; input: Record<string, unknown> }
+      payload: { id: string; name: string; input: Record<string, unknown> }
     }
   | {
       streamId: string
       sessionId: string
       type: 'tool-end'
-      payload: { name: string; output: string }
+      payload: { id: string; name: string; status: 'success' | 'error'; output: string }
     }
   | { streamId: string; sessionId: string; type: 'end'; payload: StreamResponse }
   | { streamId: string; sessionId: string; type: 'error'; payload: string }
@@ -423,6 +458,10 @@ export interface MindlaneBridge {
     onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
     /** 渲染层 → 主进程：读导图应答。 */
     respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
+    /** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 模式）。 */
+    onMindmapWriteRequest: (callback: (request: MindmapWriteRequest) => void) => () => void
+    /** 渲染层 → 主进程：落盘应答（未知 requestId 为 no-op）。 */
+    respondMindmapWrite: (payload: MindmapWriteResponse) => Promise<void>
     urlToDataUrl: (payload: { url: string }) => Promise<IpcResult<{ dataUrl: string }>>
   }
   file: {

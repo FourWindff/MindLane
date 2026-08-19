@@ -224,7 +224,9 @@ describe('SessionManager', () => {
       {
         role: 'assistant',
         content: 'Done',
-        toolCalls: [{ name: 'batchAddMindmapNodes', args: { count: 1 }, result: 'ok' }],
+        toolCalls: [
+          { name: 'batchAddMindmapNodes', args: { count: 1 }, result: 'ok', status: 'success' },
+        ],
         timestamp: '2024-01-01T00:00:01Z',
       },
     ]
@@ -233,6 +235,33 @@ describe('SessionManager', () => {
 
     const loaded = await manager.loadSessionMessages('session-ui-history')
     expect(loaded).toEqual(messages)
+  })
+
+  it('round-trips subgraph tool steps through saveSession/loadSessionMessages', async () => {
+    const steps = [
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 1, total: 2 },
+      { step: 'finalizing' },
+    ]
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        content: '生成导图完成',
+        toolCalls: [
+          {
+            name: 'generateMindmapFragment',
+            args: {},
+            result: '{"ok":true}',
+            steps,
+          },
+        ],
+      },
+    ]
+
+    await manager.saveSession('session-steps', messages, fileUuid)
+
+    const loaded = await manager.loadSessionMessages('session-steps')
+    expect(loaded[0]!.toolCalls![0]!.steps).toEqual(steps)
   })
 
   it('saveSession appends only new frontend messages without rewriting existing history', async () => {

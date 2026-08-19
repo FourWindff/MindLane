@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, type AppSettings } from '../../../fs/types.js'
 import { DashScopeProvider } from '../dashscope.js'
 import { KimiCodeProvider } from '../kimi-code.js'
 import { DeepSeekProvider } from '../deepseek.js'
+import { OpenCodeGoProvider } from '../opencode-go.js'
 import { resolveChatProvider } from '../index.js'
 
 function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -97,5 +98,20 @@ describe('resolveChatProvider', () => {
     expect(provider).toBeInstanceOf(DeepSeekProvider)
     expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://api.deepseek.com')
     expect(provider.model.lc_kwargs.modelKwargs).toEqual({ thinking: { type: 'disabled' } })
+  })
+
+  it('resolves OpenCode Go against its own catalog with the Go endpoint', () => {
+    const provider = resolveChatProvider(
+      makeSettings({
+        activeProviders: { chat: 'opencode-go' },
+        chatModel: 'glm-5.2',
+        providerConfigs: { 'opencode-go': { apiKey: 'go-key' } },
+      }),
+    )
+
+    expect(provider).toBeInstanceOf(OpenCodeGoProvider)
+    expect(provider.contextWindow).toBe(1_000_000) // glm-5.2 declared window
+    expect(provider.model.lc_kwargs.apiKey).toBe('go-key')
+    expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://opencode.ai/zen/go/v1')
   })
 })

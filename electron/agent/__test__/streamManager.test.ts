@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { StreamManager, type StreamRuntime } from '../streamManager.js'
 import type { SessionManager } from '../context/sessionManager.js'
 import { ToolRegistry } from '../tools/registry.js'
+import { logger, type LogSink } from '../../shared/logger.js'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -75,8 +76,20 @@ function createRuntime(options?: {
   capturedInputs?: Array<{ messages: BaseMessage[] }>
   omitAssistantState?: boolean
   includeToolState?: boolean
-  progressStep?: string
-  messageChunks?: Array<{ id: string; content: string }>
+  progress?: { step: string; completed?: number; total?: number }
+  toolEvents?: Array<Record<string, unknown>>
+  messageChunks?: Array<{
+    id: string
+    content: string
+    /** supervisor AI 消息携带的工具调用（子图补发 tool-start 用） */
+    toolCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>
+    /** tool 消息 chunk（子图 ToolMessage 补发 tool-end 用） */
+    type?: 'tool'
+    name?: string
+    toolCallId?: string
+    /** 消息所属节点（默认 supervisor；tool 消息默认 subgraphResult） */
+    node?: string
+  }>
 }): StreamRuntime {
   const registry = new ToolRegistry()
   registry.registerTool({ name: 'initial-tool' } as never)
@@ -89,8 +102,11 @@ function createRuntime(options?: {
       const sessionId = config.configurable?.thread_id ?? ''
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
-      if (options?.progressStep) {
-        yield ['custom', { type: 'mindmap-progress', step: options.progressStep }]
+      if (options?.progress) {
+        yield ['custom', { type: 'mindmap-progress', ...options.progress }]
+      }
+      for (const toolEvent of options?.toolEvents ?? []) {
+        yield ['tools', toolEvent]
       }
       const messageChunks = options?.messageChunks ?? [
         {
@@ -99,7 +115,40 @@ function createRuntime(options?: {
         },
       ]
       for (const chunk of messageChunks) {
-        yield ['messages', [new AIMessageChunk(chunk), { langgraph_node: 'supervisor' }]]
+        if (chunk.type === 'tool') {
+          yield [
+            'messages',
+            [
+              new ToolMessage({
+                content: chunk.content,
+                tool_call_id: chunk.toolCallId ?? '',
+                name: chunk.name,
+              }),
+              { langgraph_node: chunk.node ?? 'subgraphResult' },
+            ],
+          ]
+        } else {
+          yield [
+            'messages',
+            [
+              new AIMessageChunk({
+                id: chunk.id,
+                content: chunk.content,
+                ...(chunk.toolCalls
+                  ? {
+                      tool_call_chunks: chunk.toolCalls.map((tc, index) => ({
+                        id: tc.id ?? '',
+                        name: tc.name ?? '',
+                        args: JSON.stringify(tc.args ?? {}),
+                        index,
+                      })),
+                    }
+                  : {}),
+              }),
+              { langgraph_node: chunk.node ?? 'supervisor' },
+            ],
+          ]
+        }
       }
       await options?.gatesBySession?.[sessionId]
       await options?.gate
@@ -215,7 +264,7 @@ describe('StreamManager + Runner', () => {
 
   it('emits mindmap pipeline progress', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
-    setRuntimeFactory(() => createRuntime({ progressStep: 'extracting' }))
+    setRuntimeFactory(() => createRuntime({ progress: { step: 'extracting' } }))
 
     const streamId = manager.startStream({
       sessionId: 'session-a',
@@ -228,7 +277,440 @@ describe('StreamManager + Runner', () => {
       streamId,
       sessionId: 'session-a',
       type: 'step',
-      payload: 'extracting',
+      payload: { step: 'extracting' },
+    })
+  })
+
+  it('passes completed/total counts through step events (counts are not dropped)', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({ progress: { step: 'extracting', completed: 3, total: 8 } }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'extracting', completed: 3, total: 8 },
+    })
+  })
+
+  it('emits tool-start with the tool call id and tool-end with id + status from the result', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            input: { xml: '<node/>' },
+          },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            output: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+          },
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-2',
+            name: 'updateMindmapNode',
+            input: {},
+          },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-2',
+            name: 'updateMindmapNode',
+            output: JSON.stringify({ ok: false, error: '[block_not_found] …' }),
+          },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-1', name: 'insertXmlFragment', input: { xml: '<node/>' } },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-1',
+        name: 'insertXmlFragment',
+        status: 'success',
+        output: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+      },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: expect.objectContaining({ id: 'call-2', status: 'error' }),
+    })
+  })
+
+  it('emits a terminal tool-end with error status when a tool throws (on_tool_error)', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-err',
+            name: 'insertXmlFragment',
+            input: { xml: '<node/>' },
+          },
+          {
+            event: 'on_tool_error',
+            toolCallId: 'call-err',
+            name: 'insertXmlFragment',
+            error: new Error('boom'),
+          },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: { id: 'call-err', name: 'insertXmlFragment', status: 'error', output: 'boom' },
+    })
+  })
+
+  it('logs loudly when a tool event lacks toolCallId but still emits for name matching', async () => {
+    const errors: string[] = []
+    const sink: LogSink = { write: (line) => errors.push(line) }
+    logger.setSink(sink)
+    try {
+      const { manager, events, setRuntimeFactory } = createHarness()
+      setRuntimeFactory(() =>
+        createRuntime({
+          toolEvents: [
+            {
+              event: 'on_tool_start',
+              name: 'insertXmlFragment',
+              input: { xml: '<node/>' },
+            },
+            {
+              event: 'on_tool_end',
+              name: 'insertXmlFragment',
+              output: '{"ok":true}',
+            },
+          ],
+        }),
+      )
+
+      const streamId = manager.startStream({
+        sessionId: 'session-a',
+        message: 'question',
+        ...defaultRequestFields,
+      })
+      await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+      expect(errors.some((line) => line.includes('[ERROR]'))).toBe(true)
+      expect(events).toContainEqual({
+        streamId,
+        sessionId: 'session-a',
+        type: 'tool-start',
+        payload: { id: '', name: 'insertXmlFragment', input: { xml: '<node/>' } },
+      })
+      expect(events).toContainEqual({
+        streamId,
+        sessionId: 'session-a',
+        type: 'tool-end',
+        payload: { id: '', name: 'insertXmlFragment', status: 'success', output: '{"ok":true}' },
+      })
+    } finally {
+      logger.setSink(null)
+    }
+  })
+
+  it('re-emits subgraph tool-start/tool-end from messages-mode chunks', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    const subgraphResult = JSON.stringify({
+      ok: true,
+      title: '测试导图',
+      xmlFragment: 'root:',
+      documentRef: null,
+    })
+    setRuntimeFactory(() =>
+      createRuntime({
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub-1', name: 'generateMindmapFragment', args: { doc: 'x' } }],
+          },
+          {
+            id: 'm1',
+            content: subgraphResult,
+            type: 'tool',
+            name: 'generateMindmapFragment',
+            toolCallId: 'call-sub-1',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    // 子图虚拟调用不走 ToolNode：tool-start 由 supervisor 消息 chunk 补发（带 id），
+    // tool-end 由子图 ToolMessage 到达补发（状态来自结果 ok 字段）。
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-sub-1', name: 'generateMindmapFragment', input: { doc: 'x' } },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-sub-1',
+        name: 'generateMindmapFragment',
+        status: 'success',
+        output: subgraphResult,
+      },
+    })
+  })
+
+  it('re-emits palace subgraph tool-end as well, and error results derive status from the ok field', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    const palaceError = JSON.stringify({ ok: false, error: '生成失败' })
+    setRuntimeFactory(() =>
+      createRuntime({
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-palace-1', name: 'generatePalace', args: {} }],
+          },
+          {
+            id: 'm1',
+            content: palaceError,
+            type: 'tool',
+            name: 'generatePalace',
+            toolCallId: 'call-palace-1',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-palace-1', name: 'generatePalace', input: {} },
+    })
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-palace-1',
+        name: 'generatePalace',
+        status: 'error',
+        output: palaceError,
+      },
+    })
+  })
+
+  it('re-emitted tool events coexist with the step stream without duplication', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        progress: { step: 'extracting', completed: 2, total: 5 },
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub-1', name: 'generateMindmapFragment', args: {} }],
+          },
+          {
+            id: 'm1',
+            content: JSON.stringify({ ok: true, title: 'T', xmlFragment: 'x' }),
+            type: 'tool',
+            name: 'generateMindmapFragment',
+            toolCallId: 'call-sub-1',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events.filter((e) => e.type === 'step')).toEqual([
+      {
+        streamId,
+        sessionId: 'session-a',
+        type: 'step',
+        payload: { step: 'extracting', completed: 2, total: 5 },
+      },
+    ])
+    expect(events.filter((e) => e.type === 'tool-start')).toHaveLength(1)
+    expect(events.filter((e) => e.type === 'tool-end')).toHaveLength(1)
+  })
+
+  it('emits no subgraph tool events when the stream has no subgraph calls', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          {
+            event: 'on_tool_start',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            input: {},
+          },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            output: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+          },
+        ],
+      }),
+    )
+
+    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    // 回归：无子图调用时，不产生任何子图 tool-start/tool-end 补发。
+    const subgraphEvents = events.filter(
+      (e) =>
+        (e.type === 'tool-start' || e.type === 'tool-end') &&
+        (e.payload as { name?: string }).name?.includes('generate'),
+    )
+    expect(subgraphEvents).toEqual([])
+  })
+
+  it('does not create the subgraph card at declaration time, only when it executes', async () => {
+    // A supervisor AI chunk declares generateMindmapFragment, but the subgraph
+    // never runs (no progress, no ToolMessage): the card must NOT appear, so a
+    // later tool can never be pushed below a phantom subgraph card.
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          { event: 'on_tool_start', toolCallId: 'call-read', name: 'readMindmap', input: {} },
+          { event: 'on_tool_end', toolCallId: 'call-read', name: 'readMindmap', output: 'ok' },
+        ],
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub', name: 'generateMindmapFragment', args: { doc: 'x' } }],
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+
+    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    const subgraphStarts = events.filter(
+      (e) =>
+        e.type === 'tool-start' &&
+        (e.payload as { name?: string }).name === 'generateMindmapFragment',
+    )
+    expect(subgraphStarts).toEqual([])
+  })
+
+  it('anchors the subgraph card after an earlier real tool, matching final history order', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    const subgraphResult = JSON.stringify({ ok: true, title: 'T', xmlFragment: 'root:' })
+    setRuntimeFactory(() =>
+      createRuntime({
+        toolEvents: [
+          { event: 'on_tool_start', toolCallId: 'call-read', name: 'readMindmap', input: {} },
+          { event: 'on_tool_end', toolCallId: 'call-read', name: 'readMindmap', output: 'ok' },
+        ],
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [{ id: 'call-sub', name: 'generateMindmapFragment', args: { doc: 'x' } }],
+          },
+          {
+            id: 'm1',
+            content: subgraphResult,
+            type: 'tool',
+            name: 'generateMindmapFragment',
+            toolCallId: 'call-sub',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+      }),
+    )
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    const names = events
+      .filter((e) => e.type === 'tool-start')
+      .map((e) => (e.payload as { name?: string }).name)
+    expect(names).toEqual(['readMindmap', 'generateMindmapFragment'])
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'tool-end',
+      payload: {
+        id: 'call-sub',
+        name: 'generateMindmapFragment',
+        status: 'success',
+        output: subgraphResult,
+      },
     })
   })
 

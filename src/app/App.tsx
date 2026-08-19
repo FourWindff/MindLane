@@ -25,10 +25,10 @@ import {
   useAiStore,
 } from '@/features/chat/model/aiStore'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
+import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
+import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
-import { createMindmapToolCallRouter } from '@/features/chat/model/mindmapToolCallRouter'
-import { handleMindmapToolCall, MINDMAP_ACTION_TOOLS } from '@/features/chat/lib/aiToolCalls'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
 import '@/features/workspace/workspace.css'
@@ -96,11 +96,10 @@ function AppContent() {
     const disconnectAiStore = connectAiStore(mindmapRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
-    const stopToolRouter = createMindmapToolCallRouter({
-      subscribe: subscribeToChatStreamEvents,
-      resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
-      getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
-      handleToolCall: (toolCall, editor) => handleMindmapToolCall(toolCall, editor),
+    // 落盘应答器：主进程转发写工具参数，这里按 fileUuid 串行化校验+落图并回 ack。
+    const stopWriteResponder = createMindmapWriteResponder({
+      subscribe: (listener) => window.mindlane?.ai.onMindmapWriteRequest(listener) ?? (() => {}),
+      resolveEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
       persistFile: (fileUuid) => {
         const instance = mindmapRegistry.getByFileUuid(fileUuid)
         if (!instance) return
@@ -109,10 +108,16 @@ function AppContent() {
           onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
         })
       },
-      actionToolNames: MINDMAP_ACTION_TOOLS,
+      respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
+    }).start()
+    const stopToolRouter = createMindmapEndEffects({
+      subscribe: subscribeToChatStreamEvents,
+      resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
+      getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
     }).start()
     return () => {
       stopToolRouter()
+      stopWriteResponder()
       disconnectAiStore()
       disconnectMindmapReadResponder()
     }

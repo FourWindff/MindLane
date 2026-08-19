@@ -51,6 +51,11 @@ export class MindmapEditor {
     return this.store.getState()
   }
 
+  /** 只读当前编辑器状态（校验场景用，如落盘应答器按活状态做存在性/纯树校验）。 */
+  getState(): MindmapState {
+    return this.state
+  }
+
   // ─── 历史操作 ───
 
   undo(): void {
@@ -719,7 +724,12 @@ export class MindmapEditor {
       })
     }
 
-    this.runBatch(commands, true)
+    // Reflow in place, not just on a later dimensions change: during an AI
+    // stream the canvas is disabled (onNodesChange dropped), so the measured-
+    // dimensions reflow that would normally spread siblings never arrives until
+    // the message ends. Skipping reflow here left the anchored fragment stacked
+    // on top of the parent's existing first child for the whole stream.
+    this.runBatch(commands, false)
   }
 
   insertMindmapData(data: {

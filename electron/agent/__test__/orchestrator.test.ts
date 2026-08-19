@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AgentOrchestrator } from '../orchestrator.js'
+import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 import type { AgentServices } from '../service.js'
 import { ProviderCapability, type LLMProvider } from '../providers/index.js'
+import { AgentOrchestrator } from '../orchestrator.js'
 import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages'
 import type { BaseMessage } from '@langchain/core/messages'
 
@@ -148,7 +149,10 @@ describe('AgentOrchestrator contextCompact node', () => {
 })
 
 describe('AgentOrchestrator extractToolCalls', () => {
-  let extractToolCalls: (msgs: BaseMessage[]) => Array<{ name: string; result: string }> | undefined
+  let extractToolCalls: (
+    msgs: BaseMessage[],
+  ) =>
+    Array<{ name: string; result: string; status?: string; steps?: ChatToolCallStep[] }> | undefined
 
   beforeEach(() => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
@@ -192,5 +196,67 @@ describe('AgentOrchestrator extractToolCalls', () => {
 
     const result = extractToolCalls(messages)
     expect(result).toBeUndefined()
+  })
+
+  it('读取 additional_kwargs.toolSteps 为 ChatToolCall.steps', () => {
+    const messages: BaseMessage[] = [
+      new ToolMessage({
+        content: '{"ok":true}',
+        tool_call_id: 'call-sc1',
+        name: 'generateMindmapFragment',
+        additional_kwargs: {
+          toolSteps: [
+            { step: 'reading-doc' },
+            { step: 'extracting', completed: 1, total: 1 },
+            { step: 'finalizing' },
+          ],
+        },
+      }),
+    ]
+
+    const result = extractToolCalls(messages)
+    expect(result![0].steps).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting', completed: 1, total: 1 },
+      { step: 'finalizing' },
+    ])
+  })
+
+  it('无轨迹（旧会话）ToolMessage 不产生 steps', () => {
+    const messages: BaseMessage[] = [
+      new ToolMessage({
+        content: 'ok',
+        tool_call_id: 'call-sc2',
+        name: 'generateMindmapFragment',
+      }),
+    ]
+
+    const result = extractToolCalls(messages)
+    expect(result![0].steps).toBeUndefined()
+  })
+
+  it('derives ChatToolCall.status from the tool result ok flag', () => {
+    const ok = extractToolCalls([
+      new ToolMessage({
+        content: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: { nodeCount: 1 } }),
+        tool_call_id: 'call-ok',
+        name: 'insertXmlFragment',
+      }),
+    ])
+    expect(ok![0].status).toBe('success')
+
+    const failed = extractToolCalls([
+      new ToolMessage({
+        content: JSON.stringify({ ok: false, error: '[block_not_found] 节点不存在' }),
+        tool_call_id: 'call-fail',
+        name: 'updateMindmapNode',
+      }),
+    ])
+    expect(failed![0].status).toBe('error')
+
+    const freeText = extractToolCalls([
+      new ToolMessage({ content: '导图已生成', tool_call_id: 'call-txt', name: 'readMindmap' }),
+    ])
+    expect(freeText![0].status).toBe('success')
   })
 })

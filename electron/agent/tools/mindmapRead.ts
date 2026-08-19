@@ -19,8 +19,9 @@ export type MindmapReadToolResult = { ok: true; summary: string } | { ok: false;
  * （反向 IPC 实时拉取，不读磁盘）；输出只含 mindmap 节 XML（metadata/assets/
  * documents 不进 AI 上下文）。
  *
- * 语义限制：写工具在流结束时前端落图，本轮 run 内读取不含正在添加的节点，
- * 模型应以自身工具结果为这些节点补全。
+ * 语义限制：写工具执行即落盘（渲染层活编辑器即时应用），成功（结果 ok: true）后
+ * 本工具能看到刚写入的节点；失败时按错误码中的恢复策略处理（如 block_not_found
+ * → 先调用 readMindmap 重新定位）。
  */
 export function createReadMindmapTool(provider: MindmapSnapshotProvider) {
   return tool(
@@ -43,7 +44,7 @@ export function createReadMindmapTool(provider: MindmapSnapshotProvider) {
     },
     {
       name: 'readMindmap',
-      description: `读取当前思维导图的实时结构（XML 片段，携带 id/type/content/collapsed），用于回答「我的导图里有什么」、定位要编辑的节点。数据源是编辑器活状态，不是磁盘文件。fileUuid 可从当前用户消息末尾的 <EDITOR_STATE> 块中 file_uuid 属性获得（形如 <EDITOR_STATE file_uuid="...">）。注意：写工具（insertXmlFragment / updateMindmapNode / moveMindmapNode / deleteMindmapNode 等）在流结束时才落图，本轮 run 内读取的图**不含**你正在添加的节点——请以你自己的工具调用结果为准，不要用读图结果验证刚添加的节点。`,
+      description: `读取当前思维导图的实时结构（XML 片段，携带 id/type/content/collapsed），用于回答「我的导图里有什么」、定位要编辑的节点。数据源是编辑器活状态，不是磁盘文件。fileUuid 可从当前用户消息末尾的 <EDITOR_STATE> 块中 file_uuid 属性获得（形如 <EDITOR_STATE file_uuid="...">）。注意：写工具（insertXmlFragment / updateMindmapNode / moveMindmapNode / deleteMindmapNode）执行即落盘——成功（结果 ok: true）后本工具能看到刚写入的节点；失败（如 block_not_found）时按错误信息里的恢复策略处理，通常需先调用 readMindmap 重新定位。`,
       schema: z.object({
         fileUuid: z
           .string()

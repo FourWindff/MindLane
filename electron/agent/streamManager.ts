@@ -9,6 +9,8 @@ import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
+import { isSubgraphCall } from './subgraphRouter.js'
+import { deriveToolStatus } from './toolStatus.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
 import { isStreamStep, serializeTurnState, splitCurrentTurn } from '../ipc.js'
 
@@ -18,6 +20,25 @@ type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
 >['payload']
 
 const runnerLog = logger.withContext('runner')
+
+/**
+ * Resolve the tool-event id. LangGraph reliable supplies toolCallId; when it is
+ * missing this is a contract violation, so it is logged loudly instead of
+ * silently degrading every card to the shared `''` id (which would collide if a
+ * renderer ever keys on id). The `''` sentinel is kept so the event still flows
+ * and name-based matching still works — a skipped start/end would leave a card
+ * stuck running forever.
+ */
+function toolEventId(id: string | undefined, name: string | undefined, phase: string): string {
+  if (!id) {
+    runnerLog.error(
+      '%s 缺少 toolCallId（langgraph 契约违例）：%s，卡片将退化为按 name 匹配',
+      phase,
+      name ?? 'unknown',
+    )
+  }
+  return id ?? ''
+}
 
 /** One-line preview of tool args for info logs; full payload goes to debug. */
 function summarizeToolPayload(payload: unknown): string {
@@ -47,9 +68,10 @@ export interface StreamRequest {
 }
 
 /**
- * 运行时所需的 graph 最小面。stream 的元组对齐 LangGraph 实际输出
- * （只读元组 [mode, payload]）；编译期无法与 LangGraph 泛型 stream 完全
- * 结构匹配，由 orchestrator 装配时做一次局部强转并注释原因。
+ * The minimal graph surface the runtime needs. The stream tuples align with
+ * LangGraph's actual output (read-only tuples [mode, payload]); the compiler
+ * cannot fully match LangGraph's generic stream signatures, so the orchestrator
+ * does one local cast at assembly time and documents why.
  */
 export interface StreamGraph {
   stream: (
@@ -95,7 +117,7 @@ export class Runner {
   async run(): Promise<void> {
     const { sessionManager } = this.options
     const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
-    // 契约：SessionManager 在应用启动时装配完成，无需 isReady 守卫。
+    // Contract: SessionManager is assembled at app startup; no isReady guard needed.
     return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
   }
 
@@ -104,6 +126,13 @@ export class Runner {
     let fullContent = ''
     let currentSegmentContent = ''
     let currentMessageId: string | null = null
+    // Subgraph calls declared by the supervisor but not yet executed. The card
+    // is created when the subgraph actually starts running (first progress step
+    // or its ToolMessage), so streaming order matches the final history order.
+    const pendingSubgraphStarts = new Map<
+      string,
+      { name: string; input: Record<string, unknown> }
+    >()
 
     try {
       const history = await this.prepareHistory()
@@ -131,10 +160,65 @@ export class Runner {
 
         if (mode === 'messages') {
           const [message, metadata] = payload as [
-            { id?: string; content?: unknown },
+            {
+              id?: string
+              content?: unknown
+              type?: string
+              name?: string
+              tool_call_id?: string
+              tool_calls?: Array<{
+                id?: string
+                name?: string
+                args?: Record<string, unknown>
+              }>
+            },
             Record<string, unknown>,
           ]
+          // A subgraph ToolMessage arrived (subgraphResult node output,
+          // langgraph_node != supervisor): virtual subgraph calls do not go
+          // through ToolNode, so tools mode emits nothing; re-emit tool-end here.
+          // Progress-less runs also get their tool-start anchored here (before
+          // the end), so the card is never declared at supervisor-chunk time.
+          if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {
+            const subgraphId = message.tool_call_id ?? ''
+            const pending = subgraphId ? pendingSubgraphStarts.get(subgraphId) : undefined
+            if (pending) {
+              pendingSubgraphStarts.delete(subgraphId)
+              this.emit('tool-start', {
+                id: toolEventId(subgraphId, pending.name, 'subgraph tool-start'),
+                name: pending.name,
+                input: pending.input,
+              })
+            }
+            const output =
+              typeof message.content === 'string'
+                ? message.content
+                : JSON.stringify(message.content ?? '')
+            this.emit('tool-end', {
+              id: toolEventId(message.tool_call_id, message.name, 'subgraph tool-end'),
+              name: message.name ?? 'unknown',
+              status: deriveToolStatus(output),
+              output,
+            })
+            continue
+          }
           if (metadata?.langgraph_node && metadata.langgraph_node !== 'supervisor') continue
+          // Virtual subgraph calls are not executed through ToolNode, so tools
+          // mode emits no event for them. Their card is created when the
+          // subgraph actually starts executing — first progress step, or its
+          // ToolMessage — NOT when the supervisor declares the call. A single AI
+          // message can declare [readMindmap, generateMindmapFragment]; creating
+          // the card at declaration time would place it above readMindmap even
+          // though read runs first in the final history. Stash the declaration
+          // here and let the progress/ToolMessage handlers anchor it.
+          for (const toolCall of message.tool_calls ?? []) {
+            if (isSubgraphCall(toolCall.name ?? '')) {
+              pendingSubgraphStarts.set(toolCall.id ?? '', {
+                name: toolCall.name ?? 'unknown',
+                input: (toolCall.args ?? {}) as Record<string, unknown>,
+              })
+            }
+          }
           const messageId = message.id ?? null
           if (
             messageId &&
@@ -158,13 +242,16 @@ export class Runner {
             name?: string
             input?: unknown
             output?: unknown
+            error?: unknown
+            toolCallId?: string
           }
           if (event.event === 'on_tool_start') {
             if (event.name === 'insertXmlFragment' || event.name === 'generateMindmapFragment')
-              this.emit('step', 'generating-map')
+              this.emit('step', { step: 'generating-map' })
             runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
             runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
             this.emit('tool-start', {
+              id: toolEventId(event.toolCallId, event.name, 'tool-start'),
               name: event.name ?? 'unknown',
               input: (event.input ?? {}) as Record<string, unknown>,
             })
@@ -173,14 +260,55 @@ export class Runner {
               typeof event.output === 'string' ? event.output : JSON.stringify(event.output ?? '')
             runnerLog.info('tool 结果： %s, %s', event.name, summarizeToolResult(output))
             this.emit('tool-end', {
+              id: toolEventId(event.toolCallId, event.name, 'tool-end'),
               name: event.name ?? 'unknown',
+              status: deriveToolStatus(output),
+              output,
+            })
+          } else if (event.event === 'on_tool_error') {
+            // LangGraph tools-mode also reports thrown tool errors; without this the
+            // card would never get a terminal status (no on_tool_end is emitted).
+            const err = event.error as unknown
+            const output =
+              typeof err === 'string' ? err : err instanceof Error ? err.message : String(err ?? '')
+            runnerLog.error('tool 错误： %s, %s', event.name, output)
+            this.emit('tool-end', {
+              id: toolEventId(event.toolCallId, event.name, 'tool-error'),
+              name: event.name ?? 'unknown',
+              status: 'error',
               output,
             })
           }
         } else if (mode === 'custom') {
-          const event = payload as { type?: string; step?: string }
+          const event = payload as {
+            type?: string
+            step?: string
+            completed?: number
+            total?: number
+          }
           if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
-            this.emit('step', event.step)
+            // First subgraph activity: create the pending subgraph card here, so
+            // it is ordered by execution time (after any earlier tool) and stays
+            // ahead of later tools in the stream.
+            if (pendingSubgraphStarts.size > 0) {
+              const [pendingId, pending] = pendingSubgraphStarts.entries().next().value as [
+                string,
+                { name: string; input: Record<string, unknown> },
+              ]
+              pendingSubgraphStarts.delete(pendingId)
+              this.emit('tool-start', {
+                id: toolEventId(pendingId, pending.name, 'subgraph tool-start'),
+                name: pending.name,
+                input: pending.input,
+              })
+            }
+            // Contract: the step payload is { step, completed?, total? }; counts
+            // must pass through (cards render n/m).
+            this.emit('step', {
+              step: event.step,
+              ...(typeof event.completed === 'number' ? { completed: event.completed } : {}),
+              ...(typeof event.total === 'number' ? { total: event.total } : {}),
+            })
           }
         }
       }
@@ -210,9 +338,11 @@ export class Runner {
 
   private async prepareHistory(): Promise<BaseMessage[]> {
     const { request, sessionManager } = this.options
-    // 轮次状态：主进程在持久化时把编辑器状态序列化为 `<EDITOR_STATE>` 块，
-    // 附加到该轮用户消息末尾（`问题\n<EDITOR_STATE>…</EDITOR_STATE>`）再保存。
-    // 模型输入、checkpointer 不过滤；展示 / 滚动摘要 / 记忆提取在各自入口剥离。
+    // Turn state: on persist, the main process serializes the editor state into
+    // an `<EDITOR_STATE>` block appended to the end of that turn's user message
+    // (`question\n<EDITOR_STATE>…</EDITOR_STATE>`) before saving. Model input and
+    // the checkpointer do not filter it; display / scroll summary / memory
+    // extraction strip it at their own entry points.
     const turnState = serializeTurnState(request.context)
     const persistedContent = request.message ? `${request.message}\n${turnState}` : turnState
     const humanMessage = new HumanMessage({

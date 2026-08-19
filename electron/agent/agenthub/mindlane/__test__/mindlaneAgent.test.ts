@@ -81,6 +81,7 @@ function createInitialState() {
     mergeResults: [],
     finalTree: null,
     documentRef: null,
+    toolSteps: [],
     palaceInputText: '',
     palaceInputNodes: [],
     palace: null,

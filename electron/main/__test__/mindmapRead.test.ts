@@ -5,27 +5,14 @@ import { MindmapReadRequester } from '../mindmapRead.js'
 /** 伪 BrowserWindow：只记录发出的请求，不真正触达渲染层。 */
 function fakeWindow(): {
   window: unknown
-  sent: Array<{ requestId: string; fileUuid: string; query?: unknown; mode?: 'xml' | 'snapshot' }>
+  sent: Array<{ requestId: string; fileUuid: string; query?: unknown }>
 } {
-  const sent: Array<{
-    requestId: string
-    fileUuid: string
-    query?: unknown
-    mode?: 'xml' | 'snapshot'
-  }> = []
+  const sent: Array<{ requestId: string; fileUuid: string; query?: unknown }> = []
   const window = {
     isDestroyed: () => false,
     webContents: {
       send: vi.fn(
-        (
-          _channel: string,
-          payload: {
-            requestId: string
-            fileUuid: string
-            query?: unknown
-            mode?: 'xml' | 'snapshot'
-          },
-        ) => {
+        (_channel: string, payload: { requestId: string; fileUuid: string; query?: unknown }) => {
           sent.push(payload)
         },
       ),
@@ -54,44 +41,6 @@ describe('MindmapReadRequester', () => {
     requester.respond({ requestId: request.requestId, ok: true, summary: '实时树' })
     await expect(promise).resolves.toBe('实时树')
     expect(requester.pendingCount).toBe(0)
-  })
-
-  it('parses the JSON-serialized snapshot back into an object for snapshot requests', async () => {
-    const { window, sent } = fakeWindow()
-    const requester = new MindmapReadRequester(() => window as unknown as BrowserWindow)
-
-    const promise = requester.requestSnapshot('file-a')
-    const request = sent[0]!
-    expect(request.mode).toBe('snapshot')
-
-    requester.respond({
-      requestId: request.requestId,
-      ok: true,
-      summary: JSON.stringify({
-        nodeIds: ['root', 'n1'],
-        assetIds: ['a1'],
-        parents: { n1: 'root' },
-      }),
-    })
-    await expect(promise).resolves.toEqual({
-      nodeIds: ['root', 'n1'],
-      assetIds: ['a1'],
-      parents: { n1: 'root' },
-    })
-  })
-
-  it('rejects with a clear error when the snapshot payload is not valid JSON', async () => {
-    const { window, sent } = fakeWindow()
-    const requester = new MindmapReadRequester(() => window as unknown as BrowserWindow)
-
-    const promise = requester.requestSnapshot('file-a')
-    requester.respond({
-      requestId: sent[0]!.requestId,
-      ok: true,
-      summary: '不是 JSON',
-    })
-
-    await expect(promise).rejects.toThrow('渲染层返回的编辑器快照格式无效')
   })
 
   it('keeps xml-mode responses as raw strings even when they look like JSON', async () => {
