@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { McpManager, type McpManagerOptions } from '../mcpManager.js'
 import type { McpClientLike, McpServerDefinition } from '../types.js'
 import type { McpCredentialCrypto } from '../credentials.js'
+import { createFeishuServer, FEISHU_ALLOWED_TOOLS } from '../servers/feishu.js'
 
 function createMockTool(name: string): DynamicStructuredTool {
   return new DynamicStructuredTool({
@@ -327,5 +328,96 @@ describe('McpManager', () => {
       { id: 'apiKey', label: 'API Key', required: true, secret: true },
     ])
     expect(status.failureHint).toBe('请打开 Obsidian')
+  })
+
+  // ---- 飞书（开发者远程模式）UAT/TAT 头分支 ----
+
+  function makeFeishuManager(
+    exchange?: (appId: string, appSecret: string) => Promise<string>,
+    tools: string[] = ['doc_search', 'doc_read', 'wiki_search'],
+  ) {
+    let receivedHeaders: Record<string, string> | undefined
+    const manager = new McpManager({
+      userDataPath,
+      servers: [createFeishuServer({ exchangeTenantToken: exchange })],
+      createClient: (_def, _auth, headers) => {
+        receivedHeaders = headers
+        return makeClient(tools)
+      },
+      onToolsChanged: vi.fn(),
+    })
+    return { manager, receivedHeaders: () => receivedHeaders }
+  }
+
+  it('有 UAT 时携带 X-Lark-MCP-UAT 头与 Allowed-Tools 头，不发起 TAT 换令牌', async () => {
+    const exchange = vi.fn(async () => 'app-token')
+    const { manager, receivedHeaders } = makeFeishuManager(exchange)
+
+    await manager.connect('feishu', { appId: 'a', appSecret: 's', uat: 'user-token' })
+
+    expect(receivedHeaders()).toEqual({
+      'X-Lark-MCP-UAT': 'user-token',
+      'X-Lark-MCP-Allowed-Tools': FEISHU_ALLOWED_TOOLS,
+    })
+    expect(exchange).not.toHaveBeenCalled()
+    expect(receivedHeaders()?.['X-Lark-MCP-TAT']).toBeUndefined()
+  })
+
+  it('无 UAT 时用 app 凭证现换 TAT 发 X-Lark-MCP-TAT 头', async () => {
+    const exchange = vi.fn(async () => 'app-token')
+    const { manager, receivedHeaders } = makeFeishuManager(exchange)
+
+    await manager.connect('feishu', { appId: 'a', appSecret: 's' })
+
+    expect(exchange).toHaveBeenCalledWith('a', 's')
+    expect(receivedHeaders()).toEqual({
+      'X-Lark-MCP-TAT': 'app-token',
+      'X-Lark-MCP-Allowed-Tools': FEISHU_ALLOWED_TOOLS,
+    })
+    expect(receivedHeaders()?.['X-Lark-MCP-UAT']).toBeUndefined()
+  })
+
+  it('TAT 现换失败时降级为 failed，错误含检查 app 凭证指引', async () => {
+    const exchange = vi.fn(async () => {
+      throw new Error('app_secret invalid')
+    })
+    const { manager } = makeFeishuManager(exchange)
+
+    const status = await manager.connect('feishu', { appId: 'a', appSecret: 'bad' })
+
+    expect(status.state).toBe('failed')
+    expect(status.error).toContain('app_secret invalid')
+    expect(status.error).toContain('App Secret')
+    expect(manager.getTools()).toEqual([])
+  })
+
+  it('客户端 allowlist 再收敛：剔除消息/多维表格/日历工具，保留文档工具', async () => {
+    const { manager } = makeFeishuManager(async () => 'app-token', [
+      'doc_search',
+      'doc_read',
+      'wiki_search',
+      'im_message',
+      'bitable_record',
+      'calendar_event',
+    ])
+
+    await manager.start({ feishu: { state: 'connected' } })
+
+    const names = manager.getTools().map((t) => t.name)
+    expect(names).toEqual(['feishu__doc_search', 'feishu__doc_read', 'feishu__wiki_search'])
+    for (const forbidden of ['im_', 'bitable_', 'calendar_']) {
+      expect(names.some((n) => n.includes(forbidden))).toBe(false)
+    }
+  })
+
+  it('断开后删除全部凭据，状态回到 disconnected', async () => {
+    const { manager } = makeFeishuManager()
+    await manager.connect('feishu', { appId: 'a', appSecret: 's', uat: 'u' })
+    expect(manager.getTools().length).toBe(3)
+
+    await manager.disconnect('feishu')
+
+    expect(manager.getTools()).toEqual([])
+    expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
   })
 })

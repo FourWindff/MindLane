@@ -40,6 +40,7 @@ const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
 const MCP_ICONS: Record<string, string> = {
   notion: '/assets/notion.svg',
   obsidian: '/assets/obsidian.svg',
+  feishu: '/assets/feishu.svg',
 }
 
 function McpIntegrationsSection() {
