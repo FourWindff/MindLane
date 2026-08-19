@@ -17,7 +17,11 @@ async function readFeishuTokenBody(
   res: Response,
   what: string,
 ): Promise<{ access_token?: string; refresh_token?: string; expires_in?: number }> {
-  let body: { code?: number; msg?: string; data?: { access_token?: string; refresh_token?: string; expires_in?: number } }
+  let body: {
+    code?: number
+    msg?: string
+    data?: { access_token?: string; refresh_token?: string; expires_in?: number }
+  }
   try {
     body = (await res.json()) as typeof body
   } catch {
@@ -46,16 +50,18 @@ export async function exchangeFeishuUat(
   appSecret: string,
   code: string,
 ): Promise<FeishuUatResult> {
-  const res = await fetch(
-    'https://open.feishu.cn/open-apis/authen/v1/access_token',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ grant_type: 'authorization_code', code, app_id: appId, app_secret: appSecret }),
-      // 默认 fetch 无超时，这里 20s 兜底——宁可失败提示也不要“获取中”卡死
-      signal: AbortSignal.timeout(20_000),
-    },
-  )
+  const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'authorization_code',
+      code,
+      app_id: appId,
+      app_secret: appSecret,
+    }),
+    // 默认 fetch 无超时，这里 20s 兜底——宁可失败提示也不要“获取中”卡死
+    signal: AbortSignal.timeout(20_000),
+  })
   const data = await readFeishuTokenBody(res, '授权码换取 user_access_token')
   // 仅返回 uat 等非敏感展示信息；refresh_token 由 app 侧持有，不落盘。
   return {
@@ -74,7 +80,12 @@ export async function refreshFeishuUat(
   const res = await fetch('https://open.feishu.cn/open-apis/authen/v1/refresh_access_token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: refreshToken, app_id: appId, app_secret: appSecret }),
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      app_id: appId,
+      app_secret: appSecret,
+    }),
     // 默认 fetch 无超时，20s 兜底——失败提示好过连接卡住
     signal: AbortSignal.timeout(20_000),
   })
@@ -102,7 +113,9 @@ export async function acquireFeishuUat(opts: {
 }): Promise<FeishuUatResult> {
   const { appId, appSecret, openBrowser, timeoutMs = 5 * 60_000 } = opts
   const exchange = opts.exchange ?? exchangeFeishuUat
-  const loopback = await startLoopbackCallbackServer({ port: opts.port ?? FEISHU_UAT_CALLBACK_PORT })
+  const loopback = await startLoopbackCallbackServer({
+    port: opts.port ?? FEISHU_UAT_CALLBACK_PORT,
+  })
   try {
     const state = crypto.randomUUID()
     const authorizeUrl = new URL('https://open.feishu.cn/open-apis/authen/v1/index')

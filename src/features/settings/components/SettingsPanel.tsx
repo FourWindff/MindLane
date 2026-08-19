@@ -44,10 +44,7 @@ const MCP_ICONS: Record<string, string> = {
 }
 
 /** 各 MCP 的简短连接教程：steps 每行一步，悬浮感叹号气泡展示；链接走 shell.openExternal */
-const MCP_TUTORIAL: Record<
-  string,
-  { steps: string[]; links: { label: string; url: string }[] }
-> = {
+const MCP_TUTORIAL: Record<string, { steps: string[]; links: { label: string; url: string }[] }> = {
   obsidian: {
     steps: [
       '插件仓库：github.com/coddingtonbear/obsidian-local-rest-api（自带 MCP 服务）',
@@ -55,7 +52,9 @@ const MCP_TUTORIAL: Record<
       '在插件设置中开启加密端口（HTTPS 27124）',
       '把插件里的 API Key 粘贴到表单，确认连接',
     ],
-    links: [{ label: '打开插件仓库', url: 'https://github.com/coddingtonbear/obsidian-local-rest-api' }],
+    links: [
+      { label: '打开插件仓库', url: 'https://github.com/coddingtonbear/obsidian-local-rest-api' },
+    ],
   },
   feishu: {
     steps: [
@@ -65,8 +64,14 @@ const MCP_TUTORIAL: Record<
       '确认连接后，AI 即可搜索并读取你的云文档',
     ],
     links: [
-      { label: '接入教程', url: 'https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server' },
-      { label: '获取 UAT', url: 'https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3' },
+      {
+        label: '接入教程',
+        url: 'https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server',
+      },
+      {
+        label: '获取 UAT',
+        url: 'https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3',
+      },
     ],
   },
 }
@@ -189,43 +194,43 @@ function McpIntegrationsSection() {
         return (
           <div className="settings-card__row mcp-server" key={server.id}>
             {iconSrc ? <img src={iconSrc} alt="" width={28} height={28} /> : <Plug size={28} />}
-              <div className="mcp-server__text">
-                <div className="settings-card__label mcp-server__label">
-                  {server.displayName}
-                  {MCP_TUTORIAL[server.id] && (
-                    <span className="mcp-tutorial-tip" role="note">
-                      <CircleAlert size={14} />
-                      <span className="mcp-tutorial-bubble">
-                        {MCP_TUTORIAL[server.id].steps.map((step, i) => (
-                          <div className="mcp-tutorial-step" key={i}>
-                            {i + 1}. {step}
-                          </div>
-                        ))}
-                        {MCP_TUTORIAL[server.id].links.length > 0 && (
-                          <div className="mcp-tutorial-links">
-                            {MCP_TUTORIAL[server.id].links.map((link) => (
-                              <button
-                                type="button"
-                                key={link.url}
-                                className="mcp-tutorial-link"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  void window.mindlane?.shell.openExternal(link.url)
-                                }}
-                              >
-                                {link.label} ↗
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </span>
+            <div className="mcp-server__text">
+              <div className="settings-card__label mcp-server__label">
+                {server.displayName}
+                {MCP_TUTORIAL[server.id] && (
+                  <span className="mcp-tutorial-tip" role="note">
+                    <CircleAlert size={14} />
+                    <span className="mcp-tutorial-bubble">
+                      {MCP_TUTORIAL[server.id].steps.map((step, i) => (
+                        <div className="mcp-tutorial-step" key={i}>
+                          {i + 1}. {step}
+                        </div>
+                      ))}
+                      {MCP_TUTORIAL[server.id].links.length > 0 && (
+                        <div className="mcp-tutorial-links">
+                          {MCP_TUTORIAL[server.id].links.map((link) => (
+                            <button
+                              type="button"
+                              key={link.url}
+                              className="mcp-tutorial-link"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                void window.mindlane?.shell.openExternal(link.url)
+                              }}
+                            >
+                              {link.label} ↗
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </span>
-                  )}
-                </div>
-                <div className="settings-card__hint">
-                  {server.state === 'failed' && server.error ? server.error : server.description}
-                </div>
+                  </span>
+                )}
               </div>
+              <div className="settings-card__hint">
+                {server.state === 'failed' && server.error ? server.error : server.description}
+              </div>
+            </div>
             <div className="mcp-server__actions">
               <span
                 className={`mcp-status-dot${connected ? ' mcp-status-dot--on' : ''}`}

@@ -95,13 +95,11 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
         timeoutMs: 3 * 60_000,
       })
       // 持久化 refresh_token 与过期时间，供 createAuthHeaders 连接时自动续期
-      ctx
-        .getMcpManager()
-        ?.persistSecrets('feishu', {
-          uat: result.uat,
-          refreshToken: result.refreshToken,
-          uatExpiresAt: String(Date.now() + result.expiresIn * 1000),
-        })
+      ctx.getMcpManager()?.persistSecrets('feishu', {
+        uat: result.uat,
+        refreshToken: result.refreshToken,
+        uatExpiresAt: String(Date.now() + result.expiresIn * 1000),
+      })
       return { ok: true, data: { uat: result.uat, expiresIn: result.expiresIn } }
     } catch (err) {
       mcpLog.warn('authorize-uat: failed: %s', err instanceof Error ? err.message : String(err))

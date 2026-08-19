@@ -14,7 +14,11 @@ function fakeStore(secrets: Record<string, string>) {
 
 describe('feishu createAuthHeaders 自动续期', () => {
   it('UAT 过期且有 refresh_token → 自动刷新并回写新值', async () => {
-    const refreshUat = vi.fn(async () => ({ uat: 'u-new', refreshToken: 'ur-new', expiresIn: 7200 }))
+    const refreshUat = vi.fn(async () => ({
+      uat: 'u-new',
+      refreshToken: 'ur-new',
+      expiresIn: 7200,
+    }))
     const def = createFeishuServer({ refreshUat })
     const store = fakeStore({
       appId: 'a',

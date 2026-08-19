@@ -138,9 +138,14 @@ describe('McpManager', () => {
     // OAuth server：断开仍删除已存 token（与非 OAuth 表单配置保留的规则相反）
     const makeOAuthDef = (id: string) =>
       makeDef(id, {
-        createAuthProvider: (() => ({ authRedirected: false })) as unknown as McpServerDefinition['createAuthProvider'],
+        createAuthProvider: (() => ({
+          authRedirected: false,
+        })) as unknown as McpServerDefinition['createAuthProvider'],
       })
-    const { manager } = createManager({ credentialCrypto: testCrypto, servers: [makeOAuthDef('notion')] })
+    const { manager } = createManager({
+      credentialCrypto: testCrypto,
+      servers: [makeOAuthDef('notion')],
+    })
     const credPath = path.join(userDataPath, 'mcp-credentials', 'notion.json')
     fs.mkdirSync(path.dirname(credPath), { recursive: true })
     fs.writeFileSync(
@@ -397,15 +402,18 @@ describe('McpManager', () => {
   })
 
   it('客户端 allowlist 再收敛：剔除写操作/通用工具，保留文档工具', async () => {
-    const { manager } = makeFeishuManager(async () => 'app-token', [
-      'fetch-doc',
-      'search-doc',
-      'list-docs',
-      'create-doc',
-      'update-doc',
-      'get-comments',
-      'search-user',
-    ])
+    const { manager } = makeFeishuManager(
+      async () => 'app-token',
+      [
+        'fetch-doc',
+        'search-doc',
+        'list-docs',
+        'create-doc',
+        'update-doc',
+        'get-comments',
+        'search-user',
+      ],
+    )
 
     await manager.start({ feishu: { state: 'connected' } })
 
