@@ -214,6 +214,39 @@ describe('MindmapEditor', () => {
     })
   })
 
+  describe('insertFromXml', () => {
+    it('lays out an inserted fragment in place so it never overlaps existing children', async () => {
+      const root = rootId()
+      editor.addChild(root)
+      await editor.insertFromXml(
+        '<node type="text" content="AI A"><node type="text" content="A1"/><node type="text" content="A2"/></node>',
+        { parentId: root, position: 'child' },
+      )
+
+      const snapshot = (): string[] =>
+        store
+          .getState()
+          .nodes.map((n) => `${n.id}:${n.position.x},${n.position.y}`)
+          .sort()
+
+      // The insert must already be in its final layout: a later reflow (the
+      // dimensions-driven one that only arrives once an AI stream ends and the
+      // canvas re-enables) changes nothing, so the map is correct mid-stream.
+      const asInserted = snapshot()
+      editor.reflow()
+      expect(snapshot()).toEqual(asInserted)
+
+      // The fragment no longer stacks on the parent's existing first child.
+      const rootChildren = store
+        .getState()
+        .nodes.filter((n) =>
+          store.getState().edges.some((e) => e.source === root && e.target === n.id),
+        )
+      const childYs = rootChildren.map((n) => n.position.y)
+      expect(new Set(childYs).size).toBe(rootChildren.length)
+    })
+  })
+
   describe('transient UI helpers', () => {
     it('should set editing flag without recording history', () => {
       editor.setNodeEditing(rootId(), true)

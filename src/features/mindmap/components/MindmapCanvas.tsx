@@ -53,7 +53,11 @@ export function MindmapCanvas({
     <ReactFlow
       nodes={nodes}
       edges={edges}
-      onNodesChange={disabled ? undefined : onNodesChange}
+      // onNodesChange stays wired while disabled: dimension measurements must
+      // still reach the editor during an AI stream, or edges connect at stale
+      // default sizes until a later interaction forces a re-measure. The
+      // controller filters out everything but dimensions while aiBusy.
+      onNodesChange={onNodesChange}
       onEdgesChange={disabled ? undefined : onEdgesChange}
       onConnect={disabled ? undefined : onConnect}
       onNodeClick={onNodeClick}

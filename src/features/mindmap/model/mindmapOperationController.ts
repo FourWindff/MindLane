@@ -66,7 +66,18 @@ export function createMindmapOperationController({
   return {
     handleNodesChange(changes: NodeChange[]) {
       const state = getState()
-      if (state.aiBusy) return
+      if (state.aiBusy) {
+        // Read-only during an AI stream, but dimension measurements must still
+        // land: without them freshly inserted nodes keep default sizes and
+        // their edges connect at the wrong points until a later interaction
+        // forces a re-measure. The dimension-triggered reflow is also what
+        // spreads siblings after a fragment insert.
+        editor.applyNativeNodeChanges(
+          changes.filter((c) => c.type === 'dimensions'),
+          state.structureType,
+        )
+        return
+      }
       editor.applyNativeNodeChanges(changes, state.structureType)
     },
 
