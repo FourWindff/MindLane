@@ -43,6 +43,21 @@ const MCP_ICONS: Record<string, string> = {
   feishu: '/assets/feishu.svg',
 }
 
+/** 各 MCP 的简短连接教程：主进程不动文案，纯展示层；链接走 shell.openExternal */
+const MCP_TUTORIAL: Record<string, { hint: string; links: { label: string; url: string }[] }> = {
+  obsidian: {
+    hint: '① Obsidian → 设置 → 第三方插件,安装并启用 “Local REST API with MCP”(自带 MCP 服务);② 在插件设置中开启加密端口(HTTPS 27124);③ 复制 API Key 粘贴到左侧表单后连接。',
+    links: [{ label: '插件仓库', url: 'https://github.com/coddingtonbear/obsidian-local-rest-api' }],
+  },
+  feishu: {
+    hint: '① 飞书开放平台创建自建应用并开通文档搜索/读取/wiki 权限;② 后台「安全设置 → 重定向 URL」登记 http://127.0.0.1:44664/callback(一键获取 UAT 用);③ 填入 App ID/Secret,可用右侧 ▾ 展开一键获取 UAT 后连接。',
+    links: [
+      { label: '接入教程', url: 'https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server' },
+      { label: '获取 UAT', url: 'https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3' },
+    ],
+  },
+}
+
 function McpIntegrationsSection() {
   const [servers, setServers] = useState<McpServerStatusInfo[]>([])
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -166,6 +181,23 @@ function McpIntegrationsSection() {
               <div className="settings-card__hint">
                 {server.state === 'failed' && server.error ? server.error : server.description}
               </div>
+              {MCP_TUTORIAL[server.id] && (
+                <div className="mcp-server__tutorial">
+                  <div className="mcp-server__tutorial-hint">{MCP_TUTORIAL[server.id].hint}</div>
+                  <div className="mcp-server__tutorial-links">
+                    {MCP_TUTORIAL[server.id].links.map((link) => (
+                      <button
+                        type="button"
+                        key={link.url}
+                        className="mcp-server__tutorial-link"
+                        onClick={() => void window.mindlane?.shell.openExternal(link.url)}
+                      >
+                        {link.label} ↗
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mcp-server__actions">
               <span

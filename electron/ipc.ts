@@ -62,6 +62,7 @@ export enum IPC {
 
   ShellOpenDocumentRef = 'shell:open-document-ref',
   ShellOpenLogs = 'shell:open-logs',
+  ShellOpenExternal = 'shell:open-external',
 
   EditlogAppend = 'editlog:append',
 
@@ -560,6 +561,8 @@ export interface MindlaneBridge {
   shell: {
     openDocumentRef: (doc: DocumentRef) => Promise<{ ok: true } | { ok: false; error: string }>
     openLogs: () => Promise<{ ok: true }>
+    /** 用系统默认浏览器打开外链（仅 http/https，防指令注入） */
+    openExternal: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>
   }
   editlog: {
     /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */

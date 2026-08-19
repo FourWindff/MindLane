@@ -193,6 +193,40 @@
   min-width: 0;
 }
 
+.mcp-server__tutorial {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mcp-server__tutorial-hint {
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--ml-text-muted);
+}
+
+.mcp-server__tutorial-links {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.mcp-server__tutorial-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ml-accent, var(--ml-text));
+  cursor: pointer;
+}
+
+.mcp-server__tutorial-link:hover {
+  text-decoration: underline;
+}
+
 .mcp-server__actions {
   display: flex;
   align-items: center;
