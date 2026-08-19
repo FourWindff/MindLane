@@ -33,6 +33,7 @@ tsconfig.node.tsbuildinfo
 .claude
 .codex
 .agents
+.pi
 skills-lock.json
 docs/
 .scratch/
