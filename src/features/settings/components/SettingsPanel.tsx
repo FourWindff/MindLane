@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plug, SlidersHorizontal } from 'lucide-react'
+import { Plug, Eye, EyeOff } from 'lucide-react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
@@ -88,6 +88,17 @@ function McpIntegrationsSection() {
     setFormValues(prefilled)
     setFormError(null)
     setFormOpenId(server.id)
+  }
+
+  /** 显示配置 toggle：开→关，关→开（打开时回填已保存凭据） */
+  const toggleForm = (server: McpServerStatusInfo) => {
+    if (formOpenId === server.id) {
+      setFormOpenId(null)
+      setFormValues({})
+      setFormError(null)
+    } else {
+      void openFormPrefilled(server)
+    }
   }
 
   const submitForm = async (server: McpServerStatusInfo) => {
@@ -184,11 +195,11 @@ function McpIntegrationsSection() {
                   type="button"
                   className="panel-btn"
                   disabled={busy}
-                  onClick={() => void openFormPrefilled(server)}
-                  aria-label="显示配置"
+                  onClick={() => toggleForm(server)}
+                  aria-label={formOpen ? '隐藏配置' : '显示配置'}
+                  title={formOpen ? '隐藏配置' : '显示配置'}
                 >
-                  <SlidersHorizontal size={14} />
-                  显示配置
+                  {formOpen ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               )}
             </div>
