@@ -108,6 +108,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const [urlError, setUrlError] = useState<string | null>(null)
   const attachMenuRef = useRef<HTMLDivElement>(null)
   const urlInputRef = useRef<HTMLInputElement>(null)
+  const urlPanelRef = useRef<HTMLDivElement>(null)
 
   const closeAttachMenu = useCallback(() => {
     setAttachMenuOpen(false)
@@ -119,7 +120,13 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   useEffect(() => {
     if (!attachMenuOpen) return
     const onPointerDown = (e: PointerEvent) => {
-      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const inMenu = attachMenuRef.current?.contains(target)
+      // The url panel lives outside the attach button in the input wrap, so
+      // clicking it must not count as an outside click (that would clear the
+      // draft and close the panel before the confirm click lands).
+      const inUrlPanel = urlPanelRef.current?.contains(target)
+      if (!inMenu && !inUrlPanel) {
         closeAttachMenu()
       }
     }
@@ -211,7 +218,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
       )}
       <div className="chat-input-bar__wrap">
         {urlMode && (
-          <div className="chat-input-bar__url">
+          <div className="chat-input-bar__url" ref={urlPanelRef}>
             <span className="chat-input-bar__url-icon">
               <Link size={12} strokeWidth={2} />
             </span>
