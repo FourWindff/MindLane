@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import { MindMapView } from '@/features/mindmap/components/MindMapView'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
-import { SettingsModal } from '@/features/settings/components/SettingsModal'
-import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { SettingsModal } from '@/app/settings/components/SettingsModal'
+import { loadSettingsFromBackend, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { ChatInputBar } from '@/features/chat/components/ChatInputBar'
 import { ChatMessageList } from '@/features/chat/components/ChatMessageList'
 import { ChatCapsuleBar } from '@/features/chat/components/ChatCapsuleBar'
-import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
-import { FileManager } from '@/features/workspace/components/FileManager'
+import { WorkspaceHome } from '@/app/workspace/components/WorkspaceHome'
+import { FileManager } from '@/app/workspace/components/FileManager'
 import {
   initializeWorkspaceSession,
   saveCurrentDocumentSilently,
   useWorkspaceStore,
-} from '@/features/workspace/store'
-import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
-import { AppToolbar } from '@/features/shell/components/AppToolbar'
+} from '@/app/workspace/store'
+import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
+import { AppToolbar } from '@/app/shell/components/AppToolbar'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryProvider'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
@@ -31,7 +31,7 @@ import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
-import '@/features/workspace/workspace.css'
+import '@/app/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
 
 function WorkspaceEmptyState() {

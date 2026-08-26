@@ -8,7 +8,7 @@ import {
   type ChatStreamEvent,
   type FileChatState,
 } from '../aiStore'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import type { ChatContext } from '../../../../../electron/ipc'

@@ -5,8 +5,8 @@ import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore
 import { saveMindmapInstance } from '../model/saveMindmapInstance'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useWorkspaceStore } from '@/features/workspace/store'
+import { useSettingsStore } from '@/app/settings/model/settingsStore'
+import { useWorkspaceStore } from '@/app/workspace/store'
 
 export function useMindmapPersistence() {
   const activeInstance = useActiveMindmapInstance()

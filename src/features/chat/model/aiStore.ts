@@ -6,7 +6,7 @@ import type {
   DocumentRef,
 } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
-import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
 import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
 

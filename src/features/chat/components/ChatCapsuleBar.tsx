@@ -5,7 +5,7 @@ import {
   useAiStore,
   type ChatCapsuleEntry,
 } from '@/features/chat/model/aiStore'
-import { useWorkspaceStore } from '@/features/workspace/store'
+import { useWorkspaceStore } from '@/app/workspace/store'
 import { resolveCapsuleOpenPath } from '@/features/chat/lib/capsuleOpenPath'
 
 import '../styles/chat-capsule-bar.css'

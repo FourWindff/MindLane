@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useSettingsStore } from '@/app/settings/model/settingsStore'
 
 function useShallowById<T, U extends { id: string }>(
   selector: (state: T) => U[],

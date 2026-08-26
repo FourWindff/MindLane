@@ -77,7 +77,7 @@ vi.mock('@/features/chat/model/aiStore', () => ({
   },
 }))
 
-vi.mock('@/features/workspace/store', () => ({
+vi.mock('@/app/workspace/store', () => ({
   useWorkspaceStore: () => ({ openWorkspaceFile: vi.fn() }),
 }))
 

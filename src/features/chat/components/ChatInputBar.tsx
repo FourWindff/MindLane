@@ -16,7 +16,7 @@ import {
   selectCurrentChatHasFile,
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
-import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
 

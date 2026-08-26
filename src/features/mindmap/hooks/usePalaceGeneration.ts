@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { Edge, Node } from '@xyflow/react'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
-import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId } from '@/shared/lib/mindmapTree'

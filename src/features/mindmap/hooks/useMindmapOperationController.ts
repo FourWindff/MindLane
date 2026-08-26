@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'

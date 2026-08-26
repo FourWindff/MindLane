@@ -1,5 +1,5 @@
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
-import { useWorkspaceStore } from '@/features/workspace/store'
+import { useWorkspaceStore } from '@/app/workspace/store'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { extractNodeInfoCompact } from '@/features/chat/lib/chatUtils'
 import type { ChatContext } from '../../../../electron/ipc'
