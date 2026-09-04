@@ -27,7 +27,11 @@ function rootChildIds(editor: MindmapEditor): string[] {
 
 export function AgentWriteSimulator() {
   const editor = useActiveMindmapEditor()
-  const { nodes, edges } = useActiveMindmapStore((s) => ({ nodes: s.nodes, edges: s.edges }))
+  // Primitive selectors only: zustand v5 useStore compares selector output with
+  // Object.is, so an object-literal selector here loops useSyncExternalStore
+  // into an infinite re-render (white screen).
+  const nodes = useActiveMindmapStore((s) => s.nodes)
+  const edges = useActiveMindmapStore((s) => s.edges)
   const rootChildren = getChildIdsOrdered(nodes, edges, 'root')
   const canUpdate = rootChildren.length >= 1
   const canMove = rootChildren.length >= 2
