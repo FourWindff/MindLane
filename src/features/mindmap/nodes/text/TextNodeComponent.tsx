@@ -7,7 +7,6 @@ import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmap
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
-import { LandingBurst } from '@/features/mindmap/components/animationFx'
 import {
   useNodeGlide,
   usePrefersReducedMotion,
@@ -259,14 +258,6 @@ function TextNodeInner({
             </button>
           )
         ))}
-      {!reduced && (data.gliding || (data.justAdded && data.cascadeDelay !== undefined)) && (
-        <LandingBurst
-          // Glide transition ends at ~350ms, so the move lands its burst then;
-          // enter bursts fire at the node's own cascade delay.
-          delayMs={data.justAdded && data.cascadeDelay !== undefined ? data.cascadeDelay : 350}
-          reduced={reduced}
-        />
-      )}
     </div>
   )
 }

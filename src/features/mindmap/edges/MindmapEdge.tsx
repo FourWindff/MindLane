@@ -5,8 +5,6 @@ import { buildTaperedPath } from './taperedEdge'
 import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getEdgeColor, getNodeColor } from '@/features/mindmap/style/colorPalettes'
-import { EdgeFlowDot } from '@/features/mindmap/components/animationFx'
-import { usePrefersReducedMotion } from '@/features/mindmap/components/animationFxHooks'
 
 interface EdgeGradient {
   id: string
@@ -43,8 +41,6 @@ export function MindmapEdge(props: EdgeProps) {
 
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
   const { edge, colorScheme } = useMapStyle()
-  const reduced = usePrefersReducedMotion()
-  const edgeClassName = edges.find((e) => e.id === id)?.className
 
   const { edgePath, edgeStroke, taperPath, gradient } = useMemo(() => {
     const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
@@ -135,11 +131,6 @@ export function MindmapEdge(props: EdgeProps) {
       : {}),
     ...(targetData?.exitingDelay ? { '--edge-exit-delay': `${targetData.exitingDelay}ms` } : {}),
   } as CSSProperties
-  const agentEnterEdge =
-    typeof targetData?.cascadeDelay === 'number' &&
-    targetData.justAdded === true &&
-    edgeClassName?.includes('mindmap-edge--enter')
-
   return (
     <g>
       {gradient && (
@@ -184,9 +175,6 @@ export function MindmapEdge(props: EdgeProps) {
         labelBgPadding={labelBgPadding}
         labelBgBorderRadius={labelBgBorderRadius}
       />
-      {agentEnterEdge && (
-        <EdgeFlowDot path={edgePath} delayMs={targetData!.cascadeDelay!} reduced={reduced} />
-      )}
     </g>
   )
 }
