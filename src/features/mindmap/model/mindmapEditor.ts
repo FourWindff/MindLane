@@ -486,9 +486,13 @@ export class MindmapEditor {
       edges.map((e) => {
         const touch = allIds.has(e.source) || allIds.has(e.target)
         if (!touch) return e
+        // Drop a lingering `mindmap-edge--enter` marker: agent-inserted edges
+        // keep it forever (nodes clear theirs on animationend, edges have no
+        // cleanup), and a completed enter animation (fill-mode both) pins the
+        // path at opacity 1, blocking the exit transition below.
         const classes = new Set(
           [...(e.className ?? '').split(/\s+/), 'mindmap-edge', 'mindmap-edge--exiting'].filter(
-            Boolean,
+            (c) => Boolean(c) && c !== 'mindmap-edge--enter',
           ),
         )
         return { ...e, className: [...classes].join(' ') }

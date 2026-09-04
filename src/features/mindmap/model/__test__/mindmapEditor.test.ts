@@ -188,6 +188,31 @@ describe('MindmapEditor', () => {
       vi.useRealTimers()
     })
 
+    it('agent-inserted edges drop the lingering enter class when exiting (CSS fill must not pin opacity)', async () => {
+      // Agent-inserted edges keep `mindmap-edge--enter` forever (nodes clear
+      // their marker on animationend, edges never do). If it survives onto an
+      // exiting edge, the completed enter animation (fill-mode both) pins the
+      // path at opacity 1 and the exit transition never runs: the node fades
+      // out but its edge stays — observed on agent deletes only.
+      await editor.insertFromXml(
+        `<node type="text" content="A"><node type="text" content="A1" /></node>`,
+        { parentId: 'root' },
+      )
+      const state = store.getState()
+      expect(state.edges.some((e) => e.className?.includes('mindmap-edge--enter'))).toBe(true)
+      const a = state.nodes.find((n) => (n.data as { label: string }).label === 'A')!
+
+      editor.deleteSubtree(a.id)
+
+      const exitingEdges = store
+        .getState()
+        .edges.filter((e) => e.className?.includes('mindmap-edge--exiting'))
+      expect(exitingEdges.length).toBeGreaterThan(0)
+      for (const e of exitingEdges) {
+        expect(e.className).not.toContain('mindmap-edge--enter')
+      }
+    })
+
     it('multi-level subtrees exit in reverse cascade: leaves first, parent last, batch delete stays atomic', () => {
       vi.useFakeTimers()
       const { nodeId: a } = editor.addChild(rootId(), { label: 'A' })

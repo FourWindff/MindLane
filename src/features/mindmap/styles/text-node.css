@@ -134,14 +134,21 @@
 }
 
 .mindmap-edge--enter .react-flow__edge-path {
-  animation: mindmap-edge-enter 0.32s ease-out both;
+  /* Duration and easing match the node's own enter animation so each edge
+     appears together with its node, not ahead of it. `backwards` (not
+     `both`) fill hides the edge during its delay but lets a completed
+     animation release the path, so a later `--exiting` transition is never
+     pinned at opacity 1 by the finished enter keyframe. */
+  animation: mindmap-edge-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: var(--edge-enter-delay, 0s);
 }
 
 .mindmap-edge--exiting .react-flow__edge-path {
   transition: opacity 0.28s cubic-bezier(0.4, 0, 1, 1);
   transition-delay: var(--edge-exit-delay, 0ms);
-  opacity: 0.08;
+  /* Fade fully out with the node: any nonzero residual keeps the edge
+     ghosting after its node has already disappeared. */
+  opacity: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
