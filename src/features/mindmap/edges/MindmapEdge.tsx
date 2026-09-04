@@ -1,10 +1,12 @@
 import { BaseEdge, getBezierPath, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
-import { useMemo } from 'react'
+import { useMemo, type CSSProperties } from 'react'
 import { computeSiblingCurvature } from './siblingOffset'
 import { buildTaperedPath } from './taperedEdge'
 import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getEdgeColor, getNodeColor } from '@/features/mindmap/style/colorPalettes'
+import { EdgeFlowDot } from '@/features/mindmap/components/animationFx'
+import { usePrefersReducedMotion } from '@/features/mindmap/components/animationFxHooks'
 
 interface EdgeGradient {
   id: string
@@ -41,6 +43,8 @@ export function MindmapEdge(props: EdgeProps) {
 
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
   const { edge, colorScheme } = useMapStyle()
+  const reduced = usePrefersReducedMotion()
+  const edgeClassName = edges.find((e) => e.id === id)?.className
 
   const { edgePath, edgeStroke, taperPath, gradient } = useMemo(() => {
     const nodeYById = new Map(nodes.map((n) => [n.id, n.position.y]))
@@ -120,6 +124,22 @@ export function MindmapEdge(props: EdgeProps) {
     colorScheme,
   ])
 
+  // Edge timing for the cascade animation: the enter delay follows the target
+  // node (the edge draws in sync with its child entering), the exit delay
+  // follows the reverse cascade — both transient markers of the agent write path.
+  const targetData = nodes.find((n) => n.id === target)?.data as
+    { justAdded?: boolean; cascadeDelay?: number; exitingDelay?: number } | undefined
+  const edgeAnimateStyle = {
+    ...(typeof targetData?.cascadeDelay === 'number'
+      ? { '--edge-enter-delay': `${targetData.cascadeDelay}ms` }
+      : {}),
+    ...(targetData?.exitingDelay ? { '--edge-exit-delay': `${targetData.exitingDelay}ms` } : {}),
+  } as CSSProperties
+  const agentEnterEdge =
+    typeof targetData?.cascadeDelay === 'number' &&
+    targetData.justAdded === true &&
+    edgeClassName?.includes('mindmap-edge--enter')
+
   return (
     <g>
       {gradient && (
@@ -148,6 +168,7 @@ export function MindmapEdge(props: EdgeProps) {
         path={edgePath}
         style={{
           ...style,
+          ...edgeAnimateStyle,
           stroke: taperPath ? 'transparent' : edgeStroke,
           strokeWidth: taperPath ? undefined : edge.strokeWidth,
           // 极简式边与节点下边框对齐：关闭像素吸附避免亚像素错位
@@ -163,6 +184,9 @@ export function MindmapEdge(props: EdgeProps) {
         labelBgPadding={labelBgPadding}
         labelBgBorderRadius={labelBgBorderRadius}
       />
+      {agentEnterEdge && (
+        <EdgeFlowDot path={edgePath} delayMs={targetData!.cascadeDelay!} reduced={reduced} />
+      )}
     </g>
   )
 }

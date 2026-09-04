@@ -106,6 +106,125 @@ describe('MindmapEditor XML 集成', () => {
     })
   })
 
+  describe('Agent write-path cascade entrance', () => {
+    function delayOf(nodeId: string): number {
+      const node = store.getState().nodes.find((n) => n.id === nodeId)
+      return (node?.data as { cascadeDelay?: number }).cascadeDelay ?? -1
+    }
+
+    it('insertFromXml stamps delays with parent strictly before children, first node 0, tick 100ms', async () => {
+      await editor.insertFromXml(
+        `<node type="text" content="A"><node type="text" content="A1" /><node type="text" content="A2" /></node>`,
+        { parentId: 'root' },
+      )
+      const state = store.getState()
+      const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
+      const a = state.nodes.find((n) => labels.get(n.id) === 'A')!
+      const children = state.edges
+        .filter((e) => e.source === a.id)
+        .map((e) => e.target)
+        .map((id) => state.nodes.find((n) => n.id === id)!)
+
+      // every new node carries the marker (including 0); subtree starts at 0ms
+      expect(delayOf(a.id)).toBe(0)
+      expect(children.every((c) => delayOf(c.id) >= 0)).toBe(true)
+
+      // parent strictly before children; the three subtree delays are exactly 0/100/200
+      for (const child of children) expect(delayOf(child.id)).toBeGreaterThan(delayOf(a.id))
+      expect([delayOf(a.id), ...children.map((c) => delayOf(c.id))].sort()).toEqual([0, 100, 200])
+    })
+
+    it('multi-root fragments count each subtree independently', async () => {
+      await editor.insertFromXml(
+        `<node type="text" content="A"><node type="text" content="A1" /></node><node type="text" content="B"><node type="text" content="B1" /></node>`,
+        { parentId: 'root' },
+      )
+      const state = store.getState()
+      const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
+      const a = state.nodes.find((n) => labels.get(n.id) === 'A')!
+      const b = state.nodes.find((n) => labels.get(n.id) === 'B')!
+      const a1 = state.nodes.find((n) => labels.get(n.id) === 'A1')!
+      const b1 = state.nodes.find((n) => labels.get(n.id) === 'B1')!
+
+      // each subtree restarts at 0: B's root is not the successor of A's last node
+      expect(delayOf(a.id)).toBe(0)
+      expect(delayOf(b.id)).toBe(0)
+      expect(delayOf(a1.id)).toBe(100)
+      expect(delayOf(b1.id)).toBe(100)
+    })
+
+    it('large fragments compress the tick: last node delay stays under the ~2s budget', async () => {
+      let xml = '<node type="text" content="N0">'
+      for (let i = 1; i < 30; i++) {
+        xml += `<node type="text" content="N${i}">`
+      }
+      xml += '</node>'.repeat(30)
+      await editor.insertFromXml(xml, { parentId: 'root' })
+
+      const state = store.getState()
+      const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
+      const chain = Array.from({ length: 30 }, (_, i) =>
+        state.nodes.find((n) => labels.get(n.id) === `N${i}`)!,
+      )
+      const maxDelay = Math.max(...chain.map((n) => delayOf(n.id)))
+
+      // compressed into budget (an uncompressed tick would be 29 × 100 = 2900ms)
+      expect(maxDelay).toBeGreaterThan(0)
+      expect(maxDelay).toBeLessThanOrEqual(2000)
+      expect(maxDelay).toBeLessThan(29 * 100)
+      // parent-before-child survives the compression
+      for (let i = 1; i < chain.length; i++) {
+        expect(delayOf(chain[i]!.id)).toBeGreaterThan(delayOf(chain[i - 1]!.id))
+      }
+    })
+
+    it('replaceNodeFromXml cascades the replacement subtree in too', async () => {
+      await editor.insertFromXml(`<node type="text" content="B" />`, { parentId: 'root' })
+      const b = store.getState().nodes.find((n) => (n.data as { label: string }).label === 'B')!
+
+      await editor.replaceNodeFromXml(
+        `<node id="${b.id}" type="text" content="B-updated"><node type="text" content="B1" /><node type="text" content="B2" /></node>`,
+      )
+      const state = store.getState()
+      const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
+      const bUpdated = state.nodes.find((n) => labels.get(n.id) === 'B-updated')!
+      const children = state.edges
+        .filter((e) => e.source === bUpdated.id)
+        .map((e) => e.target)
+        .map((id) => state.nodes.find((n) => n.id === id)!)
+
+      expect(delayOf(bUpdated.id)).toBe(0)
+      for (const child of children) expect(delayOf(child.id)).toBeGreaterThan(0)
+    })
+
+    it('undo leaves no cascade markers; redo replays without entrance markers', async () => {
+      await editor.insertFromXml(
+        `<node type="text" content="A"><node type="text" content="A1" /></node>`,
+        { parentId: 'root' },
+      )
+      const insertedIds = store
+        .getState()
+        .nodes.filter((n) => n.id !== 'root')
+        .map((n) => n.id)
+      const dataOf = (id: string) =>
+        store.getState().nodes.find((n) => n.id === id)!.data as Record<string, unknown>
+      expect(dataOf(insertedIds[0]!).cascadeDelay).toBe(0)
+      expect(dataOf(insertedIds[0]!).justAdded).toBe(true)
+
+      editor.undo()
+      expect(store.getState().nodes).toHaveLength(1)
+
+      editor.redo()
+      const after = store.getState()
+      expect(after.nodes).toHaveLength(3)
+      for (const id of insertedIds) {
+        const data = after.nodes.find((n) => n.id === id)!.data as Record<string, unknown>
+        expect(data.justAdded).toBeUndefined()
+        expect(data.cascadeDelay).toBeUndefined()
+      }
+    })
+  })
+
   describe('纯树约束', () => {
     it('deleteSubtree ignores root', () => {
       const before = store.getState().nodes.length
@@ -259,17 +378,17 @@ describe('MindmapEditor XML 集成', () => {
     it('重挂后兄弟顺序保持原位（edges 顺序与 y 布局）', async () => {
       const { bId, labels } = await seedSiblings()
 
-      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
       const state = store.getState()
       const labelOf = (id: string) =>
         (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
 
       // edges 顺序（= XML 序列化/保存顺序）
-      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
       // 视觉布局顺序（y 升序）
-      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
       // 内容确实被替换
-      expect(labelOf(bId)).toBe('B-更新')
+      expect(labelOf(bId)).toBe('B-updated')
       expect(labels.get(bId)).toBe('B')
     })
 
@@ -277,7 +396,7 @@ describe('MindmapEditor XML 集成', () => {
       const { bId } = await seedSiblings()
 
       await editor.replaceNodeFromXml(
-        `<node id="${bId}" type="text" content="B-更新">
+        `<node id="${bId}" type="text" content="B-updated">
            <node type="text" content="B1" />
            <node type="text" content="B2" />
          </node>`,
@@ -286,8 +405,8 @@ describe('MindmapEditor XML 集成', () => {
       const labelOf = (id: string) =>
         (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
 
-      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
-      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-更新', 'C'])
+      expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
+      expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
       // 子树内部顺序：按 XML 声明顺序（B1 在 B2 前）
       const b1 = state.edges.find((e) => e.source === bId)!.target
       const b2 = state.edges.filter((e) => e.source === bId)[1]!.target
@@ -297,7 +416,7 @@ describe('MindmapEditor XML 集成', () => {
 
     it('保存→重载 roundtrip 后顺序仍保持（序列化顺序 = edges 顺序）', async () => {
       const { bId } = await seedSiblings()
-      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
 
       const file = store.getState().toMindLaneFile()
       const xml = serializeMindlaneFile(file)
@@ -310,19 +429,19 @@ describe('MindmapEditor XML 集成', () => {
       const labelOf = (id: string) =>
         (state2.nodes.find((n) => n.id === id)!.data as { label: string }).label
       const order = state2.edges.filter((e) => e.source === 'root').map((e) => labelOf(e.target))
-      expect(order).toEqual(['A', 'B-更新', 'C'])
+      expect(order).toEqual(['A', 'B-updated', 'C'])
       // 重载后 position 全部重算（y 归零退化排序）也不得改变顺序
       const ySorted = state2.edges
         .filter((e) => e.source === 'root')
         .map((e) => ({ id: e.target, y: state2.nodes.find((n) => n.id === e.target)!.position.y }))
         .sort((a, b) => a.y - b.y)
         .map((x) => labelOf(x.id))
-      expect(ySorted).toEqual(['A', 'B-更新', 'C'])
+      expect(ySorted).toEqual(['A', 'B-updated', 'C'])
     })
 
     it('undo 整单还原（含顺序）', async () => {
       const { bId } = await seedSiblings()
-      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-更新" />`)
+      await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
 
       editor.undo()
       const state = store.getState()
@@ -334,7 +453,7 @@ describe('MindmapEditor XML 集成', () => {
       const after = store.getState()
       const labelAfter = (id: string) =>
         (after.nodes.find((n) => n.id === id)!.data as { label: string }).label
-      expect(rootChildOrder(after).map(labelAfter)).toEqual(['A', 'B-更新', 'C'])
+      expect(rootChildOrder(after).map(labelAfter)).toEqual(['A', 'B-updated', 'C'])
     })
   })
 })

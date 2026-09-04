@@ -187,6 +187,39 @@ describe('MindmapEditor', () => {
 
       vi.useRealTimers()
     })
+
+    it('multi-level subtrees exit in reverse cascade: leaves first, parent last, batch delete stays atomic', () => {
+      vi.useFakeTimers()
+      const { nodeId: a } = editor.addChild(rootId(), { label: 'A' })
+      const { nodeId: a1 } = editor.addChild(a, { label: 'A1' })
+      editor.addChild(a1, { label: 'A11' }) // A → A1 → A11
+      const beforeNodeCount = store.getState().nodes.length
+
+      const exitDelay = (id: string) =>
+        (store.getState().nodes.find((n) => n.id === id)!.data as { exitingDelay?: number })
+          .exitingDelay ?? 0
+
+      editor.deleteSubtree(a)
+      // all are marked exiting immediately, but exit delays follow reverse DFS: leaves first, parent last
+      expect(store.getState().nodes.every((n) => n.id !== a || n.data.exiting === true)).toBe(true)
+      const a11 = store
+        .getState()
+        .nodes.find((n) => (n.data as { label: string }).label === 'A11')!.id
+      expect(exitDelay(a11)).toBe(0) // leaf exits earliest
+      expect(exitDelay(a1)).toBeGreaterThan(exitDelay(a11)) // middle level next
+      expect(exitDelay(a)).toBeGreaterThan(exitDelay(a1)) // parent last
+
+      // cascade budget: maxDelay(2 × 100ms) + NODE_EXIT_MS(300ms) before the delete fires
+      vi.advanceTimersByTime(500)
+      expect(store.getState().nodes.length).toBe(beforeNodeCount - 3)
+      expect(store.getState().nodes.some((n) => n.id === a)).toBe(false)
+
+      // delete still goes through one batch: a single undo restores everything
+      editor.undo()
+      expect(store.getState().nodes.length).toBe(beforeNodeCount)
+
+      vi.useRealTimers()
+    })
   })
 
   describe('moveNode', () => {

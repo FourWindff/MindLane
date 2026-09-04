@@ -19,6 +19,7 @@ import {
 } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
+import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
 import { mindmapLayout, type MindmapStructureType } from './mindmapLayout'
@@ -30,6 +31,8 @@ import {
 } from './types'
 
 const NODE_EXIT_MS = 300
+/** Glide animation length; keeps the transient `gliding` marker alive until the landing burst finishes. */
+const GLIDE_MS = 1000
 
 /** Sibling insertion position: end of all siblings / above / below the selected sibling. */
 export type SiblingInsertMode = 'end' | 'above' | 'below'
@@ -87,8 +90,13 @@ export class MindmapEditor {
           this.state.style.visualVariant,
         )
       : appliedNodes
-    this.state.setNodes(nodes)
-    this.state.setEdges(appliedEdges)
+    // redo is time travel: strip entrance/exit/cascade markers baked into the
+    // replayed commands (the undo snapshot is already stripped), so redo never
+    // replays a "whole fragment at once" entrance.
+    const strippedNodes = this.stripTransientFlags(nodes)
+    const strippedEdges = this.stripEdgeAnimClasses(appliedEdges)
+    this.state.setNodes(strippedNodes)
+    this.state.setEdges(strippedEdges)
     this.syncHistoryState()
   }
 
@@ -407,8 +415,34 @@ export class MindmapEditor {
         className: 'mindmap-edge',
       },
     })
+    // The glide marker must be present on the render BEFORE the position batch
+    // lands: stamp gliding/glideFrom at the old positions, then runBatch commits
+    // the new layout in the same tick so the view layer can transition. The
+    // marker is transient (stripped from history snapshots); the cleanup timer
+    // is a no-op on a disposed store.
+    const oldPositions = new Map<string, { x: number; y: number }>()
+    for (const id of subtreeIds) {
+      const node = this.state.nodes.find((n) => n.id === id)
+      if (node) oldPositions.set(id, { x: node.position.x, y: node.position.y })
+    }
+    this.state.setNodesTransient((ns) =>
+      ns.map((n) => {
+        const from = oldPositions.get(n.id)
+        if (!from) return n
+        return { ...n, data: { ...n.data, gliding: true, glideFrom: from } }
+      }),
+    )
     // runBatch 内联重布局（removeEdge/addEdge 触发 shouldReflowAfter）
     this.runBatch(commands, false)
+    setTimeout(() => {
+      this.state.setNodesTransient((ns) =>
+        ns.map((n) =>
+          subtreeIds.has(n.id)
+            ? { ...n, data: { ...n.data, gliding: undefined, glideFrom: undefined } }
+            : n,
+        ),
+      )
+    }, GLIDE_MS)
   }
 
   deleteSubtree(rootId: string): void {
@@ -416,15 +450,37 @@ export class MindmapEditor {
   }
 
   deleteSubtrees(rootIds: string[]): void {
+    const edges = this.state.edges
     const allIds = new Set<string>()
     for (const rootId of rootIds) {
       if (rootId === 'root') continue
-      for (const id of collectSubtreeIds(this.state.edges, rootId)) allIds.add(id)
+      for (const id of collectSubtreeIds(edges, rootId)) allIds.add(id)
     }
 
-    // 先标记退出动画（不进入历史，也不触发 dirty）
+    // Reverse cascade exit: leaves start exiting first, the parent last
+    // (`exitingDelay` drives the view animation delay); the final batch delete
+    // stays atomic with unchanged history semantics. A single node degrades to
+    // the existing behaviour (0ms delay + delete after NODE_EXIT_MS).
+    const exitDelays = computeExitDelays(
+      rootIds.filter((r) => r !== 'root'),
+      this.state.nodes,
+      edges,
+    )
+
+    // Mark the exit animation first (not recorded in history, no dirty flag)
     this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => (allIds.has(n.id) ? { ...n, data: { ...n.data, exiting: true } } : n)),
+      nodes.map((n) => {
+        if (!allIds.has(n.id)) return n
+        const delay = exitDelays.get(n.id) ?? 0
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            exiting: true,
+            ...(delay > 0 ? { exitingDelay: delay } : {}),
+          },
+        }
+      }),
     )
     this.state.setEdgesTransient((edges) =>
       edges.map((e) => {
@@ -439,10 +495,13 @@ export class MindmapEditor {
       }),
     )
 
-    const timerId = setTimeout(() => {
-      this.pendingDeleteTimers.delete(timerId)
-      this.batch(rootIds.map((rootId) => ({ type: 'deleteSubtree' as const, rootId })))
-    }, NODE_EXIT_MS)
+    const timerId = setTimeout(
+      () => {
+        this.pendingDeleteTimers.delete(timerId)
+        this.batch(rootIds.map((rootId) => ({ type: 'deleteSubtree' as const, rootId })))
+      },
+      totalExitDuration(exitDelays, NODE_EXIT_MS),
+    )
     this.pendingDeleteTimers.add(timerId)
   }
 
@@ -530,6 +589,9 @@ export class MindmapEditor {
     const oldParentId = findParentId(edges, nodeId)
     const oldNode = nodes.find((n) => n.id === nodeId)
     const oldEdgeIndex = edges.findIndex((e) => e.target === nodeId)
+    // The replacement subtree cascades in parent-first, same as fragments (the
+    // single-root constraint here rules out multi-root independence).
+    const enterDelays = computeEnterDelays([nodeId], parsed.nodes, parsed.edges)
     const commands: MindmapCommand[] = [{ type: 'deleteSubtree', rootId: nodeId }]
     for (const n of parsed.nodes) {
       commands.push({
@@ -537,7 +599,11 @@ export class MindmapEditor {
         node: {
           ...n,
           position: n.id === nodeId && oldNode?.position ? oldNode.position : n.position,
-          data: { ...n.data, justAdded: true },
+          data: {
+            ...n.data,
+            justAdded: true,
+            cascadeDelay: enterDelays.get(n.id) ?? 0,
+          },
         },
       })
     }
@@ -681,6 +747,12 @@ export class MindmapEditor {
     const offsetX = anchorX - firstSubRoot.position.x
     const offsetY = anchorY - firstSubRoot.position.y
 
+    // Cascade entrance: DFS pre-order (parent before child, siblings in layout
+    // order) computes a per-node delay; multi-root fragments keep subtrees
+    // independent. Stamped into the addNode commands so it lands with the
+    // fragment (a transient marker, stripped from snapshots).
+    const enterDelays = computeEnterDelays(subRootIds, laidOut, parsed.edges)
+
     const commands: MindmapCommand[] = []
 
     for (const n of laidOut) {
@@ -691,7 +763,14 @@ export class MindmapEditor {
           x: n.position.x + offsetX,
           y: n.position.y + offsetY,
         },
-        data: { ...n.data, justAdded: true },
+        data: {
+          ...n.data,
+          justAdded: true,
+          // Always written (including 0): cascadeDelay present = this node came
+          // from an agent write path; the view uses it to tell manual inserts
+          // (no cascade/particles) apart from agent fragments.
+          cascadeDelay: enterDelays.get(n.id) ?? 0,
+        },
       }
       const node: Node = shifted as Node
       commands.push({ type: 'addNode', node })
@@ -941,16 +1020,17 @@ export class MindmapEditor {
   private takeSnapshot(): MindmapSnapshot {
     return {
       nodes: this.stripTransientFlags(this.state.nodes),
-      edges: this.stripExitingEdgeClass(this.state.edges),
+      edges: this.stripEdgeAnimClasses(this.state.edges),
     }
   }
 
-  private stripExitingEdgeClass(edges: Edge[]): Edge[] {
+  /** Strip enter/exit animation classes from edges (snapshots and redo replays must not carry animation residue). */
+  private stripEdgeAnimClasses(edges: Edge[]): Edge[] {
     return edges.map((e) => {
-      if (!e.className?.includes('mindmap-edge--exiting')) return e
+      if (!e.className?.includes('mindmap-edge--')) return e
       const classes = e.className
         .split(/\s+/)
-        .filter((c) => c !== 'mindmap-edge--exiting')
+        .filter((c) => c !== 'mindmap-edge--exiting' && c !== 'mindmap-edge--enter')
         .join(' ')
       return { ...e, className: classes || undefined }
     })

@@ -40,6 +40,12 @@ export const TRANSIENT_NODE_DATA_FLAGS = [
   'processing',
   'expanded',
   'generating',
+  // Cascade animation transient markers (agent write path):
+  // staggered enter delay / reverse exit delay / gliding and its origin.
+  'cascadeDelay',
+  'exitingDelay',
+  'gliding',
+  'glideFrom',
 ] as const
 
 export type TransientNodeDataFlag = (typeof TRANSIENT_NODE_DATA_FLAGS)[number]

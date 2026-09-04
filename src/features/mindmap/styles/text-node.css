@@ -40,11 +40,33 @@
 
 .text-node--enter {
   animation: text-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--node-enter-delay, 0s);
 }
 
 .text-node--exiting {
   pointer-events: none;
   animation: text-node-exit 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation-delay: var(--node-exit-delay, 0ms);
+}
+
+/* Landing burst particles (accent-colored cluster erupting from the node center when an agent-written node lands) */
+.node-landing-burst {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.node-landing-burst__dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 999px;
+  background: var(--ml-accent, #6366f1);
 }
 
 .text-node--selected {
@@ -134,10 +156,12 @@
 
 .mindmap-edge--enter .react-flow__edge-path {
   animation: mindmap-edge-enter 0.32s ease-out both;
+  animation-delay: var(--edge-enter-delay, 0s);
 }
 
 .mindmap-edge--exiting .react-flow__edge-path {
   transition: opacity 0.28s cubic-bezier(0.4, 0, 1, 1);
+  transition-delay: var(--edge-exit-delay, 0ms);
   opacity: 0.08;
 }
 
@@ -145,16 +169,19 @@
   .text-node--enter,
   .text-node--exiting {
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
   }
 
   .mindmap-edge--enter .react-flow__edge-path {
     animation: none !important;
+    animation-delay: 0ms !important;
     opacity: 1 !important;
   }
 
   .mindmap-edge--exiting .react-flow__edge-path {
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     opacity: 0 !important;
   }
 }

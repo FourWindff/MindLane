@@ -7,9 +7,20 @@ import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmap
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
+import { LandingBurst } from '@/features/mindmap/components/animationFx'
+import {
+  useNodeGlide,
+  usePrefersReducedMotion,
+} from '@/features/mindmap/components/animationFxHooks'
 import type { TextNodeData } from './types'
 
-function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
+function TextNodeInner({
+  id,
+  data: rawData,
+  selected,
+  positionAbsoluteX,
+  positionAbsoluteY,
+}: NodeProps) {
   const data = rawData as TextNodeData
   const editor = useActiveMindmapEditor()
   const instance = useActiveMindmapInstance()
@@ -127,12 +138,21 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
   const depth = data.depth ?? 0
   const branchIndex = data.branchIndex ?? 0
   const nodeColors = getNodeColor(colorScheme, depth, branchIndex)
+  const reduced = usePrefersReducedMotion()
 
   const colorStyle: React.CSSProperties = {
     '--node-bg': nodeColors.nodeBg,
     '--node-border': nodeColors.nodeBorder,
     '--node-text': nodeColors.nodeText,
   } as React.CSSProperties
+
+  const glideStyle = useNodeGlide(data, positionAbsoluteX, positionAbsoluteY, reduced)
+  const style: React.CSSProperties = {
+    ...colorStyle,
+    ...glideStyle,
+    ...(data.cascadeDelay !== undefined ? { '--node-enter-delay': `${data.cascadeDelay}ms` } : {}),
+    ...(data.exitingDelay ? { '--node-exit-delay': `${data.exitingDelay}ms` } : {}),
+  }
 
   const className = [
     'text-node',
@@ -147,7 +167,7 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
     .join(' ')
 
   return (
-    <div className={className} style={colorStyle} onAnimationEnd={onAnimationEnd}>
+    <div className={className} style={style} onAnimationEnd={onAnimationEnd}>
       {/* 所有方向 handle 均渲染，CSS 隐藏；xyflow 根据 sourcePosition/targetPosition 路由 */}
       <Handle type="target" position={Position.Left} />
       <Handle type="target" position={Position.Top} />
@@ -239,6 +259,14 @@ function TextNodeInner({ id, data: rawData, selected }: NodeProps) {
             </button>
           )
         ))}
+      {!reduced && (data.gliding || (data.justAdded && data.cascadeDelay !== undefined)) && (
+        <LandingBurst
+          // Glide transition ends at ~350ms, so the move lands its burst then;
+          // enter bursts fire at the node's own cascade delay.
+          delayMs={data.justAdded && data.cascadeDelay !== undefined ? data.cascadeDelay : 350}
+          reduced={reduced}
+        />
+      )}
     </div>
   )
 }

@@ -160,6 +160,32 @@ export function useMindmapOperationController() {
     }
   }, [activeInstance.store, filePath, hasDocumentOpen, nodes.length, reactFlow])
 
+  // Agent-written fragments: one smooth fitView to the new fragment area (only
+  // fires on the cascadeDelay write path; manual single-node inserts carry no
+  // marker and never move the viewport; skipped under reduced motion).
+  const lastCascadeIdsRef = useRef('')
+  useEffect(() => {
+    const entering = nodes.filter(
+      (n) => n.data?.justAdded === true && typeof n.data?.cascadeDelay === 'number',
+    )
+    if (entering.length === 0) return
+    const signature = entering
+      .map((n) => n.id)
+      .sort()
+      .join('|')
+    if (signature === lastCascadeIdsRef.current) return
+    lastCascadeIdsRef.current = signature
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const raf = requestAnimationFrame(() => {
+      const targets = entering
+        .map((n) => reactFlow.getNode(n.id))
+        .filter((n): n is Node => Boolean(n))
+      if (targets.length === 0) return
+      void reactFlow.fitView({ nodes: targets, padding: 0.2, duration: 300 })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [nodes, reactFlow])
+
   const handleInit = useCallback(
     (instance: ReactFlowInstance) => {
       const viewport = activeInstance.store.getState().viewport

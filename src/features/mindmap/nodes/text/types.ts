@@ -10,7 +10,15 @@ export type TextNodeData = {
   /** Root-only, bilateral layout: collapse the root's right branch (direct right children and their subtrees); expanded by default */
   rightCollapsed?: boolean
   justAdded?: boolean
+  /** Agent write-path cascade enter delay (ms); present iff the node came from an agent write tool. Transient, never persisted. */
+  cascadeDelay?: number
   exiting?: boolean
+  /** Reverse-cascade exit delay (ms); leaves exit first, parent last. Transient, never persisted. */
+  exitingDelay?: number
+  /** Gliding (moveSubtree moved this subtree); pairs with glideFrom for the position transition. Transient, never persisted. */
+  gliding?: boolean
+  /** Glide origin (old position); the view derives the transition offset from it. Transient, never persisted. */
+  glideFrom?: { x: number; y: number }
   editing?: boolean
   processing?: boolean
   /** 节点在树中的深度：0=根节点，1=根的直接子节点，以此类推。由布局算法写入。 */
