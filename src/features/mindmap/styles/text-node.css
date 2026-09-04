@@ -102,8 +102,7 @@
   box-shadow: var(--ml-shadow-soft, 0 1px 3px rgba(0, 0, 0, 0.15));
 }
 
-.text-node:hover .text-node__collapse-btn,
-.text-node--selected .text-node__collapse-btn {
+.text-node:hover .text-node__collapse-btn {
   opacity: 1;
 }
 
