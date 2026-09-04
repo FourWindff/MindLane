@@ -15,6 +15,7 @@ import {
 } from '@/app/workspace/store'
 import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
 import { AppToolbar } from '@/app/shell/components/AppToolbar'
+import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryProvider'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
@@ -172,11 +173,14 @@ function AppContent() {
           <div className="app-shell">
             <main className="app-shell__main">
               {workspacePath && (
-                <AppToolbar
-                  onOpenFileManager={() => setFileManagerOpen(true)}
-                  fileManagerOpen={fileManagerOpen}
-                  filePath={filePath ?? undefined}
-                />
+                <>
+                  <AppToolbar
+                    onOpenFileManager={() => setFileManagerOpen(true)}
+                    fileManagerOpen={fileManagerOpen}
+                    filePath={filePath ?? undefined}
+                  />
+                  {hasDocumentOpen && <AgentWriteSimulator />}
+                </>
               )}
               {hasDocumentOpen ? (
                 <MindMapView
