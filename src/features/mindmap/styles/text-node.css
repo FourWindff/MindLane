@@ -52,7 +52,7 @@
 .text-node--selected {
   border-color: var(--ml-accent);
   box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.08),
+    0 0 0 2px rgba(0, 0, 0, 0.16),
     var(--ml-shadow-strong);
 }
 

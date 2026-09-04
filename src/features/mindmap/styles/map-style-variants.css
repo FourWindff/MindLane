@@ -23,9 +23,11 @@
 }
 
 [data-map-style='card'] .text-node--selected {
+  /* deepen: selected border darkens over the branch tint, ring gets heavier. */
+  border-color: #151210;
   box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.08),
-    0 4px 20px rgba(0, 0, 0, 0.08);
+    0 0 0 2px rgba(0, 0, 0, 0.16),
+    0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 /* ── 线框式（outline） ── */
@@ -59,7 +61,7 @@
 [data-map-style='minimal'] .text-node--selected {
   background: transparent;
   box-shadow: none;
-  border-bottom-color: var(--ml-accent);
+  border-bottom-color: #151210;
 }
 
 /* ══════════════════════════════════════════════════════
