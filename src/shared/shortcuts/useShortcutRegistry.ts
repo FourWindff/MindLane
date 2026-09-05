@@ -1,6 +1,6 @@
 import { useContext } from 'react'
 import type { ShortcutRegistry } from './ShortcutRegistry'
-import { ShortcutRegistryContext } from './shortcutRegistryContext'
+import { ShortcutRegistryContext } from './ShortcutRegistryContext'
 
 export function useShortcutRegistry(): ShortcutRegistry {
   const ctx = useContext(ShortcutRegistryContext)
