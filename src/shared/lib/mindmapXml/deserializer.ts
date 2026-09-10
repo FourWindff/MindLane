@@ -26,7 +26,7 @@ import {
 } from './types.js'
 import { newId } from '../mindmapTree.js'
 
-/** 片段解析产物（与 parseYamlFragment 对齐，insertFromXml 复用布局/聚合/历史）。 */
+/** 片段解析产物（insertFromXml 复用布局/聚合/历史）。 */
 export interface ParsedFragment {
   nodes: Node[]
   edges: Edge[]
