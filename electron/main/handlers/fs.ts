@@ -326,6 +326,8 @@ export function registerFsHandlers(ctx: HandlerContext): void {
       if (!result.ok) return result
       // 清理缩略图
       await ctx.fsService.thumbnails.delete(payload.targetPath).catch(() => {})
+      // 清理会话文件索引里指向已删路径的失效映射（文件/文件夹均被移入回收站，路径立即失效）。
+      await ctx.fsService.workspace.pruneFileUuidPaths(payload.workspacePath).catch(() => {})
       return { ok: true }
     },
   )

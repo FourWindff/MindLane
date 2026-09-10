@@ -504,6 +504,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       const tree = await listWorkspaceTree(workspacePath)
       const files = flattenTreeFiles(tree)
       set({ tree, files })
+      // 删除后重拉胶囊条输入（持久映射已被主进程 prune，会话仍在，重新投影即隐藏已删文件的胶囊）。
+      void useAiStore.getState().refreshCapsuleData()
       return true
     } finally {
       set({ busy: false })

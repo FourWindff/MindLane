@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
+import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '../store'
 
 type WorkspaceApiOverrides = Partial<{
@@ -10,6 +11,7 @@ type WorkspaceApiOverrides = Partial<{
   getSession: () => Promise<unknown>
   listFiles: (payload: { workspacePath: string }) => Promise<unknown>
   listTree: (payload: { workspacePath: string }) => Promise<unknown>
+  deleteItem: (payload: { targetPath: string; workspacePath: string }) => Promise<unknown>
 }>
 
 function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
@@ -40,6 +42,7 @@ function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
         },
       ],
     })),
+    deleteItem: vi.fn(async () => ({ ok: true as const })),
     ...overrides,
   }
   vi.stubGlobal('window', { mindlane: { workspace: api } })
@@ -178,5 +181,75 @@ describe('workspace switch restore protocol', () => {
     expect(state.toggleFolder).toBeUndefined()
     expect(state.expandAllFolders).toBeUndefined()
     expect(state.collapseAllFolders).toBeUndefined()
+  })
+})
+
+describe('file deletion capsule cleanup', () => {
+  beforeEach(() => {
+    mindmapRegistry.releaseAll()
+    useWorkspaceStore.setState({ busy: false, lastError: null })
+    useAiStore.setState({
+      fileUuidPaths: {},
+      filePaths: {},
+      fileChats: {},
+      allSessions: [],
+      currentFileUuid: null,
+      currentFilePath: null,
+    })
+  })
+
+  it('drops the deleted file from the capsule projection once the mapping is pruned', async () => {
+    const session = {
+      id: 'session-a',
+      fileUuid: 'file-a',
+      title: 'A',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      updatedAt: '2026-06-18T00:01:00.000Z',
+      messageCount: 1,
+    }
+    const api = installWorkspaceApis({
+      // 主进程在删除成功后已 prune:getSession 返回的映射不再含已删路径。
+      getSession: vi.fn(async () => ({
+        workspacePath: '/ws',
+        workspaceUuid: null,
+        activeSessionIds: {},
+        fileUuidPaths: {},
+        recentWorkspacePaths: ['/ws'],
+        lastOpenedFilePath: null,
+        restoreLastWorkspaceOnLaunch: true,
+      })),
+    })
+    const chat = {
+      listSessions: vi.fn(async () => ({ ok: true as const, data: { sessions: [session] } })),
+    }
+    vi.stubGlobal('window', { mindlane: { workspace: api, chat } })
+    useWorkspaceStore.setState({ workspacePath: '/ws' })
+    // 删除前:会话仍在 + 映射仍在 → 胶囊可见。
+    useAiStore.setState({
+      fileUuidPaths: { 'file-a': '/ws/a.mindlane' },
+      allSessions: [session],
+    })
+    const derive = () =>
+      deriveChatCapsuleEntries(
+        useAiStore.getState().fileChats,
+        useAiStore.getState().filePaths,
+        useAiStore.getState().fileUuidPaths,
+        useAiStore.getState().allSessions,
+        useAiStore.getState().currentFileUuid,
+        useAiStore.getState().currentFilePath,
+      )
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeDefined()
+
+    const ok = await useWorkspaceStore.getState().deleteItem('/ws/a.mindlane')
+
+    expect(ok).toBe(true)
+    expect(api.deleteItem).toHaveBeenCalledWith({
+      targetPath: '/ws/a.mindlane',
+      workspacePath: '/ws',
+    })
+    await vi.waitFor(() => expect(useAiStore.getState().fileUuidPaths).toEqual({}))
+    // 删除后:映射已被 prune 刷新,会话保留但无映射 → 胶囊隐藏。
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeUndefined()
+    expect(chat.listSessions).toHaveBeenCalledWith({ workspacePath: '/ws' })
   })
 })
