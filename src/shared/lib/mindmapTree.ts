@@ -1,4 +1,3 @@
-import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import { defaultNodeSize } from './nodeSize'
 import type { Edge, Node, Position as XyflowPosition } from '@xyflow/react'
 
@@ -115,7 +114,7 @@ function subtreeHeight(nodeId: string, edges: Edge[], nodes: Node[], gapY: numbe
 }
 
 /** 节点是否处于折叠状态（通用展示属性，缺省展开）。 */
-export function isNodeCollapsed(nodes: Node[], nodeId: string): boolean {
+function isNodeCollapsed(nodes: Node[], nodeId: string): boolean {
   return nodes.find((n) => n.id === nodeId)?.data?.collapsed === true
 }
 
@@ -454,38 +453,4 @@ function findRootId(edges: Edge[], startId: string): string {
     if (!parent) return current
     current = parent.source
   }
-}
-
-export function withNewChild(
-  nodes: Node[],
-  edges: Edge[],
-  parentId: string,
-  data: TextNodeData,
-  offsetX: number,
-  gapY: number,
-  structureType: 'logic' | 'mindmap' = 'logic',
-): { nodes: Node[]; edges: Edge[]; newNodeId: string } {
-  const childId = newId()
-  const parent = nodes.find((n) => n.id === parentId)
-  if (!parent) return { nodes, edges, newNodeId: childId }
-
-  const child: Node = {
-    id: childId,
-    type: 'text',
-    position: { x: parent.position.x + offsetX, y: parent.position.y },
-    data: { ...data, justAdded: true },
-  }
-  const nextEdges: Edge[] = [
-    ...edges,
-    {
-      id: `e-${parentId}-${childId}`,
-      source: parentId,
-      target: childId,
-      type: 'mindmap',
-      className: 'mindmap-edge mindmap-edge--enter',
-    },
-  ]
-  const nextNodes = [...nodes, child]
-  const laidOut = reflowChildren(parentId, nextNodes, nextEdges, offsetX, gapY, structureType)
-  return { nodes: laidOut, edges: nextEdges, newNodeId: childId }
 }

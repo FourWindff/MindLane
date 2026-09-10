@@ -6,8 +6,8 @@ import {
   collectDescendantIds,
   createInitialEdges,
   createInitialNodes,
+  newId,
   reflowChildren,
-  withNewChild,
 } from '../mindmapTree'
 
 // registry 副作用注册 text 节点类型
@@ -15,16 +15,40 @@ import '@/features/mindmap/nodes'
 
 type Tree = { nodes: Node[]; edges: Edge[] }
 
-function addChild(tree: Tree, parentId: string, label: string): Tree & { newNodeId: string } {
-  return withNewChild(
-    tree.nodes,
-    tree.edges,
+// Fixture-local tree builder: the production withNewChild shell was removed
+// (test-only consumer), so the fixture calls the layout core directly.
+function addChild(
+  tree: Tree,
+  parentId: string,
+  label: string,
+  structureType: 'logic' | 'mindmap' = 'mindmap',
+): Tree & { newNodeId: string } {
+  const childId = newId()
+  const parent = tree.nodes.find((n) => n.id === parentId)!
+  const child: Node = {
+    id: childId,
+    type: 'text',
+    position: { x: parent.position.x + CHILD_OFFSET_X, y: parent.position.y },
+    data: { label, justAdded: true },
+  }
+  const edges: Edge[] = [
+    ...tree.edges,
+    {
+      id: `e-${parentId}-${childId}`,
+      source: parentId,
+      target: childId,
+      type: 'mindmap',
+    },
+  ]
+  const nodes = reflowChildren(
     parentId,
-    { label },
+    [...tree.nodes, child],
+    edges,
     CHILD_OFFSET_X,
     CHILD_GAP_Y,
-    'mindmap',
+    structureType,
   )
+  return { nodes, edges, newNodeId: childId }
 }
 
 function sideOf(nodes: Node[], id: string): 'left' | 'right' {
@@ -137,29 +161,13 @@ describe('mindmap 布局左右分侧', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const ids: string[] = []
     for (let i = 0; i < 3; i++) {
-      const r = withNewChild(
-        tree.nodes,
-        tree.edges,
-        'root',
-        { label: `n${i}` },
-        CHILD_OFFSET_X,
-        CHILD_GAP_Y,
-        'logic',
-      )
+      const r = addChild(tree, 'root', `n${i}`, 'logic')
       tree = r
       ids.push(r.newNodeId)
     }
 
     const before = ids.map((id) => tree.nodes.find((n) => n.id === id)!.data.branchIndex)
-    const r = withNewChild(
-      tree.nodes,
-      tree.edges,
-      'root',
-      { label: 'n3' },
-      CHILD_OFFSET_X,
-      CHILD_GAP_Y,
-      'logic',
-    )
+    const r = addChild(tree, 'root', 'n3', 'logic')
     const after = ids.map((id) => r.nodes.find((n) => n.id === id)!.data.branchIndex)
 
     expect(after).toEqual(before)
@@ -168,16 +176,7 @@ describe('mindmap 布局左右分侧', () => {
   it('logic 布局不受影响：所有子节点都在根节点右侧', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     for (let i = 0; i < 4; i++) {
-      const r = withNewChild(
-        tree.nodes,
-        tree.edges,
-        'root',
-        { label: `n${i}` },
-        CHILD_OFFSET_X,
-        CHILD_GAP_Y,
-        'logic',
-      )
-      tree = r
+      tree = addChild(tree, 'root', `n${i}`, 'logic')
     }
 
     const children = tree.nodes.filter((n) => n.id !== 'root')
