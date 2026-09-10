@@ -307,15 +307,6 @@ export interface MindmapReadRequest {
 export type MindmapReadResponse =
   { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
 
-/** 写工具动作词表（渲染层落盘应答器按此分发）。 */
-export const WRITE_ACTIONS = [
-  'insertXmlFragment',
-  'updateMindmapNode',
-  'moveMindmapNode',
-  'deleteNode',
-] as const
-export type WriteAction = (typeof WRITE_ACTIONS)[number]
-
 /** 每个写动作的参数形状（IPC 边界仍为 Record<string,unknown>，渲染层按此解析）。 */
 export interface WriteActionArgs {
   insertXmlFragment: {
@@ -327,6 +318,9 @@ export interface WriteActionArgs {
   moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
   deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
 }
+
+/** 写动作名 = 参数形状映射的键位（动作名单与参数形状收敛到同一处声明，不再手抄词表）。 */
+export type WriteAction = keyof WriteActionArgs
 
 /** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 通道模式）。 */
 export interface MindmapWriteRequest {
