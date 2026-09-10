@@ -10,12 +10,21 @@
   files: [
     'dist',
     'dist-electron',
+    // Native module pinned top-level; must ship unpacked (see asarUnpack).
+    // Do not treat as removable: build-time external + runtime node_modules
+    // resolution + electron-rebuild ABI toolchain — see docs/adr/0020-packaging-contract.md.
     'node_modules/better-sqlite3/**/*',
+    // pdf-parse / bindings / file-uri-to-path / node-addon-api / prebuild-install:
+    // better-sqlite3's native dependency closure (bindings, prebuild-install,
+    // …) plus pdf-parse (build-time external, runtime node_modules resolution).
     'node_modules/pdf-parse/**/*',
     'node_modules/bindings/**/*',
     'node_modules/file-uri-to-path/**/*',
     'node_modules/node-addon-api/**/*',
     'node_modules/prebuild-install/**/*',
+    // officeparser slim contract: devDep whose browser entry is a ~2.7MB
+    // self-contained bundle; copy exactly these two files, never the full
+    // dependency tree (pdfjs-dist/tesseract.js) — see docs/adr/0020-packaging-contract.md.
     {
       from: 'node_modules/officeparser',
       to: 'node_modules/officeparser',
