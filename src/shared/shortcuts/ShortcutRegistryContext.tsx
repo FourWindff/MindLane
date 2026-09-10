@@ -9,6 +9,7 @@ type RegistryContextValue = {
 // 注意：context 对象与此 Provider 同居一文件 —— 历史上曾拆成
 // shortcutRegistryContext.ts（仅大小写不同），Windows 大小写不敏感文件系统下
 // Vite 会误解析到错误文件导致「启动白屏」。勿再拆分。
+// eslint-disable-next-line react-refresh/only-export-components -- 拆分 context 会重现 Windows 大小写重名白屏
 export const ShortcutRegistryContext = createContext<RegistryContextValue | null>(null)
 
 export function ShortcutRegistryProvider({ children }: { children: ReactNode }) {
