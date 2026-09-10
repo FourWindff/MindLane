@@ -1,22 +1,12 @@
 import type { Node } from '@xyflow/react'
 import { isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
-
-export type ContextNodeInfo = {
-  id: string
-  type: 'text' | 'palace'
-  label: string
-  /** 根节点链（root → … → 本节点，compact 轮次状态用，帮助模型定位） */
-  chain?: string[]
-  /** 直接子节点（compact 子树，深度 1） */
-  children?: ContextNodeInfo[]
-  extra?: Record<string, unknown>
-}
+import type { ContextNodeInfo } from '../../../../electron/ipc'
 
 function isKnownNodeType(type: string | undefined): type is 'text' | 'palace' {
   return type === 'text' || type === 'palace'
 }
 
-export function extractNodeInfo(node: Node): ContextNodeInfo {
+function extractNodeInfo(node: Node): ContextNodeInfo {
   const nodeType = isKnownNodeType(node.type) ? node.type : 'text'
 
   switch (nodeType) {
