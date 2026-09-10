@@ -113,4 +113,12 @@ export class CheckpointerManager {
     if (!this.saver) return
     await this.saver.deleteThread(threadId)
   }
+
+  /**
+   * 关闭数据库连接（Windows 上未关闭的连接会阻塞删除数据库文件）
+   */
+  close(): void {
+    this.saver?.db.close()
+    this.saver = null
+  }
 }

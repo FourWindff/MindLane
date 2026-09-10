@@ -18,22 +18,25 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import electron from 'electron'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
 
-const electronPath = path.join(rootDir, 'node_modules', '.bin', 'electron')
+// `import electron from 'electron'` gives the path to the real binary; the
+// node_modules/.bin shim is a shell script that Windows cannot spawn.
 const vitestPath = path.join(rootDir, 'node_modules', 'vitest', 'vitest.mjs')
 
 const args = [vitestPath, ...process.argv.slice(2)]
 
-const result = spawnSync(electronPath, args, {
+const result = spawnSync(electron, args, {
   stdio: 'inherit',
   cwd: rootDir,
   env: {
     ...process.env,
     ELECTRON_RUN_AS_NODE: '1',
+    NODE_OPTIONS: '--max-old-space-size=4096',
   },
 })
 
-process.exit(result.status ?? 0)
+process.exit(result.status ?? 1)

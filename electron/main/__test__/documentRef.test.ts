@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import path from 'node:path'
 import { resolveDocumentRef } from '../documentRef.js'
 
 const userDataPath = '/home/user/.config/MindLane'
@@ -83,7 +84,7 @@ describe('resolveDocumentRef', () => {
     expect(result).toEqual({
       ok: true,
       displayText: 'Lorem ipsum dolor sit amet...',
-      target: `${userDataPath}/text-cache/doc-3.txt`,
+      target: path.join(userDataPath, 'text-cache', 'doc-3.txt'),
       external: false,
     })
   })

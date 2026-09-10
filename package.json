@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "vite preview",
-    "test": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/test.mjs run",
+    "test": "node scripts/test.mjs run",
     "test:watch": "node scripts/test.mjs",
     "prepare": "husky",
     "postinstall": "electron-rebuild"

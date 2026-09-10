@@ -22,6 +22,7 @@ describe('initAgentServices 装配', () => {
 
   afterEach(() => {
     services.sessionManager.close()
+    services.checkpointer.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
