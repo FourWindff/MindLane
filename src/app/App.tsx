@@ -179,7 +179,8 @@ function AppContent() {
                     fileManagerOpen={fileManagerOpen}
                     filePath={filePath ?? undefined}
                   />
-                  {hasDocumentOpen && <AgentWriteSimulator />}
+                  {/* Dev-only visual QA panel for agent write animations; tree-shaken out of production builds */}
+                  {hasDocumentOpen && import.meta.env.DEV && <AgentWriteSimulator />}
                 </>
               )}
               {hasDocumentOpen ? (

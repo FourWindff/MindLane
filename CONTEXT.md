@@ -568,6 +568,13 @@
 - 定义在契约模块 `ipc.ts`，主进程 fs 服务经 re-export 复用同一类型。
 - _Avoid_: FsResult（旧名，误导性地暗示仅文件系统用途，实际覆盖 ai / mcp / settings 等所有跨界调用）
 
+## 开发面板（Dev Panel）
+
+- 仅存在于开发构建（`import.meta.env.DEV`）、不对最终用户可见的 UI，用于手动触发或观察内部行为。
+- 由 Vite 在生产构建中死代码消除，**不随产物分发**；不得作为用户可配置的开关暴露。
+- 当前实例：`AgentWriteSimulator`（手动复现 agent 写操作动画的 QA 面板）。
+- _Avoid_: 把此类 UI 当作正式功能命名或接入设置页。
+
 ## 本次范围外
 
 ### MemoryExtractor
