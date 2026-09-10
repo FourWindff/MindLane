@@ -16,7 +16,7 @@ import {
 import { AppWindowBar } from '@/features/shell/components/AppWindowBar'
 import { AppToolbar } from '@/features/shell/components/AppToolbar'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
-import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryContext'
+import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryProvider'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { ToastContainer } from '@/shared/components/ToastContainer'
 import {
