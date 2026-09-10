@@ -40,7 +40,7 @@ Drop in what you already have and get a structured map back:
 
 ### 🎨 Canvas Editing
 
-A fast, free-form canvas built on React Flow. Drag nodes anywhere, restyle them in the style panel, auto-layout when things get messy, and drive everything from the keyboard.
+A fast, free-form canvas built on React Flow. Nodes are laid out automatically — right-click a node to add children, parents, or siblings; restyle selections in the style panel; and let the AI restructure the map on request.
 
 ### 🔌 Multi-Provider
 
