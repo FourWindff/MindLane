@@ -1,5 +1,7 @@
+import type { BaseMessage } from '@langchain/core/messages'
+
 /**
- * 从 LangChain message content 中提取文本
+ * Extract text from LangChain message content.
  * Anthropic 格式返回 content 是数组 [{type:"text", text:"..."}]
  * OpenAI 格式返回 content 是字符串
  */
@@ -19,6 +21,24 @@ export function extractTextContent(content: unknown): string {
       .join('')
   }
   return ''
+}
+
+/**
+ * Find the text of the latest non-empty human message (shared by the
+ * subgraph input resolvers; single implementation so the two copies
+ * cannot drift apart).
+ */
+export function findLatestUserMessageText(messages: BaseMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.getType() === 'human') {
+      const text = extractTextContent(message.content)
+      if (text.trim()) {
+        return text
+      }
+    }
+  }
+  return null
 }
 
 /**

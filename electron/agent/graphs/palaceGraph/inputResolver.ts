@@ -1,5 +1,4 @@
-import { type BaseMessage } from '@langchain/core/messages'
-import { extractTextContent } from '../../utils.js'
+import { findLatestUserMessageText } from '../../utils.js'
 import type { PalaceSubgraphStateType, SelectedNodeContent } from '../../state.js'
 
 export interface PalaceInputResolution {
@@ -9,19 +8,6 @@ export interface PalaceInputResolution {
 
 function mapSelectedNodes(nodes: { id: string; label: string }[]): SelectedNodeContent[] {
   return nodes.map((node) => ({ id: node.id, label: node.label }))
-}
-
-function findLatestUserMessageText(messages: BaseMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.getType() === 'human') {
-      const text = extractTextContent(message.content)
-      if (text.trim()) {
-        return text
-      }
-    }
-  }
-  return null
 }
 
 export class PalaceInputResolver {

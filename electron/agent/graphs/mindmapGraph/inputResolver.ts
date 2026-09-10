@@ -1,7 +1,6 @@
-import type { BaseMessage } from '@langchain/core/messages'
-import { extractTextContent } from '../../utils.js'
 import type { MindmapInputSource, MindmapSubgraphStateType } from '../../state.js'
 import type { DocumentRef } from '../../state.js'
+import { findLatestUserMessageText } from '../../utils.js'
 
 export interface MindmapInputResolution {
   /** 解析后的输入源 */
@@ -30,19 +29,6 @@ function resolveAttachedDocument(documentRef: DocumentRef): MindmapInputSource {
 
 function resolveTitle(documentRef: DocumentRef | undefined, fileTitle: string | undefined): string {
   return documentRef?.title || documentRef?.filename || fileTitle || ''
-}
-
-function findLatestUserMessageText(messages: BaseMessage[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.getType() === 'human') {
-      const text = extractTextContent(message.content)
-      if (text.trim()) {
-        return text
-      }
-    }
-  }
-  return null
 }
 
 /**
