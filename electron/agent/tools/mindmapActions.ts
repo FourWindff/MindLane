@@ -37,7 +37,7 @@ function asToolError(err: unknown): { ok: false; error: string } {
  * after|before=become a sibling of parentId.
  * Validation and apply both happen inside the renderer responder (atomic live-editor op).
  */
-export function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
+function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, xml, parentId, position }) => {
       try {
@@ -71,7 +71,7 @@ export function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
  * Creates the update tool: replaces the node wholesale (with subtree) from an
  * XML arg. Validation and apply happen inside the renderer responder.
  */
-export function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
+function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, xml }) => {
       try {
@@ -98,7 +98,7 @@ export function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
  * (single batch history entry, atomic). Validation (root immovable; target
  * must not live inside the moved subtree) happens in the renderer responder.
  */
-export function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
+function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, nodeId, targetId, position }) => {
       try {
@@ -129,7 +129,7 @@ export function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
  * Creates the delete tool: deletes the node (with its subtree). The action
  * name stays `deleteNode` (the renderer responder applies by that name).
  */
-export function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
+function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, nodeId, confirmDeleteSubtree }) => {
       try {
@@ -151,15 +151,8 @@ export function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
   )
 }
 
-export interface MindmapWriteTools {
-  insertXmlFragmentTool: ReturnType<typeof createInsertXmlFragmentTool>
-  updateNodeTool: ReturnType<typeof createUpdateMindmapNodeTool>
-  moveNodeTool: ReturnType<typeof createMoveMindmapNodeTool>
-  deleteNodeTool: ReturnType<typeof createDeleteMindmapNodeTool>
-}
-
 /** Creates the fixed 4 write tools (renderer proxies). */
-export function createMindmapActionTools(proxy: MindmapWriteProxy): MindmapWriteTools {
+export function createMindmapActionTools(proxy: MindmapWriteProxy) {
   return {
     insertXmlFragmentTool: createInsertXmlFragmentTool(proxy),
     updateNodeTool: createUpdateMindmapNodeTool(proxy),
