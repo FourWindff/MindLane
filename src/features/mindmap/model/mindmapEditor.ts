@@ -1,7 +1,6 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { type MindLaneFile, type MindLaneNode } from '@/shared/lib/fileFormat'
-import { parseYamlFragment, VIRTUAL_ROOT_SYMBOL } from '@/shared/lib/yamlMindmapParser'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -533,7 +532,7 @@ export class MindmapEditor {
     this.state.addDocumentRef(ref)
   }
 
-  // ─── YAML / AI 批量插入 ───
+  // ─── AI 批量插入 ───
 
   /**
    * 解析并插入 XML 片段（AI 写操作统一入口之一）。
@@ -639,17 +638,8 @@ export class MindmapEditor {
     this.runBatch(commands, false)
   }
 
-  insertFromYaml(yamlFragment: string, options: { parentId?: string } = {}): void {
-    const parsed = parseYamlFragment(yamlFragment)
-    this.insertParsedFragment(parsed, options)
-  }
-
   /**
-   * insertFromYaml / insertFromXml 共用的落图逻辑（布局/聚合/历史/回退链对齐）。
-   * 回退链：显式 parentId → 选中节点 → 根节点。
-   */
-  /**
-   * insertFromYaml / insertFromXml 共用的落图逻辑（布局/聚合/历史/回退链对齐）。
+   * insertFromXml 的落图逻辑（布局/聚合/历史/回退链对齐）。
    * 回退链：显式 parentId → 选中节点 → 根节点。
    */
   private insertParsedFragment(
@@ -729,13 +719,6 @@ export class MindmapEditor {
       direction: 'LR',
     })
 
-    const virtualRootIds = new Set<string>()
-    for (const n of laidOut) {
-      if ((n.data as Record<symbol, boolean>)[VIRTUAL_ROOT_SYMBOL]) {
-        virtualRootIds.add(n.id)
-      }
-    }
-
     const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {
       console.warn('[insertParsedFragment] 无法找到子树根节点')
@@ -760,7 +743,6 @@ export class MindmapEditor {
     const commands: MindmapCommand[] = []
 
     for (const n of laidOut) {
-      if (virtualRootIds.has(n.id)) continue
       const shifted = {
         ...n,
         position: {
@@ -781,7 +763,6 @@ export class MindmapEditor {
     }
 
     for (const e of parsed.edges) {
-      if (virtualRootIds.has(e.source) || virtualRootIds.has(e.target)) continue
       commands.push({
         type: 'addEdge',
         edge: {

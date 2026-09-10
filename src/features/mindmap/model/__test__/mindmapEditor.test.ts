@@ -334,29 +334,6 @@ describe('MindmapEditor', () => {
     })
   })
 
-  describe('insertFromYaml', () => {
-    it('should insert a YAML fragment as a single batch', () => {
-      const beforeNodeCount = store.getState().nodes.length
-      editor.insertFromYaml(
-        `
-- "子主题 A":
-  - "子主题 A1"
-- "子主题 B"
-`,
-        { parentId: rootId() },
-      )
-
-      const labels = store.getState().nodes.map((n) => (n.data as { label: string }).label)
-      expect(labels).toContain('子主题 A')
-      expect(labels).toContain('子主题 A1')
-      expect(labels).toContain('子主题 B')
-      expect(store.getState().nodes.length).toBe(beforeNodeCount + 3)
-
-      editor.undo()
-      expect(store.getState().nodes.length).toBe(beforeNodeCount)
-    })
-  })
-
   describe('insertFromXml', () => {
     it('lays out an inserted fragment in place so it never overlaps existing children', async () => {
       const root = rootId()
