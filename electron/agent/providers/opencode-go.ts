@@ -1,7 +1,34 @@
+import crypto from 'node:crypto'
 import { ChatOpenAI } from '@langchain/openai'
 import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
+import { currentSessionId } from '../../shared/runContext.js'
 
 const OPENCODE_GO_BASE_URL = 'https://opencode.ai/zen/go/v1'
+
+/**
+ * Conversation id for calls made outside a stream (e.g. Nodes-to-Palace),
+ * stable for the whole process so the gateway can still route these.
+ */
+const FALLBACK_SESSION_ID = crypto.randomUUID()
+
+/** Identify ourselves instead of the generic SDK user agent (opencode.ai/docs/go). */
+const USER_AGENT = 'MindLaneAgent/1.0'
+
+/**
+ * Stamp the OpenCode Go gateway headers onto an outbound request:
+ * `x-opencode-session` (required since the gateway routing update;
+ * conversation-scoped when the call runs inside a stream) and our own
+ * User-Agent in place of the generic SDK name.
+ */
+export function withGatewayHeaders(
+  init: RequestInit | undefined,
+  sessionId: string | undefined,
+): RequestInit {
+  const headers = new Headers(init?.headers)
+  headers.set('x-opencode-session', sessionId ?? FALLBACK_SESSION_ID)
+  headers.set('User-Agent', USER_AGENT)
+  return { ...init, headers }
+}
 
 /**
  * OpenCode Go — low-cost subscription gateway for open coding models
@@ -47,7 +74,14 @@ export class OpenCodeGoProvider extends LLMProvider {
         temperature: 0.35,
         timeout: 60_000,
         maxRetries: 1,
-        configuration: { baseURL },
+        configuration: {
+          baseURL,
+          // Inject the gateway headers at request time: the session header
+          // must be stable per conversation, so it is resolved from the
+          // runner's AsyncLocalStorage context rather than frozen at
+          // construction (the model instance is shared across conversations).
+          fetch: (url, init) => fetch(url, withGatewayHeaders(init, currentSessionId())),
+        },
       }),
       undefined,
       chatModelId,

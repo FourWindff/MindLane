@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, type AppSettings } from '../../../fs/types.js'
 import { DashScopeProvider } from '../dashscope.js'
 import { KimiCodeProvider } from '../kimi-code.js'
 import { DeepSeekProvider } from '../deepseek.js'
-import { OpenCodeGoProvider } from '../opencode-go.js'
+import { OpenCodeGoProvider, withGatewayHeaders } from '../opencode-go.js'
 import { resolveChatProvider } from '../index.js'
 
 function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
@@ -113,5 +113,23 @@ describe('resolveChatProvider', () => {
     expect(provider.contextWindow).toBe(1_000_000) // glm-5.2 declared window
     expect(provider.model.lc_kwargs.apiKey).toBe('go-key')
     expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://opencode.ai/zen/go/v1')
+    expect(typeof provider.model.lc_kwargs.configuration.fetch).toBe('function')
+  })
+
+  it('stamps the gateway session header per conversation, preserving other headers', () => {
+    const init = withGatewayHeaders({ headers: { authorization: 'Bearer x' } }, 'session-123')
+
+    const headers = new Headers(init.headers)
+    expect(headers.get('x-opencode-session')).toBe('session-123')
+    expect(headers.get('authorization')).toBe('Bearer x')
+    expect(headers.get('User-Agent')).toMatch(/^MindLaneAgent\//)
+  })
+
+  it('falls back to a stable per-process session id outside a stream', () => {
+    const first = new Headers(withGatewayHeaders(undefined, undefined).headers)
+    const second = new Headers(withGatewayHeaders(undefined, undefined).headers)
+
+    expect(first.get('x-opencode-session')).toBeTruthy()
+    expect(first.get('x-opencode-session')).toBe(second.get('x-opencode-session'))
   })
 })

@@ -116,7 +116,8 @@ export class Runner {
 
   async run(): Promise<void> {
     const { sessionManager } = this.options
-    const execute = () => runWithStreamId(this.options.streamId, () => this.execute())
+    const execute = () =>
+      runWithStreamId(this.options.streamId, this.options.request.sessionId, () => this.execute())
     // Contract: SessionManager is assembled at app startup; no isReady guard needed.
     return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
   }
