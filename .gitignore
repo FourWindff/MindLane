@@ -41,6 +41,7 @@ docs/
 # agent instructions (root only)
 /AGENTS.md
 /CLAUDE.md
+/CONTEXT.md
 
 # LangGraph API
 .langgraph_api
