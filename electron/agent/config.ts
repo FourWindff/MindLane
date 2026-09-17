@@ -12,6 +12,9 @@
  * - recursionLimit: LangGraph `StateGraph` 单次 invoke/stream 允许的最大节点
  *   迭代次数（防止 supervisor ↔ tools 无限循环），单位：步数。
  * - maxCompletionTokens: 为模型响应预留的 token 数（输入预算的固定扣减项，与窗口大小无关）。
+ * - consolidationTriggerTokens: 压缩触发阈值（**策略值**）：会话长到这一步就滚动摘要，
+ *   实际触发点取它与输入预算的较小者——小窗口模型在自己的容量处触发，大窗口模型
+ *   保持固定的摘要与记忆提取节奏（不随窗口放大）。
  * - contextCompactRecentMessages: 压缩时保留的最近消息条数（滚动摘要尾部窗口，
  *   也用作调用前超限时的非 LLM 裁剪重试窗口）。
  * - consolidationRatio: 归档目标占输入预算的比例。
@@ -27,6 +30,7 @@
 export const AGENT_LIMITS = {
   recursionLimit: 80,
   maxCompletionTokens: 8_000,
+  consolidationTriggerTokens: 64_000,
   contextCompactRecentMessages: 10,
   consolidationRatio: 0.5,
   consolidationSafetyBuffer: 1_024,

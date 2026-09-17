@@ -30,6 +30,11 @@ interface ConsolidationLimits {
    * 未显式给出时由模型上下文窗口推导：窗口 − 输出预留 − 估算误差缓冲。
    */
   inputBudgetTokens: number
+  /**
+   * 压缩触发阈值（策略值）。触发点取它与容量的较小者：小窗口模型在容量处触发，
+   * 大窗口模型保持固定的摘要与记忆提取节奏。
+   */
+  consolidationTriggerTokens: number
   /** 归档目标占容量的比例 */
   consolidationRatio: number
   /** 最大消息条数 */
@@ -77,6 +82,8 @@ export class Consolidator {
         deps.provider.contextWindow -
           AGENT_LIMITS.maxCompletionTokens -
           AGENT_LIMITS.consolidationSafetyBuffer,
+      consolidationTriggerTokens:
+        limits?.consolidationTriggerTokens ?? AGENT_LIMITS.consolidationTriggerTokens,
       consolidationRatio: limits?.consolidationRatio ?? AGENT_LIMITS.consolidationRatio,
       maxContextMessages: limits?.maxContextMessages ?? AGENT_LIMITS.maxContextMessages,
       maxMessagesBeforeTokenCheck:
@@ -124,6 +131,8 @@ export class Consolidator {
       }
 
       const inputBudget = limits.inputBudgetTokens
+      // 容量与策略是两件事：塞得进多少由模型窗口决定，何时摘要由成本与记忆节奏决定。
+      const trigger = Math.min(limits.consolidationTriggerTokens, inputBudget)
       const target = Math.floor(inputBudget * limits.consolidationRatio)
 
       let currentLast = lastConsolidated
@@ -136,7 +145,7 @@ export class Consolidator {
         if (remaining.length === 0) break
 
         const estimated = await this.estimateSessionPromptTokens(remaining, currentSummary)
-        if (estimated <= inputBudget) break
+        if (estimated <= trigger) break
 
         const tokensToRemove = Math.max(0, estimated - target)
         const boundaryIdx = this.pickConsolidationBoundary(remaining, tokensToRemove)

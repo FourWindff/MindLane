@@ -82,6 +82,30 @@ describe('Consolidator', () => {
     expect(meta?.lastConsolidated).toBeUndefined()
   })
 
+  it('触发阈值低于容量时按阈值触发（策略与容量解耦）', async () => {
+    const sessionId = 'trigger'
+    await manager.saveMessages(sessionId, makeMessages(12), fileUuid)
+
+    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+    const consolidator = new Consolidator(
+      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+      {
+        // 容量远大于会话：只有策略阈值能触发归档。
+        inputBudgetTokens: 100_000,
+        consolidationTriggerTokens: 10,
+        consolidationRatio: 0.5,
+        maxContextMessages: 120,
+        maxMessagesBeforeTokenCheck: 3,
+        maxConsolidationRounds: 5,
+      },
+    )
+
+    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+
+    expect(changed).toBe(true)
+    expect(manager.getSessionMeta(sessionId)?.lastConsolidated).toBeGreaterThan(0)
+  })
+
   it('pickConsolidationBoundary 优先在 user 消息边界处结束', () => {
     const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
     const consolidator = new Consolidator(
