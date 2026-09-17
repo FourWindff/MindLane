@@ -7,6 +7,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
+import { AGENT_LIMITS } from '../config.js'
 import { estimateMessageTokens } from '../lib/tokenCounter.js'
 import { messageContentToString, sanitizeAIMessageContent, sanitizeFileName } from '../utils.js'
 import { logger } from '../../shared/logger.js'
@@ -21,8 +22,11 @@ const log = logger.withContext('messagePreparation')
 export interface MessagePreparationConfig {
   /** 是否启用预处理管道 */
   enabled: boolean
-  /** 历史消息最大 token 预算（不含 system prompt） */
-  maxContextTokens: number
+  /**
+   * 单次模型调用允许的**总输入** token 预算（含 system prompt 与当前用户消息）。
+   * 由模型上下文窗口推导：窗口 − 输出预留 − 估算误差缓冲。
+   */
+  inputBudgetTokens: number
   /** 单条 tool_result 最大字节数，超过则转存磁盘 */
   toolResultMaxBytes: number
   /** 仅对这些工具名的结果执行 microcompact */
@@ -37,9 +41,8 @@ export interface MessagePreparationConfig {
   snipPreserveLastUser: boolean
 }
 
-const DEFAULT_MESSAGE_PREPARATION_CONFIG: MessagePreparationConfig = {
+const DEFAULT_MESSAGE_PREPARATION_CONFIG: Omit<MessagePreparationConfig, 'inputBudgetTokens'> = {
   enabled: true,
-  maxContextTokens: 16_000,
   toolResultMaxBytes: 8_000,
   microcompactToolNames: [],
   microcompactThreshold: 4_000,
@@ -49,14 +52,21 @@ const DEFAULT_MESSAGE_PREPARATION_CONFIG: MessagePreparationConfig = {
 }
 
 /**
- * 合并部分配置到默认配置
+ * 合并部分配置到默认配置。
+ *
+ * 未显式给出输入预算时，从模型上下文窗口现算：输出预留与估算缓冲都是固定
+ * 扣减项（不随窗口缩放），扣减值住 AGENT_LIMITS。
  */
 export function mergeMessagePreparationConfig(
-  partial?: Partial<MessagePreparationConfig>,
+  partial: Partial<MessagePreparationConfig> | undefined,
+  contextWindow: number,
 ): MessagePreparationConfig {
   return {
     ...DEFAULT_MESSAGE_PREPARATION_CONFIG,
     ...partial,
+    inputBudgetTokens:
+      partial?.inputBudgetTokens ??
+      contextWindow - AGENT_LIMITS.maxCompletionTokens - AGENT_LIMITS.consolidationSafetyBuffer,
     microcompactToolNames: partial?.microcompactToolNames
       ? [...partial.microcompactToolNames]
       : [...DEFAULT_MESSAGE_PREPARATION_CONFIG.microcompactToolNames],
@@ -373,7 +383,7 @@ export function snipHistory(
   messages: BaseMessage[],
   config: MessagePreparationConfig,
 ): BaseMessage[] {
-  if (config.maxContextTokens <= 0) return messages
+  if (config.inputBudgetTokens <= 0) return messages
 
   const systemMsgs = messages.filter((m) => m.type === 'system')
   const nonSystem = messages.filter((m) => m.type !== 'system')
@@ -389,7 +399,7 @@ export function snipHistory(
 
   const keptHistory = trimHistoryToBudget(
     history,
-    config.maxContextTokens -
+    config.inputBudgetTokens -
       estimateMessageTokens(systemMsgs) -
       (currentUserMsg ? estimateMessageTokens([currentUserMsg]) : 0),
   )

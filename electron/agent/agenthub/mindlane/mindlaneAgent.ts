@@ -61,7 +61,10 @@ export class MindLaneAgent extends BaseAgent {
     this.modelWithTools = this.provider.model.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
-    this.messagePipelineConfig = mergeMessagePreparationConfig(options?.messagePipeline)
+    this.messagePipelineConfig = mergeMessagePreparationConfig(
+      options?.messagePipeline,
+      provider.contextWindow,
+    )
   }
 
   async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {

@@ -11,6 +11,7 @@ import {
   microcompact,
   applyToolResultBudget,
   snipHistory,
+  mergeMessagePreparationConfig,
 } from '../messagePreparation.js'
 import type { MessagePreparationConfig } from '../messagePreparation.js'
 
@@ -27,7 +28,7 @@ afterEach(async () => {
 function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
   return {
     enabled: true,
-    maxContextTokens: 100,
+    inputBudgetTokens: 100,
     toolResultMaxBytes: 1_000,
     microcompactToolNames: ['bigTool'],
     microcompactThreshold: 50,
@@ -246,7 +247,7 @@ describe('microcompact', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
       enabled: true,
-      maxContextTokens: 16_000,
+      inputBudgetTokens: 16_000,
       toolResultMaxBytes: 8_000,
       microcompactToolNames: ['bigTool'],
       microcompactThreshold: 100,
@@ -318,7 +319,7 @@ describe('applyToolResultBudget', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
       enabled: true,
-      maxContextTokens: 16_000,
+      inputBudgetTokens: 16_000,
       toolResultMaxBytes: 8_000,
       microcompactToolNames: ['bigTool'],
       microcompactThreshold: 100,
@@ -379,7 +380,7 @@ describe('snipHistory', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
       enabled: true,
-      maxContextTokens: 100,
+      inputBudgetTokens: 100,
       toolResultMaxBytes: 8_000,
       microcompactToolNames: [],
       microcompactThreshold: 4_000,
@@ -393,7 +394,7 @@ describe('snipHistory', () => {
   it('未超预算时保留所有消息', () => {
     const messages = [new SystemMessage('system'), new HumanMessage('hello'), new AIMessage('hi')]
 
-    const result = snipHistory(messages, makeConfig({ maxContextTokens: 10_000 }))
+    const result = snipHistory(messages, makeConfig({ inputBudgetTokens: 10_000 }))
 
     expect(result).toHaveLength(3)
   })
@@ -406,7 +407,7 @@ describe('snipHistory', () => {
       new HumanMessage('current'),
     ]
 
-    const result = snipHistory(messages, makeConfig({ maxContextTokens: 20 }))
+    const result = snipHistory(messages, makeConfig({ inputBudgetTokens: 20 }))
 
     expect(result.some((m) => m.type === 'system')).toBe(true)
     expect(result[result.length - 1].content).toBe('current')
@@ -423,7 +424,7 @@ describe('snipHistory', () => {
       new HumanMessage('current'),
     ]
 
-    const result = snipHistory(messages, makeConfig({ maxContextTokens: 10 }))
+    const result = snipHistory(messages, makeConfig({ inputBudgetTokens: 10 }))
 
     const toolCalls = result.filter((m) => m.type === 'ai')
     const toolResults = result.filter((m) => m.type === 'tool')
@@ -441,7 +442,7 @@ describe('snipHistory', () => {
       new HumanMessage('current'),
     ]
 
-    const result = snipHistory(messages, makeConfig({ maxContextTokens: 10 }))
+    const result = snipHistory(messages, makeConfig({ inputBudgetTokens: 10 }))
 
     expect(
       result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2'),
@@ -453,9 +454,24 @@ describe('snipHistory', () => {
 
     const result = snipHistory(
       messages,
-      makeConfig({ maxContextTokens: 5, snipPreserveSystem: false }),
+      makeConfig({ inputBudgetTokens: 5, snipPreserveSystem: false }),
     )
 
     expect(result.some((m) => m.type === 'system')).toBe(false)
+  })
+})
+
+describe('mergeMessagePreparationConfig', () => {
+  it('未显式给预算时从模型窗口推导，且始终小于窗口', () => {
+    const config = mergeMessagePreparationConfig(undefined, 32_768)
+
+    expect(config.inputBudgetTokens).toBe(23_744)
+    expect(config.inputBudgetTokens).toBeLessThan(32_768)
+  })
+
+  it('显式给出的输入预算优先于推导值', () => {
+    const config = mergeMessagePreparationConfig({ inputBudgetTokens: 20 }, 1_000_000)
+
+    expect(config.inputBudgetTokens).toBe(20)
   })
 })

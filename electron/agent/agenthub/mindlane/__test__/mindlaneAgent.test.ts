@@ -247,11 +247,10 @@ describe('MindLaneAgent.invoke()', () => {
       undefined,
       undefined,
       {
-        messagePipeline: mergeMessagePreparationConfig({
-          maxContextTokens: 20,
-          toolResultMaxBytes: 0,
-          microcompactToolNames: [],
-        }),
+        messagePipeline: mergeMessagePreparationConfig(
+          { inputBudgetTokens: 20, toolResultMaxBytes: 0, microcompactToolNames: [] },
+          32_768,
+        ),
       },
     )
     const state = createInitialState()

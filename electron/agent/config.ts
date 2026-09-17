@@ -11,9 +11,7 @@
  *
  * - recursionLimit: LangGraph `StateGraph` 单次 invoke/stream 允许的最大节点
  *   迭代次数（防止 supervisor ↔ tools 无限循环），单位：步数。
- * - contextWindowTokens: 模型上下文窗口总 token 数，用于计算输入预算。
- * - maxCompletionTokens: 为模型响应预留的 token 数。
- * - contextSafetyBufferTokens: 输入预算安全缓冲，防止估算误差导致超限。
+ * - maxCompletionTokens: 为模型响应预留的 token 数（输入预算的固定扣减项，与窗口大小无关）。
  * - contextCompactRecentMessages: 压缩时保留的最近消息条数（滚动摘要尾部窗口，
  *   也用作调用前超限时的非 LLM 裁剪重试窗口）。
  * - consolidationRatio: 归档目标占输入预算的比例。
@@ -28,9 +26,7 @@
  */
 export const AGENT_LIMITS = {
   recursionLimit: 80,
-  contextWindowTokens: 64_000,
   maxCompletionTokens: 8_000,
-  contextSafetyBufferTokens: 1_024,
   contextCompactRecentMessages: 10,
   consolidationRatio: 0.5,
   consolidationSafetyBuffer: 1_024,

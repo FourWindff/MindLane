@@ -67,9 +67,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 100,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 100,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 5,
@@ -89,9 +87,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 1000,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 1000,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 120,
@@ -121,9 +117,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 30,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 30,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 3,
@@ -153,9 +147,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 30,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 30,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 3,
@@ -180,9 +172,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 1000,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 20,
         consolidationRatio: 0.5,
         maxContextMessages: 4,
         maxMessagesBeforeTokenCheck: 120,
@@ -192,7 +182,6 @@ describe('Consolidator', () => {
 
     const contextMessages = await consolidator.getMessagesForContext(sessionId, {
       maxMessages: 4,
-      budget: 20,
     })
 
     // 条数上限 4 条非系统消息 + 可能保留的系统消息
@@ -217,9 +206,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 1000,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 2,
         consolidationRatio: 0.5,
         maxContextMessages: 1,
         maxMessagesBeforeTokenCheck: 120,
@@ -229,7 +216,6 @@ describe('Consolidator', () => {
 
     const contextMessages = await consolidator.getMessagesForContext(sessionId, {
       maxMessages: 1,
-      budget: 2,
     })
 
     const types = contextMessages.map((m) => m.getType())
@@ -247,9 +233,7 @@ describe('Consolidator', () => {
     const consolidator = new Consolidator(
       { sessionManager: manager, provider, buildMessages, getToolDefinitions },
       {
-        contextWindowTokens: 40,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 40,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 3,
@@ -275,9 +259,7 @@ describe('Consolidator 轮次状态剥离', () => {
   const fileUuid = 'file-uuid-1'
 
   const STRIP_LIMITS = {
-    contextWindowTokens: 30,
-    maxCompletionTokens: 0,
-    safetyBuffer: 0,
+    inputBudgetTokens: 30,
     consolidationRatio: 0.5,
     maxContextMessages: 120,
     maxMessagesBeforeTokenCheck: 3,
@@ -362,9 +344,7 @@ describe('Consolidator 提取回调接缝', () => {
   const fileUuid = 'file-uuid-1'
 
   const ARCHIVE_LIMITS = {
-    contextWindowTokens: 30,
-    maxCompletionTokens: 0,
-    safetyBuffer: 0,
+    inputBudgetTokens: 30,
     consolidationRatio: 0.5,
     maxContextMessages: 120,
     maxMessagesBeforeTokenCheck: 3,
@@ -445,7 +425,7 @@ describe('Consolidator 提取回调接缝', () => {
         getToolDefinitions: () => [],
         onArchived,
       },
-      { ...ARCHIVE_LIMITS, contextWindowTokens: 100, maxMessagesBeforeTokenCheck: 5 },
+      { ...ARCHIVE_LIMITS, inputBudgetTokens: 100, maxMessagesBeforeTokenCheck: 5 },
     )
 
     const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)

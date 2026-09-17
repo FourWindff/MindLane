@@ -25,10 +25,14 @@ interface ConsolidatorDependencies {
 }
 
 interface ConsolidationLimits {
-  contextWindowTokens: number
-  maxCompletionTokens: number
-  safetyBuffer: number
+  /**
+   * 单次模型调用允许的**总输入** token 预算（容量）。
+   * 未显式给出时由模型上下文窗口推导：窗口 − 输出预留 − 估算误差缓冲。
+   */
+  inputBudgetTokens: number
+  /** 归档目标占容量的比例 */
   consolidationRatio: number
+  /** 最大消息条数 */
   maxContextMessages: number
   maxMessagesBeforeTokenCheck: number
   maxConsolidationRounds: number
@@ -37,8 +41,6 @@ interface ConsolidationLimits {
 interface GetMessagesForContextOptions {
   /** 最大返回消息条数（不含系统消息） */
   maxMessages?: number
-  /** 消息总 token 预算 */
-  budget?: number
 }
 
 /**
@@ -69,9 +71,12 @@ export class Consolidator {
     this.getToolDefinitions = deps.getToolDefinitions
     this.onArchived = deps.onArchived
     this.limits = {
-      contextWindowTokens: limits?.contextWindowTokens ?? AGENT_LIMITS.contextWindowTokens,
-      maxCompletionTokens: limits?.maxCompletionTokens ?? AGENT_LIMITS.maxCompletionTokens,
-      safetyBuffer: limits?.safetyBuffer ?? AGENT_LIMITS.consolidationSafetyBuffer,
+      // 容量从模型窗口现算：预留给模型的输出与估算缓冲都是固定扣减项。
+      inputBudgetTokens:
+        limits?.inputBudgetTokens ??
+        deps.provider.contextWindow -
+          AGENT_LIMITS.maxCompletionTokens -
+          AGENT_LIMITS.consolidationSafetyBuffer,
       consolidationRatio: limits?.consolidationRatio ?? AGENT_LIMITS.consolidationRatio,
       maxContextMessages: limits?.maxContextMessages ?? AGENT_LIMITS.maxContextMessages,
       maxMessagesBeforeTokenCheck:
@@ -118,8 +123,7 @@ export class Consolidator {
         return false
       }
 
-      const inputBudget =
-        limits.contextWindowTokens - limits.maxCompletionTokens - limits.safetyBuffer
+      const inputBudget = limits.inputBudgetTokens
       const target = Math.floor(inputBudget * limits.consolidationRatio)
 
       let currentLast = lastConsolidated
@@ -207,9 +211,7 @@ export class Consolidator {
     const lastConsolidated = meta?.lastConsolidated ?? 0
 
     const maxMessages = options?.maxMessages ?? this.limits.maxContextMessages
-    const budget =
-      options?.budget ??
-      this.limits.contextWindowTokens - this.limits.maxCompletionTokens - this.limits.safetyBuffer
+    const budget = this.limits.inputBudgetTokens
 
     const candidate = allMessages.slice(lastConsolidated)
 

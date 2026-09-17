@@ -1,4 +1,5 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
+import { logger } from '../../shared/logger.js'
 import { attachMetering } from './metering.js'
 
 export enum ProviderCapability {
@@ -47,6 +48,17 @@ export abstract class LLMProvider {
     this.model = model
     this.visionModel = visionModel
     this.modelId = modelId ?? ''
+    // A model without a declared contextWindow falls back to the conservative
+    // default; warn once at construction so the guess is visible in logs.
+    if (this.modelId && !this.findModel(this.modelId)?.contextWindow) {
+      logger
+        .withContext('provider')
+        .warn(
+          'model %s declares no contextWindow; falling back to %d tokens',
+          this.modelId,
+          DEFAULT_CONTEXT_WINDOW,
+        )
+    }
     attachMetering(model)
     if (visionModel) attachMetering(visionModel)
   }
@@ -61,10 +73,11 @@ export abstract class LLMProvider {
 
   /** Context window (tokens) of the current model; falls back to 32k when undeclared */
   get contextWindow(): number {
-    return (
-      this.models.find((model) => model.id === this.modelId)?.contextWindow ??
-      DEFAULT_CONTEXT_WINDOW
-    )
+    return this.findModel(this.modelId)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+  }
+
+  private findModel(modelId: string): ModelOption | undefined {
+    return this.models.find((model) => model.id === modelId)
   }
 
   generateImage(_input: {

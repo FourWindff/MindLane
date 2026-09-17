@@ -78,9 +78,7 @@ describe('Consolidator integration', () => {
         getToolDefinitions,
       },
       {
-        contextWindowTokens: 1_000,
-        maxCompletionTokens: 0,
-        safetyBuffer: 0,
+        inputBudgetTokens: 1_000,
         consolidationRatio: 0.5,
         maxContextMessages: 120,
         maxMessagesBeforeTokenCheck: 120,
@@ -101,7 +99,6 @@ describe('Consolidator integration', () => {
 
     const contextMessages = await consolidator.getMessagesForContext(sessionId, {
       maxMessages: 120,
-      budget: 1_000,
     })
     expect(contextMessages.length).toBeLessThanOrEqual(120)
 

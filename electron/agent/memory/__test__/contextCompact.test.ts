@@ -36,23 +36,13 @@ describe('messagesStateReducer', () => {
 
 describe('AGENT_LIMITS context compact config', () => {
   it('has all required context compact fields', () => {
-    expect(AGENT_LIMITS).toHaveProperty('contextWindowTokens')
     expect(AGENT_LIMITS).toHaveProperty('maxCompletionTokens')
-    expect(AGENT_LIMITS).toHaveProperty('contextSafetyBufferTokens')
     expect(AGENT_LIMITS).toHaveProperty('contextCompactRecentMessages')
     expect(AGENT_LIMITS).toHaveProperty('consolidationRatio')
     expect(AGENT_LIMITS).toHaveProperty('consolidationSafetyBuffer')
     expect(AGENT_LIMITS).toHaveProperty('maxContextMessages')
     expect(AGENT_LIMITS).toHaveProperty('maxMessagesBeforeTokenCheck')
     expect(AGENT_LIMITS).toHaveProperty('maxConsolidationRounds')
-  })
-
-  it('computes inputBudget correctly from defaults', () => {
-    const inputBudget =
-      AGENT_LIMITS.contextWindowTokens -
-      AGENT_LIMITS.maxCompletionTokens -
-      AGENT_LIMITS.contextSafetyBufferTokens
-    expect(inputBudget).toBe(54976)
   })
 })
 

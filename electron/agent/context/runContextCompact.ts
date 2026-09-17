@@ -82,7 +82,6 @@ export async function runContextCompact(
       onArchived,
     },
     {
-      safetyBuffer: AGENT_LIMITS.consolidationSafetyBuffer,
       consolidationRatio: AGENT_LIMITS.consolidationRatio,
       maxContextMessages: AGENT_LIMITS.maxContextMessages,
       maxMessagesBeforeTokenCheck: AGENT_LIMITS.maxMessagesBeforeTokenCheck,
@@ -94,10 +93,6 @@ export async function runContextCompact(
     await consolidator.maybe_consolidate_by_tokens(threadId)
     const contextMessages = await consolidator.getMessagesForContext(threadId, {
       maxMessages: AGENT_LIMITS.maxContextMessages,
-      budget:
-        AGENT_LIMITS.contextWindowTokens -
-        AGENT_LIMITS.maxCompletionTokens -
-        AGENT_LIMITS.consolidationSafetyBuffer,
     })
 
     const meta = sessionManager.getSessionMeta(threadId)
