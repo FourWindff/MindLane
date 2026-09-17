@@ -11,7 +11,7 @@ import {
   getToolSchemas,
 } from '../../../subgraphRouter.js'
 import { createMindmapActionTools } from '../../../tools/mindmapActions.js'
-import { mergeMessagePipelineConfig } from '../../../context/pipeline.js'
+import { mergeMessagePreparationConfig } from '../../../context/messagePreparation.js'
 import { ToolRegistry } from '../../../tools/registry.js'
 import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 
@@ -247,7 +247,7 @@ describe('MindLaneAgent.invoke()', () => {
       undefined,
       undefined,
       {
-        messagePipeline: mergeMessagePipelineConfig({
+        messagePipeline: mergeMessagePreparationConfig({
           maxContextTokens: 20,
           toolResultMaxBytes: 0,
           microcompactToolNames: [],

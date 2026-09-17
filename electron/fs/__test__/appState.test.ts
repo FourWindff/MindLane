@@ -65,7 +65,6 @@ describe('AppState', () => {
           anthropic: {
             apiKey: 'key',
             baseUrl: 'https://api.anthropic.com',
-            messagePipeline: { maxContextTokens: 3000 },
           },
         },
       }),
@@ -73,7 +72,7 @@ describe('AppState', () => {
 
     const result = await appState.update({
       providerConfigs: {
-        anthropic: { messagePipeline: { maxContextTokens: 5000 } },
+        anthropic: { baseUrl: 'https://proxy.example.com' },
       } as unknown as AppSettings['providerConfigs'],
     })
     expect(result.ok).toBe(true)
@@ -81,8 +80,7 @@ describe('AppState', () => {
     const settings = await appState.load()
     expect(settings.providerConfigs.anthropic).toEqual({
       apiKey: 'key',
-      baseUrl: 'https://api.anthropic.com',
-      messagePipeline: { maxContextTokens: 5000 },
+      baseUrl: 'https://proxy.example.com',
     })
   })
 

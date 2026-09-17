@@ -1,4 +1,3 @@
-import type { MessagePipelineConfig } from '../agent/context/pipelineTypes.js'
 import type { McpServerUserState } from '../mcp/types.js'
 import type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry } from '../ipc.js'
 
@@ -23,7 +22,6 @@ export interface AppSettings {
   restoreLastWorkspaceOnLaunch: boolean
   workspacePathsByUuid: Record<string, string>
   filePathsByUuid: Record<string, string>
-  messagePipeline?: MessagePipelineConfig
   /** MCP 用户态：每个 server 的连接状态与非敏感展示信息（不含任何凭据） */
   mcpServers: Record<string, McpServerUserState>
 }
@@ -40,7 +38,6 @@ export interface WorkspaceState {
 export interface ProviderConfig {
   apiKey: string
   baseUrl?: string
-  messagePipeline?: Partial<MessagePipelineConfig>
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

@@ -33,7 +33,7 @@ import {
 } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
-import type { MessagePipelineConfig } from './context/pipeline.js'
+import type { MessagePreparationConfig } from './context/messagePreparation.js'
 import type { StreamRuntime } from './streamManager.js'
 import { splitCurrentTurn } from '../ipc.js'
 import {
@@ -66,7 +66,7 @@ interface ChatResponse {
 
 interface AgentOrchestratorOptions {
   userDataPath?: string
-  messagePipeline?: MessagePipelineConfig
+  messagePipeline?: MessagePreparationConfig
   /** 按需读导图快照提供者：主进程装配时注入（经反向 IPC 向渲染层拉取）。 */
   mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
   /** 写工具渲染层代理：转发参数、返回渲染层落盘应答（原样）。 */
@@ -121,7 +121,7 @@ export class AgentOrchestrator {
     this.rebuildToolRegistry()
   }
 
-  updateProvider(provider: LLMProvider, messagePipeline?: MessagePipelineConfig): void {
+  updateProvider(provider: LLMProvider, messagePipeline?: MessagePreparationConfig): void {
     this.provider = provider
     this.options = { ...this.options, messagePipeline }
     this.hasPalace =

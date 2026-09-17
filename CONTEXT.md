@@ -119,6 +119,13 @@
 - 提供 `startStream(request)` 返回 `streamId`，`stopStream(streamId)` 精确停止目标 runner。
 - 不限制并发 runner 数量；暴露 `getActiveStreamCount()` 供 UI 观测。
 
+### 消息准备（Message Preparation）
+
+- 监督器每次模型调用前对消息数组执行的**非 LLM** 规范化，固定 7 步顺序：配对修复（丢孤儿 tool_result / 补缺失 tool_result）→ microcompact（按工具名的结果摘要替换，保留最近 N 条）→ 单条结果 offload（超字节预算写盘、原位留引用）→ snip（按 token 预算从最旧截断）→ 再跑一次配对修复。
+- 纯函数：不调模型、不写会话文件、不推进压缩游标；预算不够时只裁剪、不摘要。
+- 编排入口是 `prepareMessagesForModel`；步骤函数可复用，但**顺序只在模块内定义**。
+- _Avoid_：简称「压缩」，或与「会话压缩（Consolidation）」混用——后者是 LLM 滚动摘要，消息准备一步 LLM 都不调；也不与「文档导入管线」（另一个东西）共用「管线」的指代。
+
 ### 会话压缩（Consolidation）
 
 - 全系统**唯一**的 LLM 摘要机制，在每次 run 开始时由 `contextCompact` 节点执行（调用模型之前，无被动/无兜底摘要）。

@@ -13,10 +13,10 @@ import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
 import { isPromptTooLongError, trimToRecentWindow } from '../../memory/contextCompact.js'
 import { AGENT_LIMITS } from '../../config.js'
 import {
-  preprocessMessages,
-  mergeMessagePipelineConfig,
-  type MessagePipelineConfig,
-} from '../../context/pipeline.js'
+  prepareMessagesForModel,
+  mergeMessagePreparationConfig,
+  type MessagePreparationConfig,
+} from '../../context/messagePreparation.js'
 
 const log = logger.withContext('MindLaneAgent')
 
@@ -37,7 +37,7 @@ type AIMessageContent = AIMessage['content']
  */
 interface MindLaneAgentOptions {
   userDataPath?: string
-  messagePipeline?: MessagePipelineConfig
+  messagePipeline?: MessagePreparationConfig
 }
 
 export class MindLaneAgent extends BaseAgent {
@@ -46,7 +46,7 @@ export class MindLaneAgent extends BaseAgent {
   private modelWithTools: ReturnType<NonNullable<BaseChatModel['bindTools']>>
   private memoryManager?: MemoryManager
   private userDataPath?: string
-  private messagePipelineConfig: MessagePipelineConfig
+  private messagePipelineConfig: MessagePreparationConfig
 
   constructor(
     provider: LLMProvider,
@@ -61,7 +61,7 @@ export class MindLaneAgent extends BaseAgent {
     this.modelWithTools = this.provider.model.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
-    this.messagePipelineConfig = mergeMessagePipelineConfig(options?.messagePipeline)
+    this.messagePipelineConfig = mergeMessagePreparationConfig(options?.messagePipeline)
   }
 
   async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {
@@ -77,7 +77,7 @@ export class MindLaneAgent extends BaseAgent {
     }
 
     try {
-      const preprocessedMessages = await preprocessMessages(
+      const preprocessedMessages = await prepareMessagesForModel(
         state.messages,
         this.messagePipelineConfig,
         this.userDataPath,

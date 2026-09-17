@@ -50,10 +50,6 @@ export class AppState {
           mergedConfigs[key] = {
             ...mergedConfigs[key],
             ...value,
-            messagePipeline: {
-              ...mergedConfigs[key]?.messagePipeline,
-              ...value?.messagePipeline,
-            },
           }
         }
         merged.providerConfigs = mergedConfigs

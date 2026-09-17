@@ -35,7 +35,6 @@ import { registerSettingsHandlers } from './main/handlers/settings.js'
 import { registerMcpHandlers, persistMcpStatus } from './main/handlers/mcp.js'
 import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
-import { resolveMessagePipelineConfig } from './main/messagePipeline.js'
 import { MindmapReadRequester } from './main/mindmapRead.js'
 import { MindmapWriteRequester } from './main/mindmapWrite.js'
 import type { HandlerContext } from './main/handlers/context.js'
@@ -320,11 +319,9 @@ app.whenReady().then(async () => {
     if (!chatOrchestrator) {
       const settings = await fsService.appState.load()
       const provider = resolveChatProvider(settings)
-      const messagePipeline = resolveMessagePipelineConfig(settings)
       // 惰性创建仅发生在就绪门控通过之后（getChatOrchestrator），services 必非空。
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
-        messagePipeline,
         mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
         mindmapWriteProxy: (fileUuid, action, args) =>
           mindmapWriteRequester.request(fileUuid, action, args),
@@ -347,9 +344,8 @@ app.whenReady().then(async () => {
           settings.activeProviders.chat || 'dashscope',
           settings.chatModel,
         )
-        const messagePipeline = resolveMessagePipelineConfig(settings)
         const orchestrator = await ensureChatOrchestrator()
-        orchestrator.updateProvider(provider, messagePipeline)
+        orchestrator.updateProvider(provider)
         // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
         orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
         return orchestrator.getStreamRuntime()
