@@ -336,7 +336,7 @@ export type MindmapWriteResponse =
   | { requestId: string; ok: true; action: string; data: unknown }
   | { requestId: string; ok: false; error: string }
 
-/** 主进程经 `step` 事件可发出的步骤词表：导图子图与宫殿子图共用。 */
+/** Steps the main process may emit as `step` events: mindmap subgraph + palace subgraph. */
 export const STREAM_STEPS = [
   'generating-map',
   'reading-doc',

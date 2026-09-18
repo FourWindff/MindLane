@@ -501,6 +501,7 @@
 - 每条日志携带的层级化标识，格式为 `模块名:streamId短前缀`，如 `mindmapGraph:a1b2c3d4`。
 - 用于把一次运行中跨图、跨模块的日志关联到一起。
 - 日志中一次运行的身份统一使用 `streamId`，不存在独立的 `runId` 概念。
+- 渲染层经桥（`shell.logError`）上报的错误固定使用 `renderer` 上下文：上报点不保证有 `streamId`，因此不带短前缀。
 
 ### 排障日志（Diagnostic Log）
 

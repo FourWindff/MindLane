@@ -36,7 +36,7 @@ interface PalaceSubgraphOptions {
  * at node entry is the point — the running card must show the stage while the
  * node is still working, not when it finishes.
  */
-function stage(
+function beginStage(
   state: Pick<PalaceSubgraphStateType, 'toolSteps'>,
   step: SubgraphProgressStep,
 ): ChatToolCallStep[] {
@@ -82,7 +82,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       }
     })
     .addNode('analyze', async (state) => {
-      const toolSteps = stage(state, 'planning-stations')
+      const toolSteps = beginStage(state, 'planning-stations')
       const start = Date.now()
       const result = await analyze.invoke(state)
       const stations = (result as { palace?: { stations?: unknown[] } }).palace?.stations
@@ -94,7 +94,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       return { ...result, toolSteps }
     })
     .addNode('imageGen', async (state) => {
-      const toolSteps = stage(state, 'generating-image')
+      const toolSteps = beginStage(state, 'generating-image')
       const start = Date.now()
       const result = await imageGen.invoke(state)
       const urls = (result as { imageUrls?: string[] }).imageUrls
@@ -110,7 +110,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
     })
     .addNode('normalizeImages', (state) => normalizePalaceImageUrls(state))
     .addNode('vision', async (state) => {
-      const toolSteps = stage(state, 'locating-stations')
+      const toolSteps = beginStage(state, 'locating-stations')
       const start = Date.now()
       const result = await vision.invoke(state)
       const route = (result as { memoryRoute?: unknown[] }).memoryRoute

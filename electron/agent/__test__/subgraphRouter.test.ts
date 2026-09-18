@@ -167,18 +167,27 @@ describe('SubgraphRouter.packageResult', () => {
     expect(result.pendingSubgraphToolName).toBe('')
   })
 
-  it('palace 成功路径不带 toolSteps', () => {
+  it('palace 成功路径把阶段轨迹带进 toolSteps', () => {
     const state = createMinimalState({
       pendingSubgraph: 'palace',
       pendingSubgraphToolCallId: 'call-palace',
       pendingSubgraphToolName: GENERATE_PALACE_TOOL,
       palace: { theme: '测试宫殿', stations: [] },
       memoryRoute: [{ order: 1, content: '第一站', x: 0.1, y: 0.2 }],
+      toolSteps: [
+        { step: 'planning-stations' },
+        { step: 'generating-image' },
+        { step: 'locating-stations' },
+      ],
     })
 
     const result = packageResult(state)
 
-    expect(result.messages[0].additional_kwargs.toolSteps).toBeUndefined()
+    expect(result.messages[0].additional_kwargs.toolSteps).toEqual([
+      { step: 'planning-stations' },
+      { step: 'generating-image' },
+      { step: 'locating-stations' },
+    ])
   })
 
   it('palace 成功路径直接使用 state.imageUrls 中的 data URL', () => {

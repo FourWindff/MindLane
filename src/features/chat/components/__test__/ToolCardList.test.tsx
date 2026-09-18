@@ -132,7 +132,7 @@ describe('ToolCardList rendering', () => {
     expect((html.match(/chat-message-list__tool-card__stage">/g) ?? []).length).toBe(3)
   })
 
-  it('keeps a stage-less palace card single-line (canvas-button path has no progress channel)', () => {
+  it('keeps a stage-less palace card single-line (subgraph failed before emitting a stage)', () => {
     const running = ReactDOMServer.renderToString(
       <ToolCardList cards={[card({ name: 'generatePalace', status: 'running' })]} />,
     )
@@ -165,7 +165,8 @@ describe('ToolCardList rendering', () => {
       />,
     )
 
-    // 历史卡片与导图卡片同形：折叠为单行，阶段轨迹留在可展开区域内
+    // History cards render like the mindmap ones: single line while collapsed,
+    // stage trace kept inside the expandable body.
     expect(html).toContain('chat-message-list__tool-card--subgraph')
     expect(html).toContain('aria-expanded="false"')
     expect(html).not.toContain('chat-message-list__tool-card__stage')

@@ -22,7 +22,6 @@ import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
  * 第五个按钮「模拟宫殿」重放「生成记忆宫殿」的整条用户操作：占位节点插在选中节点
  * 原位、选中节点挂到宫殿下并打处理标记、等假子图返回后内嵌图片并展开。编排是
  * usePalaceGeneration 的 dev 副本——生产 hook 不为此留接缝，代价是两者可能漂移。
- * 失败只写排障日志，与生产一致（渲染层无错误 UI），但必须自己清掉 busy。
  */
 
 const INSERT_FRAGMENT = `<node type="text" content="模拟分支A">

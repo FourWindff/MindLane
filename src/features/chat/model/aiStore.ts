@@ -6,6 +6,7 @@ import type {
   DocumentRef,
 } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
+import { isSubgraphTool } from '@/features/chat/lib/chatUtils'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
@@ -629,13 +630,6 @@ async function persistActiveSession(
     workspacePath,
     activeSession: { fileUuid, sessionId },
   })
-}
-
-/** Subgraph virtual tools: `step` events map to the unfinished instances of these cards. */
-const SUBGRAPH_TOOLS = ['generateMindmapFragment', 'generatePalace']
-
-function isSubgraphTool(name: string): boolean {
-  return SUBGRAPH_TOOLS.includes(name)
 }
 
 function markRunningCardsCanceled(toolCards: ToolCard[]): ToolCard[] {

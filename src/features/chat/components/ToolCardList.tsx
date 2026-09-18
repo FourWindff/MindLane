@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Ban, Check, ChevronDown, ChevronRight, X } from 'lucide-react'
 import type { ChatToolCall, ChatToolCallStep } from '@/shared/lib/fileFormat'
-import { toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { isSubgraphTool, toolDisplayName } from '@/features/chat/lib/chatUtils'
 
 export type ToolCardStatus = NonNullable<ChatToolCall['status']>
 
@@ -17,15 +17,6 @@ export interface ToolCardItem {
   stages?: ChatToolCallStep[]
   /** Historical subgraph stage trace (persisted, ChatToolCall.steps). */
   steps?: ChatToolCallStep[]
-}
-
-/**
- * Subgraph cards carry a stage trace and can expand; write/read tool cards
- * stay single-line. The palace card only becomes expandable once it has stages
- * (the canvas-button path has no progress channel and stays single-line).
- */
-function isSubgraphCard(name: string): boolean {
-  return name === 'generateMindmapFragment' || name === 'generatePalace'
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -74,7 +65,9 @@ function ToolCardRow({ card }: { card: ToolCardItem & { status: ToolCardStatus }
     card.steps ??
     card.stages ??
     (card.step ? [{ step: card.step, completed: card.completed, total: card.total }] : undefined)
-  if (!isSubgraphCard(card.name) || !stages || stages.length === 0) {
+  // Subgraph cards carry a stage trace and can expand; write/read cards stay
+  // single-line, and so does a subgraph that failed before emitting any stage.
+  if (!isSubgraphTool(card.name) || !stages || stages.length === 0) {
     return <SingleLineCard card={card} />
   }
   return <SubgraphCard card={card} stages={stages} />

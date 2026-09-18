@@ -64,7 +64,10 @@ export function useMindmapPersistence() {
       try {
         const data = store.toMindLaneFile()
         const result = await window.mindlane?.file.save({ filePath: null, data })
-        if (!result?.ok) return
+        if (!result?.ok) {
+          reportRendererError(`保存失败：${result?.error ?? '未知错误'}`)
+          return
+        }
 
         store.setFilePath(result.data.filePath)
         store.markClean()

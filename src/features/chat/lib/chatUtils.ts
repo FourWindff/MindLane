@@ -88,3 +88,12 @@ export function toolDisplayName(name: string): string {
   } as const
   return map[name as keyof typeof map] ?? name
 }
+
+/**
+ * Virtual subgraph tools: their cards carry a stage trace and can expand
+ * (write/read tool cards stay single-line). Renderer-side twin of the agent's
+ * `isSubgraphCall` — the one list both the store and the card renderer share.
+ */
+export function isSubgraphTool(name: string): boolean {
+  return name === 'generateMindmapFragment' || name === 'generatePalace'
+}
