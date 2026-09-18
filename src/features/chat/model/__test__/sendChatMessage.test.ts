@@ -23,6 +23,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
     (options?.chatStream ?? (async () => ({ ok: true as const, streamId: 'stream-1' })))(),
   )
   const stopStream = vi.fn(async () => ({ ok: true as const }))
+  const logError = vi.fn()
 
   Object.defineProperty(globalThis, 'window', { configurable: true, value: globalThis })
   Object.defineProperty(globalThis.window, 'mindlane', {
@@ -41,6 +42,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
       chat: {
         listSessions: vi.fn(async () => ({ ok: true, data: { sessions: [] } })),
       },
+      shell: { logError },
       workspace: {
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
@@ -55,7 +57,12 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
     },
   })
 
-  return { chatStream, stopStream, emit: (event: ChatStreamEvent) => streamListener?.(event) }
+  return {
+    chatStream,
+    stopStream,
+    logError,
+    emit: (event: ChatStreamEvent) => streamListener?.(event),
+  }
 }
 
 function createRegistryHarness() {
@@ -213,7 +220,6 @@ describe('sendChatMessage handshake', () => {
     expect(accepted).toBe(true)
     const chat = useAiStore.getState().fileChats['file-a']
     expect(chat?.busy).toBe(false)
-    expect(chat?.step).toBe('idle')
     expect(chat?.chatMessages).toEqual([
       expect.objectContaining({ role: 'user', content: 'hello' }),
     ])
@@ -233,15 +239,18 @@ describe('sendChatMessage handshake', () => {
     expect(context).not.toHaveProperty('mindmapSummary')
   })
 
-  it('surfaces a failed chatStream invoke as a file error on the origin file', async () => {
-    installApis({ chatStream: async () => ({ ok: false as const, error: 'boom' }) })
+  it('logs a failed chatStream invoke and clears busy without any error state', async () => {
+    const { logError } = installApis({
+      chatStream: async () => ({ ok: false as const, error: 'boom' }),
+    })
     activateFile('file-a')
 
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(true)
 
     const chat = useAiStore.getState().fileChats['file-a']
-    expect(chat?.errorMessage).toBe('boom')
     expect(chat?.busy).toBe(false)
+    expect(chat).not.toHaveProperty('errorMessage')
+    expect(logError).toHaveBeenCalledWith('boom')
     expect(useAiStore.getState().activeStreamIds['session-a']).toBeUndefined()
   })
 })

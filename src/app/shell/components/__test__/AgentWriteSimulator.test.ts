@@ -2,11 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import { MindmapHistory } from '@/features/mindmap/model/mindmapHistory'
 import { createMindmapStore } from '@/features/mindmap/model/mindmapStore'
-import {
-  selectCurrentChatBusy,
-  selectCurrentChatStep,
-  useAiStore,
-} from '@/features/chat/model/aiStore'
+import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 import { simulatePalaceInsert } from '../AgentWriteSimulator'
 
@@ -58,9 +54,8 @@ describe('simulatePalaceInsert', () => {
       const node = store.getState().nodes.find((n) => n.id === id)!
       expect((node.data as { processing?: boolean }).processing).toBe(true)
     }
-    // Same pipeline state the progress overlay reads while the subgraph runs.
+    // Same busy state the palace flow sets while the subgraph runs.
     expect(selectCurrentChatBusy(useAiStore.getState())).toBe(true)
-    expect(selectCurrentChatStep(useAiStore.getState())).toBe('analyzing')
 
     await run
 
@@ -80,6 +75,5 @@ describe('simulatePalaceInsert', () => {
       expect((node.data as { processing?: boolean }).processing).toBeUndefined()
     }
     expect(selectCurrentChatBusy(useAiStore.getState())).toBe(false)
-    expect(selectCurrentChatStep(useAiStore.getState())).toBe('idle')
   })
 })

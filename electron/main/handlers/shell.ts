@@ -3,8 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { DocumentRef } from '../../../src/shared/lib/fileFormat.js'
 import { IPC } from '../../ipc.js'
+import { logger } from '../../shared/logger.js'
 import { resolveDocumentRef } from '../documentRef.js'
 import type { HandlerContext } from './context.js'
+
+/** Renderer-reported errors: fixed context, no streamId is guaranteed at the report site. */
+const rendererLog = logger.withContext('renderer')
 
 export function registerShellHandlers(ctx: HandlerContext): void {
   ipcMain.handle(IPC.ShellOpenDocumentRef, async (_e, doc: DocumentRef) => {
@@ -35,6 +39,11 @@ export function registerShellHandlers(ctx: HandlerContext): void {
   ipcMain.handle(IPC.ShellOpenLogs, () => {
     shell.showItemInFolder(path.join(ctx.userDataPath, 'logs', 'mindlane.log'))
     return { ok: true }
+  })
+
+  ipcMain.on(IPC.ShellLogError, (_e, message: unknown) => {
+    if (typeof message !== 'string' || message.length === 0) return
+    rendererLog.error('%s', message)
   })
 
   ipcMain.handle(IPC.ShellOpenExternal, (_e, payload: { url: string }) => {

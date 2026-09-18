@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
@@ -248,13 +249,13 @@ export function useMindmapOperationController() {
         reader.onload = () => {
           const dataUrl = typeof reader.result === 'string' ? reader.result : null
           if (!dataUrl) {
-            useAiStore.getState().setError('图片读取失败')
+            reportRendererError('图片读取失败')
             return
           }
           void (async () => {
             const asset = await assetFromDataUrl(dataUrl)
             if (!asset) {
-              useAiStore.getState().setError('图片格式不支持')
+              reportRendererError('图片格式不支持')
               return
             }
             const parentId = selectedId ?? 'root'
@@ -266,7 +267,7 @@ export function useMindmapOperationController() {
             })
           })()
         }
-        reader.onerror = () => useAiStore.getState().setError('图片读取失败')
+        reader.onerror = () => reportRendererError('图片读取失败')
         reader.readAsDataURL(file)
       })
       insertImageRef.current = input

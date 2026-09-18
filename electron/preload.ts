@@ -89,6 +89,7 @@ const api: MindlaneBridge = {
     openDocumentRef: (doc) => ipcRenderer.invoke(IPC.ShellOpenDocumentRef, doc),
     openLogs: () => ipcRenderer.invoke(IPC.ShellOpenLogs),
     openExternal: (url) => ipcRenderer.invoke(IPC.ShellOpenExternal, { url }),
+    logError: (message) => ipcRenderer.send(IPC.ShellLogError, message),
   },
   editlog: {
     append: (payload) => ipcRenderer.send(IPC.EditlogAppend, payload),

@@ -4,6 +4,7 @@ import type { Edge, Node } from '@xyflow/react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
@@ -21,6 +22,7 @@ import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
  * 第五个按钮「模拟宫殿」重放「生成记忆宫殿」的整条用户操作：占位节点插在选中节点
  * 原位、选中节点挂到宫殿下并打处理标记、等假子图返回后内嵌图片并展开。编排是
  * usePalaceGeneration 的 dev 副本——生产 hook 不为此留接缝，代价是两者可能漂移。
+ * 失败只写排障日志，与生产一致（渲染层无错误 UI），但必须自己清掉 busy。
  */
 
 const INSERT_FRAGMENT = `<node type="text" content="模拟分支A">
@@ -33,7 +35,7 @@ const INSERT_FRAGMENT = `<node type="text" content="模拟分支A">
 
 // ─── 记忆宫殿模拟：（假子图 + 整体编排）─────────────────────────────────────
 
-/** 假子图的耗时；够看清「生成中…」占位、处理标记与进度浮层。 */
+/** 假子图的耗时；够看清「生成中…」占位与处理标记。 */
 const PALACE_SIM_GENERATION_MS = 2400
 const PALACE_SIM_LABEL = '模拟记忆宫殿'
 
@@ -252,7 +254,6 @@ export async function simulatePalaceInsert({
   for (const nodeId of selectedIds) editor.setNodeFlag(nodeId, 'processing', true)
   editor.batch(commands)
   ai.setBusy(true)
-  ai.setStep('analyzing')
 
   await new Promise((resolve) => setTimeout(resolve, PALACE_SIM_GENERATION_MS))
 
@@ -261,7 +262,8 @@ export async function simulatePalaceInsert({
     // Same rollback shape as the real flow: one undo plus cleared flags.
     editor.undo()
     for (const nodeId of selectedIds) editor.clearNodeFlag(nodeId, 'processing')
-    ai.setError('模拟宫殿图片解析失败，本次插入已取消')
+    reportRendererError('模拟宫殿图片解析失败，本次插入已取消')
+    ai.setBusy(false)
     return
   }
 

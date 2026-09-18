@@ -4,7 +4,6 @@ import { MindMapHeader } from './MindMapHeader'
 import { MindmapCanvas } from './MindmapCanvas'
 import { MindMapContextMenu } from './MindMapContextMenu'
 import { SelectionActionBar } from './SelectionActionBar'
-import { AiProgressOverlay } from './AiProgressOverlay'
 import { PalaceModal } from './PalaceModal'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
@@ -79,7 +78,6 @@ function MindMapWorkspace({
           aiBusy={view.aiBusy}
           palaceEnabled={view.palaceEnabled}
         />
-        <AiProgressOverlay />
         <MindMapContextMenu
           menu={view.contextMenu}
           menuRef={view.contextMenuRef}

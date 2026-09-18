@@ -7,22 +7,13 @@ import type {
 } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
 import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
 
 function generateSessionId(): string {
   return crypto.randomUUID()
 }
-
-export type AiPipelineStep =
-  | StreamStep
-  | 'idle'
-  | 'preparing'
-  | 'analyzing'
-  | 'planning'
-  | 'generating-image'
-  | 'building'
-  | 'chatting'
 
 export type { ChatMessage }
 
@@ -36,7 +27,7 @@ export interface ToolCard {
   id: string
   name: string
   status: 'running' | 'success' | 'error' | 'canceled'
-  /** Current subgraph stage (subgraph virtual tools only, consumed by slice 05). */
+  /** Current subgraph stage (subgraph virtual tools only). */
   step?: StreamStep
   /** Accumulated live subgraph stages (same source as step events), so the
    * running card can show the full sequence instead of only the latest step. */
@@ -59,9 +50,7 @@ export interface FileChatState {
   chatMessages: ChatMessage[]
   sessions: ChatSession[]
   busy: boolean
-  step: AiPipelineStep
   streamText: string
-  errorMessage: string | null
   toolCards: ToolCard[]
   stopRequested: boolean
   lastUserMessageAt: number
@@ -107,10 +96,6 @@ interface AiState {
   inputDraft: string
 
   setBusy: (busy: boolean) => void
-  setStep: (step: AiPipelineStep) => void
-  setError: (message: string) => void
-  setFileError: (fileUuid: string, message: string) => void
-  clearError: () => void
   reset: () => void
   addChatMessage: (message: ChatMessage) => void
   setShowSessionList: (show: boolean) => void
@@ -136,9 +121,7 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
     chatMessages: [],
     sessions: [],
     busy: false,
-    step: 'idle',
     streamText: '',
-    errorMessage: null,
     toolCards: [],
     stopRequested: false,
     lastUserMessageAt: 0,
@@ -197,14 +180,8 @@ export function selectCurrentChatHasFile(state: AiState): boolean {
 export function selectCurrentChatBusy(state: AiState): boolean {
   return currentChat(state)?.busy ?? false
 }
-export function selectCurrentChatStep(state: AiState): AiPipelineStep {
-  return currentChat(state)?.step ?? 'idle'
-}
 export function selectCurrentChatStreamText(state: AiState): string {
   return currentChat(state)?.streamText ?? ''
-}
-export function selectCurrentChatErrorMessage(state: AiState): string | null {
-  return currentChat(state)?.errorMessage ?? null
 }
 export function selectCurrentChatChatMessages(state: AiState): ChatMessage[] {
   return currentChat(state)?.chatMessages ?? EMPTY_CHAT_MESSAGES
@@ -322,35 +299,13 @@ export const useAiStore = create<AiState>((set, get) => ({
       if (!fileUuid) return {}
       return patchFileChat(state, fileUuid, { busy })
     }),
-  setStep: (step) =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { step })
-    }),
-  setError: (errorMessage) =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { errorMessage, busy: false, step: 'idle' })
-    }),
-  setFileError: (fileUuid, errorMessage) =>
-    set((state) => patchFileChat(state, fileUuid, { errorMessage, busy: false, step: 'idle' })),
-  clearError: () =>
-    set((state) => {
-      const fileUuid = state.currentFileUuid
-      if (!fileUuid) return {}
-      return patchFileChat(state, fileUuid, { errorMessage: null })
-    }),
   reset: () =>
     set((state) => {
       const fileUuid = state.currentFileUuid
       if (!fileUuid) return {}
       return patchFileChat(state, fileUuid, {
         busy: false,
-        step: 'idle',
         streamText: '',
-        errorMessage: null,
         toolCards: [],
       })
     }),
@@ -390,9 +345,7 @@ export const useAiStore = create<AiState>((set, get) => ({
           activeSessionId: result.data.sessionId,
           chatMessages: stripTurnStateFromMessages(result.data.messages),
           busy: false,
-          step: 'idle',
           streamText: '',
-          errorMessage: null,
           toolCards: [],
         }),
         ...(current.currentFileUuid === fileUuid
@@ -512,7 +465,6 @@ export const useAiStore = create<AiState>((set, get) => ({
           ...current,
           activeSessionId: sessionId,
           busy: true,
-          step: 'chatting' as const,
           lastUserMessageAt: Date.now(),
         },
       }
@@ -565,7 +517,6 @@ export const useAiStore = create<AiState>((set, get) => ({
     if (!api) return true
 
     get().setBusy(true)
-    get().setStep('chatting')
 
     const context = buildChatContext()
     const originFileUuid = get().currentFileUuid
@@ -582,7 +533,15 @@ export const useAiStore = create<AiState>((set, get) => ({
         get().registerStream(originFileUuid, originSessionId, result.streamId)
       }
     } else if (originFileUuid) {
-      get().setFileError(originFileUuid, result.error)
+      // Errors have no renderer UI: log the text and clear busy. The old
+      // per-file error state used to clear busy as a side effect; without it a
+      // failed startup invoke would leave the file stuck in `busy`.
+      reportRendererError(result.error)
+      set((state) =>
+        state.fileChats[originFileUuid]
+          ? patchFileChat(state, originFileUuid, { busy: false })
+          : state,
+      )
     }
     return true
   },
@@ -672,7 +631,7 @@ async function persistActiveSession(
   })
 }
 
-/** Subgraph virtual tools: `step` events map to the unfinished instances of these cards (palace has no stage process, only status transitions). */
+/** Subgraph virtual tools: `step` events map to the unfinished instances of these cards. */
 const SUBGRAPH_TOOLS = ['generateMindmapFragment', 'generatePalace']
 
 function isSubgraphTool(name: string): boolean {
@@ -771,11 +730,14 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
       return { ...chat, toolCards }
     }
     case 'step': {
+      // The only renderer consumer of step events: the running subgraph card's
+      // stage trace. Without one there is nothing to render — no "current step"
+      // state exists anymore.
       const { step, completed, total } = event.payload
       const runningSubgraph = chat.toolCards.filter(
         (card) => card.status === 'running' && isSubgraphTool(card.name),
       )
-      if (runningSubgraph.length === 0) return { ...chat, step }
+      if (runningSubgraph.length === 0) return chat
       const target = runningSubgraph[runningSubgraph.length - 1]!
       const stage: ChatToolCallStep = {
         step,
@@ -784,7 +746,6 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
       }
       return {
         ...chat,
-        step,
         toolCards: chat.toolCards.map((card) =>
           card === target
             ? {
@@ -824,20 +785,19 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
         chatMessages: [...previous, ...messages],
         busy: false,
         stopRequested: false,
-        step: 'idle',
         streamText: '',
         toolCards: [],
       }
     }
     case 'error':
+      // Errors reset the stream state only; the message goes to the diagnostic
+      // log (see dispatchStreamEvent) and no error state reaches the UI.
       return {
         ...chat,
         busy: false,
         stopRequested: false,
-        step: 'idle',
         streamText: '',
         toolCards: [],
-        errorMessage: event.payload,
       }
   }
 }
@@ -887,6 +847,9 @@ export function subscribeToChatStreamEvents(
 
 function dispatchStreamEvent(event: ChatStreamEvent): void {
   if (!routeStreamEvent(event)) return
+  // Stream errors have no renderer UI: report the text to the main-process
+  // diagnostic log (accepted events only — stale streams are not ours to log).
+  if (event.type === 'error') reportRendererError(event.payload)
   // By the time the stream ends or fails, the main process has already
   // persisted (or abandoned) the session: re-pull the full list so
   // conversations created this launch appear in the capsule bar immediately

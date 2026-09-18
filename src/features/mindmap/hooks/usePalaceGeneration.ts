@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import type { Edge, Node } from '@xyflow/react'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId } from '@/shared/lib/mindmapTree'
@@ -32,12 +33,12 @@ export function usePalaceGeneration({
     const ai = useAiStore.getState()
     const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
     if (!mindlane) {
-      ai.setError('IPC 通道不可用，请确认 Electron 环境')
+      reportRendererError('IPC 通道不可用，请确认 Electron 环境')
       return
     }
 
     if (!chatReady) {
-      ai.setError('请先在右侧「设置」面板中配置 API Key 并选择模型')
+      reportRendererError('请先在右侧「设置」面板中配置 API Key 并选择模型')
       return
     }
 
@@ -51,7 +52,7 @@ export function usePalaceGeneration({
       }
     }
     if (selectedNodes.length === 0) {
-      ai.setError('未选中任何主题节点')
+      reportRendererError('未选中任何主题节点')
       return
     }
 
@@ -106,7 +107,6 @@ export function usePalaceGeneration({
     ]
     editor.batch(commands)
     ai.setBusy(true)
-    ai.setStep('analyzing')
 
     try {
       const result = await Promise.race([
@@ -115,13 +115,15 @@ export function usePalaceGeneration({
       ])
       if (!result) {
         rollback()
-        ai.setError('生成超时（超过 2 分钟），请检查网络后重试')
+        reportRendererError('生成超时（超过 2 分钟），请检查网络后重试')
+        ai.setBusy(false)
         return
       }
       if (!result.ok) {
         rollback()
         const message = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
-        ai.setError(`AI 返回错误：${message}`)
+        reportRendererError(`AI 返回错误：${message}`)
+        ai.setBusy(false)
         return
       }
 
@@ -136,7 +138,8 @@ export function usePalaceGeneration({
               .then((r) => (r.ok ? r.data.dataUrl : null))
         if (!dataUrl) {
           rollback()
-          ai.setError('宫殿图片下载失败，本次插入已取消')
+          reportRendererError('宫殿图片下载失败，本次插入已取消')
+          ai.setBusy(false)
           return
         }
         const asset = await assetFromDataUrl(dataUrl)
@@ -174,7 +177,8 @@ export function usePalaceGeneration({
       ai.reset()
     } catch (error) {
       rollback()
-      ai.setError(`生成异常：${error instanceof Error ? error.message : String(error)}`)
+      reportRendererError(`生成异常：${error instanceof Error ? error.message : String(error)}`)
+      ai.setBusy(false)
     }
   }, [aiBusy, chatReady, edges, editor, nodes, selectedId, visualVariant])
 }

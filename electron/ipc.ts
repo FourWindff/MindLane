@@ -65,6 +65,7 @@ export enum IPC {
   ShellOpenDocumentRef = 'shell:open-document-ref',
   ShellOpenLogs = 'shell:open-logs',
   ShellOpenExternal = 'shell:open-external',
+  ShellLogError = 'shell:log-error',
 
   EditlogAppend = 'editlog:append',
 
@@ -594,6 +595,12 @@ export interface MindlaneBridge {
     openLogs: () => Promise<{ ok: true }>
     /** 用系统默认浏览器打开外链（仅 http/https，防指令注入） */
     openExternal: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>
+    /**
+     * Fire-and-forget renderer error report: the main process writes it to the
+     * diagnostic log under the `renderer` context. No result, the renderer never
+     * awaits — renderer errors have no UI outlet (PRD: errors live in the log).
+     */
+    logError: (message: string) => void
   }
   editlog: {
     /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */

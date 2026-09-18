@@ -223,7 +223,7 @@ describe('aiStore per-file chat state', () => {
     expect(useAiStore.getState().fileChats['file-b']?.streamText).toBe('B')
   })
 
-  it('routes pipeline progress to the file bound to the session', () => {
+  it('routes pipeline progress onto the running subgraph card of the file bound to the session', () => {
     const { emit } = installApis()
     const harness = createRegistryHarness()
     connectAiStore(harness.registry)
@@ -236,11 +236,20 @@ describe('aiStore per-file chat state', () => {
     emit({
       streamId: 'stream-a',
       sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-1', name: 'generateMindmapFragment', input: {} },
+    })
+    emit({
+      streamId: 'stream-a',
+      sessionId: 'session-a',
       type: 'step',
-      payload: { step: 'extracting' },
+      payload: { step: 'extracting', completed: 1, total: 2 },
     })
 
-    expect(useAiStore.getState().fileChats['file-a']?.step).toBe('extracting')
+    expect(useAiStore.getState().fileChats['file-a']?.toolCards[0]).toMatchObject({
+      step: 'extracting',
+      stages: [{ step: 'extracting', completed: 1, total: 2 }],
+    })
   })
 
   it('drops events whose stream ID is stale or unknown', () => {
@@ -533,21 +542,25 @@ describe('aiStore per-file chat state', () => {
     }
   })
 
-  it('writes a stream startup error to its originating background file', () => {
-    installApis()
+  it('resets only the streaming state of the file whose stream errored', async () => {
+    const { emit } = installApis()
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
     useAiStore.setState({
       currentFileUuid: 'file-b',
       fileChats: {
         'file-a': { ...createFileChatState('session-a'), busy: true },
         'file-b': createFileChatState('session-b'),
       },
+      sessionFileUuids: { 'session-a': 'file-a' },
+      activeStreamIds: { 'session-a': 'stream-a' },
     })
 
-    useAiStore.getState().setFileError('file-a', 'startup failed')
+    // The stream error resets only the streaming state (no renderer error state).
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'error', payload: 'boom' })
 
-    expect(useAiStore.getState().fileChats['file-a']?.errorMessage).toBe('startup failed')
     expect(useAiStore.getState().fileChats['file-a']?.busy).toBe(false)
-    expect(useAiStore.getState().fileChats['file-b']?.errorMessage).toBeNull()
+    expect(useAiStore.getState().fileChats['file-b']?.busy).toBe(false)
   })
 })
 
@@ -1112,7 +1125,6 @@ describe('reduceStreamEvent', () => {
       type: 'step',
       payload: { step: 'extracting', completed: 2, total: 5 },
     })
-    expect(stepped.step).toBe('extracting')
     expect(stepped.toolCards[0]).toMatchObject({
       name: 'generateMindmapFragment',
       status: 'running',
@@ -1162,7 +1174,7 @@ describe('reduceStreamEvent', () => {
     expect(step4.toolCards[0]?.step).toBe('finalizing')
   })
 
-  it('does not map steps onto non-subgraph cards but still updates the pipeline step', () => {
+  it('changes nothing when a step event has no running subgraph card to map onto', () => {
     const withWrite = reduceStreamEvent(base, {
       streamId: 's',
       sessionId: 'session-a',
@@ -1175,8 +1187,7 @@ describe('reduceStreamEvent', () => {
       type: 'step',
       payload: { step: 'reading-doc' },
     })
-    expect(stepped.step).toBe('reading-doc')
-    expect(stepped.toolCards[0]).not.toHaveProperty('step')
+    expect(stepped).toBe(withWrite)
   })
 
   it('ignores tool-start with an empty name', () => {
@@ -1187,16 +1198,6 @@ describe('reduceStreamEvent', () => {
       payload: { id: '', name: '', input: {} },
     })
     expect(next).toBe(base)
-  })
-
-  it('sets the pipeline step', () => {
-    const next = reduceStreamEvent(base, {
-      streamId: 's',
-      sessionId: 'session-a',
-      type: 'step',
-      payload: { step: 'extracting' },
-    })
-    expect(next.step).toBe('extracting')
   })
 
   it('replaces the current turn with end payload messages', () => {
@@ -1219,7 +1220,6 @@ describe('reduceStreamEvent', () => {
     expect(ended.streamText).toBe('')
     expect(ended.busy).toBe(false)
     expect(ended.stopRequested).toBe(false)
-    expect(ended.step).toBe('idle')
     expect(ended.toolCards).toEqual([])
   })
 
@@ -1350,12 +1350,11 @@ describe('reduceStreamEvent', () => {
     expect(ended.chatMessages).toEqual([{ role: 'user', content: 'q' }])
   })
 
-  it('writes an error and resets the chat state', () => {
+  it('resets the streaming state on error without producing an error state', () => {
     const started = reduceStreamEvent(
       {
         ...base,
         busy: true,
-        step: 'chatting',
         toolCards: [{ id: 'call-1', name: 'insertXmlFragment', status: 'running' }],
         streamText: 'x',
       },
@@ -1366,12 +1365,12 @@ describe('reduceStreamEvent', () => {
         payload: 'boom',
       },
     )
-    expect(started.errorMessage).toBe('boom')
     expect(started.busy).toBe(false)
     expect(started.stopRequested).toBe(false)
-    expect(started.step).toBe('idle')
     expect(started.streamText).toBe('')
     expect(started.toolCards).toEqual([])
+    // The error text goes to the diagnostic log, never into chat state.
+    expect(started).not.toHaveProperty('errorMessage')
   })
 
   it('marks running cards canceled when a stream is stopped', () => {

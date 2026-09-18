@@ -30,6 +30,7 @@ import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteR
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
 import '@/app/workspace/workspace.css'
@@ -106,7 +107,9 @@ function AppContent() {
         if (!instance) return
         void saveMindmapInstance(instance, {
           syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
-          onError: (message) => useAiStore.getState().setFileError(fileUuid, message),
+          // A write-tool persist failure is reported per file: errors have no
+          // renderer UI anymore, they only enter the diagnostic log.
+          onError: (message) => reportRendererError(`[${fileUuid}] ${message}`),
         })
       },
       respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
