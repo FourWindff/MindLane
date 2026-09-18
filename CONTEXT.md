@@ -70,7 +70,7 @@
 
 - 渲染在每条 AI 消息气泡**上方**的工具块，一个工具调用一行，左对齐，文字流式显示在下方。
 - 每行展示工具显示名（`toolDisplayName`）与状态：进行中 spinner、成功 ✓、失败 ✗、停止后取消。
-- 只展示工具名，不展示参数摘要（`args` 可能含完整 XML 片段）；子图类工具（生成思维导图片段/记忆宫殿）的卡片内额外渲染执行过程——导图子图 `reading-doc → extracting n/m → merging → finalizing`，宫殿子图 `planning-stations → generating-image → locating-stations`：运行时展开（工具名行 + spinner + 下方逐阶段进度），执行完毕自动折叠为单行（工具名 + ✓），支持手动展开/收起；仅子图卡片可展开，写/读工具卡片保持单行。
+- 只展示工具名，不展示参数摘要（`args` 可能含完整 XML 片段）；子图类工具（生成思维导图片段/记忆宫殿）的卡片内额外渲染执行过程——导图子图 `reading-doc → extracting n/m → merging → finalizing`，宫殿子图按**宫殿画面载体**取子集（矢量 `planning-stations → generating-image`，位图再加 `locating-stations`）：运行时展开（工具名行 + spinner + 下方逐阶段进度），执行完毕自动折叠为单行（工具名 + ✓），支持手动展开/收起；仅子图卡片可展开，写/读工具卡片保持单行。
 - 阶段轨迹来自同一条自定义进度通道（子图经 `getWriter()` 发 `subgraph-progress`，主进程转发为 `step` 流事件），两个子图共用；展示文案由渲染层的步骤标签表唯一维护。
 - 子图阶段轨迹经 `ToolMessage.additional_kwargs.toolSteps` 持久化（jsonl 往返不丢），重建时读入 `ChatToolCall.steps`；历史、会话加载、重启后展开均可见。
 - 每条 assistant 消息只携带自己那轮的工具调用（`ChatMessage.toolCalls`，含 `status` 字段）。
@@ -182,6 +182,7 @@
 ### StreamStep（步骤发射词表）
 
 - 主进程可经 `step` 事件发出的步骤值集合：导图子图 `generating-map`、`reading-doc`、`extracting`、`merging`、`finalizing`；宫殿子图 `planning-stations`、`generating-image`、`locating-stations`。
+- 宫殿子图按**宫殿画面载体**取子集：矢量只发 `planning-stations` → `generating-image`（没有视觉定位段——站点坐标由绘制方自报，不需要「找出来」），位图三段全发。
 - 定义在共享契约 `ipc.ts`；主进程 emits 与渲染层消费同一份词表，两侧由编译器同时看守。
 - 子图节点可发射的步骤值是 `StreamStep` 去掉 `generating-map`（它由工具事件触发，不由节点发射），两个子图共用同一份声明。
 - 渲染层不再有其超集：`step` 事件的唯一消费方是正在运行的子图卡片的阶段轨迹。
@@ -456,7 +457,49 @@
 
 - mindmap/palace 子图执行完毕后由 `packageResult` 包装、以 ToolMessage 形式喂回主图 agent 的 payload。
 - mindmap 为 JSON 壳 `{ok, title, xmlFragment, documentRef}`，其中 `xmlFragment` 是存储方言的 XML 片段；palace 为 `{ok, label, stations, imageUrl, sourceNodeIds}`。
+- palace 的 `imageUrl` 恒为 data URL（矢量载体为 `image/svg+xml`）；落图时由落图应答器物化为**图片资源**（asset），节点数据只留 asset 引用。
 - _Avoid_: 模型协议（子图内部契约，见上条）
+
+## 记忆宫殿
+
+### 宫殿图（Palace Artwork）
+
+- 记忆宫殿节点上承载的那张画面，是**伞词**：具体载体有两种（见下），在节点数据里一律以「图片资源」（asset）引用。
+- 画面对 AI（`readMindmap`）与人都不透明：矢量源码不落进节点、不进模型上下文。
+- 画面缺失不等于生成失败：宫殿节点可以在无画面时落图，站点列表与巡游照常可用。
+- _Avoid_: 宫殿图片（把伞词缩成位图的意思）
+
+### 宫殿矢量图（Palace Vector Artwork）
+
+- 默认载体：由聊天模型直接绘制的 SVG，按 `data:image/svg+xml;base64,…` 内嵌为图片资源。
+- 由一次**绘图调用**产出，并在同一次调用里自报每个站点的坐标（**站点坐标**）；画面内每个站点以 `<g data-station="n">` 标注。
+- **画面闸门**三条（全在主进程）：可解析、根元素带 `viewBox`、站点标注组数等于站点数。任一条不过即视为无画面，不报错。
+- 阶段轨迹只有 `planning-stations` → `generating-image`：没有视觉定位段。
+
+### 宫殿位图（Palace Bitmap Artwork）
+
+- 可选载体：由文生图模型产出的位图，要求 provider 具备 `imageGen`。
+- 站点坐标由视觉模型在图上定位（**视觉定位坐标**）；provider 无 `vision` 时回退**标准布局**。
+- 阶段轨迹三段：`planning-stations` → `generating-image` → `locating-stations`。
+
+### 站点坐标（Station Coordinates）
+
+- 站点在宫殿图内的归一化坐标（0–1），是站点钉与巡游轨迹的唯一依据。
+- 矢量载体的坐标由绘图调用自报；位图载体的坐标由视觉模型定位。两者都经同一道**最小间距**约束：靠得过近时按欧氏距离互相推开。
+- _Avoid_: 锚点坐标（锚点是画面里的物体，坐标是站点在画面上的位置）
+
+### 标准布局（Canonical Layout）
+
+- 由路线风格（弧线 / S 形 / 锯齿 / 环形 / 阶梯）与站点序号**确定性**算出的站点坐标。
+- 两个载体共用：位图在视觉定位失败或 provider 无视觉能力时回退它；矢量的自报坐标非法（缺失 / 非数 / 越界）时整组回退它。
+- _Avoid_: 默认布局（它与「默认载体」无关）、兜底布局（它同时是两个载体的正常路径之一）
+
+### 宫殿画面载体（Palace Artwork Style）
+
+- 设置项的二选一：`使用 SVG 矢量图`（默认） / `使用生图模型`。
+- 实际载体由纯函数判定：偏好位图但当前 provider 无 `imageGen` 时落到矢量，不报错。
+- 宫殿可用性不再依赖 provider 能力：只要「对话就绪」即可生成记忆宫殿。
+- _Avoid_: 载体模式、图像模式（都与「模型」混指）
 
 ## AI Provider
 
@@ -491,7 +534,7 @@
 ### Provider 能力（Capability）
 
 - provider 自声明的能力集合：`chat`（对话）、`vision`（视觉理解）、`imageGen`（文生图）。
-- 记忆宫殿功能要求 chat provider 同时具备 `vision` + `imageGen`；不具备时（如 Kimi Code、MiniMax、DeepSeek）入口返回友好错误，不降级尝试。
+- 记忆宫殿**不再**要求这些能力：只要配置了对话模型即可用，入口复用「对话就绪」判定。画面载体由「宫殿画面载体」决定，只是位图载体额外要求 `imageGen`（缺实时落到矢量，不报错）；`vision` 只影响位图载体的站点坐标精度（缺时回退标准布局）。
 - 视觉与文生图**未设独立 provider 槽位**：主进程始终使用 chat provider 承载 palace 子图（历史遗留的 `activeProviders.image` 槽位已随死代码清理移除，见 ADR-0014 附注）。
 
 ## 日志
