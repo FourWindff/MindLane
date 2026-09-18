@@ -108,6 +108,11 @@ const BaseStateAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
+  /** 子图阶段轨迹（与 step 流事件同源），由子图收口并随子图状态返回主图（两种子图共用）。 */
+  toolSteps: Annotation<ChatToolCallStep[]>({
+    reducer: replaceReducer,
+    default: () => [],
+  }),
 }
 
 /**
@@ -220,11 +225,6 @@ const MindmapStateAnnotations = {
   documentRef: Annotation<DocumentRef | null>({
     reducer: replaceReducer,
     default: () => null,
-  }),
-  /** 子图阶段轨迹（与 step 流事件同源），由 build_output 收口并随子图状态返回主图。 */
-  toolSteps: Annotation<ChatToolCallStep[]>({
-    reducer: replaceReducer,
-    default: () => [],
   }),
 }
 

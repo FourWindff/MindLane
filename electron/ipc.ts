@@ -336,15 +336,31 @@ export type MindmapWriteResponse =
   | { requestId: string; ok: true; action: string; data: unknown }
   | { requestId: string; ok: false; error: string }
 
-/** 主进程经 `step` 事件可发出的步骤词表；渲染层 `AiPipelineStep` 是其超集。 */
+/** 主进程经 `step` 事件可发出的步骤词表：导图子图与宫殿子图共用。 */
 export const STREAM_STEPS = [
   'generating-map',
   'reading-doc',
   'extracting',
   'merging',
   'finalizing',
+  'planning-stations',
+  'generating-image',
+  'locating-stations',
 ] as const
 export type StreamStep = (typeof STREAM_STEPS)[number]
+
+/**
+ * Steps a subgraph node may emit: `generating-map` is triggered by tool events
+ * (insertXmlFragment / generateMindmapFragment on_tool_start), never by a node.
+ * Shared by the mindmap and palace subgraphs so both speak one stage vocabulary.
+ */
+export type SubgraphProgressStep = Exclude<StreamStep, 'generating-map'>
+
+/**
+ * Custom progress event a subgraph writes via `getWriter()`; streamManager
+ * forwards it as a `step` stream event. One channel, shared by both subgraphs.
+ */
+export const SUBGRAPH_PROGRESS_EVENT = 'subgraph-progress'
 
 export function isStreamStep(value: unknown): value is StreamStep {
   return typeof value === 'string' && STREAM_STEPS.some((step) => step === value)

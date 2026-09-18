@@ -106,7 +106,33 @@ describe('ToolCardList rendering', () => {
     expect(html).not.toContain('chat-message-list__tool-card__stage')
   })
 
-  it('keeps the palace subgraph card single-line (spinner → ✓, no stages, no expand)', () => {
+  it('shows a running palace subgraph card expanded with the three palace stages', () => {
+    const html = ReactDOMServer.renderToString(
+      <ToolCardList
+        cards={[
+          card({
+            name: 'generatePalace',
+            status: 'running',
+            stages: [
+              { step: 'planning-stations' },
+              { step: 'generating-image' },
+              { step: 'locating-stations' },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    expect(html).toContain('chat-message-list__tool-card--subgraph')
+    expect(html).toContain('chat-message-list__spinner')
+    expect(html).toContain('aria-expanded="true"')
+    expect(html).toContain('Planning stations')
+    expect(html).toContain('Generating image')
+    expect(html).toContain('Locating stations')
+    expect((html.match(/chat-message-list__tool-card__stage">/g) ?? []).length).toBe(3)
+  })
+
+  it('keeps a stage-less palace card single-line (canvas-button path has no progress channel)', () => {
     const running = ReactDOMServer.renderToString(
       <ToolCardList cards={[card({ name: 'generatePalace', status: 'running' })]} />,
     )
@@ -120,6 +146,29 @@ describe('ToolCardList rendering', () => {
     expect(running).not.toContain('chat-message-list__tool-card__stage')
     expect(done).not.toContain('chat-message-list__spinner')
     expect(done).toContain('Generate Memory Palace')
+  })
+
+  it('renders the persisted palace history trace as an expandable subgraph card', () => {
+    const html = ReactDOMServer.renderToString(
+      <ToolCardList
+        cards={[
+          card({
+            name: 'generatePalace',
+            status: 'success',
+            steps: [
+              { step: 'planning-stations' },
+              { step: 'generating-image' },
+              { step: 'locating-stations' },
+            ],
+          }),
+        ]}
+      />,
+    )
+
+    // 历史卡片与导图卡片同形：折叠为单行，阶段轨迹留在可展开区域内
+    expect(html).toContain('chat-message-list__tool-card--subgraph')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html).not.toContain('chat-message-list__tool-card__stage')
   })
 
   it('keeps write/read tool cards single-line and non-expandable', () => {
@@ -210,6 +259,34 @@ describe('ToolCardList manual expand/collapse', () => {
     clickToggle()
     expect(window.document.body.textContent).not.toContain('Reading doc')
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('re-expands a finished palace history card on click and collapses it again', () => {
+    act(() => {
+      root.render(
+        <ToolCardList
+          cards={[
+            card({
+              name: 'generatePalace',
+              status: 'success',
+              steps: [
+                { step: 'planning-stations' },
+                { step: 'generating-image' },
+                { step: 'locating-stations' },
+              ],
+            }),
+          ]}
+        />,
+      )
+    })
+
+    expect(window.document.body.textContent).not.toContain('Planning stations')
+    clickToggle()
+    expect(window.document.body.textContent).toContain('Planning stations')
+    expect(window.document.body.textContent).toContain('Generating image')
+    expect(window.document.body.textContent).toContain('Locating stations')
+    clickToggle()
+    expect(window.document.body.textContent).not.toContain('Planning stations')
   })
 
   it('collapses a running subgraph card manually and re-expands it', () => {

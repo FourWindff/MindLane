@@ -20,12 +20,12 @@ export interface ToolCardItem {
 }
 
 /**
- * Only the mindmap subgraph card (generateMindmapFragment) has stage progress
- * and can expand; the palace subgraph emits no stage events, and write/read
- * tool cards stay single-line.
+ * Subgraph cards carry a stage trace and can expand; write/read tool cards
+ * stay single-line. The palace card only becomes expandable once it has stages
+ * (the canvas-button path has no progress channel and stays single-line).
  */
 function isSubgraphCard(name: string): boolean {
-  return name === 'generateMindmapFragment'
+  return name === 'generateMindmapFragment' || name === 'generatePalace'
 }
 
 const STAGE_LABELS: Record<string, string> = {
@@ -33,6 +33,9 @@ const STAGE_LABELS: Record<string, string> = {
   extracting: 'Extracting',
   merging: 'Merging',
   finalizing: 'Finalizing',
+  'planning-stations': 'Planning stations',
+  'generating-image': 'Generating image',
+  'locating-stations': 'Locating stations',
 }
 
 function stageDisplayName(step: string, completed?: number, total?: number): string {

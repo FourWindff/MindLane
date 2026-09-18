@@ -1134,6 +1134,27 @@ describe('reduceStreamEvent', () => {
     })
   })
 
+  it('maps palace stages onto the running generatePalace card too', () => {
+    const withPalace = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-palace', name: 'generatePalace', input: {} },
+    })
+    const stepped = reduceStreamEvent(withPalace, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'planning-stations' },
+    })
+    expect(stepped.toolCards[0]).toMatchObject({
+      name: 'generatePalace',
+      status: 'running',
+      step: 'planning-stations',
+      stages: [{ step: 'planning-stations' }],
+    })
+  })
+
   it('accumulates the full stage sequence on the running subgraph card', () => {
     const withSubgraph = reduceStreamEvent(base, {
       streamId: 's',

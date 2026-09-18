@@ -70,7 +70,8 @@
 
 - 渲染在每条 AI 消息气泡**上方**的工具块，一个工具调用一行，左对齐，文字流式显示在下方。
 - 每行展示工具显示名（`toolDisplayName`）与状态：进行中 spinner、成功 ✓、失败 ✗、停止后取消。
-- 只展示工具名，不展示参数摘要（`args` 可能含完整 XML 片段）；子图类工具（生成思维导图片段/记忆宫殿）的卡片内额外渲染执行过程（reading-doc → extracting n/m → merging → finalizing）：运行时展开（工具名行 + spinner + 下方逐阶段进度），执行完毕自动折叠为单行（工具名 + ✓），支持手动展开/收起；仅子图卡片可展开，写/读工具卡片保持单行。
+- 只展示工具名，不展示参数摘要（`args` 可能含完整 XML 片段）；子图类工具（生成思维导图片段/记忆宫殿）的卡片内额外渲染执行过程——导图子图 `reading-doc → extracting n/m → merging → finalizing`，宫殿子图 `planning-stations → generating-image → locating-stations`：运行时展开（工具名行 + spinner + 下方逐阶段进度），执行完毕自动折叠为单行（工具名 + ✓），支持手动展开/收起；仅子图卡片可展开，写/读工具卡片保持单行。
+- 阶段轨迹来自同一条自定义进度通道（子图经 `getWriter()` 发 `subgraph-progress`，主进程转发为 `step` 流事件），两个子图共用；展示文案由渲染层的步骤标签表唯一维护。
 - 子图阶段轨迹经 `ToolMessage.additional_kwargs.toolSteps` 持久化（jsonl 往返不丢），重建时读入 `ChatToolCall.steps`；历史、会话加载、重启后展开均可见。
 - 每条 assistant 消息只携带自己那轮的工具调用（`ChatMessage.toolCalls`，含 `status` 字段）。
 - 历史消息与流式进行中遵循同一渲染规则；纯工具调用消息（无文字）的工具记录并入下一条有文字的 assistant 消息。
@@ -180,9 +181,10 @@
 
 ### StreamStep（步骤发射词表）
 
-- 主进程可经 `step` 事件发出的步骤值集合：`generating-map`、`reading-doc`、`extracting`、`merging`、`finalizing`。
+- 主进程可经 `step` 事件发出的步骤值集合：导图子图 `generating-map`、`reading-doc`、`extracting`、`merging`、`finalizing`；宫殿子图 `planning-stations`、`generating-image`、`locating-stations`。
 - 定义在共享契约 `ipc.ts`；主进程 emits 与渲染层消费同一份词表，两侧由编译器同时看守。
-- 渲染层 `AiPipelineStep` 是其超集：`StreamStep` 之外还有 `idle`、`chatting`、`preparing` 等纯渲染层状态，不属于发射词表。
+- 子图节点可发射的步骤值是 `StreamStep` 去掉 `generating-map`（它由工具事件触发，不由节点发射），两个子图共用同一份声明。
+- 渲染层不再有其超集：`step` 事件的唯一消费方是正在运行的子图卡片的阶段轨迹。
 
 ## 渲染层状态
 

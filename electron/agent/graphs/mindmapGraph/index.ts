@@ -19,7 +19,7 @@ import { logger } from '../../../shared/logger.js'
 import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
 import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
-import type { StreamStep } from '../../../ipc.js'
+import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../../ipc.js'
 
 const log = logger.withContext('mindmap')
 
@@ -57,9 +57,6 @@ function countTreeNodes(node: MindmapOutlineNode): number {
 
 type PromptMessage = { role: string; content: string }
 
-/** The mindmap progress vocabulary is a subset of the shared StreamStep (without generating-map, which tool events trigger). */
-type MindmapProgressStep = Exclude<StreamStep, 'generating-map'>
-
 /**
  * Subgraph stage trace (same source as step stream events), collected per
  * streamId and closed out by build_output. Same lifecycle as
@@ -81,8 +78,8 @@ function takeStepTrace(): ChatToolCallStep[] | undefined {
   return trace
 }
 
-function emitProgress(step: MindmapProgressStep): void {
-  getWriter()?.({ type: 'mindmap-progress', step })
+function emitProgress(step: SubgraphProgressStep): void {
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step })
   pushStep({ step })
 }
 
@@ -99,11 +96,11 @@ function resetItemProgress(): void {
 }
 
 /** Count one finished branch item and emit its quantified progress event. */
-function takeItemProgress(step: MindmapProgressStep, total: number): number {
+function takeItemProgress(step: SubgraphProgressStep, total: number): number {
   const key = runKey()
   const completed = (itemProgressCounts.get(key) ?? 0) + 1
   itemProgressCounts.set(key, completed)
-  getWriter()?.({ type: 'mindmap-progress', step, completed, total })
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step, completed, total })
   pushStep({ step, completed, total })
   return completed
 }

@@ -12,7 +12,12 @@ import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import { isSubgraphCall } from './subgraphRouter.js'
 import { deriveToolStatus } from './toolStatus.js'
 import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
-import { isStreamStep, serializeTurnState, splitCurrentTurn } from '../ipc.js'
+import {
+  isStreamStep,
+  serializeTurnState,
+  splitCurrentTurn,
+  SUBGRAPH_PROGRESS_EVENT,
+} from '../ipc.js'
 
 type ChatStreamEventPayload<T extends ChatStreamEvent['type']> = Extract<
   ChatStreamEvent,
@@ -287,7 +292,7 @@ export class Runner {
             completed?: number
             total?: number
           }
-          if (event.type === 'mindmap-progress' && isStreamStep(event.step)) {
+          if (event.type === SUBGRAPH_PROGRESS_EVENT && isStreamStep(event.step)) {
             // First subgraph activity: create the pending subgraph card here, so
             // it is ordered by execution time (after any earlier tool) and stays
             // ahead of later tools in the stream.

@@ -1,12 +1,14 @@
-import { StateGraph, START, END } from '@langchain/langgraph'
+import { StateGraph, START, END, getWriter } from '@langchain/langgraph'
 import type { LLMProvider } from '../providers/index.js'
 import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
 import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
 import { AnchorAgent } from '../agenthub/anchorAgent.js'
-import { PalaceSubgraphState } from '../state.js'
+import { PalaceSubgraphState, type PalaceSubgraphStateType } from '../state.js'
 import { logger } from '../../shared/logger.js'
 import { currentStreamId } from '../../shared/runContext.js'
 import { takeModelCallCount } from '../providers/metering.js'
+import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../ipc.js'
+import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
@@ -29,6 +31,20 @@ interface PalaceSubgraphOptions {
 // ===== Subgraph 构建器 =====
 
 /**
+ * Emit one stage and return the trace to carry in state: the live card reads
+ * the custom event, the persisted ToolMessage reads state.toolSteps. Emitting
+ * at node entry is the point — the running card must show the stage while the
+ * node is still working, not when it finishes.
+ */
+function stage(
+  state: Pick<PalaceSubgraphStateType, 'toolSteps'>,
+  step: SubgraphProgressStep,
+): ChatToolCallStep[] {
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step })
+  return [...(state.toolSteps ?? []), { step }]
+}
+
+/**
  * 构建 Palace Subgraph
  * 流程: START -> resolve_input -> analyze -> imageGen -> normalizeImages -> vision -> END
  */
@@ -48,6 +64,9 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         return {
           error: '请提供记忆宫殿的输入内容。',
           response: '请提供记忆宫殿的输入内容。',
+          // Clear the trace carried in from the main graph: a previous subgraph run
+          // must not leak its stages into this one's ToolMessage.
+          toolSteps: [],
         }
       }
       runStarts.set(runKey(), Date.now())
@@ -59,9 +78,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       return {
         palaceInputNodes: resolution.palaceInputNodes,
         palaceInputText: resolution.palaceInputText,
+        toolSteps: [],
       }
     })
     .addNode('analyze', async (state) => {
+      const toolSteps = stage(state, 'planning-stations')
       const start = Date.now()
       const result = await analyze.invoke(state)
       const stations = (result as { palace?: { stations?: unknown[] } }).palace?.stations
@@ -70,9 +91,10 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         stations?.length ?? 0,
         ((Date.now() - start) / 1000).toFixed(1),
       )
-      return result
+      return { ...result, toolSteps }
     })
     .addNode('imageGen', async (state) => {
+      const toolSteps = stage(state, 'generating-image')
       const start = Date.now()
       const result = await imageGen.invoke(state)
       const urls = (result as { imageUrls?: string[] }).imageUrls
@@ -84,10 +106,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
           urls?.length ?? 0,
           ((Date.now() - start) / 1000).toFixed(1),
         )
-      return result
+      return { ...result, toolSteps }
     })
     .addNode('normalizeImages', (state) => normalizePalaceImageUrls(state))
     .addNode('vision', async (state) => {
+      const toolSteps = stage(state, 'locating-stations')
       const start = Date.now()
       const result = await vision.invoke(state)
       const route = (result as { memoryRoute?: unknown[] }).memoryRoute
@@ -106,7 +129,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         route?.length ?? 0,
         takeModelCallCount(currentStreamId() ?? ''),
       )
-      return result
+      return { ...result, toolSteps }
     })
 
   // 基础边

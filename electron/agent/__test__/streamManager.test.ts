@@ -103,7 +103,7 @@ function createRuntime(options?: {
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
       if (options?.progress) {
-        yield ['custom', { type: 'mindmap-progress', ...options.progress }]
+        yield ['custom', { type: 'subgraph-progress', ...options.progress }]
       }
       for (const toolEvent of options?.toolEvents ?? []) {
         yield ['tools', toolEvent]
@@ -262,7 +262,7 @@ describe('StreamManager + Runner', () => {
     expect(String(userMessage!.content)).toContain('<SELECTED_NODES count="0">')
   })
 
-  it('emits mindmap pipeline progress', async () => {
+  it('emits subgraph pipeline progress', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime({ progress: { step: 'extracting' } }))
 
@@ -278,6 +278,25 @@ describe('StreamManager + Runner', () => {
       sessionId: 'session-a',
       type: 'step',
       payload: { step: 'extracting' },
+    })
+  })
+
+  it('forwards palace subgraph stages through the same channel', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    setRuntimeFactory(() => createRuntime({ progress: { step: 'planning-stations' } }))
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events).toContainEqual({
+      streamId,
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'planning-stations' },
     })
   })
 
