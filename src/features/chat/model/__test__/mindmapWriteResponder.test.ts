@@ -131,7 +131,10 @@ describe('MindmapWriteResponder', () => {
   it('drops malformed palace SVG artwork, inserts an artwork-less palace, and logs a warning', async () => {
     const { editor, store } = createRealEditor()
     const { send, respond, warn, stop } = setupResponder({ 'file-a': editor })
-    const imageUrl = svgDataUrl('<svg><g data-station="1" /></svg>')
+    const imageUrl = svgDataUrl('<svg><g data-station="1" /></svg>').replace(
+      'image/svg+xml',
+      'image/SVG+XML',
+    )
 
     send({
       requestId: 'palace-invalid-svg',
@@ -180,6 +183,54 @@ describe('MindmapWriteResponder', () => {
     expect(state.assets).toHaveLength(1)
     expect(palace?.data).toMatchObject({ assetId: existingAssetId })
     expect(warn).not.toHaveBeenCalled()
+    stop()
+  })
+
+  it('does not retain a materialized asset when the palace write is rejected', async () => {
+    const { editor, store } = createRealEditor()
+    const duplicateId = editor.addChild('root', { label: '已有节点' }).nodeId
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const imageUrl = svgDataUrl('<svg viewBox="0 0 10 10" />')
+
+    send({
+      requestId: 'palace-rejected',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: {
+        parentId: 'root',
+        xml: `<node id="${duplicateId}" type="palace" imageUrl="${imageUrl}" />`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    expect(respond).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'palace-rejected', ok: false }),
+    )
+    expect(store.getState().assets).toHaveLength(0)
+    stop()
+  })
+
+  it('does not retain a materialized asset when sibling placement has no target', async () => {
+    const { editor, store } = createRealEditor()
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const imageUrl = svgDataUrl('<svg viewBox="0 0 10 10" />')
+
+    send({
+      requestId: 'palace-missing-sibling',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: {
+        position: 'after',
+        xml: `<node type="palace" imageUrl="${imageUrl}" />`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    expect(respond).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'palace-missing-sibling', ok: false }),
+    )
+    expect(store.getState().assets).toHaveLength(0)
+    expect(store.getState().nodes.filter((node) => node.type === 'palace')).toHaveLength(0)
     stop()
   })
 

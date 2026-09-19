@@ -6,6 +6,7 @@ import {
   isValidSvgArtwork,
   parseXmlFragment,
   serializeTreeFragment,
+  type MindlaneAsset,
   validateMove,
 } from '@/shared/lib/mindmapXml'
 import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
@@ -120,8 +121,9 @@ async function materializePalaceArtwork(
   xml: string,
   editor: MindmapEditor,
   warn: (message: string) => void,
-): Promise<{ xml: string; nodeCount: number; rootId: string }> {
+): Promise<{ xml: string; nodeCount: number; rootId: string; assets: MindlaneAsset[] }> {
   const parsed = await parseXmlFragment(xml)
+  const assets: MindlaneAsset[] = []
   let changed = false
 
   for (const node of parsed.nodes) {
@@ -132,7 +134,7 @@ async function materializePalaceArtwork(
 
     const dataUrl = parseDataUrl(data.imageUrl)
     if (!dataUrl) continue
-    if (dataUrl.mime === 'image/svg+xml') {
+    if (dataUrl.mime.toLowerCase() === 'image/svg+xml') {
       const svg = decodeBase64Utf8(dataUrl.data)
       const stationCount = Array.isArray(data.stations) ? data.stations.length : 0
       if (!svg || !isValidSvgArtwork(svg, stationCount)) {
@@ -145,7 +147,11 @@ async function materializePalaceArtwork(
 
     const asset = await assetFromDataUrl(data.imageUrl)
     if (!asset) continue
-    data.assetId = editor.getState().addAsset(asset)
+    const existingAsset = [...editor.getState().assets, ...assets].find(
+      (candidate) => candidate.sha256 === asset.sha256,
+    )
+    data.assetId = existingAsset?.id ?? asset.id
+    if (!existingAsset) assets.push(asset)
     delete data.imageUrl
     changed = true
   }
@@ -154,6 +160,7 @@ async function materializePalaceArtwork(
     xml: changed ? serializeTreeFragment(parsed.nodes, parsed.edges) : xml,
     nodeCount: parsed.nodes.length,
     rootId: parsed.rootIds[0]!,
+    assets,
   }
 }
 
@@ -186,7 +193,15 @@ async function applyWriteAction(
       }
       // insertFromXml re-runs validateFragmentForInsert on the live editor state,
       // so a structural failure surfaces as the same MindmapXmlError from there.
-      await editor.insertFromXml(materialized.xml, { parentId, position: pos })
+      if (materialized.assets.length > 0) {
+        await editor.insertFromXml(
+          materialized.xml,
+          { parentId, position: pos },
+          materialized.assets,
+        )
+      } else {
+        await editor.insertFromXml(materialized.xml, { parentId, position: pos })
+      }
       return { nodeCount: materialized.nodeCount, parentId: parentId ?? null, position: pos }
     }
 
@@ -196,7 +211,11 @@ async function applyWriteAction(
         throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
       }
       const materialized = await materializePalaceArtwork(xml, editor, warn)
-      await editor.replaceNodeFromXml(materialized.xml)
+      if (materialized.assets.length > 0) {
+        await editor.replaceNodeFromXml(materialized.xml, materialized.assets)
+      } else {
+        await editor.replaceNodeFromXml(materialized.xml)
+      }
       return {
         xml: materialized.xml,
         nodeId: materialized.rootId,

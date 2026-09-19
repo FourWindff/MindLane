@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
-import { type MindLaneFile, type MindLaneNode } from '@/shared/lib/fileFormat'
+import { type MindLaneFile, type MindLaneNode, type MindlaneAsset } from '@/shared/lib/fileFormat'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -542,12 +542,24 @@ export class MindmapEditor {
    */ async insertFromXml(
     xml: string,
     options: { parentId?: string; position?: 'root' | 'child' | 'after' | 'before' } = {},
+    pendingAssets: MindlaneAsset[] = [],
   ): Promise<void> {
     const parsed = await parseXmlFragment(xml)
-    const { ctx } = buildValidationContext(this.state.nodes, this.state.edges, this.state.assets)
+    const { ctx } = buildValidationContext(this.state.nodes, this.state.edges, [
+      ...this.state.assets,
+      ...pendingAssets,
+    ])
     validateFragmentForInsert(parsed, ctx)
 
     const position = options.position ?? 'child'
+    if ((position === 'after' || position === 'before') && !options.parentId?.trim()) {
+      throw new MindmapXmlError('block_not_found', `${position} 插入必须提供定位节点`)
+    }
+    if (position !== 'root' && options.parentId && !ctx.nodeIds.has(options.parentId)) {
+      throw new MindmapXmlError('block_not_found', `定位节点「${options.parentId}」不存在`)
+    }
+    // Pending assets become live only after parsing and structural validation succeed.
+    for (const asset of pendingAssets) this.state.addAsset(asset)
     if (position === 'after' || position === 'before') {
       this.insertParsedFragmentSibling(parsed, {
         siblingId: options.parentId ?? '',
@@ -563,7 +575,7 @@ export class MindmapEditor {
    * 整体替换节点（含子树，updateMindmapNode 前端执行）：
    * 删除旧子树 → 用片段（同 id 根）重挂到旧父节点下，单条 batch 历史。
    */
-  async replaceNodeFromXml(xml: string): Promise<void> {
+  async replaceNodeFromXml(xml: string, pendingAssets: MindlaneAsset[] = []): Promise<void> {
     const parsed = await parseXmlFragment(xml)
     if (parsed.rootIds.length !== 1) {
       throw new MindmapXmlError(
@@ -583,8 +595,11 @@ export class MindmapEditor {
         `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
       )
     }
-    const { ctx } = buildValidationContext(nodes, edges, this.state.assets)
+    const { ctx } = buildValidationContext(nodes, edges, [...this.state.assets, ...pendingAssets])
     validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
+
+    // Keep materialization in the same validated write operation as the replacement.
+    for (const asset of pendingAssets) this.state.addAsset(asset)
 
     // 保序：删除前记录旧 position 与旧父边下标。重挂时根节点恢复旧 position
     // （否则 (0,0) 会按 y 重排漂移），父边插回原下标（否则 edges 顺序即 XML
