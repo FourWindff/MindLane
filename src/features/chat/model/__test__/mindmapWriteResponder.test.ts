@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import { MindmapEditor as RealMindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import { MindmapHistory } from '@/features/mindmap/model/mindmapHistory'
+import { createMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { MindmapXmlError, formatXmlError } from '@/shared/lib/mindmapXml'
 import type { MindmapWriteRequest } from '../../../../../electron/ipc'
 import { createMindmapWriteResponder } from '../mindmapWriteResponder'
@@ -39,6 +42,7 @@ function setupResponder(editors: Record<string, MindmapEditor>) {
   let listener: ((request: MindmapWriteRequest) => void) | undefined
   const persistFile = vi.fn()
   const respond = vi.fn(async () => undefined)
+  const warn = vi.fn()
   const responder = createMindmapWriteResponder({
     subscribe: (next) => {
       listener = next
@@ -47,18 +51,138 @@ function setupResponder(editors: Record<string, MindmapEditor>) {
     resolveEditor: (fileUuid) => editors[fileUuid],
     persistFile,
     respond,
+    warn,
   })
   const stop = responder.start()
-  return { send: (request: MindmapWriteRequest) => listener?.(request), persistFile, respond, stop }
+  return {
+    send: (request: MindmapWriteRequest) => listener?.(request),
+    persistFile,
+    respond,
+    warn,
+    stop,
+  }
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0))
+
+function createRealEditor() {
+  const store = createMindmapStore()
+  const editor = new RealMindmapEditor(store, new MindmapHistory())
+  editor.newFile('Responder test')
+  return { editor, store }
+}
+
+function svgDataUrl(svg: string): string {
+  return `data:image/svg+xml;base64,${btoa(svg)}`
+}
 
 afterEach(() => {
   vi.useRealTimers()
 })
 
 describe('MindmapWriteResponder', () => {
+  it('materializes palace SVG data URLs as assets before insert and update writes', async () => {
+    const { editor, store } = createRealEditor()
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const imageUrl = svgDataUrl(
+      '<svg viewBox="0 0 1000 1000"><g data-station="1"><circle cx="100" cy="100" r="20" /></g></svg>',
+    )
+
+    send({
+      requestId: 'palace-insert',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: {
+        parentId: 'root',
+        xml: `<node type="palace" content="宫殿" imageUrl="${imageUrl}"><station order="1" x="0.1" y="0.1">入口</station></node>`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')
+    expect(state.assets).toHaveLength(1)
+    expect(state.assets[0]).toMatchObject({ mime: 'image/svg+xml' })
+    expect(palace?.data).toMatchObject({ assetId: state.assets[0]!.id })
+    expect(palace?.data).not.toHaveProperty('imageUrl')
+
+    const updatedImageUrl = svgDataUrl(
+      '<svg viewBox="0 0 1000 1000"><g data-station="1"><rect width="200" height="200" /></g></svg>',
+    )
+    respond.mockClear()
+    send({
+      requestId: 'palace-update',
+      fileUuid: 'file-a',
+      action: 'updateMindmapNode',
+      args: {
+        xml: `<node id="${palace!.id}" type="palace" content="更新宫殿" imageUrl="${updatedImageUrl}"><station order="1" x="0.2" y="0.2">大厅</station></node>`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const updatedState = store.getState()
+    const updatedPalace = updatedState.nodes.find((node) => node.id === palace!.id)
+    expect(updatedState.assets).toHaveLength(2)
+    expect(updatedPalace?.data).toMatchObject({ assetId: updatedState.assets[1]!.id })
+    expect(updatedPalace?.data).not.toHaveProperty('imageUrl')
+    stop()
+  })
+
+  it('drops malformed palace SVG artwork, inserts an artwork-less palace, and logs a warning', async () => {
+    const { editor, store } = createRealEditor()
+    const { send, respond, warn, stop } = setupResponder({ 'file-a': editor })
+    const imageUrl = svgDataUrl('<svg><g data-station="1" /></svg>')
+
+    send({
+      requestId: 'palace-invalid-svg',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: {
+        parentId: 'root',
+        xml: `<node type="palace" content="宫殿" imageUrl="${imageUrl}"><station order="1">入口</station></node>`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')
+    expect(state.assets).toHaveLength(0)
+    expect(palace).toBeDefined()
+    expect(palace?.data).not.toHaveProperty('assetId')
+    expect(palace?.data).not.toHaveProperty('imageUrl')
+    expect(warn).toHaveBeenCalledOnce()
+    stop()
+  })
+
+  it('passes through palace asset references without creating another asset', async () => {
+    const { editor, store } = createRealEditor()
+    const existingAssetId = store.getState().addAsset({
+      id: 'existing-palace-artwork',
+      mime: 'image/svg+xml',
+      sha256: 'existing-sha',
+      data: 'PHN2ZyB2aWV3Qm94PSIwIDAgMSAxIiAvPg==',
+    })
+    const { send, respond, warn, stop } = setupResponder({ 'file-a': editor })
+
+    send({
+      requestId: 'palace-existing-asset',
+      fileUuid: 'file-a',
+      action: 'insertXmlFragment',
+      args: {
+        parentId: 'root',
+        xml: `<node type="palace" content="既有宫殿" asset="${existingAssetId}" />`,
+      },
+    })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')
+    expect(state.assets).toHaveLength(1)
+    expect(palace?.data).toMatchObject({ assetId: existingAssetId })
+    expect(warn).not.toHaveBeenCalled()
+    stop()
+  })
+
   it('resolves the live editor by fileUuid and answers with a structured {ok, action, data} ack', async () => {
     const fake = createFakeEditor()
     fake.state.nodes = [

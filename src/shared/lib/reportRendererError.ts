@@ -9,3 +9,8 @@
 export function reportRendererError(message: string): void {
   window.mindlane?.shell?.logError?.(message)
 }
+
+/** Report a recoverable renderer degradation without promoting it to an error. */
+export function reportRendererWarning(message: string): void {
+  window.mindlane?.shell?.logWarning?.(message)
+}

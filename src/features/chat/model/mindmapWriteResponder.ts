@@ -3,9 +3,12 @@ import {
   MindmapXmlError,
   buildValidationContext,
   formatXmlError,
+  isValidSvgArtwork,
   parseXmlFragment,
+  serializeTreeFragment,
   validateMove,
 } from '@/shared/lib/mindmapXml'
+import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type {
   MindmapWriteRequest,
   MindmapWriteResponse,
@@ -33,6 +36,8 @@ export interface MindmapWriteResponderDependencies {
   persistFile: (fileUuid: string) => void
   /** 渲染层 → 主进程落盘应答（未知 requestId 为 no-op）。 */
   respond: (payload: MindmapWriteResponse) => void | Promise<void>
+  /** 可恢复的落图降级写入排障日志。 */
+  warn: (message: string) => void
 }
 
 export function createMindmapWriteResponder(deps: MindmapWriteResponderDependencies) {
@@ -61,7 +66,7 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
         })
         return
       }
-      const data = await applyWriteAction(request.action, request.args, editor)
+      const data = await applyWriteAction(request.action, request.args, editor, deps.warn)
       deps.persistFile(request.fileUuid)
       await safeRespond({
         requestId: request.requestId,
@@ -101,6 +106,57 @@ const DEFAULT_POSITION = 'child'
 const INSERT_POSITIONS = new Set(['root', 'child', 'after', 'before'])
 const MOVE_POSITIONS = new Set(['child', 'after', 'before'])
 
+function decodeBase64Utf8(data: string): string | null {
+  try {
+    const binary = atob(data)
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
+    return new TextDecoder().decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+async function materializePalaceArtwork(
+  xml: string,
+  editor: MindmapEditor,
+  warn: (message: string) => void,
+): Promise<{ xml: string; nodeCount: number; rootId: string }> {
+  const parsed = await parseXmlFragment(xml)
+  let changed = false
+
+  for (const node of parsed.nodes) {
+    if (node.type !== 'palace') continue
+    const data = node.data as Record<string, unknown>
+    if (typeof data.assetId === 'string' && data.assetId) continue
+    if (typeof data.imageUrl !== 'string') continue
+
+    const dataUrl = parseDataUrl(data.imageUrl)
+    if (!dataUrl) continue
+    if (dataUrl.mime === 'image/svg+xml') {
+      const svg = decodeBase64Utf8(dataUrl.data)
+      const stationCount = Array.isArray(data.stations) ? data.stations.length : 0
+      if (!svg || !isValidSvgArtwork(svg, stationCount)) {
+        delete data.imageUrl
+        changed = true
+        warn('宫殿画面未通过闸门，使用无图宫殿')
+        continue
+      }
+    }
+
+    const asset = await assetFromDataUrl(data.imageUrl)
+    if (!asset) continue
+    data.assetId = editor.getState().addAsset(asset)
+    delete data.imageUrl
+    changed = true
+  }
+
+  return {
+    xml: changed ? serializeTreeFragment(parsed.nodes, parsed.edges) : xml,
+    nodeCount: parsed.nodes.length,
+    rootId: parsed.rootIds[0]!,
+  }
+}
+
 /**
  * 原子校验 + 落图：校验失败抛 MindmapXmlError（错误码 + 恢复策略由 formatXmlError
  * 统一格式化），不触碰编辑器；成功返回 `data` 载荷（ack 的一部分）。
@@ -110,6 +166,7 @@ async function applyWriteAction(
   action: WriteAction,
   args: Record<string, unknown>,
   editor: MindmapEditor,
+  warn: (message: string) => void,
 ): Promise<unknown> {
   switch (action) {
     case 'insertXmlFragment': {
@@ -120,7 +177,7 @@ async function applyWriteAction(
       if (typeof position !== 'undefined' && !INSERT_POSITIONS.has(position)) {
         throw new Error(`position 参数无效：${String(position)}，只能是 root/child/after/before`)
       }
-      const parsed = await parseXmlFragment(xml)
+      const materialized = await materializePalaceArtwork(xml, editor, warn)
       const state = editor.getState()
       const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
       const pos = position ?? DEFAULT_POSITION
@@ -129,8 +186,8 @@ async function applyWriteAction(
       }
       // insertFromXml re-runs validateFragmentForInsert on the live editor state,
       // so a structural failure surfaces as the same MindmapXmlError from there.
-      await editor.insertFromXml(xml, { parentId, position: pos })
-      return { nodeCount: parsed.nodes.length, parentId: parentId ?? null, position: pos }
+      await editor.insertFromXml(materialized.xml, { parentId, position: pos })
+      return { nodeCount: materialized.nodeCount, parentId: parentId ?? null, position: pos }
     }
 
     case 'updateMindmapNode': {
@@ -138,9 +195,13 @@ async function applyWriteAction(
       if (typeof xml !== 'string') {
         throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
       }
-      const parsed = await parseXmlFragment(xml)
-      await editor.replaceNodeFromXml(xml)
-      return { xml, nodeId: parsed.rootIds[0], nodeCount: parsed.nodes.length }
+      const materialized = await materializePalaceArtwork(xml, editor, warn)
+      await editor.replaceNodeFromXml(materialized.xml)
+      return {
+        xml: materialized.xml,
+        nodeId: materialized.rootId,
+        nodeCount: materialized.nodeCount,
+      }
     }
 
     case 'moveMindmapNode': {

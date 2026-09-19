@@ -46,6 +46,11 @@ export function registerShellHandlers(ctx: HandlerContext): void {
     rendererLog.error('%s', message)
   })
 
+  ipcMain.on(IPC.ShellLogWarning, (_e, message: unknown) => {
+    if (typeof message !== 'string' || message.length === 0) return
+    rendererLog.warn('%s', message)
+  })
+
   ipcMain.handle(IPC.ShellOpenExternal, (_e, payload: { url: string }) => {
     // 只放行 http/https，防止渲染层把任意指令塞给 openExternal
     let url: URL

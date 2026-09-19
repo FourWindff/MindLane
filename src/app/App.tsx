@@ -30,7 +30,7 @@ import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteR
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
-import { reportRendererError } from '@/shared/lib/reportRendererError'
+import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
 import '@/shared/components/toast.css'
 import '@/app/workspace/workspace.css'
@@ -113,6 +113,7 @@ function AppContent() {
         })
       },
       respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
+      warn: reportRendererWarning,
     }).start()
     const stopToolRouter = createMindmapEndEffects({
       subscribe: subscribeToChatStreamEvents,

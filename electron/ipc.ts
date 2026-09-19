@@ -66,6 +66,7 @@ export enum IPC {
   ShellOpenLogs = 'shell:open-logs',
   ShellOpenExternal = 'shell:open-external',
   ShellLogError = 'shell:log-error',
+  ShellLogWarning = 'shell:log-warning',
 
   EditlogAppend = 'editlog:append',
 
@@ -619,6 +620,8 @@ export interface MindlaneBridge {
      * awaits — renderer errors have no UI outlet (PRD: errors live in the log).
      */
     logError: (message: string) => void
+    /** Fire-and-forget recoverable renderer warning written to the diagnostic log. */
+    logWarning: (message: string) => void
   }
   editlog: {
     /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */
