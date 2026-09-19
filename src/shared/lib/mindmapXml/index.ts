@@ -9,6 +9,7 @@ export { formatXmlError } from './errors.js'
 export { escapeXml, unescapeXml } from './escape.js'
 export { normalizeSelfClosingTags, findUnescapedInAttrValues } from './normalize.js'
 export { parseXmlStrict, parseXmlTolerant, topLevelElements } from './parser.js'
+export { isValidSvgArtwork } from './svg.js'
 export { xmlNodeTypeRegistry } from './registry.js'
 export type { XmlNodeTypeDescriptor, XmlNodeReaderContext } from './registry.js'
 export {

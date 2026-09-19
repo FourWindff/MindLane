@@ -134,7 +134,7 @@ export function MindMapContextMenu({
             role="menuitem"
             onClick={() => run(() => onGeneratePalace?.())}
             disabled={!onGeneratePalace || aiBusy || !palaceEnabled}
-            title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
+            title={palaceEnabled ? undefined : '需要配置对话模型'}
           >
             生成记忆宫殿{selectedCount > 1 ? ` (${selectedCount} 节点)` : ''}
           </button>

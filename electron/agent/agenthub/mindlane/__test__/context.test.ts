@@ -25,7 +25,6 @@ const ctx: ChatContext = {
 
 const baseInput: SystemPromptInput = {
   context: ctx,
-  capabilityFlags: { hasPalace: true },
 }
 
 describe('buildSystemPrompt memory', () => {

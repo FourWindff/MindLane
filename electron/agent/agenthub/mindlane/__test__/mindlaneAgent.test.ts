@@ -33,10 +33,9 @@ const mockSearchTool = new DynamicStructuredTool({
 })
 
 function createTestRegistry(
-  options: { hasPalace?: boolean; extraTools?: StructuredToolInterface[] } = {},
+  options: { extraTools?: StructuredToolInterface[] } = {},
 ): ToolRegistry {
   const registry = new ToolRegistry()
-  const hasPalace = options.hasPalace ?? true
 
   const actionTools = createMindmapActionTools(async () => ({
     nodeIds: ['root'],
@@ -50,9 +49,6 @@ function createTestRegistry(
 
   const schemas = getToolSchemas()
   for (const tool of schemas) {
-    if (tool.name === GENERATE_PALACE_TOOL && !hasPalace) {
-      continue
-    }
     registry.registerTool(tool)
   }
 
@@ -85,6 +81,7 @@ function createInitialState() {
     palaceInputText: '',
     palaceInputNodes: [],
     palace: null,
+    artworkStyle: 'vector' as const,
     imageUrls: [],
     memoryRoute: [],
     summary: '',
@@ -230,13 +227,13 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.response).toBe('这是一个回答')
   })
 
-  it('does not expose generatePalace when palace is disabled', () => {
-    const registry = createTestRegistry({ hasPalace: false, extraTools: [mockSearchTool] })
+  it('always exposes generatePalace alongside the other virtual route', () => {
+    const registry = createTestRegistry({ extraTools: [mockSearchTool] })
 
     expect(registry.allTools.some((tool) => tool.name === GENERATE_MINDMAP_FRAGMENT_TOOL)).toBe(
       true,
     )
-    expect(registry.allTools.some((tool) => tool.name === GENERATE_PALACE_TOOL)).toBe(false)
+    expect(registry.allTools.some((tool) => tool.name === GENERATE_PALACE_TOOL)).toBe(true)
   })
 
   it('does not duplicate chat history in the system prompt', async () => {
@@ -244,7 +241,6 @@ describe('MindLaneAgent.invoke()', () => {
     const agent = new MindLaneAgent(
       createMockProvider(mockInvoke),
       createTestRegistry({ extraTools: [mockSearchTool] }),
-      undefined,
       undefined,
       {
         messagePipeline: mergeMessagePreparationConfig(
@@ -355,20 +351,17 @@ describe('MindLaneAgent.route()', () => {
     expect(agent.route(createInitialState())).toBe('__end__')
   })
 
-  it('disabled palace falls back to end', () => {
+  it('routes palace regardless of provider capabilities', () => {
     const agent = new MindLaneAgent(
       createMockProvider(vi.fn()),
-      createTestRegistry({ hasPalace: false, extraTools: [mockSearchTool] }),
-      {
-        hasPalace: false,
-      },
+      createTestRegistry({ extraTools: [mockSearchTool] }),
     )
     const state = {
       ...createInitialState(),
       pendingSubgraph: 'palace' as const,
     }
 
-    expect(agent.route(state)).toBe('__end__')
+    expect(agent.route(state)).toBe('palaceSubgraph')
   })
 })
 

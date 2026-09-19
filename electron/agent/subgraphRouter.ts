@@ -28,7 +28,7 @@ export interface ToolCallLike {
 /**
  * 返回模型可见的虚拟子图路由工具列表（mindmap 与 palace）。
  *
- * 调用方（如 AgentOrchestrator）根据自身的 palace 能力决定是否注册 palace 工具。
+ * 记忆宫殿默认可用；画面载体在子图内按偏好与 provider 能力解析。
  */
 export function getToolSchemas() {
   return [createGenerateMindmapFragmentTool(), createGeneratePalaceTool()]

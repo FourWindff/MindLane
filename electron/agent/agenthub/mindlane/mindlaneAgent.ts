@@ -3,7 +3,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { LLMProvider } from '../../providers/index.js'
 import type { MainGraphStateType } from '../../state.js'
 import { BaseAgent } from '../base.js'
-import { buildSystemPrompt, type CapabilityFlags } from './context.js'
+import { buildSystemPrompt } from './context.js'
 import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '../../utils.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
 import { logger } from '../../../shared/logger.js'
@@ -42,7 +42,6 @@ interface MindLaneAgentOptions {
 
 export class MindLaneAgent extends BaseAgent {
   private toolRegistry: ToolRegistry
-  private capabilityFlags: CapabilityFlags
   private modelWithTools: ReturnType<NonNullable<BaseChatModel['bindTools']>>
   private memoryManager?: MemoryManager
   private userDataPath?: string
@@ -51,13 +50,11 @@ export class MindLaneAgent extends BaseAgent {
   constructor(
     provider: LLMProvider,
     toolRegistry: ToolRegistry,
-    capabilityFlags?: CapabilityFlags,
     memoryManager?: MemoryManager,
     options?: MindLaneAgentOptions,
   ) {
     super(provider)
     this.toolRegistry = toolRegistry
-    this.capabilityFlags = capabilityFlags ?? { hasPalace: true }
     this.modelWithTools = this.provider.model.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
@@ -88,7 +85,6 @@ export class MindLaneAgent extends BaseAgent {
 
       const systemPrompt = await buildSystemPrompt({
         context: state.context ?? undefined,
-        capabilityFlags: this.capabilityFlags,
         memoryManager: this.memoryManager,
         lastSummary: state.summary || undefined,
       })
@@ -108,7 +104,7 @@ export class MindLaneAgent extends BaseAgent {
   route(state: MainGraphStateType): string {
     switch (state.pendingSubgraph) {
       case 'palace':
-        return this.capabilityFlags.hasPalace ? 'palaceSubgraph' : '__end__'
+        return 'palaceSubgraph'
       case 'mindmap':
         return 'mindmapSubgraph'
       default: {

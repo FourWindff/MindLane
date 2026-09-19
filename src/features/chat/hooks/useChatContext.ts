@@ -1,7 +1,6 @@
 import { useRef, useCallback } from 'react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useSettingsStore } from '@/app/settings/model/settingsStore'
 
 function useShallowById<T, U extends { id: string }>(
   selector: (state: T) => U[],
@@ -27,8 +26,6 @@ export interface QuickAction {
 }
 
 export function useChatContext() {
-  const capabilities = useSettingsStore((s) => s.capabilities)
-
   const activeInstance = useActiveMindmapInstance()
   const selectedNodes = activeInstance.store(
     useShallowById((s) => s.nodes.filter((n) => n.selected)),
@@ -40,12 +37,7 @@ export function useChatContext() {
     editor.clearNodeSelection()
   }, [editor])
 
-  const features = ['生成思维导图']
-  if (capabilities.includes('imageGen') && capabilities.includes('vision')) {
-    features.push('生成记忆宫殿')
-  } else if (capabilities.includes('imageGen')) {
-    features.push('生成图片')
-  }
+  const features = ['生成思维导图', '生成记忆宫殿']
 
   const emptyHint = `AI 助手可以${features.join('、')}`
 
@@ -57,7 +49,6 @@ export function useChatContext() {
   ]
 
   return {
-    capabilities,
     selectedNodes,
     clearNodeSelection,
     emptyHint,

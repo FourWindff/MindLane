@@ -3,7 +3,7 @@ import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph, getWriter } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
-import { type LLMProvider, ProviderCapability } from './providers/index.js'
+import type { LLMProvider } from './providers/index.js'
 import type { AgentServices } from './service.js'
 import type {
   SelectedNodeContent,
@@ -25,12 +25,7 @@ import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
-import {
-  GENERATE_PALACE_TOOL,
-  getToolSchemas,
-  isSubgraphCall,
-  packageResult,
-} from './subgraphRouter.js'
+import { getToolSchemas, isSubgraphCall, packageResult } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
@@ -109,24 +104,18 @@ export class AgentOrchestrator {
   > | null = null
   private toolRegistry = new ToolRegistry()
   private mcpTools: StructuredToolInterface[] = []
-  private hasPalace: boolean
 
   constructor(
     private provider: LLMProvider,
     private services: AgentServices,
     private options: AgentOrchestratorOptions = {},
   ) {
-    const caps = this.provider.capabilities
-    this.hasPalace = caps.has(ProviderCapability.ImageGen) && caps.has(ProviderCapability.Vision)
     this.rebuildToolRegistry()
   }
 
   updateProvider(provider: LLMProvider, messagePipeline?: MessagePreparationConfig): void {
     this.provider = provider
     this.options = { ...this.options, messagePipeline }
-    this.hasPalace =
-      provider.capabilities.has(ProviderCapability.ImageGen) &&
-      provider.capabilities.has(ProviderCapability.Vision)
     this.compiledMindmapSubgraph = null
     this.compiledPalaceSubgraph = null
     this.rebuildToolRegistry()
@@ -144,7 +133,7 @@ export class AgentOrchestrator {
 
   private rebuildToolRegistry(): void {
     this.toolRegistry = new ToolRegistry()
-    this.registerDefaultTools({ hasPalace: this.hasPalace })
+    this.registerDefaultTools()
     for (const tool of this.mcpTools) {
       this.toolRegistry.registerTool(tool)
     }
@@ -154,7 +143,7 @@ export class AgentOrchestrator {
    * Register MindLane's default tools into the toolRegistry.
    * XML 写工具（固定 4 个）先注册，随后是路由工具。
    */
-  private registerDefaultTools(options: { hasPalace: boolean }): void {
+  private registerDefaultTools(): void {
     // 写工具渲染层代理：参数转发给渲染层落盘应答器；未装配代理时调用即报错
     const writeProxy: MindmapWriteProxy = (fileUuid, action, args) => {
       const proxy = this.options.mindmapWriteProxy
@@ -182,17 +171,13 @@ export class AgentOrchestrator {
     }
 
     for (const tool of getToolSchemas()) {
-      if (tool.name === GENERATE_PALACE_TOOL && !options.hasPalace) {
-        continue
-      }
       this.toolRegistry.registerTool(tool)
     }
 
     logger.withContext('orchestrator').info(
-      'registered %d tools (%d executable), hasPalace=%s, names=%o',
+      'registered %d tools (%d executable), names=%o',
       this.toolRegistry.allTools.length,
       this.toolRegistry.executableTools.length,
-      options.hasPalace,
       this.toolRegistry.allTools.map((t) => t.name),
     )
   }
@@ -240,14 +225,6 @@ export class AgentOrchestrator {
       return { ok: false, error: '未选中任何节点' }
     }
 
-    const caps = provider.capabilities
-    if (!caps.has(ProviderCapability.ImageGen) || !caps.has(ProviderCapability.Vision)) {
-      return {
-        ok: false,
-        error: '当前 provider 不支持记忆宫殿功能（需要文生图和视觉理解能力）',
-      }
-    }
-
     // Use the dedicated Palace Subgraph.
     const app =
       provider === this.provider
@@ -259,6 +236,7 @@ export class AgentOrchestrator {
         {
           messages: [],
           context: null,
+          artworkStyle: 'vector',
           error: '',
           palaceInputText: '',
           palaceInputNodes: selectedNodes,
@@ -410,16 +388,10 @@ export class AgentOrchestrator {
 
     const subgraphResultNode = async (state: MainGraphStateType) => packageResult(state)
 
-    const supervisor = new MindLaneAgent(
-      this.provider,
-      toolRegistry,
-      { hasPalace: this.hasPalace },
-      this.services.memoryManager,
-      {
-        userDataPath: this.options.userDataPath,
-        messagePipeline: this.options.messagePipeline,
-      },
-    )
+    const supervisor = new MindLaneAgent(this.provider, toolRegistry, this.services.memoryManager, {
+      userDataPath: this.options.userDataPath,
+      messagePipeline: this.options.messagePipeline,
+    })
 
     // Proactive compaction: compress to persistence (rolling summary), then read
     // unarchived messages by budget. The running summary flows to the supervisor
@@ -429,18 +401,16 @@ export class AgentOrchestrator {
     const runAssemblyDeps: RunContextAssemblyDeps = {
       provider: this.provider,
       services: this.services,
-      hasPalace: this.hasPalace,
       userDataPath: this.options.userDataPath,
       toolRegistry,
     }
     const contextCompactNode = (state: MainGraphStateType, config?: RunContextCompactConfig) =>
       runContextCompact(runAssemblyDeps, state, config)
 
-    // Unified routing function: MindLaneAgent.route() already handles fallback when palace is unavailable.
+    // Unified routing function: MindLaneAgent.route() owns subgraph selection.
     const routeFn = (state: MainGraphStateType) => supervisor.route(state)
 
     // Unified graph structure: always includes the palaceSubgraph node.
-    // When hasPalace=false the subgraph is still compiled but is never executed (route() guarantees this).
     const graph = new StateGraph(MainGraphState)
       .addNode('contextCompact', contextCompactNode)
       .addNode('supervisor', (state) => supervisor.invoke(state))

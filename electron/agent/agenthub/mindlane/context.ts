@@ -8,10 +8,6 @@ const MEMORY_TAG = 'MEMORY'
 // 易变编辑器状态（选中节点、附件、文件身份）不进 system prompt，改由主进程序列化为
 // `<EDITOR_STATE>` 块附加到用户消息末尾（轮次状态），保住前缀缓存命中。
 
-export interface CapabilityFlags {
-  hasPalace: boolean
-}
-
 /**
  * 预载记忆上下文：`MEMORY.md` 的完整内容。
  * 由 `loadMemoryContext` 一次性读盘产出，供预算估算路径复用，
@@ -23,7 +19,6 @@ export interface MemoryContext {
 
 export interface SystemPromptInput {
   context?: ChatContext
-  capabilityFlags?: CapabilityFlags
   memoryManager?: MemoryManager
   lastSummary?: string
   /** 预载记忆：提供时跳过 `memoryManager` 的磁盘加载。 */
@@ -56,7 +51,7 @@ export async function buildSystemPrompt(input: SystemPromptInput): Promise<strin
   const memorySection = await buildMemorySection(input)
   if (memorySection) parts.push(memorySection)
 
-  parts.push(buildCorePrompt(input.capabilityFlags, input.lastSummary))
+  parts.push(buildCorePrompt(input.lastSummary))
   parts.push(buildMindmapXmlContract())
   parts.push(buildEnvironmentPrompt())
 
@@ -84,15 +79,8 @@ async function buildMemorySection(input: SystemPromptInput): Promise<string> {
   return `<${MEMORY_TAG}>\n${memory.trim()}\n</${MEMORY_TAG}>\n`
 }
 
-function buildCorePrompt(
-  capabilityFlags: CapabilityFlags | undefined,
-  lastSummary: string | undefined,
-): string {
-  const flags = capabilityFlags ?? { hasPalace: true }
-  const features = ['思维导图创作']
-  if (flags.hasPalace) {
-    features.push('记忆训练')
-  }
+function buildCorePrompt(lastSummary: string | undefined): string {
+  const features = ['思维导图创作', '记忆训练']
 
   let prompt = `<SYSTEM_PROMPT>
 你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。

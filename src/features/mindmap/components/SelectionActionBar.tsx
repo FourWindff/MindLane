@@ -21,7 +21,7 @@ export function SelectionActionBar({
         className="selection-bar__btn"
         onClick={onGeneratePalace}
         disabled={!palaceEnabled}
-        title={palaceEnabled ? undefined : '当前模型不支持记忆宫殿功能'}
+        title={palaceEnabled ? undefined : '需要配置对话模型'}
       >
         <Landmark size={14} strokeWidth={1.6} />
         生成记忆宫殿

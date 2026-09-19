@@ -30,6 +30,8 @@ export type SelectedNodeContent = {
   label: string
 }
 
+export type PalaceArtworkStyle = 'vector' | 'raster'
+
 export type MemoryItem = {
   order: number
   content: string
@@ -119,6 +121,10 @@ const BaseStateAnnotations = {
  * 记忆宫殿状态切片
  */
 const PalaceStateAnnotations = {
+  artworkStyle: Annotation<PalaceArtworkStyle>({
+    reducer: replaceReducer,
+    default: () => 'vector',
+  }),
   palaceInputText: Annotation<string>({
     reducer: replaceReducer,
     default: () => '',
@@ -239,6 +245,7 @@ export const MainGraphState = Annotation.Root({
   ...MindmapStateAnnotations,
   palaceInputText: PalaceStateAnnotations.palaceInputText,
   palaceInputNodes: PalaceStateAnnotations.palaceInputNodes,
+  artworkStyle: PalaceStateAnnotations.artworkStyle,
   // Palace 子图输出（需要同步回主图用于构建响应）
   palace: PalaceStateAnnotations.palace,
   imageUrls: PalaceStateAnnotations.imageUrls,

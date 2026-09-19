@@ -3,6 +3,7 @@ import type { LLMProvider } from '../providers/index.js'
 import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
 import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
 import { AnchorAgent } from '../agenthub/anchorAgent.js'
+import { SvgAgent } from '../agenthub/svgAgent.js'
 import { PalaceSubgraphState, type PalaceSubgraphStateType } from '../state.js'
 import { logger } from '../../shared/logger.js'
 import { currentStreamId } from '../../shared/runContext.js'
@@ -12,6 +13,7 @@ import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
+import { resolveArtworkStyle } from './palaceGraph/artworkStyle.js'
 
 const log = logger.withContext('palace')
 
@@ -46,7 +48,7 @@ function beginStage(
 
 /**
  * 构建 Palace Subgraph
- * 流程: START -> resolve_input -> analyze -> imageGen -> normalizeImages -> vision -> END
+ * 流程: START -> resolve_input -> analyze -> (svgGen | imageGen -> normalizeImages -> vision) -> END
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const { provider } = options
@@ -54,6 +56,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const analyze = new AnalyzeAgent(provider)
   const imageGen = new ImageGenAgent(provider)
   const vision = new AnchorAgent(provider)
+  const svgGen = new SvgAgent(provider)
   const inputResolver = new PalaceInputResolver()
 
   // 使用 Palace 子图专用状态类型
@@ -89,6 +92,18 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       log.info(
         'analyze 完成： %d 站, %ss',
         stations?.length ?? 0,
+        ((Date.now() - start) / 1000).toFixed(1),
+      )
+      return { ...result, toolSteps }
+    })
+    .addNode('svgGen', async (state) => {
+      const toolSteps = beginStage(state, 'generating-image')
+      const start = Date.now()
+      const result = await svgGen.invoke(state)
+      runStarts.delete(runKey())
+      log.info(
+        'svgGen 完成： 画面%s, %ss',
+        result.imageUrls?.length ? '可用' : '缺失',
         ((Date.now() - start) / 1000).toFixed(1),
       )
       return { ...result, toolSteps }
@@ -138,7 +153,12 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
     'analyze',
     END,
   ])
-  graph.addEdge('analyze', 'imageGen')
+  graph.addConditionalEdges(
+    'analyze',
+    (state) => resolveArtworkStyle(state.artworkStyle, provider.capabilities),
+    { vector: 'svgGen', raster: 'imageGen' },
+  )
+  graph.addEdge('svgGen', END)
   graph.addEdge('imageGen', 'normalizeImages')
   graph.addEdge('normalizeImages', 'vision')
   graph.addEdge('vision', END)

@@ -17,7 +17,7 @@ import {
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { useSettingsStore } from '@/app/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
@@ -44,8 +44,8 @@ export function useMindmapOperationController() {
   const canUndo = useActiveMindmapStore((state) => state.canUndo)
   const canRedo = useActiveMindmapStore((state) => state.canRedo)
   const aiBusy = useAiStore(selectCurrentChatBusy)
-  const capabilities = useSettingsStore((state) => state.capabilities)
-  const palaceEnabled = capabilities.includes('imageGen') && capabilities.includes('vision')
+  const chatReady = useSettingsStore(selectChatReady)
+  const palaceEnabled = chatReady
   const structureType = useActiveMindmapStore((state) => state.style.structureType)
   const visualVariant = useActiveMindmapStore((state) => state.style.visualVariant)
   const filePath = useActiveMindmapStore((state) => state.filePath)

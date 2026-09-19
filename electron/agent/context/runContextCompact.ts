@@ -21,7 +21,6 @@ import type { MainGraphStateType } from '../state.js'
 export interface RunContextAssemblyDeps {
   provider: LLMProvider
   services: AgentServices
-  hasPalace: boolean
   userDataPath?: string
   toolRegistry: ToolRegistry
 }
@@ -35,7 +34,7 @@ export async function runContextCompact(
   state: MainGraphStateType,
   config?: RunContextCompactConfig,
 ): Promise<Partial<MainGraphStateType>> {
-  const { provider, services, hasPalace, toolRegistry } = deps
+  const { provider, services, toolRegistry } = deps
   const sessionManager = services.sessionManager
   const threadId = config?.configurable?.thread_id ?? ''
 
@@ -49,7 +48,6 @@ export async function runContextCompact(
   ): Promise<BaseMessage[]> => {
     const systemPrompt = await buildSystemPrompt({
       context: state.context ?? undefined,
-      capabilityFlags: { hasPalace },
       lastSummary,
       memory,
     })

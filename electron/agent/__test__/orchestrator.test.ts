@@ -67,7 +67,7 @@ describe('AgentOrchestrator 编译缓存', () => {
 })
 
 describe('AgentOrchestrator buildGraph 结构', () => {
-  it('无论 hasPalace 如何，graph 节点结构完全一致', () => {
+  it('无论 provider 能力如何，graph 节点结构完全一致', () => {
     const providerWithPalace = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
     )

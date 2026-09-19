@@ -561,8 +561,7 @@ export function SettingsPanel() {
                 {chatEnabled && ' 对话'}
                 {visionEnabled && ' 视觉理解'}
                 {imageGenEnabled && ' 文生图'}
-                {imageGenEnabled && !visionEnabled && ' | 可文生图，但记忆宫殿不可用'}
-                {!imageGenEnabled && ' | 文生图不可用'}
+                {imageGenEnabled ? ' | 记忆宫殿可使用概念图载体' : ' | 记忆宫殿使用 SVG 矢量图'}
               </div>
             )}
           </section>
