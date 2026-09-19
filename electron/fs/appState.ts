@@ -261,6 +261,8 @@ export class AppState {
       },
       apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
       chatModel: partial.chatModel ?? DEFAULT_SETTINGS.chatModel,
+      palaceArtworkStyle:
+        partial.palaceArtworkStyle === 'raster' ? 'raster' : DEFAULT_SETTINGS.palaceArtworkStyle,
       recentFilesMax: partial.recentFilesMax ?? DEFAULT_SETTINGS.recentFilesMax,
       lastWorkspacePath: partial.lastWorkspacePath ?? DEFAULT_SETTINGS.lastWorkspacePath,
       recentWorkspacePaths: partial.recentWorkspacePaths ?? DEFAULT_SETTINGS.recentWorkspacePaths,

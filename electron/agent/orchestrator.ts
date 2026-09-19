@@ -30,7 +30,7 @@ import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
 import type { StreamRuntime } from './streamManager.js'
-import { splitCurrentTurn } from '../ipc.js'
+import { splitCurrentTurn, type PalaceArtworkStyle } from '../ipc.js'
 import {
   runContextCompact,
   type RunContextAssemblyDeps,
@@ -182,7 +182,7 @@ export class AgentOrchestrator {
     )
   }
 
-  getStreamRuntime(): StreamRuntime {
+  getStreamRuntime(artworkStyle: PalaceArtworkStyle = 'vector'): StreamRuntime {
     const toolRegistry = this.toolRegistry.snapshot()
     const graph = this.buildGraph(toolRegistry)
     const checkpointer = this.services.checkpointer.getAdapter()
@@ -194,6 +194,7 @@ export class AgentOrchestrator {
         checkpointer ? { checkpointer } : undefined,
       ) as unknown as StreamRuntime['graph'],
       toolRegistry,
+      artworkStyle,
       buildResponse: this.buildResponse.bind(this),
     }
   }
@@ -219,7 +220,9 @@ export class AgentOrchestrator {
 
   async runPalaceFromNodes(
     selectedNodes: SelectedNodeContent[],
+    fileUuid: string,
     provider = this.provider,
+    artworkStyle: PalaceArtworkStyle = 'vector',
   ): Promise<NodesToPalaceResult> {
     if (selectedNodes.length === 0) {
       return { ok: false, error: '未选中任何节点' }
@@ -235,8 +238,11 @@ export class AgentOrchestrator {
       const result = (await app.invoke(
         {
           messages: [],
-          context: null,
-          artworkStyle: 'vector',
+          context: {
+            fileUuid,
+            selectedNodes: selectedNodes.map((node) => ({ ...node, type: 'text' as const })),
+          },
+          artworkStyle,
           error: '',
           palaceInputText: '',
           palaceInputNodes: selectedNodes,

@@ -81,6 +81,8 @@ export enum IPC {
 
 export type IpcResult<T = void> = { ok: true; data: T } | { ok: false; error: string }
 
+export type { PalaceArtworkStyle } from '../src/shared/lib/palaceArtworkStyle'
+
 // ---- 边界 DTO（Boundary DTOs） ----
 
 /** mcp:connect 载荷：OAuth server 只带 serverId，非 OAuth server 附带表单凭据 */
@@ -454,6 +456,7 @@ export interface MindlaneBridge {
     stopStream: (streamId: string) => Promise<{ ok: boolean }>
     onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void
     nodesToPalace: (payload: {
+      fileUuid: string
       selectedNodes: SelectedNodeContent[]
     }) => Promise<NodesToPalaceResult>
     listProviders: () => Promise<{
@@ -463,7 +466,6 @@ export interface MindlaneBridge {
         models: { id: string; displayName: string }[]
         capabilities: string[]
       }[]
-      image: { id: string; displayName: string }[]
     }>
     getProviders: () => Promise<
       | {

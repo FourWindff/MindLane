@@ -11,6 +11,65 @@
   color: var(--ml-text-muted);
 }
 
+.palace-artwork-field {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(100%, 420px);
+  padding: 3px;
+  border: 1px solid var(--ml-border);
+  border-radius: 8px;
+  background: rgba(28, 25, 23, 0.05);
+}
+
+.settings-segmented-control label {
+  min-width: 0;
+  cursor: pointer;
+}
+
+.settings-segmented-control input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-segmented-control span {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.55rem;
+  border-radius: 5px;
+  color: var(--ml-text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.settings-segmented-control input:checked + span {
+  color: var(--ml-text);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(28, 25, 23, 0.12);
+}
+
+.settings-segmented-control input:focus-visible + span {
+  outline: 2px solid var(--ml-accent);
+  outline-offset: 1px;
+}
+
+.palace-artwork-field:disabled .settings-segmented-control label {
+  cursor: not-allowed;
+}
+
+.palace-artwork-field:disabled .settings-segmented-control span {
+  opacity: 0.42;
+}
+
 .panel-field__input-row {
   display: flex;
   align-items: center;
@@ -570,6 +629,10 @@
   .settings-card__row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .settings-segmented-control {
+    grid-template-columns: 1fr;
   }
 
   .settings-modal {

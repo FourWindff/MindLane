@@ -11,7 +11,7 @@ import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import { isSubgraphCall } from './subgraphRouter.js'
 import { deriveToolStatus } from './toolStatus.js'
-import type { ChatStreamEvent, StreamResponse } from '../ipc.js'
+import type { ChatStreamEvent, PalaceArtworkStyle, StreamResponse } from '../ipc.js'
 import {
   isStreamStep,
   serializeTurnState,
@@ -89,6 +89,7 @@ export interface StreamGraph {
 export interface StreamRuntime {
   graph: StreamGraph
   toolRegistry: ToolRegistry
+  artworkStyle: PalaceArtworkStyle
   buildResponse: (state: MainGraphStateType, streamingContent?: string) => StreamResponse
 }
 
@@ -146,6 +147,7 @@ export class Runner {
         messages: history,
         context: request.context,
         documentRef: request.documentRef ?? null,
+        artworkStyle: runtime.artworkStyle,
       }
       const config = {
         signal: this.abortController.signal,

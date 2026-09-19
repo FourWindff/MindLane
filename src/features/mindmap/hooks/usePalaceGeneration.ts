@@ -110,7 +110,10 @@ export function usePalaceGeneration({
 
     try {
       const result = await Promise.race([
-        mindlane.ai.nodesToPalace({ selectedNodes }),
+        mindlane.ai.nodesToPalace({
+          fileUuid: editor.getState().fileUuid,
+          selectedNodes,
+        }),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 120_000)),
       ])
       if (!result) {

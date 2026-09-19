@@ -73,7 +73,7 @@ function createRuntime(options?: {
   tokensBySession?: Record<string, string>
   fail?: Error
   capturedToolNames?: string[][]
-  capturedInputs?: Array<{ messages: BaseMessage[] }>
+  capturedInputs?: Array<{ messages: BaseMessage[]; artworkStyle?: unknown }>
   omitAssistantState?: boolean
   includeToolState?: boolean
   progress?: { step: string; completed?: number; total?: number }
@@ -95,10 +95,13 @@ function createRuntime(options?: {
   registry.registerTool({ name: 'initial-tool' } as never)
   const graph = {
     stream: vi.fn().mockImplementation(async function* (
-      input: { messages: BaseMessage[] },
+      input: { messages: BaseMessage[]; artworkStyle?: unknown },
       config: { configurable?: { thread_id?: string; tool_names?: string[] } },
     ) {
-      options?.capturedInputs?.push({ messages: input.messages })
+      options?.capturedInputs?.push({
+        messages: input.messages,
+        artworkStyle: input.artworkStyle,
+      })
       const sessionId = config.configurable?.thread_id ?? ''
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
@@ -172,6 +175,7 @@ function createRuntime(options?: {
   return {
     graph,
     toolRegistry: registry,
+    artworkStyle: 'vector',
     buildResponse: (_state, content) => ({ content: content ?? '' }),
   }
 }
@@ -208,6 +212,25 @@ describe('StreamManager + Runner', () => {
         expect.objectContaining({ streamId, sessionId: 'session-a', type: 'end' }),
       ]),
     )
+  })
+
+  it('passes the runtime palace artwork style into the initial graph state', async () => {
+    const { manager, setRuntimeFactory } = createHarness()
+    const capturedInputs: Array<{ messages: BaseMessage[]; artworkStyle?: unknown }> = []
+    setRuntimeFactory(() => {
+      const runtime = createRuntime({ capturedInputs })
+      ;(runtime as StreamRuntime & { artworkStyle: 'raster' }).artworkStyle = 'raster'
+      return runtime
+    })
+
+    manager.startStream({
+      sessionId: 'session-raster',
+      message: '生成记忆宫殿',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(capturedInputs[0]?.artworkStyle).toBe('raster')
   })
 
   it('persists the user message with a trailing EDITOR_STATE turn-state block', async () => {

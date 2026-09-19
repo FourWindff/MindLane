@@ -19,6 +19,36 @@ describe('AppState', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
+  it('defaults a missing palace artwork style to vector', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ chatModel: 'qwen-plus' }))
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('vector')
+  })
+
+  it('coerces an invalid palace artwork style to vector', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ palaceArtworkStyle: 'oil-painting' }),
+    )
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('vector')
+  })
+
+  it('preserves the raster palace artwork style', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ palaceArtworkStyle: 'raster' }),
+    )
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('raster')
+  })
+
   it('keeps non-enumerated setting fields when updating', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),

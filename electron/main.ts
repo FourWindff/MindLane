@@ -348,7 +348,7 @@ app.whenReady().then(async () => {
         orchestrator.updateProvider(provider)
         // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
         orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
-        return orchestrator.getStreamRuntime()
+        return orchestrator.getStreamRuntime(settings.palaceArtworkStyle)
       },
     })
   }

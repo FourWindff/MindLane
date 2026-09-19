@@ -4,7 +4,7 @@ import type { Document } from '@langchain/core/documents'
 import type { ChatToolCallStep, DocumentRef } from '@/shared/lib/fileFormat'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { DetectedAnchor } from './providers/index.js'
-import type { ChatContext } from '../ipc.js'
+import type { ChatContext, PalaceArtworkStyle } from '../ipc.js'
 import type { MindmapOutlineNode } from './utils/mindmapOutline.js'
 
 export type { DocumentRef }
@@ -29,8 +29,6 @@ export type SelectedNodeContent = {
   id: string
   label: string
 }
-
-export type PalaceArtworkStyle = 'vector' | 'raster'
 
 export type MemoryItem = {
   order: number

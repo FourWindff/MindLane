@@ -13,7 +13,7 @@ import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
-import { resolveArtworkStyle } from './palaceGraph/artworkStyle.js'
+import { resolveArtworkStyle } from '../../../src/shared/lib/palaceArtworkStyle.js'
 
 const log = logger.withContext('palace')
 

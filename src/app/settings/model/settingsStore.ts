@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { PalaceArtworkStyle } from '../../../../electron/ipc'
 
 interface ProviderInfo {
   id: string
@@ -16,6 +17,7 @@ interface SettingsState {
   activeChatProvider: string
   apiKey: string
   chatModel: string
+  palaceArtworkStyle: PalaceArtworkStyle
   autoSaveIntervalMs: number
   providers: ProviderInfo[]
   capabilities: string[]
@@ -25,6 +27,7 @@ interface SettingsState {
   setActiveChatProvider: (id: string) => void
   setApiKey: (key: string) => void
   setChatModel: (model: string) => void
+  setPalaceArtworkStyle: (style: PalaceArtworkStyle) => void
   setAutoSaveIntervalMs: (ms: number) => void
   setProviders: (providers: ProviderInfo[]) => void
   setCapabilities: (capabilities: string[]) => void
@@ -49,6 +52,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   activeChatProvider: 'dashscope',
   apiKey: '',
   chatModel: '',
+  palaceArtworkStyle: 'vector',
   autoSaveIntervalMs: 30_000,
   providers: [],
   capabilities: [],
@@ -87,6 +91,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ chatModel: model })
     persistToBackend({ chatModel: model })
   },
+  setPalaceArtworkStyle: (style) => {
+    set({ palaceArtworkStyle: style })
+    persistToBackend({ palaceArtworkStyle: style })
+  },
   setAutoSaveIntervalMs: (ms) => {
     set({ autoSaveIntervalMs: ms })
     persistToBackend({ editor: { autoSaveIntervalMs: ms } })
@@ -109,6 +117,7 @@ export async function loadSettingsFromBackend(): Promise<void> {
   const s = settings as {
     apiKey?: string
     chatModel?: string
+    palaceArtworkStyle?: PalaceArtworkStyle
     activeProviders?: { chat?: string }
     providerConfigs?: Record<string, { apiKey: string; baseUrl?: string }>
     editor?: { autoSaveIntervalMs?: number }
@@ -122,6 +131,7 @@ export async function loadSettingsFromBackend(): Promise<void> {
   useSettingsStore.getState().hydrate({
     apiKey: displayKey,
     chatModel: s.chatModel ?? '',
+    palaceArtworkStyle: s.palaceArtworkStyle ?? 'vector',
     autoSaveIntervalMs: s.editor?.autoSaveIntervalMs ?? 30_000,
     activeChatProvider: providerId,
     providerConfigs: configs,

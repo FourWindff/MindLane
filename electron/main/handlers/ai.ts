@@ -144,13 +144,18 @@ export function registerAiHandlers(ctx: HandlerContext): void {
   // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
   ipcMain.handle(
     IPC.AiNodesToPalace,
-    async (_e, payload: { selectedNodes: SelectedNodeContent[] }) => {
+    async (_e, payload: { fileUuid: string; selectedNodes: SelectedNodeContent[] }) => {
       try {
         const orchestrator = await ctx.getChatOrchestrator()
         if (!orchestrator) return aiNotReadyResponse()
         const settings = await fsService.appState.load()
         const provider = resolveChatProvider(settings)
-        return await orchestrator.runPalaceFromNodes(payload.selectedNodes, provider)
+        return await orchestrator.runPalaceFromNodes(
+          payload.selectedNodes,
+          payload.fileUuid,
+          provider,
+          settings.palaceArtworkStyle,
+        )
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) }
       }
@@ -166,9 +171,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         models: meta.defaultModels.map((m) => ({ ...m })),
         capabilities: meta.capabilities,
       })),
-      image: getRegisteredProviders()
-        .filter((meta) => meta.capabilities.includes('imageGen' as never))
-        .map((meta) => ({ id: meta.id, displayName: meta.displayName })),
     }
   })
 

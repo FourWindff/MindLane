@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/app/workspace/store'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
 import type { MindLaneFile } from '@/shared/lib/fileFormat'
+import { resolveArtworkStyle } from '@/shared/lib/palaceArtworkStyle'
 
 type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor' | 'integrations'
 
@@ -326,6 +327,8 @@ export function SettingsPanel() {
   const setApiKey = useSettingsStore((s) => s.setApiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
   const setChatModel = useSettingsStore((s) => s.setChatModel)
+  const palaceArtworkStyle = useSettingsStore((s) => s.palaceArtworkStyle)
+  const setPalaceArtworkStyle = useSettingsStore((s) => s.setPalaceArtworkStyle)
   const capabilities = useSettingsStore((s) => s.capabilities)
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const setAutoSaveIntervalMs = useSettingsStore((s) => s.setAutoSaveIntervalMs)
@@ -346,6 +349,10 @@ export function SettingsPanel() {
   const chatEnabled = capabilities.includes('chat')
   const visionEnabled = capabilities.includes('vision')
   const imageGenEnabled = capabilities.includes('imageGen')
+  const effectivePalaceArtwork =
+    resolveArtworkStyle(palaceArtworkStyle, new Set(capabilities)) === 'raster'
+      ? '概念图（文生图）'
+      : 'SVG 矢量图'
 
   return (
     <div className="settings-page">
@@ -555,13 +562,41 @@ export function SettingsPanel() {
                 ))}
               </select>
             </div>
+            <fieldset className="panel-field palace-artwork-field" disabled={!imageGenEnabled}>
+              <legend className="panel-field__label">记忆宫殿画面</legend>
+              <div className="settings-segmented-control">
+                <label>
+                  <input
+                    type="radio"
+                    name="palace-artwork-style"
+                    value="vector"
+                    checked={palaceArtworkStyle === 'vector'}
+                    onChange={() => setPalaceArtworkStyle('vector')}
+                  />
+                  <span>使用 SVG 矢量图</span>
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="palace-artwork-style"
+                    value="raster"
+                    checked={palaceArtworkStyle === 'raster'}
+                    onChange={() => setPalaceArtworkStyle('raster')}
+                  />
+                  <span>使用生图模型</span>
+                </label>
+              </div>
+              {!imageGenEnabled && (
+                <div className="settings-card__hint">当前 provider 无文生图能力，将使用矢量图</div>
+              )}
+            </fieldset>
             {activeProvider && (
               <div className="settings-card__hint">
                 {activeProvider.displayName} 支持的功能：
                 {chatEnabled && ' 对话'}
                 {visionEnabled && ' 视觉理解'}
                 {imageGenEnabled && ' 文生图'}
-                {imageGenEnabled ? ' | 记忆宫殿可使用概念图载体' : ' | 记忆宫殿使用 SVG 矢量图'}
+                {' | '}记忆宫殿：{effectivePalaceArtwork}
               </div>
             )}
           </section>

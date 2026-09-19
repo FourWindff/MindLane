@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { buildPalaceSubgraph } from '../palaceGraph.js'
 import { ProviderCapability, type LLMProvider } from '../../providers/index.js'
 import type { ChatContext } from '../../../ipc.js'
-import { resolveArtworkStyle } from '../palaceGraph/artworkStyle.js'
+import { resolveArtworkStyle } from '../../../../src/shared/lib/palaceArtworkStyle.js'
 
 function createMockProvider(): LLMProvider {
   return {

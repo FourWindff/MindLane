@@ -1,5 +1,11 @@
 import type { McpServerUserState } from '../mcp/types.js'
-import type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry } from '../ipc.js'
+import type {
+  IpcResult,
+  PalaceArtworkStyle,
+  RecentFileEntry,
+  WorkspaceFileEntry,
+  WorkspaceTreeEntry,
+} from '../ipc.js'
 
 // 边界 DTO 与结果信封由契约模块单一声明，主进程 fs 域经 re-export 复用同一类型。
 export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry }
@@ -7,6 +13,7 @@ export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry
 export interface AppSettings {
   apiKey: string
   chatModel: string
+  palaceArtworkStyle: PalaceArtworkStyle
   activeProviders: {
     chat: string
   }
@@ -43,6 +50,7 @@ export interface ProviderConfig {
 export const DEFAULT_SETTINGS: AppSettings = {
   apiKey: '',
   chatModel: '',
+  palaceArtworkStyle: 'vector',
   activeProviders: { chat: 'dashscope' },
   providerConfigs: {},
   editor: {

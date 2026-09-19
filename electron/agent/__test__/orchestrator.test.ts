@@ -66,6 +66,63 @@ describe('AgentOrchestrator 编译缓存', () => {
   })
 })
 
+describe('AgentOrchestrator palace artwork preference', () => {
+  it('uses image generation for a direct raster palace request', async () => {
+    const modelInvoke = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          theme: '测试宫殿',
+          scene_brief: '一间测试大厅',
+          route_style: 'arc',
+          stations: [
+            { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({ content: '沿着铜钟前进。' })
+    const generateImage = vi.fn().mockResolvedValue({
+      urls: ['data:image/png;base64,iVBORw0KGgo='],
+    })
+    const provider = {
+      model: {
+        invoke: modelInvoke,
+        bindTools: vi.fn().mockReturnValue({ invoke: vi.fn() }),
+        withStructuredOutput: vi.fn().mockReturnValue({ invoke: vi.fn() }),
+      },
+      visionModel: {
+        invoke: vi.fn().mockResolvedValue({
+          content: JSON.stringify([{ order: 1, x: 0.25, y: 0.4 }]),
+        }),
+      },
+      capabilities: new Set([
+        ProviderCapability.Chat,
+        ProviderCapability.ImageGen,
+        ProviderCapability.Vision,
+      ]),
+      models: [],
+      generateImage,
+    } as unknown as LLMProvider
+    const orchestrator = new AgentOrchestrator(provider, createMockServices())
+    const runPalaceFromNodes = orchestrator.runPalaceFromNodes.bind(orchestrator) as (
+      nodes: Array<{ id: string; label: string }>,
+      fileUuid: string,
+      provider: LLMProvider,
+      artworkStyle: 'vector' | 'raster',
+    ) => Promise<{ ok: boolean }>
+
+    const result = await runPalaceFromNodes(
+      [{ id: 'n1', label: '第一站' }],
+      'file-a',
+      provider,
+      'raster',
+    )
+
+    expect(result).toEqual(expect.objectContaining({ ok: true }))
+    expect(generateImage).toHaveBeenCalledOnce()
+  })
+})
+
 describe('AgentOrchestrator buildGraph 结构', () => {
   it('无论 provider 能力如何，graph 节点结构完全一致', () => {
     const providerWithPalace = createMockProvider(
