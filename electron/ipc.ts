@@ -20,12 +20,9 @@ export enum IPC {
   AiMindmapReadRespond = 'ai:mindmap-read-respond',
   AiMindmapWriteRequest = 'ai:mindmap-write-request',
   AiMindmapWriteRespond = 'ai:mindmap-write-respond',
-  AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
   AiGetCapabilities = 'ai:get-capabilities',
   AiIsReady = 'ai:is-ready',
-
-  ImageUrlToDataUrl = 'image:url-to-data-url',
 
   FileOpen = 'file:open',
   FileSave = 'file:save',
@@ -73,7 +70,6 @@ export enum IPC {
   WindowToggleMaximize = 'window:toggle-maximize',
   WindowClose = 'window:close',
   WindowCloseConfirmed = 'window:close-confirmed',
-  WindowOpenDevtools = 'window:open-devtools',
 }
 
 // ---- 结果信封（Result Envelope） ----
@@ -492,14 +488,6 @@ export interface MindlaneBridge {
     }) => Promise<{ ok: true; streamId: string } | { ok: false; error: string }>
     stopStream: (streamId: string) => Promise<{ ok: boolean }>
     onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void
-    listProviders: () => Promise<{
-      chat: {
-        id: string
-        displayName: string
-        models: { id: string; displayName: string }[]
-        capabilities: string[]
-      }[]
-    }>
     getProviders: () => Promise<
       | {
           ok: true
@@ -525,7 +513,6 @@ export interface MindlaneBridge {
     onMindmapWriteRequest: (callback: (request: MindmapWriteRequest) => void) => () => void
     /** 渲染层 → 主进程：落盘应答（未知 requestId 为 no-op）。 */
     respondMindmapWrite: (payload: MindmapWriteResponse) => Promise<void>
-    urlToDataUrl: (payload: { url: string }) => Promise<IpcResult<{ dataUrl: string }>>
   }
   file: {
     open: () => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>

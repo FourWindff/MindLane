@@ -1,10 +1,6 @@
 import { ipcMain } from 'electron'
 import crypto from 'node:crypto'
-import {
-  urlToDataUrl,
-  getProviderMeta,
-  getRegisteredProviders,
-} from '../../agent/providers/index.js'
+import { getProviderMeta, getRegisteredProviders } from '../../agent/providers/index.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
 import type {
   ChatContext,
@@ -147,28 +143,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
     },
   )
 
-  // -- Image URL to base64 data URL --
-  ipcMain.handle(IPC.ImageUrlToDataUrl, async (_e, payload: { url: string }) => {
-    try {
-      const dataUrl = await urlToDataUrl(payload.url)
-      return { ok: true, data: { dataUrl } }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
-    }
-  })
-
   // -- Provider management --
-  ipcMain.handle(IPC.AiListProviders, async () => {
-    return {
-      chat: getRegisteredProviders().map((meta) => ({
-        id: meta.id,
-        displayName: meta.displayName,
-        models: meta.defaultModels.map((m) => ({ ...m })),
-        capabilities: meta.capabilities,
-      })),
-    }
-  })
-
   ipcMain.handle(IPC.AiGetProviders, async () => {
     return {
       ok: true,

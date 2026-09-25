@@ -13,7 +13,6 @@ const api: MindlaneBridge = {
     chatStream: (payload) => ipcRenderer.invoke(IPC.AiChatStream, payload),
     stopStream: (streamId) => ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }),
     onStreamEvent: onChatStreamEvent,
-    listProviders: () => ipcRenderer.invoke(IPC.AiListProviders),
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
     getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),
     isReady: () => ipcRenderer.invoke(IPC.AiIsReady),
@@ -23,7 +22,6 @@ const api: MindlaneBridge = {
     onMindmapWriteRequest: onMindmapWriteRequest,
     respondMindmapWrite: (payload: MindmapWriteResponse) =>
       ipcRenderer.invoke(IPC.AiMindmapWriteRespond, payload),
-    urlToDataUrl: (payload) => ipcRenderer.invoke(IPC.ImageUrlToDataUrl, payload),
   },
   file: {
     open: () => ipcRenderer.invoke(IPC.FileOpen),

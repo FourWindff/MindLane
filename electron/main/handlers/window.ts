@@ -24,8 +24,4 @@ export function registerWindowHandlers(ctx: HandlerContext): void {
     ctx.setForceClose(true)
     ctx.getWindow()?.close()
   })
-
-  ipcMain.handle(IPC.WindowOpenDevtools, () => {
-    ctx.getWindow()?.webContents.openDevTools()
-  })
 }

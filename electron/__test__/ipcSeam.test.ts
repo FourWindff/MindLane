@@ -150,10 +150,9 @@ describe('IPC seam contract', () => {
     const missing = [...requested].filter((m) => !registered.has(m))
     expect(missing).toEqual([])
 
-    // 防幽灵注册：主进程注册的 channel 必须被 preload 请求使用，
-    // 唯一例外是历史遗留的主进程独占 channel（渲染层从不调用）。
+    // 防幽灵注册：主进程注册的 channel 必须被 preload 请求使用。
     const mainOnly = [...registered].filter((m) => !requested.has(m))
-    expect(mainOnly).toEqual(['WindowOpenDevtools'])
+    expect(mainOnly).toEqual([])
   })
 
   it('pairs webContents.send push channels with preload on-channels', () => {
