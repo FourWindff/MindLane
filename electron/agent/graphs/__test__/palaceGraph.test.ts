@@ -6,6 +6,16 @@ import type { ChatContext } from '../../../ipc.js'
 import { resolveArtworkStyle } from '../../../../src/shared/lib/palaceArtworkStyle.js'
 import { GENERATE_PALACE_TOOL } from '../../tools/subgraphRoutingTools.js'
 
+// The subgraph nodes key their per-run bookkeeping by the Runner's run context
+// and throw without one (the `(no-stream)` fallback key is gone). These unit
+// tests drive the subgraph directly, so they pin a run id here; the
+// run-context requirement itself is covered by the run-contract seam test.
+vi.mock('../../../shared/runContext.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../shared/runContext.js')>()),
+  currentStreamId: () => 'stream_test',
+  requireStreamId: () => 'stream_test',
+}))
+
 function createMockProvider(): LLMProvider {
   return {
     model: {

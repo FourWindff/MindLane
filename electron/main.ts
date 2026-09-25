@@ -314,12 +314,12 @@ app.whenReady().then(async () => {
   const mindmapWriteRequester = new MindmapWriteRequester(() => win)
 
   // 唯一装配点：惰性创建（或复用）当前 orchestrator。createRuntime 与
-  // getChatOrchestrator 都从这里取，避免两条构造路径漂移。
+  // 就绪门控后的聊天运行都从这里取，避免两条构造路径漂移。
   const ensureChatOrchestrator = async (): Promise<AgentOrchestrator> => {
     if (!chatOrchestrator) {
       const settings = await fsService.appState.load()
       const provider = resolveChatProvider(settings)
-      // 惰性创建仅发生在就绪门控通过之后（getChatOrchestrator），services 必非空。
+      // 惰性创建仅发生在就绪门控通过之后，services 必非空。
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
         mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
@@ -361,10 +361,6 @@ app.whenReady().then(async () => {
     mindmapReadRequester,
     mindmapWriteRequester,
     getStreamManager: () => streamManager,
-    getChatOrchestrator: async () => {
-      if (!aiServiceReady) return null
-      return ensureChatOrchestrator()
-    },
     getMcpManager: () => mcpManager,
     isAiServiceReady: () => aiServiceReady,
     userDataPath,

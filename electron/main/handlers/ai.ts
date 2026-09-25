@@ -4,11 +4,14 @@ import {
   urlToDataUrl,
   getProviderMeta,
   getRegisteredProviders,
-  resolveChatProvider,
 } from '../../agent/providers/index.js'
-import type { SelectedNodeContent } from '../../agent/state.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
-import type { ChatContext, MindmapReadResponse, MindmapWriteResponse } from '../../ipc.js'
+import type {
+  ChatContext,
+  EphemeralRunRequest,
+  MindmapReadResponse,
+  MindmapWriteResponse,
+} from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { aiNotReadyResponse } from './helpers.js'
@@ -26,33 +29,45 @@ export function registerAiHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(
     IPC.AiChatStream,
-    async (_e, payload: { threadId: string; message: string; context: ChatContext }) => {
+    async (
+      _e,
+      payload: {
+        threadId: string
+        message: string
+        context: ChatContext
+        ephemeral?: EphemeralRunRequest
+      },
+    ) => {
       if (!ctx.isAiServiceReady()) {
         return aiNotReadyResponse()
       }
 
       try {
-        if (!payload.message?.trim()) {
+        // Ephemeral runs (manual palace) may carry an empty message: the palace
+        // subgraph takes its input from the selection, and a resume re-runs the
+        // private thread with empty input.
+        if (!payload.message?.trim() && !payload.ephemeral) {
           return { ok: false, error: '消息不能为空' }
         }
 
         const workspacePath = payload.context.workspacePath
-        // 源头不变量：发送必有活动文件（fileUuid 创建即存在），下游不做存在性检查。
-        // 工作区路径仍是持久化前提（workspaceUuid 解析），此处保留。
-        if (!workspacePath) {
-          return { ok: false, error: '聊天上下文缺少工作区路径' }
-        }
-        let workspaceUuid: string
-        {
+        // Source invariant: a send always has an active file (the fileUuid exists
+        // from creation). The workspace path is what session persistence needs
+        // (workspaceUuid resolution); an ephemeral run writes no session record,
+        // so a standalone file outside any workspace can still run.
+        let workspaceUuid = ''
+        if (workspacePath) {
           const workspaceState = await fsService.workspace.load(workspacePath)
           if (!workspaceState.ok) return workspaceState
           workspaceUuid = workspaceState.data.workspaceUuid
           if (!workspaceUuid) return { ok: false, error: '工作区缺少稳定身份' }
+        } else if (!payload.ephemeral) {
+          return { ok: false, error: '聊天上下文缺少工作区路径' }
         }
 
         const request: StreamRequest = {
           sessionId: payload.threadId || crypto.randomUUID(),
-          message: payload.message,
+          message: payload.message ?? '',
           workspaceUuid,
           context: {
             ...payload.context,
@@ -61,6 +76,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
             ),
           },
           documentRef: payload.context?.attachedDocument,
+          ephemeral: payload.ephemeral,
         }
 
         const streamManager = ctx.getStreamManager()
@@ -140,27 +156,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
-
-  // -- Nodes to Palace pipeline (multi-agent: Analyze → imageGen → Vision) --
-  ipcMain.handle(
-    IPC.AiNodesToPalace,
-    async (_e, payload: { fileUuid: string; selectedNodes: SelectedNodeContent[] }) => {
-      try {
-        const orchestrator = await ctx.getChatOrchestrator()
-        if (!orchestrator) return aiNotReadyResponse()
-        const settings = await fsService.appState.load()
-        const provider = resolveChatProvider(settings)
-        return await orchestrator.runPalaceFromNodes(
-          payload.selectedNodes,
-          payload.fileUuid,
-          provider,
-          settings.palaceArtworkStyle,
-        )
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
-    },
-  )
 
   // -- Provider management --
   ipcMain.handle(IPC.AiListProviders, async () => {

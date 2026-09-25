@@ -6,6 +6,7 @@ import { AgentOrchestrator } from '../orchestrator.js'
 import type { AgentServices } from '../service.js'
 import { ProviderCapability, type LLMProvider } from '../providers/index.js'
 import { AGENT_LIMITS } from '../config.js'
+import { runWithStreamId } from '../../shared/runContext.js'
 import { StreamManager } from '../streamManager.js'
 import type { SessionManager } from '../context/sessionManager.js'
 import type { ChatStreamEvent } from '../../ipc.js'
@@ -156,6 +157,187 @@ const SVG_ARTIFACT =
   '{"stations":[{"order":1,"x":0.25,"y":0.4}]}\n<svg viewBox="0 0 1000 1000"><g data-station="1"><circle cx="250" cy="400" r="20"/></g></svg>'
 
 /**
+ * Scripted provider for the manual palace run: the palace subgraph's two model
+ * calls (plan → artwork) are keyed on their prompts, and any supervisor call is
+ * a contract violation — the palace entry must not ask the model to route.
+ */
+function palaceRunProvider(options: { blockArtwork?: boolean } = {}) {
+  let releaseArtwork: () => void = () => undefined
+  const artworkGate = new Promise<void>((resolve) => {
+    releaseArtwork = resolve
+  })
+  const invoke = vi.fn(async (messages: BaseMessage[]) => {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const last = messages[messages.length - 1] as { content?: unknown } | undefined
+    const prompt = typeof last?.content === 'string' ? last.content : ''
+    if (prompt.includes('请为以下')) return new AIMessage({ content: PALACE_PLAN_JSON })
+    if (prompt.includes('主题：')) {
+      if (options.blockArtwork) await artworkGate
+      return new AIMessage({ content: SVG_ARTIFACT })
+    }
+    throw new Error(`unexpected palace prompt: ${prompt.slice(0, 120)}`)
+  })
+  const supervisorInvoke = vi.fn(async () => {
+    throw new Error('palace entry must not run the supervisor')
+  })
+
+  return {
+    provider: {
+      model: {
+        invoke,
+        bindTools: () => ({ invoke: supervisorInvoke }),
+        withStructuredOutput: () => ({ invoke }),
+      },
+      contextWindow: 32_768,
+      capabilities: new Set([ProviderCapability.Chat]),
+      models: [],
+    } as unknown as LLMProvider,
+    /** Model calls whose last message carries the marker (plan vs artwork). */
+    calls: (marker: string) =>
+      invoke.mock.calls.filter(([messages]) => {
+        const last = messages[messages.length - 1] as { content?: unknown } | undefined
+        return typeof last?.content === 'string' && last.content.includes(marker)
+      }).length,
+    releaseArtwork,
+  }
+}
+
+/**
+ * Manual palace generation is one ephemeral graph run (CONTEXT.md「临时运行」):
+ * the request carries the entry marker, START goes straight to the palace
+ * subgraph, nothing reaches a session, and the run's `end` carries the landing
+ * payload exactly once.
+ */
+describe('手动宫殿：一次临时运行', () => {
+  const palaceRequest = (sessionId: string, privateThreadId: string, resume = false) => ({
+    sessionId,
+    message: '',
+    workspaceUuid: 'workspace-a',
+    context: {
+      fileUuid: 'file-a',
+      filePath: '/a.mindlane',
+      fileTitle: '读书笔记',
+      selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+    },
+    ephemeral: { privateThreadId, runEntry: 'palace' as const, ...(resume ? { resume } : {}) },
+  })
+
+  it('不发模型回合、不写会话、発阶段进度、只带一份落图载荷结束', async () => {
+    const scripted = palaceRunProvider()
+    const harness = createHarness(scripted.provider)
+
+    harness.manager.startStream(palaceRequest('palace-run-1', 'palace-thread-1'))
+    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+
+    // Stage progress flows like any other run (same channel, same vocabulary).
+    // The manual run answers no virtual tool call, so no callId rides along and
+    // no tool card is declared — its progress belongs to the palace node.
+    const steps = harness.events
+      .filter((event) => event.type === 'step')
+      .map((event) => event.payload)
+    expect(steps).toEqual([{ step: 'planning-stations' }, { step: 'generating-image' }])
+    expect(
+      harness.events.filter((event) => event.type === 'tool-start' || event.type === 'tool-end'),
+    ).toEqual([])
+
+    // The model was asked to plan and to draw — never to route (no compaction,
+    // no supervisor): two subgraph calls, zero supervisor turns.
+    expect(scripted.calls('请为以下')).toBe(1)
+    expect(scripted.calls('主题：')).toBe(1)
+
+    // Zero session writes: no history read, no user message, no result.
+    expect(harness.savedUserMessages).toEqual([])
+    expect(harness.persisted.size).toBe(0)
+
+    const ends = harness.events.filter((event) => event.type === 'end')
+    const landingPayloads = ends.filter(
+      (event) => (event.payload as { palaceData?: unknown }).palaceData,
+    )
+    expect(landingPayloads).toHaveLength(1)
+    expect((landingPayloads[0]!.payload as { palaceData: unknown }).palaceData).toMatchObject({
+      ok: true,
+      label: '测试宫殿',
+      sourceNodeIds: ['n1'],
+      imageUrl: expect.stringMatching(/^data:image\/svg\+xml/),
+    })
+  })
+
+  it('中止后同线程空输入续跑：已完成的超步不重跑，落图仍在同一载荷上收尾', async () => {
+    const scripted = palaceRunProvider({ blockArtwork: true })
+    const harness = createHarness(scripted.provider)
+
+    // Run 1: stop while the artwork stage is in flight — the plan super-step has
+    // already completed and is checkpointed on the private thread.
+    const firstStreamId = harness.manager.startStream(
+      palaceRequest('palace-run-2', 'palace-thread-2'),
+    )
+    await waitUntil(() =>
+      harness.events.some(
+        (event) =>
+          event.type === 'step' && (event.payload as { step?: string }).step === 'generating-image',
+      ),
+    )
+    expect(scripted.calls('请为以下')).toBe(1)
+    harness.manager.stopStream(firstStreamId)
+    scripted.releaseArtwork()
+    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    // A stopped run lands nothing: no palace payload on its end event.
+    expect(
+      harness.events
+        .filter((event) => event.type === 'end')
+        .every((event) => !(event.payload as { palaceData?: unknown }).palaceData),
+    ).toBe(true)
+
+    // Resume: same private thread, empty input.
+    harness.manager.startStream(palaceRequest('palace-run-3', 'palace-thread-2', true))
+    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+
+    // The completed stage did not re-run (one plan call across both runs), the
+    // interrupted one did, and the resumed run still lands.
+    expect(scripted.calls('请为以下')).toBe(1)
+    expect(scripted.calls('主题：')).toBe(2)
+    const ends = harness.events.filter(
+      (event) => event.type === 'end' && (event.payload as { palaceData?: unknown }).palaceData,
+    )
+    expect(ends).toHaveLength(1)
+    expect((ends[0]!.payload as { palaceData: unknown }).palaceData).toMatchObject({
+      ok: true,
+      sourceNodeIds: ['n1'],
+    })
+    expect(harness.persisted.size).toBe(0)
+  })
+
+  it('子图没有运行上下文时直接报错（兜底键已删除）', async () => {
+    const { provider } = palaceRunProvider()
+    const orchestrator = new AgentOrchestrator(provider, {
+      checkpointer: { getAdapter: () => new MemorySaver() },
+      sessionManager: { workspaceUuid: 'workspace-a' },
+    } as unknown as AgentServices)
+    const graph = orchestrator.getStreamRuntime().graph
+
+    // No Runner wrapped this stream, so there is no run context to key the
+    // subgraph's per-run bookkeeping — that must fail loudly, not share a bucket.
+    const runWithoutContext = async () => {
+      const stream = await graph.stream(
+        {
+          runEntry: 'palace',
+          context: {
+            fileUuid: 'file-a',
+            selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+          },
+          artworkStyle: 'vector' as const,
+        },
+        { streamMode: ['custom'] },
+      )
+      for await (const chunk of stream) {
+        void chunk // drain to the failure
+      }
+    }
+    await expect(runWithoutContext()).rejects.toThrow(/运行上下文/)
+  })
+})
+
+/**
  * One scripted provider for a round that declares several calls at once.
  *
  * Supervisor calls go through `bindTools`; both subgraphs call the plain model,
@@ -290,25 +472,28 @@ describe('主图以节点形式挂载两个子图', () => {
 
   it('长文档（多波 leaf + 归并）在共享预算内跑完，旧的 80 步预算不够', async () => {
     const batches = 150
-    const runOnce = async (recursionLimit: number): Promise<ToolMessage | undefined> => {
-      const harness = createHarness(scriptedProvider(512), false)
-      const runtime = harness.orchestrator.getStreamRuntime()
-      const stream = await runtime.graph.stream(
-        {
-          messages: [new HumanMessage(manyBatchText(batches))],
-          context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '长文档' },
-          artworkStyle: 'vector',
-        },
-        { recursionLimit, streamMode: ['messages'] },
-      )
-      let toolMessage: ToolMessage | undefined
-      for await (const [mode, payload] of stream) {
-        if (mode !== 'messages') continue
-        const [message] = payload as [BaseMessage]
-        if (message.type === 'tool') toolMessage = message as ToolMessage
-      }
-      return toolMessage
-    }
+    const runOnce = (recursionLimit: number): Promise<ToolMessage | undefined> =>
+      // The run context is what the subgraph keys its waves by: the direct-graph
+      // test plays the Runner's part.
+      runWithStreamId('stream-test', 'session-long-doc', async () => {
+        const harness = createHarness(scriptedProvider(512), false)
+        const runtime = harness.orchestrator.getStreamRuntime()
+        const stream = await runtime.graph.stream(
+          {
+            messages: [new HumanMessage(manyBatchText(batches))],
+            context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '长文档' },
+            artworkStyle: 'vector',
+          },
+          { recursionLimit, streamMode: ['messages'] },
+        )
+        let toolMessage: ToolMessage | undefined
+        for await (const [mode, payload] of stream) {
+          if (mode !== 'messages') continue
+          const [message] = payload as [BaseMessage]
+          if (message.type === 'tool') toolMessage = message as ToolMessage
+        }
+        return toolMessage
+      })
 
     // Subgraph super-steps count against the host graph's budget (S9a): the
     // pre-change 80 would die mid-wave, which is why AGENT_LIMITS was retuned.

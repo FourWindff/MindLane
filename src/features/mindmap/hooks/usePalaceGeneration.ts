@@ -6,11 +6,17 @@ import { reportRendererError } from '@/shared/lib/reportRendererError'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { findParentId, newId } from '@/shared/lib/mindmapTree'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
-import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
+import { startPalaceRun } from '@/features/mindmap/model/palaceRun'
+import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import type { VisualVariant } from '@/features/mindmap/style/types'
 
+/**
+ * Manual palace generation (CONTEXT.md「触发面」): the user's gesture starts one
+ * ephemeral graph run (see palaceRun.ts) instead of calling the palace subgraph
+ * outside the graph. The placeholder node and the edge rewiring stay here; the
+ * run's progress, resume entry and landing live in the palace run module.
+ */
 export function usePalaceGeneration({
   nodes,
   edges,
@@ -108,80 +114,36 @@ export function usePalaceGeneration({
     editor.batch(commands)
     ai.setBusy(true)
 
+    const fileUuid = editor.getState().fileUuid
+    // Settling clears the run's own file flag: the user may have switched files
+    // while the palace was generating.
+    const settle = () => useAiStore.getState().setFileBusy(fileUuid, false)
+    let started: { ok: true } | { ok: false; error: string }
     try {
-      const result = await Promise.race([
-        mindlane.ai.nodesToPalace({
-          fileUuid: editor.getState().fileUuid,
-          selectedNodes,
-        }),
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 120_000)),
-      ])
-      if (!result) {
-        rollback()
-        reportRendererError('生成超时（超过 2 分钟），请检查网络后重试')
-        ai.setBusy(false)
-        return
-      }
-      if (!result.ok) {
-        rollback()
-        const message = (result as { ok: false; error: string }).error || '生成失败（未知错误）'
-        reportRendererError(`AI 返回错误：${message}`)
-        ai.setBusy(false)
-        return
-      }
-
-      // 图片生成即内嵌（PRD 4.1）：data URL → base64 asset，sha256 去重；
-      // 下载失败该次插入报错（子图已把远程 URL 转 data URL，失败在子图内报错）
-      let assetId: string | undefined
-      if (result.imageUrl) {
-        const dataUrl = parseDataUrl(result.imageUrl)
-          ? result.imageUrl
-          : await window.mindlane?.ai
-              .urlToDataUrl({ url: result.imageUrl })
-              .then((r) => (r.ok ? r.data.dataUrl : null))
-        if (!dataUrl) {
-          rollback()
-          reportRendererError('宫殿图片下载失败，本次插入已取消')
-          ai.setBusy(false)
-          return
-        }
-        const asset = await assetFromDataUrl(dataUrl)
-        if (asset) {
-          assetId = mindmapRegistry.getActive()?.store.getState().addAsset(asset)
-        }
-      }
-
-      editor.batch([
-        {
-          type: 'updateNode',
-          nodeId: palaceId,
-          patch: (node) => ({
-            ...node,
-            data: {
-              label: result.label,
-              ...(assetId ? { assetId } : {}),
-              imageUrl: '',
-              stations: result.stations,
-              sourceNodeIds: result.sourceNodeIds,
-              expanded: true,
-              generating: undefined,
-            },
-          }),
-        },
-        ...[...selectedIdSet].map((nodeId) => ({
-          type: 'updateNode' as const,
-          nodeId,
-          patch: (node: Node) => ({
-            ...node,
-            data: { ...node.data, processing: undefined },
-          }),
+      // The palace subgraph reads its input from the turn state's selection.
+      const context = {
+        ...buildChatContext(),
+        selectedNodes: selectedNodes.map((node) => ({
+          id: node.id,
+          type: 'text' as const,
+          label: node.label,
         })),
-      ])
-      ai.reset()
+      }
+      started = await startPalaceRun({
+        fileUuid,
+        nodeId: palaceId,
+        context,
+        // The run itself never touches the chat history (that is the ephemeral
+        // contract); settling only releases the busy flag.
+        handlers: { settle },
+      })
     } catch (error) {
+      started = { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+    if (!started.ok) {
       rollback()
-      reportRendererError(`生成异常：${error instanceof Error ? error.message : String(error)}`)
-      ai.setBusy(false)
+      reportRendererError(`宫殿生成启动失败：${started.error}`)
+      settle()
     }
   }, [aiBusy, chatReady, edges, editor, nodes, selectedId, visualVariant])
 }

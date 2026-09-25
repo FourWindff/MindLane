@@ -9,6 +9,16 @@ import type { LLMProvider } from '../../../providers/index.js'
 import { MindmapSubgraphState } from '../../../state.js'
 import { GENERATE_MINDMAP_FRAGMENT_TOOL } from '../../../tools/subgraphRoutingTools.js'
 
+// The subgraph nodes key their per-run bookkeeping by the Runner's run context
+// and throw without one (the `(no-stream)` fallback key is gone). These unit
+// tests drive the subgraph directly, so they pin a run id here; the
+// run-context requirement itself is covered by the run-contract seam test.
+vi.mock('../../../../shared/runContext.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../shared/runContext.js')>()),
+  currentStreamId: () => 'stream_test',
+  requireStreamId: () => 'stream_test',
+}))
+
 type InvokeMock = ReturnType<typeof vi.fn>
 
 function mockProvider(

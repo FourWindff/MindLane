@@ -187,7 +187,7 @@
 - 定义在共享契约 `ipc.ts`；主进程 emits 与渲染层消费同一份词表，两侧由编译器同时看守。
 - 子图节点可发射的步骤值是 `StreamStep` 去掉 `generating-map`（它由工具事件触发，不由节点发射），两个子图共用同一份声明。
 - `step` 载荷带 `callId`（发出该阶段的子图调用），是并行时卡片归因的唯一依据。
-- 渲染层不再有其超集：`step` 事件的唯一消费方是正在运行的子图卡片的阶段轨迹。
+- 渲染层不再有其超集：`step` 事件只有两个消费方——正在运行的子图卡片的阶段轨迹，与手动宫殿运行时占位节点旁的阶段文案。
 
 ## 子图接入与触发
 
@@ -215,7 +215,7 @@
 ### 临时运行（Ephemeral Run）
 
 - 手动触发记忆宫殿的那次运行：挂在私有线程上，不写会话记录、不进会话列表，但照常发流事件与阶段进度。
-- 中止或失败后可在原线程续跑。
+- 中止或失败后可在原线程续跑：续跑是一次空输入的运行（保留已完成的超步，只重跑被中断的那一个）；运行已跑完时续跑退化为同一线程上的新一次运行。
 
 ### 确定性落图（Deterministic Landing）
 
@@ -250,6 +250,7 @@
 - `aiStore` 在创建时注册单一 `onStreamEvent` 监听器。
 - 维护 `sessionId -> fileUuid` 映射与 `activeStreamIds: Record<sessionId, streamId>`。
 - 收到事件时先通过 `sessionId` 找到 `fileUuid`，再校验 `streamId` 是否仍有效；无效则丢弃。
+- 手动宫殿的临时运行不属于任何会话：其事件在会话路由之前交给宫殿运行（按 `streamId` 归位，`invoke` 未 resolve 时按会话 id 暂存），不进 `FileChatState`。
 - `end`/`error` 事件后从 `activeStreamIds` 中移除对应条目。
 - 注册前到达事件的缓冲与配对冲刷见「发送握手」。
 
@@ -260,6 +261,7 @@
 - invoke 未 resolve 期间到达的流事件进入 pending-event buffer（按 `sessionId` 暂存）；`registerStream` 注册映射后配对冲刷，只放行 `streamId` 匹配的事件。
 - 握手全程以发起前捕获的 origin ids（`fileUuid` / `sessionId`）为准，不用切换文件后的当前投影。
 - 握手与 buffer 住在同一 module（`aiStore.ts`），时序由单元测试固定。
+- 临时运行（手动宫殿）自己拥有一份同形的握手与 buffer：它不注册会话，事件交给宫殿运行而不是 `FileChatState`。
 
 ### 会话 API
 

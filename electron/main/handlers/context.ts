@@ -1,5 +1,4 @@
 import type { BrowserWindow } from 'electron'
-import type { AgentOrchestrator } from '../../agent/orchestrator.js'
 import type { SessionManager } from '../../agent/context/sessionManager.js'
 import type { EditLogStore } from '../../agent/memory/editLogStore.js'
 import type { StreamManager } from '../../agent/streamManager.js'
@@ -26,8 +25,6 @@ export interface HandlerContext {
   /** 主进程 → 渲染层落盘请求器（requestId 关联 + 超时），装配时创建。 */
   mindmapWriteRequester: MindmapWriteRequester
   getStreamManager: () => StreamManager | null
-  /** 可空、惰性创建：主进程负责在首次需要时装配 AgentOrchestrator。 */
-  getChatOrchestrator: () => Promise<AgentOrchestrator | null>
   getMcpManager: () => McpManager | null
   isAiServiceReady: () => boolean
   userDataPath: string

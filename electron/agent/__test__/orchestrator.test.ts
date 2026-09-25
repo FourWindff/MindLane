@@ -66,64 +66,15 @@ describe('AgentOrchestrator 编译缓存', () => {
   })
 })
 
-describe('AgentOrchestrator palace artwork preference', () => {
-  it('uses image generation for a direct raster palace request', async () => {
-    const modelInvoke = vi
-      .fn()
-      .mockResolvedValueOnce({
-        content: JSON.stringify({
-          theme: '测试宫殿',
-          scene_brief: '一间测试大厅',
-          route_style: 'arc',
-          stations: [
-            { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
-          ],
-        }),
-      })
-      .mockResolvedValueOnce({ content: '沿着铜钟前进。' })
-    const generateImage = vi.fn().mockResolvedValue({
-      urls: ['data:image/png;base64,iVBORw0KGgo='],
-    })
-    const provider = {
-      model: {
-        invoke: modelInvoke,
-        bindTools: vi.fn().mockReturnValue({ invoke: vi.fn() }),
-        withStructuredOutput: vi.fn().mockReturnValue({ invoke: vi.fn() }),
-      },
-      visionModel: {
-        invoke: vi.fn().mockResolvedValue({
-          content: JSON.stringify([{ order: 1, x: 0.25, y: 0.4 }]),
-        }),
-      },
-      capabilities: new Set([
-        ProviderCapability.Chat,
-        ProviderCapability.ImageGen,
-        ProviderCapability.Vision,
-      ]),
-      models: [],
-      generateImage,
-    } as unknown as LLMProvider
-    const orchestrator = new AgentOrchestrator(provider, createMockServices())
-    const runPalaceFromNodes = orchestrator.runPalaceFromNodes.bind(orchestrator) as (
-      nodes: Array<{ id: string; label: string }>,
-      fileUuid: string,
-      provider: LLMProvider,
-      artworkStyle: 'vector' | 'raster',
-    ) => Promise<{ ok: boolean }>
-
-    const result = await runPalaceFromNodes(
-      [{ id: 'n1', label: '第一站' }],
-      'file-a',
-      provider,
-      'raster',
-    )
-
-    expect(result).toEqual(expect.objectContaining({ ok: true }))
-    expect(generateImage).toHaveBeenCalledOnce()
-  })
-})
-
 describe('AgentOrchestrator buildGraph 结构', () => {
+  /** Conditional-edge targets of a node, read straight off the un-compiled graph. */
+  function branchEnds(graph: unknown, node: string): Record<string, string> {
+    const branches = (
+      graph as { branches: Record<string, { condition: { ends: Record<string, string> } }> }
+    ).branches
+    return branches[node]?.condition.ends ?? {}
+  }
+
   it('无论 provider 能力如何，graph 节点结构完全一致', () => {
     const providerWithPalace = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
@@ -163,18 +114,38 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     }
   })
 
+  it('START 按入口标记分派：聊天走压缩，手动宫殿直达宫殿子图', () => {
+    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
+
+    const graph = (orchestrator as unknown as Record<string, () => unknown>)['buildGraph'].bind(
+      orchestrator,
+    )()
+
+    expect(branchEnds(graph, '__start__')).toEqual({
+      contextCompact: 'contextCompact',
+      palaceSubgraph: 'palaceSubgraph',
+    })
+  })
+
   it('每个子图节点直接回到 supervisor：没有收口节点', () => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
 
     const graph = (
       orchestrator as unknown as {
-        buildGraph: () => { edges: Iterable<[string, string]> }
+        buildGraph: () => unknown
       }
     )['buildGraph'].bind(orchestrator)()
-    const edges = Array.from(graph.edges).map((edge) => edge.join('->'))
+    const edges = Array.from((graph as { edges: Iterable<[string, string]> }).edges).map((edge) =>
+      edge.join('->'),
+    )
 
     expect(edges).toContain('mindmapSubgraph->supervisor')
-    expect(edges).toContain('palaceSubgraph->supervisor')
+    // The palace node goes back to the supervisor on a chat run, and ends the
+    // run on the manual entry (which never reaches the supervisor).
+    expect(branchEnds(graph, 'palaceSubgraph')).toEqual({
+      supervisor: 'supervisor',
+      __end__: '__end__',
+    })
   })
 })
 
@@ -191,23 +162,20 @@ describe('AgentOrchestrator contextCompact node', () => {
     expect(Object.keys(graph.nodes)).toContain('contextCompact')
   })
 
-  it('START edge points to contextCompact, not supervisor', () => {
+  it('START entry is conditional: compaction for chat, palace subgraph for the manual run', () => {
     const provider = createMockProvider()
     const orchestrator = new AgentOrchestrator(provider, createMockServices())
 
-    const buildGraph = (
-      orchestrator as unknown as Record<string, () => { edges: Array<[string, string]> }>
-    )['buildGraph'].bind(orchestrator)
+    const buildGraph = (orchestrator as unknown as Record<string, () => unknown>)[
+      'buildGraph'
+    ].bind(orchestrator)
     const graph = buildGraph()
 
-    let startTarget = null
-    for (const edge of graph.edges) {
-      if (edge[0] === '__start__') {
-        startTarget = edge[1]
-        break
-      }
-    }
-    expect(startTarget).toBe('contextCompact')
+    const ends =
+      (graph as { branches: Record<string, { condition: { ends: Record<string, string> } }> })
+        .branches['__start__']?.condition.ends ?? {}
+    expect(ends.contextCompact).toBe('contextCompact')
+    expect(ends.palaceSubgraph).toBe('palaceSubgraph')
   })
 })
 

@@ -11,7 +11,12 @@ import { logger } from '../shared/logger.js'
 import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
 import { isSubgraphCall } from './subgraphRouter.js'
 import { deriveToolStatus } from './toolStatus.js'
-import type { ChatStreamEvent, PalaceArtworkStyle, StreamResponse } from '../ipc.js'
+import type {
+  ChatStreamEvent,
+  EphemeralRunRequest,
+  PalaceArtworkStyle,
+  StreamResponse,
+} from '../ipc.js'
 import {
   isStreamStep,
   serializeTurnState,
@@ -64,24 +69,10 @@ function summarizeToolResult(output: string): string {
   return `${size}, ${preview}`
 }
 
-/**
- * Ephemeral run (CONTEXT.md 「Ephemeral Run」): the manual palace run lives on a
- * private thread and writes no session record, but still emits stream events.
- */
-export interface EphemeralRunRequest {
-  /**
-   * Private checkpoint thread: resume by re-running with the same id and empty
-   * input. Distinct from `sessionId`, which stays the stream-event correlation
-   * id and is never persisted for this run.
-   */
-  privateThreadId: string
-  /** Graph entry: only the palace entry has an ephemeral trigger today. */
-  runEntry: 'palace'
-}
-
 export interface StreamRequest {
   sessionId: string
   message: string
+  /** Workspace of the run's session store; unused by ephemeral runs. */
   workspaceUuid: string
   context: ChatContext
   documentRef?: DocumentRef
@@ -101,10 +92,14 @@ export interface StreamRequest {
  */
 export interface StreamGraph {
   stream: (
-    input: Partial<MainGraphStateType>,
+    input: Partial<MainGraphStateType> | null,
     config: Record<string, unknown>,
   ) => Promise<AsyncIterable<readonly [string, unknown]>>
-  getState: (config: Record<string, unknown>) => Promise<{ values: MainGraphStateType }>
+  getState: (config: Record<string, unknown>) => Promise<{
+    values: MainGraphStateType
+    /** Pending super-step targets; empty once the thread reached the end. */
+    next?: string[]
+  }>
 }
 
 export interface StreamRuntime {
@@ -147,15 +142,18 @@ export class Runner {
   }
 
   async run(): Promise<void> {
-    const { sessionManager } = this.options
+    const { sessionManager, request } = this.options
     const execute = () =>
-      runWithStreamId(this.options.streamId, this.options.request.sessionId, () => this.execute())
+      runWithStreamId(this.options.streamId, request.sessionId, () => this.execute())
     // Contract: SessionManager is assembled at app startup; no isReady guard needed.
-    return sessionManager.runInWorkspace(this.options.request.workspaceUuid, execute)
+    // Ephemeral runs write no session record, so they skip the workspace switch —
+    // a standalone file outside any workspace has no workspace to run in.
+    if (request.ephemeral) return execute()
+    return sessionManager.runInWorkspace(request.workspaceUuid, execute)
   }
 
   private async execute(): Promise<void> {
-    const { request, runtime } = this.options
+    const { runtime } = this.options
     let fullContent = ''
     let currentSegmentContent = ''
     let currentMessageId: string | null = null
@@ -169,13 +167,7 @@ export class Runner {
 
     try {
       const history = await this.prepareHistory()
-      const initialState: Partial<MainGraphStateType> = {
-        messages: history,
-        context: request.context,
-        documentRef: request.documentRef ?? null,
-        artworkStyle: runtime.artworkStyle,
-        runEntry: request.ephemeral?.runEntry ?? 'chat',
-      }
+      const initialState: Partial<MainGraphStateType> | null = await this.buildGraphInput(history)
       const config = {
         signal: this.abortController.signal,
         recursionLimit: AGENT_LIMITS.recursionLimit,
@@ -216,6 +208,10 @@ export class Runner {
           // Progress-less runs also get their tool-start anchored here (before
           // the end), so the card is never declared at supervisor-chunk time.
           if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {
+            // An ephemeral run (manual palace) declares no virtual call and drives
+            // no tool cards: its close-out ToolMessage is internal state, and the
+            // run's own end event carries the landing payload.
+            if (this.options.request.ephemeral) continue
             const subgraphId = message.tool_call_id ?? ''
             const pending = subgraphId ? pendingSubgraphStarts.get(subgraphId) : undefined
             if (pending) {
@@ -371,6 +367,38 @@ export class Runner {
         return
       }
       this.emit('error', error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  /**
+   * Graph input for this run. A resume with a pending super-step continues the
+   * private thread with no new input (LangGraph then re-dispatches the pending
+   * task, and the mounted subgraph continues from its own checkpointed
+   * super-step); every other run builds the normal input.
+   */
+  private async buildGraphInput(
+    history: BaseMessage[],
+  ): Promise<Partial<MainGraphStateType> | null> {
+    const { request, runtime } = this.options
+    if (request.ephemeral?.resume && (await this.hasPendingSuperStep())) return null
+    return {
+      messages: history,
+      context: request.context,
+      documentRef: request.documentRef ?? null,
+      artworkStyle: runtime.artworkStyle,
+      runEntry: request.ephemeral?.runEntry ?? 'chat',
+    }
+  }
+
+  private async hasPendingSuperStep(): Promise<boolean> {
+    try {
+      const snapshot = await this.options.runtime.graph.getState({
+        configurable: { thread_id: this.checkpointThreadId },
+      })
+      return (snapshot.next?.length ?? 0) > 0
+    } catch (error) {
+      runnerLog.warn('resume probe failed, starting a fresh run instead:', error)
+      return false
     }
   }
 

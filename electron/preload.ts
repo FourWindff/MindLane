@@ -13,7 +13,6 @@ const api: MindlaneBridge = {
     chatStream: (payload) => ipcRenderer.invoke(IPC.AiChatStream, payload),
     stopStream: (streamId) => ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }),
     onStreamEvent: onChatStreamEvent,
-    nodesToPalace: (payload) => ipcRenderer.invoke(IPC.AiNodesToPalace, payload),
     listProviders: () => ipcRenderer.invoke(IPC.AiListProviders),
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
     getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),

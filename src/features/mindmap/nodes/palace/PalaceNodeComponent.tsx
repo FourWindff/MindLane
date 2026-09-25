@@ -1,8 +1,9 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { Image, Landmark, Minimize2 } from 'lucide-react'
+import { ChevronRight, Image, Landmark, Minimize2, X } from 'lucide-react'
 import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { resumePalaceRun, stopPalaceRun } from '@/features/mindmap/model/palaceRun'
 import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData } from './types'
 
@@ -44,10 +45,28 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   )
 
   if (data.generating) {
+    // Manual run in flight: progress sits beside the node (CONTEXT.md「流事件路由」),
+    // not in the chat panel. A stopped/failed run keeps the placeholder so it can
+    // resume on its own private thread, and that is what the button then offers.
+    const stopped = data.runStopped === true
+    const fileUuid = editor.getState().fileUuid
     return (
       <div className="palace-node-generating">
         <Handle type="target" position={Position.Left} />
         <Landmark size={24} strokeWidth={1.5} className="palace-node-generating__icon" />
+        {data.runStage && <span className="palace-node-generating__stage">{data.runStage}</span>}
+        <button
+          className="palace-node-generating__action"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (stopped) void resumePalaceRun(fileUuid, id)
+            else stopPalaceRun(fileUuid, id)
+          }}
+          aria-label={stopped ? '继续生成宫殿' : '中止生成宫殿'}
+        >
+          {stopped ? <ChevronRight size={12} strokeWidth={2} /> : <X size={12} strokeWidth={2} />}
+          {stopped ? '继续' : '中止'}
+        </button>
         <Handle type="source" position={Position.Right} />
       </div>
     )

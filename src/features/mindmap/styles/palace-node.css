@@ -6,16 +6,50 @@
 
 .palace-node-generating {
   position: relative;
-  width: 72px;
-  height: 72px;
+  box-sizing: border-box;
+  min-width: 72px;
+  min-height: 72px;
+  width: max-content;
+  max-width: 150px;
+  padding: 6px 8px;
   border-radius: 14px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   color: var(--ml-info);
   pointer-events: none;
   isolation: isolate;
   animation: text-node-enter 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Live stage beside the node (manual run) and the stop/resume affordance. */
+.palace-node-generating__stage {
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--ml-text-muted);
+}
+
+.palace-node-generating__action {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border: 1px solid var(--ml-border);
+  border-radius: 6px;
+  background: var(--ml-bg-elevated);
+  color: var(--ml-text-muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.palace-node-generating__action:hover {
+  color: var(--ml-text);
+  border-color: var(--ml-info);
 }
 
 .palace-node-generating::before {

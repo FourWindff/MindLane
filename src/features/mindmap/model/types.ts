@@ -40,6 +40,9 @@ export const TRANSIENT_NODE_DATA_FLAGS = [
   'processing',
   'expanded',
   'generating',
+  // Manual palace run state (live progress and the resume affordance).
+  'runStage',
+  'runStopped',
   // Cascade animation transient markers (agent write path):
   // staggered enter delay / reverse exit delay / gliding and its origin.
   'cascadeDelay',

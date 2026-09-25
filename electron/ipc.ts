@@ -20,7 +20,6 @@ export enum IPC {
   AiMindmapReadRespond = 'ai:mindmap-read-respond',
   AiMindmapWriteRequest = 'ai:mindmap-write-request',
   AiMindmapWriteRespond = 'ai:mindmap-write-respond',
-  AiNodesToPalace = 'ai:nodes-to-palace',
   AiListProviders = 'ai:list-providers',
   AiGetProviders = 'ai:get-providers',
   AiGetCapabilities = 'ai:get-capabilities',
@@ -157,8 +156,6 @@ export type ChatLoadSessionResult = {
     messages: ChatMessage[]
   }
 }
-
-export type SelectedNodeContent = { id: string; label: string }
 
 export interface ContextNodeInfo {
   id: string
@@ -393,8 +390,8 @@ export interface StreamResponse {
   messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
   toolCalls?: ChatToolCall[]
   mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[]; title: string }
-  /** 渲染层不消费，保持 unknown，不提前类型化。 */
-  palaceData?: unknown
+  /** Palace landing payload (the renderer lands a manual run with it). */
+  palaceData?: PalaceRunPayload
 }
 
 /**
@@ -428,23 +425,49 @@ export type ChatStreamEvent =
   | { streamId: string; sessionId: string; type: 'end'; payload: StreamResponse }
   | { streamId: string; sessionId: string; type: 'error'; payload: string }
 
-export type NodesToPalaceResult =
+/**
+ * Palace landing payload (CONTEXT.md「确定性落图」): the palace subgraph's output,
+ * written by its close-out node and carried on the run's `end` event.
+ * The renderer lands it with code — the model never repeats the image data URL.
+ */
+export interface PalaceStationPayload {
+  order: number
+  content: string
+  anchorVisual: string
+  association?: string
+  x: number
+  y: number
+  linkedNodeId: string
+}
+
+export type PalaceRunPayload =
   | {
       ok: true
       label: string
-      stations: Array<{
-        order: number
-        content: string
-        anchorVisual: string
-        association?: string
-        x: number
-        y: number
-        linkedNodeId: string
-      }>
+      stations: PalaceStationPayload[]
       imageUrl: string
       sourceNodeIds: string[]
     }
   | { ok: false; error: string }
+
+/**
+ * Ephemeral run marker (CONTEXT.md「临时运行」): the manual palace generation.
+ * The run lives on a private checkpoint thread, writes no session record and
+ * still emits stream events; `runEntry` picks the graph's edge out of START.
+ */
+export interface EphemeralRunRequest {
+  /** Resume by re-running with the same id and empty input; never a session id. */
+  privateThreadId: string
+  runEntry: 'palace'
+  /**
+   * Continue the private thread instead of starting it: when the thread still
+   * has a pending super-step (a stopped run), the graph is driven with no new
+   * input, so completed super-steps are not re-run. Without a pending task (a
+   * finished run, e.g. one that ended in an error payload) the run falls back
+   * to a normal start on the same thread.
+   */
+  resume?: boolean
+}
 
 // ---- 桥（Bridge）契约 ----
 // 渲染层访问主进程能力的唯一门户。preload 实现与渲染层类型引用同一份，
@@ -456,13 +479,11 @@ export interface MindlaneBridge {
       threadId: string
       message: string
       context: ChatContext
+      /** Present = ephemeral run: no session IO, private thread, entry marker. */
+      ephemeral?: EphemeralRunRequest
     }) => Promise<{ ok: true; streamId: string } | { ok: false; error: string }>
     stopStream: (streamId: string) => Promise<{ ok: boolean }>
     onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void
-    nodesToPalace: (payload: {
-      fileUuid: string
-      selectedNodes: SelectedNodeContent[]
-    }) => Promise<NodesToPalaceResult>
     listProviders: () => Promise<{
       chat: {
         id: string

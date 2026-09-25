@@ -17,7 +17,7 @@ import {
 } from '../../document/index.js'
 import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
-import { currentStreamId } from '../../../shared/runContext.js'
+import { currentStreamId, requireStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
 import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
 import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../../ipc.js'
@@ -41,8 +41,9 @@ const EXTRACT_CONCURRENCY = 4
 /** Per-run start times keyed by streamId so summary lines can report total elapsed. */
 const runStarts = new Map<string, number>()
 
+/** Run key for the per-stream bookkeeping maps (see `requireStreamId`). */
 function runKey(): string {
-  return currentStreamId() ?? '(no-stream)'
+  return requireStreamId('导图子图')
 }
 
 /** Read and clear the run start (build_output always runs, so this never leaks). */

@@ -8,6 +8,7 @@ import type {
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { createEntryFile } from '@/features/chat/lib/entryConversation'
 import { isSubgraphTool } from '@/features/chat/lib/chatUtils'
+import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
@@ -98,6 +99,11 @@ interface AiState {
   inputDraft: string
 
   setBusy: (busy: boolean) => void
+  /**
+   * Set one file's streaming flag by id: the manual palace run settles after the
+   * user may have switched files, so it cannot rely on the current-file action.
+   */
+  setFileBusy: (fileUuid: string, busy: boolean) => void
   reset: () => void
   addChatMessage: (message: ChatMessage) => void
   setShowSessionList: (show: boolean) => void
@@ -317,6 +323,8 @@ export const useAiStore = create<AiState>((set, get) => ({
         toolCards: [],
       })
     }),
+  setFileBusy: (fileUuid, busy) =>
+    set((state) => (state.fileChats[fileUuid] ? patchFileChat(state, fileUuid, { busy }) : {})),
   addChatMessage: (message) =>
     set((state) => {
       const fileUuid = state.currentFileUuid
@@ -878,6 +886,9 @@ export function subscribeToChatStreamEvents(
 }
 
 function dispatchStreamEvent(event: ChatStreamEvent): void {
+  // Manual palace runs (CONTEXT.md「临时运行」) are not sessions: their events
+  // never enter a FileChatState, so they are routed before the session route.
+  if (handlePalaceRunEvent(event)) return
   if (!routeStreamEvent(event)) return
   // Stream errors have no renderer UI: report the text to the main-process
   // diagnostic log (accepted events only — stale streams are not ours to log).

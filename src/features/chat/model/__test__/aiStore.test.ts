@@ -11,6 +11,11 @@ import {
   type ChatStreamEvent,
 } from '../aiStore'
 import type { ChatMessage } from '@/shared/lib/fileFormat'
+import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
+
+vi.mock('@/features/mindmap/model/palaceRun', () => ({
+  handlePalaceRunEvent: vi.fn(() => false),
+}))
 
 type ChatApiMock = {
   listSessions: ReturnType<typeof vi.fn>
@@ -110,6 +115,9 @@ beforeEach(() => {
 describe('aiStore per-file chat state', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    // The palace-run route stays off unless a test turns it on: the session route
+    // owns every other stream.
+    vi.mocked(handlePalaceRunEvent).mockReturnValue(false)
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,
@@ -124,6 +132,22 @@ describe('aiStore per-file chat state', () => {
       showSessionList: false,
       attachedDocument: null,
     })
+  })
+
+  it('routes a manual palace run before the session route: no chat state is written', async () => {
+    // A palace run's events carry no session of their own; if they reached the
+    // session route they would land in the file's chat state.
+    vi.mocked(handlePalaceRunEvent).mockReturnValue(true)
+    const { emit } = installApis({ activeSessionIds: { 'file-a': 'session-restored' } })
+    const harness = createRegistryHarness()
+    connectAiStore(harness.registry)
+
+    harness.activate('file-a', '/a.mindlane', 'A')
+    await vi.waitFor(() => expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true))
+    useAiStore.getState().registerStream('file-a', 'session-restored', 'stream-palace')
+
+    emit({ streamId: 'stream-palace', sessionId: 'session-restored', type: 'token', payload: '厅' })
+    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('')
   })
 
   it('loads the newly active file after a registry switch', async () => {
@@ -567,6 +591,9 @@ describe('aiStore per-file chat state', () => {
 describe('turn-state display stripping and gating', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    // The palace-run route stays off unless a test turns it on: the session route
+    // owns every other stream.
+    vi.mocked(handlePalaceRunEvent).mockReturnValue(false)
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,
@@ -688,6 +715,9 @@ describe('deriveChatCapsuleEntries projection', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks()
+    // The palace-run route stays off unless a test turns it on: the session route
+    // owns every other stream.
+    vi.mocked(handlePalaceRunEvent).mockReturnValue(false)
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,

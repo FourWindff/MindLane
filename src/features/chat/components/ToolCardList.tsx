@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Ban, Check, ChevronDown, ChevronRight, X } from 'lucide-react'
 import type { ChatToolCall, ChatToolCallStep } from '@/shared/lib/fileFormat'
 import { isSubgraphTool, toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { stageDisplayName } from '@/shared/lib/stageLabels'
 
 export type ToolCardStatus = NonNullable<ChatToolCall['status']>
 
@@ -17,23 +18,6 @@ export interface ToolCardItem {
   stages?: ChatToolCallStep[]
   /** Historical subgraph stage trace (persisted, ChatToolCall.steps). */
   steps?: ChatToolCallStep[]
-}
-
-const STAGE_LABELS: Record<string, string> = {
-  'reading-doc': 'Reading doc',
-  extracting: 'Extracting',
-  merging: 'Merging',
-  finalizing: 'Finalizing',
-  'planning-stations': 'Planning stations',
-  'generating-image': 'Generating image',
-  'locating-stations': 'Locating stations',
-}
-
-function stageDisplayName(step: string, completed?: number, total?: number): string {
-  const label = STAGE_LABELS[step] ?? step
-  return typeof completed === 'number' && typeof total === 'number'
-    ? `${label} ${completed}/${total}`
-    : label
 }
 
 function cx(...classes: (string | false | undefined)[]) {

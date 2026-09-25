@@ -29,6 +29,18 @@ export function currentStreamId(): string | undefined {
   return storage.getStore()?.streamId
 }
 
+/**
+ * Run id for components that only ever execute inside a run (the subgraphs,
+ * which the host graph mounts as nodes). A missing context is a contract
+ * violation: throwing here beats silently sharing one bucket across unrelated
+ * runs (the old `(no-stream)` fallback key).
+ */
+export function requireStreamId(subject: string): string {
+  const streamId = currentStreamId()
+  if (!streamId) throw new Error(`${subject}缺少运行上下文（streamId）`)
+  return streamId
+}
+
 export function currentSessionId(): string | undefined {
   return storage.getStore()?.sessionId
 }

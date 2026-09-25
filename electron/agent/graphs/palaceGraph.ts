@@ -4,11 +4,19 @@ import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
 import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
 import { AnchorAgent } from '../agenthub/anchorAgent.js'
 import { SvgAgent } from '../agenthub/svgAgent.js'
-import { PalaceSubgraphState, type PalaceSubgraphStateType } from '../state.js'
+import {
+  PalaceSubgraphState,
+  type MemoryPalaceStation,
+  type PalaceSubgraphStateType,
+} from '../state.js'
 import { logger } from '../../shared/logger.js'
-import { currentStreamId } from '../../shared/runContext.js'
+import { currentStreamId, requireStreamId } from '../../shared/runContext.js'
 import { takeModelCallCount } from '../providers/metering.js'
-import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../ipc.js'
+import {
+  SUBGRAPH_PROGRESS_EVENT,
+  type PalaceRunPayload,
+  type SubgraphProgressStep,
+} from '../../ipc.js'
 import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
@@ -21,8 +29,9 @@ const log = logger.withContext('palace')
 /** Per-run start times keyed by streamId for the closing summary line. */
 const runStarts = new Map<string, number>()
 
+/** Run key for the per-stream bookkeeping maps (see `requireStreamId`). */
 function runKey(): string {
-  return currentStreamId() ?? '(no-stream)'
+  return requireStreamId('记忆宫殿子图')
 }
 
 // ===== 配置选项 =====
@@ -48,31 +57,47 @@ function beginStage(
 }
 
 /**
+ * The palace subgraph's output payload — one builder for the close-out
+ * ToolMessage and for the run's `end` event, so the two shapes cannot drift.
+ */
+export function buildPalacePayload(state: {
+  palaceError: string
+  palaceResponse: string
+  palace: { theme: string } | null
+  memoryRoute: MemoryPalaceStation[]
+  imageUrls: string[]
+  palaceInputNodes: { id: string }[]
+}): PalaceRunPayload {
+  if (state.palaceError) {
+    return { ok: false, error: state.palaceResponse || state.palaceError }
+  }
+
+  return {
+    ok: true,
+    label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
+    stations: state.memoryRoute.map((s) => ({
+      order: s.order,
+      content: s.content,
+      anchorVisual: s.anchorVisual ?? '',
+      association: s.association,
+      x: s.x,
+      y: s.y,
+      linkedNodeId: s.linkedNodeId ?? '',
+    })),
+    // The palace subgraph normalizes remote URLs to data URLs inside the
+    // graph, so the first entry is already the persistable payload.
+    imageUrl: state.imageUrls[0] ?? '',
+    sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
+  }
+}
+
+/**
  * Close out the run: this node owns the subgraph's ToolMessage (call id, tool
  * name, stage trace). The host graph mounts this subgraph as a node, so the
  * ToolMessage lands in the main graph's messages channel directly.
  */
 function buildOutputNode(state: PalaceSubgraphStateType): Partial<PalaceSubgraphStateType> {
-  const content = state.palaceError
-    ? { ok: false, error: state.palaceResponse || state.palaceError }
-    : {
-        ok: true,
-        label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
-        stations: state.memoryRoute.map((s) => ({
-          order: s.order,
-          content: s.content,
-          anchorVisual: s.anchorVisual ?? '',
-          association: s.association,
-          x: s.x,
-          y: s.y,
-          linkedNodeId: s.linkedNodeId ?? '',
-        })),
-        // The palace subgraph normalizes remote URLs to data URLs inside the
-        // graph, so the first entry is already the persistable payload.
-        imageUrl: state.imageUrls[0] ?? '',
-        sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
-      }
-
+  const content = buildPalacePayload(state)
   const toolSteps = state.palaceToolSteps ?? []
   return {
     messages: [

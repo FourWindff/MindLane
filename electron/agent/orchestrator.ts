@@ -6,8 +6,6 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LLMProvider } from './providers/index.js'
 import type { AgentServices } from './service.js'
 import type {
-  SelectedNodeContent,
-  MemoryPalaceStation,
   MainGraphStateType,
   PalaceSubgraphStateType,
   MindmapSubgraphStateType,
@@ -16,7 +14,7 @@ import { MainGraphState } from './state.js'
 
 import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/lib/fileFormat.js'
-import { buildPalaceSubgraph } from './graphs/palaceGraph.js'
+import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
@@ -26,11 +24,10 @@ import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
 import { getToolSchemas } from './subgraphRouter.js'
-import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
 import type { StreamRuntime } from './streamManager.js'
-import { splitCurrentTurn, type PalaceArtworkStyle } from '../ipc.js'
+import { splitCurrentTurn, type PalaceArtworkStyle, type PalaceRunPayload } from '../ipc.js'
 import {
   runContextCompact,
   type RunContextAssemblyDeps,
@@ -52,11 +49,7 @@ interface ChatResponse {
     edges: MindLaneEdge[]
     title: string
   }
-  palaceData?: {
-    content: string
-    imageUrls?: string[]
-    memoryRoute?: MemoryPalaceStation[]
-  }
+  palaceData?: PalaceRunPayload
 }
 
 interface AgentOrchestratorOptions {
@@ -67,29 +60,6 @@ interface AgentOrchestratorOptions {
   /** 写工具渲染层代理：转发参数、返回渲染层落盘应答（原样）。 */
   mindmapWriteProxy?: MindmapWriteProxy
 }
-
-interface PalaceFromNodesResult {
-  ok: true
-  label: string
-  stations: Array<{
-    order: number
-    content: string
-    anchorVisual: string
-    association?: string
-    x: number
-    y: number
-    linkedNodeId: string
-  }>
-  imageUrl: string
-  sourceNodeIds: string[]
-}
-
-interface PalaceFromNodesError {
-  ok: false
-  error: string
-}
-
-type NodesToPalaceResult = PalaceFromNodesResult | PalaceFromNodesError
 
 export class AgentOrchestrator {
   private compiledMindmapSubgraph: CompiledStateGraph<
@@ -218,70 +188,6 @@ export class AgentOrchestrator {
     return this.compiledPalaceSubgraph
   }
 
-  async runPalaceFromNodes(
-    selectedNodes: SelectedNodeContent[],
-    fileUuid: string,
-    provider = this.provider,
-    artworkStyle: PalaceArtworkStyle = 'vector',
-  ): Promise<NodesToPalaceResult> {
-    if (selectedNodes.length === 0) {
-      return { ok: false, error: '未选中任何节点' }
-    }
-
-    // Use the dedicated Palace Subgraph.
-    const app =
-      provider === this.provider
-        ? this.getCompiledPalaceSubgraph()
-        : buildPalaceSubgraph({ provider }).compile()
-
-    try {
-      const result = (await app.invoke(
-        {
-          messages: [],
-          context: {
-            fileUuid,
-            selectedNodes: selectedNodes.map((node) => ({ ...node, type: 'text' as const })),
-          },
-          artworkStyle,
-          palaceError: '',
-          palaceInputText: '',
-          palaceInputNodes: selectedNodes,
-          memoryItems: [],
-          palace: null,
-          imagePrompt: '',
-          imageUrls: [],
-          detectedCoords: [],
-          memoryRoute: [],
-        },
-        { recursionLimit: AGENT_LIMITS.recursionLimit },
-      )) as PalaceSubgraphStateType
-
-      if (result.palaceError) {
-        return { ok: false, error: result.palaceError }
-      }
-
-      const imageUrl = result.imageUrls[0] ?? ''
-
-      return {
-        ok: true,
-        label: result.palace?.theme || `记忆宫殿 (${selectedNodes.length} 站)`,
-        stations: result.memoryRoute.map((s: MemoryPalaceStation) => ({
-          order: s.order,
-          content: s.content,
-          anchorVisual: s.anchorVisual ?? '',
-          association: s.association,
-          x: s.x,
-          y: s.y,
-          linkedNodeId: s.linkedNodeId ?? '',
-        })),
-        imageUrl,
-        sourceNodeIds: selectedNodes.map((n) => n.id),
-      }
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
-  }
-
   buildGraph(toolRegistry = this.toolRegistry) {
     const toolNode = new ToolNode(toolRegistry.executableTools)
 
@@ -371,13 +277,24 @@ export class AgentOrchestrator {
     // same stream/writer, and the subgraph's own close-out node writes its
     // ToolMessage straight into the messages channel. The model-visible interface
     // stays the two virtual tool schemas the supervisor routes on.
+    //
+    // Entry: a plain chat run compacts and then asks the supervisor; the manual
+    // palace run (runEntry='palace') goes straight to the palace subgraph and
+    // ends there — no compaction, no model round.
+    const entryTarget = (state: MainGraphStateType) =>
+      state.runEntry === 'palace' ? 'palaceSubgraph' : 'contextCompact'
+    const exitTarget = (state: MainGraphStateType) =>
+      state.runEntry === 'palace' ? '__end__' : 'supervisor'
     const graph = new StateGraph(MainGraphState)
       .addNode('contextCompact', contextCompactNode)
       .addNode('supervisor', (state) => supervisor.invoke(state))
       .addNode('tools', toolsNode)
       .addNode('mindmapSubgraph', this.getCompiledMindmapSubgraph())
       .addNode('palaceSubgraph', this.getCompiledPalaceSubgraph())
-      .addEdge(START, 'contextCompact')
+      .addConditionalEdges(START, entryTarget, {
+        contextCompact: 'contextCompact',
+        palaceSubgraph: 'palaceSubgraph',
+      })
       .addEdge('contextCompact', 'supervisor')
       .addConditionalEdges('supervisor', routeFn, {
         tools: 'tools',
@@ -386,7 +303,10 @@ export class AgentOrchestrator {
         __end__: END,
       })
       .addEdge('mindmapSubgraph', 'supervisor')
-      .addEdge('palaceSubgraph', 'supervisor')
+      .addConditionalEdges('palaceSubgraph', exitTarget, {
+        supervisor: 'supervisor',
+        __end__: END,
+      })
       .addEdge('tools', 'supervisor')
 
     return graph
@@ -396,7 +316,10 @@ export class AgentOrchestrator {
    * Build the response object.
    */
   buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
-    const rawContent = streamingContent || result.response || '抱歉，我无法生成回复。'
+    // The palace entry has no supervisor reply to fall back to: its run carries
+    // the palace payload, not prose.
+    const fallback = result.runEntry === 'palace' ? '' : '抱歉，我无法生成回复。'
+    const rawContent = streamingContent || result.response || fallback
     const assistantMessages = checkpointMessagesToSessionMessages(
       splitCurrentTurn(result.messages).current,
     ).filter((msg): msg is AssistantMessage => msg.role === 'assistant')
@@ -405,18 +328,19 @@ export class AgentOrchestrator {
     const response: ChatResponse = {
       content: rawContent,
       messages,
-      toolCalls: this.extractToolCalls(result.messages),
+      // A palace entry run has no chat record to keep: its reply is the landing
+      // payload below, not a tool-call log.
+      toolCalls: result.runEntry === 'palace' ? undefined : this.extractToolCalls(result.messages),
     }
 
     // Mindmap data flows through XML fragment → insertXmlFragment tool calls
     // The insertion is handled by the tool execution in the supervisor loop
 
-    if (result.memoryRoute.length > 0) {
-      response.palaceData = {
-        content: rawContent,
-        imageUrls: result.imageUrls,
-        memoryRoute: result.memoryRoute,
-      }
+    // Palace data: the landing payload the renderer applies with code (manual run)
+    // — the same shape the subgraph wrote into its close-out ToolMessage. Chat
+    // runs keep their old surface (a successful palace only).
+    if (result.runEntry === 'palace' || result.memoryRoute.length > 0) {
+      response.palaceData = buildPalacePayload(result)
     }
 
     return response
