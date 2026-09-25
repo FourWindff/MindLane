@@ -17,6 +17,7 @@ import {
 } from '@/features/chat/model/aiStore'
 import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { useWorkspaceStore } from '@/app/workspace/store'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
 
@@ -31,6 +32,7 @@ interface ChatInputBarProps {
 export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const busy = useAiStore(selectCurrentChatBusy)
   const hasActiveFile = useAiStore(selectCurrentChatHasFile)
+  const hasWorkspace = useWorkspaceStore((s) => Boolean(s.workspacePath))
   const attachedDocument = useAiStore((s) => s.attachedDocument)
   const setAttachedDocument = useAiStore((s) => s.setAttachedDocument)
   const sendChatMessage = useAiStore((s) => s.sendChatMessage)
@@ -43,17 +45,15 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const hasApiKey = useSettingsStore((s) => s.apiKey.trim() !== '')
   const hasChatModel = useSettingsStore((s) => s.chatModel.trim() !== '')
 
-  // 源头不变量：没有活动文件时不能发起对话（输入组件 disabled 条件）。
-  // 下游（Runner / 发送路径）不做存在性检查。
-  const inputEnabled = chatReady && hasActiveFile
+  // The resolved chat panel is the entry conversation box: with a workspace but
+  // no file open, sending creates and opens the .mindlane file for this turn.
+  const inputEnabled = chatReady && (hasActiveFile || hasWorkspace)
 
   let placeholder = attachedDocument ? '输入提示词（可选）...' : '输入消息…'
   if (!chatReady && settingsLoaded) {
     if (!hasApiKey && !hasChatModel) placeholder = '请先在设置中配置 API Key 并选择模型'
     else if (!hasApiKey) placeholder = '请先在设置中配置 API Key'
     else if (!hasChatModel) placeholder = '请先在设置中选择模型'
-  } else if (!hasActiveFile) {
-    placeholder = '请先打开一个 .mindlane 文件'
   }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)

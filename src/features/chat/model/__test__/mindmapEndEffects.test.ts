@@ -40,6 +40,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
       },
       resolveFileUuid: (sessionId) => (sessionId === 'session-a' ? 'file-a' : undefined),
       getEditor: (fileUuid) => (fileUuid === 'file-a' ? editor : undefined),
+      backfillTitle: vi.fn(),
     })
 
     effects.start()
@@ -75,6 +76,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
       },
       resolveFileUuid: () => 'file-a',
       getEditor: () => editor,
+      backfillTitle: vi.fn(),
     })
 
     effects.start()
@@ -109,6 +111,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
       },
       resolveFileUuid: () => 'file-a',
       getEditor: () => editor,
+      backfillTitle: vi.fn(),
     })
 
     effects.start()
@@ -137,5 +140,60 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
 
     expect(editor.addDocumentRef).not.toHaveBeenCalled()
     expect(editor.insertMindmapData).not.toHaveBeenCalled()
+  })
+
+  it('backfills the file title with the generated map title', () => {
+    let listener: ((event: never) => void) | undefined
+    const editor = stubEditor()
+    const backfillTitle = vi.fn()
+    const effects = createMindmapEndEffects({
+      subscribe: (next) => {
+        listener = next
+        return () => undefined
+      },
+      resolveFileUuid: () => 'file-a',
+      getEditor: () => editor,
+      backfillTitle,
+    })
+
+    effects.start()
+    listener?.(
+      endEvent({
+        toolCalls: [
+          {
+            name: 'generateMindmapFragment',
+            args: {},
+            result: JSON.stringify({ ok: true, title: 'Ruby 学习路线', documentRef: DOC_REF }),
+          },
+          {
+            name: 'insertXmlFragment',
+            args: {},
+            result: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: {} }),
+          },
+        ],
+      }),
+    )
+
+    expect(backfillTitle).toHaveBeenCalledWith('file-a', 'Ruby 学习路线')
+  })
+
+  it('does not backfill a title when this turn produced no map', () => {
+    let listener: ((event: never) => void) | undefined
+    const editor = stubEditor()
+    const backfillTitle = vi.fn()
+    const effects = createMindmapEndEffects({
+      subscribe: (next) => {
+        listener = next
+        return () => undefined
+      },
+      resolveFileUuid: () => 'file-a',
+      getEditor: () => editor,
+      backfillTitle,
+    })
+
+    effects.start()
+    listener?.(endEvent({ content: '这份文档讲了三件事' }))
+
+    expect(backfillTitle).not.toHaveBeenCalled()
   })
 })

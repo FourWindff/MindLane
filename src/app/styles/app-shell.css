@@ -55,3 +55,8 @@
 .chat-panel > * {
   pointer-events: auto;
 }
+
+/* Entry conversation: no message list above the input box, so keep the box at the panel bottom. */
+.chat-panel--entry .chat-input-bar {
+  margin-top: auto;
+}

@@ -6,6 +6,7 @@ import type {
   DocumentRef,
 } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
+import { createEntryFile } from '@/features/chat/lib/entryConversation'
 import { isSubgraphTool } from '@/features/chat/lib/chatUtils'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
@@ -130,6 +131,12 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
 }
 
 const fileChatLoads = new Map<string, Promise<void>>()
+
+/**
+ * Guards the entry send while it creates its file: without it a second Enter
+ * (key repeat) arriving during creation would create a second file.
+ */
+let entrySendInFlight = false
 
 // Bounded backoff retry for the read-side IPC: listSessions/loadSession return
 // not-ready while the AI service is still starting; retry with a delay avoids a
@@ -506,6 +513,34 @@ export const useAiStore = create<AiState>((set, get) => ({
     if (!selectChatReady(useSettingsStore.getState())) return false
 
     const message = text || `请根据「${doc?.filename}」生成思维导图`
+
+    // Entry conversation: with no file open this send creates and opens its own
+    // .mindlane first (create → open → wait for editor ready → start stream),
+    // and the turn becomes that file's first round.
+    if (!fileUuid) {
+      if (entrySendInFlight) return false
+      entrySendInFlight = true
+      try {
+        const entry = await createEntryFile(text, doc)
+        if (!entry) return false
+        set((state) => ({
+          currentFileUuid: entry.fileUuid,
+          currentFilePath: entry.filePath,
+          filePaths: { ...state.filePaths, [entry.fileUuid]: entry.filePath },
+          fileChats: state.fileChats[entry.fileUuid]
+            ? state.fileChats
+            : { ...state.fileChats, [entry.fileUuid]: createFileChatState() },
+        }))
+        // The history load must settle first: a loadFileChat arriving later
+        // would overwrite the state this turn is about to write.
+        await get().loadFileChat(entry.fileUuid)
+        // A file switch during creation would send this turn into the wrong file.
+        if (get().currentFileUuid !== entry.fileUuid) return false
+      } finally {
+        entrySendInFlight = false
+      }
+    }
+
     get().addChatMessage({
       role: 'user',
       content: message,

@@ -118,13 +118,48 @@ describe('deleteMindmapNode（渲染层代理）', () => {
 })
 
 describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径）', () => {
-  it('returns the renderer error as a tool failure result', async () => {
+  it('returns the renderer error as a tool failure result with the long-content correction', async () => {
     const { tools: t } = fakeProxy({
       fail: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
     })
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
       xml: '<node type="text" content="x" />',
+    })
+    const failure = result as { ok: boolean; error: string }
+    expect(failure.ok).toBe(false)
+    expect(failure.error).toContain(
+      '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+    )
+    // ADR-0023：判据错判（长内容自己写）时的纠偏路径。
+    expect(failure.error).toContain('generateMindmapFragment')
+  })
+
+  it('appends the long-content correction to a renderer ok:false ack', async () => {
+    const proxy = vi.fn<MindmapWriteProxy>(async () => ({
+      ok: false,
+      error: '[xml_parse_error] 第 1 行标签未闭合。恢复策略：重写 XML 后重试',
+    }))
+    const tools = createMindmapActionTools(proxy)
+    const result = await tools.insertXmlFragmentTool.invoke({
+      fileUuid: 'file-a',
+      xml: '<node type="text" content="x" />',
+    })
+    const failure = result as { ok: boolean; error: string }
+    expect(failure.ok).toBe(false)
+    expect(failure.error).toContain('generateMindmapFragment')
+    expect(failure.error).toContain('重写 XML 后重试')
+  })
+
+  it('does not add the correction to the other write tools', async () => {
+    const proxy = vi.fn<MindmapWriteProxy>(async () => ({
+      ok: false,
+      error: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+    }))
+    const tools = createMindmapActionTools(proxy)
+    const result = await tools.updateNodeTool.invoke({
+      fileUuid: 'file-a',
+      xml: '<node id="ghost" type="text" content="x" />',
     })
     expect(result).toEqual({
       ok: false,
@@ -141,6 +176,9 @@ describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径�
       fileUuid: 'file-a',
       xml: '<node type="text" content="x" />',
     })
-    expect(result).toEqual({ ok: false, error: 'boom' })
+    const failure = result as { ok: boolean; error: string }
+    expect(failure.ok).toBe(false)
+    expect(failure.error).toContain('boom')
+    expect(failure.error).toContain('generateMindmapFragment')
   })
 })

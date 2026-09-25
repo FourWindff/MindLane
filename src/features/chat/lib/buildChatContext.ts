@@ -9,8 +9,8 @@ import type { ChatContext } from '../../../../electron/ipc'
  * Reads the active mindmap instance, workspace state, and aiStore directly so
  * the sendChatMessage store action can call it outside any component.
  *
- * 源头不变量：发送必有活动文件（输入组件门控），因此这里不兜底默认实例、
- * 不做空 uuid 早退——调用时必有活动实例，其 fileUuid 创建即存在。
+ * 源头不变量：调用时必有活动文件。有文件时直接用；没有文件时发送路径先经入口分支
+ * 建并打开一个新文件（编辑器就绪）才走到这里，所以这里不兜底默认实例、不做空 uuid 早退。
  * 导图树摘要（mindmapSummary）已删除：模型需要结构时按需调用读工具。
  */
 export function buildChatContext(): ChatContext {

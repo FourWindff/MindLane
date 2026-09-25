@@ -42,6 +42,8 @@ export interface MindmapState {
 
   markClean: () => void
   setFilePath: (filePath: string) => void
+  /** Rename the document title (metadata.title); marking dirty lets autosave persist it. */
+  setFileTitle: (title: string) => void
   setViewport: (viewport: Viewport) => void
   /** 添加内嵌图片资源；sha256 相同则复用已有 asset，返回实际使用的 asset id。 */
   addAsset: (asset: MindlaneAsset) => string
@@ -80,6 +82,9 @@ export function createMindmapStore(): MindmapStore {
     canRedo: false,
 
     setFilePath: (filePath) => set({ filePath }),
+
+    setFileTitle: (fileTitle) =>
+      set((s) => (s.fileTitle === fileTitle ? {} : { fileTitle, dirty: true })),
 
     setViewport: (viewport) => set({ viewport }),
 

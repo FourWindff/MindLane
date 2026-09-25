@@ -24,7 +24,11 @@ interface WorkspaceStore {
   createWorkspaceDirectory: (name: string) => Promise<boolean>
   switchWorkspace: (workspacePath: string) => Promise<boolean>
   openWorkspaceFile: (filePath: string) => Promise<boolean>
-  createMindlaneFile: (name: string, parentPath?: string) => Promise<boolean>
+  createMindlaneFile: (
+    name: string,
+    parentPath?: string,
+    options?: { uniqueName?: boolean },
+  ) => Promise<boolean>
   refreshWorkspaceFiles: (workspacePath?: string | null) => Promise<void>
   syncAfterFileSaved: (filePath: string) => Promise<void>
   updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
@@ -135,7 +139,7 @@ async function createUniqueWorkspaceFile(
   workspacePath: string,
   preferredName: string,
   data: MindLaneFile,
-): Promise<{ ok: true; filePath: string; data: unknown } | { ok: false; error: string }> {
+): Promise<{ ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }> {
   const baseName = preferredName.trim() || '未命名'
   for (let index = 0; index < 100; index += 1) {
     const candidateName = index === 0 ? baseName : `${baseName}-${index + 1}`
@@ -145,7 +149,7 @@ async function createUniqueWorkspaceFile(
       data,
     })
     if (result?.ok) {
-      return { ok: true, filePath: result.data.filePath, data: result.data.data }
+      return { ok: true, data: { filePath: result.data.filePath, data: result.data.data } }
     }
     if (result?.error !== '文件已存在') {
       return { ok: false, error: result?.error ?? '创建文件失败' }
@@ -187,8 +191,8 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
     return false
   }
 
-  loadMindLaneFile(createResult.filePath, createResult.data, workspacePath)
-  await workspaceState.syncAfterFileSaved(createResult.filePath)
+  loadMindLaneFile(createResult.data.filePath, createResult.data.data, workspacePath)
+  await workspaceState.syncAfterFileSaved(createResult.data.filePath)
   return true
 }
 
@@ -340,7 +344,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
-  createMindlaneFile: async (name: string, parentPath?: string) => {
+  createMindlaneFile: async (name, parentPath, options) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
       set({ lastError: '请先打开工作区' })
@@ -355,11 +359,15 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const data = createEmptyFile(name.trim())
-      const result = await window.mindlane?.workspace.createFile({
-        workspacePath: targetDir,
-        name,
-        data,
-      })
+      // uniqueName: an existing name yields `名字-2` instead of a failed create
+      // (the entry conversation derives the name from user input and must land).
+      const result = options?.uniqueName
+        ? await createUniqueWorkspaceFile(targetDir, name, data)
+        : await window.mindlane?.workspace.createFile({
+            workspacePath: targetDir,
+            name,
+            data,
+          })
       if (!result?.ok) {
         set({ lastError: result?.error ?? '新建文件失败' })
         return false

@@ -1,5 +1,5 @@
 import type { ChatStreamEvent } from './aiStore'
-import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 
 /**
@@ -9,7 +9,8 @@ import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
  *   graph dump, feed it straight into the editor;
  * - `generatedDocumentRef` association: only when this turn had a write tool
  *   applied successfully (or mindmapData landed) do we attach the doc
- *   reference produced by the subgraph product, to avoid dangling references.
+ *   reference produced by the subgraph product, to avoid dangling references;
+ * - generated-title backfill: the map title lands on the file it was generated for.
  * Batch persistence was removed — write tools are applied instantly through
  * the write responder during the stream; this module no longer touches editor
  * write operations.
@@ -19,6 +20,11 @@ export interface MindmapEndEffectsDependencies {
   subscribe: (listener: (event: ChatStreamEvent) => void) => () => void
   resolveFileUuid: (sessionId: string) => string | undefined
   getEditor: (fileUuid: string) => MindmapEditor | undefined
+  /**
+   * Backfills the title of the map produced this turn onto the file (entry
+   * conversation: the eagerly created file starts with a placeholder title).
+   */
+  backfillTitle: (fileUuid: string, title: string) => void
 }
 
 /** The fixed 4 write tools (same name set as the write tools; decides whether this turn truly applied to disk). */
@@ -29,6 +35,9 @@ const WRITE_TOOL_NAMES = [
   'deleteMindmapNode',
 ]
 
+/** Virtual tool the mindmap subgraph answers with; carries the generated title. */
+const MINDMAP_SUBGRAPH_TOOL = 'generateMindmapFragment'
+
 /** Whether the tool result is `{ok: true}` (write tool applied / subgraph product ok). */
 function toolResultOk(result: string): boolean {
   try {
@@ -37,6 +46,22 @@ function toolResultOk(result: string): boolean {
   } catch {
     return false
   }
+}
+
+/** Title of the map the mindmap subgraph produced this turn ('' when it produced none). */
+function generatedMapTitle(toolCalls: ChatToolCall[] | undefined): string {
+  for (const toolCall of toolCalls ?? []) {
+    if (toolCall.name !== MINDMAP_SUBGRAPH_TOOL) continue
+    try {
+      const result = JSON.parse(toolCall.result) as { ok?: unknown; title?: unknown }
+      if (result.ok === true && typeof result.title === 'string' && result.title.trim()) {
+        return result.title.trim()
+      }
+    } catch {
+      // Unparseable subgraph result: nothing to backfill.
+    }
+  }
+  return ''
 }
 
 export function createMindmapEndEffects(dependencies: MindmapEndEffectsDependencies) {
@@ -55,6 +80,9 @@ export function createMindmapEndEffects(dependencies: MindmapEndEffectsDependenc
 
         if (response.mindmapData) editor.insertMindmapData(response.mindmapData)
 
+        const title = generatedMapTitle(response.toolCalls)
+        if (title) dependencies.backfillTitle(fileUuid, title)
+
         const appliedMindmapChange =
           Boolean(response.mindmapData) ||
           (response.toolCalls ?? []).some(
@@ -63,7 +91,7 @@ export function createMindmapEndEffects(dependencies: MindmapEndEffectsDependenc
         if (!appliedMindmapChange) return
 
         for (const toolCall of response.toolCalls ?? []) {
-          if (toolCall.name !== 'generateMindmapFragment') continue
+          if (toolCall.name !== MINDMAP_SUBGRAPH_TOOL) continue
           try {
             const result = JSON.parse(toolCall.result) as {
               ok?: boolean

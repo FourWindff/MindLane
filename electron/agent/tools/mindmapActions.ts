@@ -28,6 +28,21 @@ function asToolError(err: unknown): { ok: false; error: string } {
   return { ok: false, error: err instanceof Error ? err.message : String(err) }
 }
 
+/**
+ * ADR-0023: the criterion "short content self-written / documents or long text via
+ * the mindmap subgraph" lives in the subgraph tool's description. When a self-written
+ * fragment fails anyway, the failure feedback carries the correction path.
+ */
+const LONG_CONTENT_CORRECTION = '若内容较长，请改用 generateMindmapFragment 生成后再插入。'
+
+/** Appends the long-content correction to an insertXmlFragment failure (success acks pass through). */
+function withLongContentCorrection(result: unknown): unknown {
+  if (typeof result !== 'object' || result === null) return result
+  const ack = result as { ok?: unknown; error?: unknown }
+  if (ack.ok !== false || typeof ack.error !== 'string') return result
+  return { ...ack, error: `${ack.error}。${LONG_CONTENT_CORRECTION}` }
+}
+
 // ========== insertXmlFragment (unified write entry) ==========
 
 /**
@@ -41,9 +56,11 @@ function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, xml, parentId, position }) => {
       try {
-        return await proxy(fileUuid ?? '', 'insertXmlFragment', { xml, parentId, position })
+        return withLongContentCorrection(
+          await proxy(fileUuid ?? '', 'insertXmlFragment', { xml, parentId, position }),
+        )
       } catch (err) {
-        return asToolError(err)
+        return withLongContentCorrection(asToolError(err))
       }
     },
     {

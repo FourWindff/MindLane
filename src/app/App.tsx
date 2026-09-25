@@ -28,6 +28,7 @@ import {
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
+import { backfillEntryFileTitle } from '@/features/chat/lib/entryConversation'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
@@ -119,6 +120,9 @@ function AppContent() {
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
       getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
+      // Entry-turn files start with a placeholder title; the generated map title
+      // backfills it (only files the entry turn created are renamed).
+      backfillTitle: backfillEntryFileTitle,
     }).start()
     return () => {
       stopToolRouter()
@@ -200,20 +204,22 @@ function AppContent() {
                 <WorkspaceEmptyState />
               )}
             </main>
-            {hasDocumentOpen && (
-              <aside className="chat-panel" aria-label="聊天面板">
-                <ChatCapsuleBar
-                  expanded={capsuleExpanded}
-                  onToggleExpand={() => setCapsuleExpanded((e) => !e)}
-                />
-                {chatOpen && (
-                  <>
-                    <ChatMessageList />
-                    <ChatInputBar onOpenSettings={() => setSettingsOpen(true)} />
-                  </>
-                )}
-              </aside>
-            )}
+            <aside
+              className={`chat-panel${hasDocumentOpen ? '' : ' chat-panel--entry'}`}
+              aria-label="聊天面板"
+            >
+              <ChatCapsuleBar
+                expanded={capsuleExpanded}
+                onToggleExpand={() => setCapsuleExpanded((e) => !e)}
+              />
+              {chatOpen && (
+                <>
+                  {/* No file open = entry conversation: input box only; sending creates and opens the file. */}
+                  {hasDocumentOpen && <ChatMessageList />}
+                  <ChatInputBar onOpenSettings={() => setSettingsOpen(true)} />
+                </>
+              )}
+            </aside>
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
             <ToastContainer />

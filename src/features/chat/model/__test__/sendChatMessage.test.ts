@@ -9,6 +9,7 @@ import {
   type FileChatState,
 } from '../aiStore'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
+import { useWorkspaceStore } from '@/app/workspace/store'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import type { ChatContext } from '../../../../../electron/ipc'
@@ -24,6 +25,18 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
   )
   const stopStream = vi.fn(async () => ({ ok: true as const }))
   const logError = vi.fn()
+  const createFile = vi.fn(
+    async (payload: {
+      workspacePath: string
+      name: string
+      data: unknown
+    }): Promise<
+      { ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }
+    > => ({
+      ok: true,
+      data: { filePath: `${payload.workspacePath}/${payload.name}.mindlane`, data: payload.data },
+    }),
+  )
 
   Object.defineProperty(globalThis, 'window', { configurable: true, value: globalThis })
   Object.defineProperty(globalThis.window, 'mindlane', {
@@ -44,6 +57,9 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
       },
       shell: { logError },
       workspace: {
+        createFile,
+        listFiles: vi.fn(async () => ({ ok: true, data: [] })),
+        listTree: vi.fn(async () => ({ ok: true, data: [] })),
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
           workspaceUuid: 'workspace-uuid',
@@ -61,6 +77,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
     chatStream,
     stopStream,
     logError,
+    createFile,
     emit: (event: ChatStreamEvent) => streamListener?.(event),
   }
 }
@@ -252,5 +269,145 @@ describe('sendChatMessage handshake', () => {
     expect(chat).not.toHaveProperty('errorMessage')
     expect(logError).toHaveBeenCalledWith('boom')
     expect(useAiStore.getState().activeStreamIds['session-a']).toBeUndefined()
+  })
+})
+
+describe('sendChatMessage entry conversation (no file open)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    mindmapRegistry.releaseAll()
+    useAiStore.setState({
+      currentFileUuid: null,
+      currentFilePath: null,
+      fileChats: {},
+      filePaths: {},
+      fileUuidPaths: {},
+      allSessions: [],
+      loadedFileChats: {},
+      sessionFileUuids: {},
+      activeStreamIds: {},
+      workspacePath: '/workspace',
+      showSessionList: false,
+      attachedDocument: null,
+    })
+    useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+    useWorkspaceStore.setState({
+      busy: false,
+      lastError: null,
+      workspacePath: '/workspace',
+      files: [],
+      tree: [],
+    })
+  })
+
+  afterEach(() => {
+    mindmapRegistry.releaseAll()
+  })
+
+  it('creates and opens a .mindlane file, then runs the turn inside that file', async () => {
+    const { chatStream, createFile } = installApis()
+
+    expect(await useAiStore.getState().sendChatMessage('帮我整理一份学习计划')).toBe(true)
+
+    // Create: the file name comes from the first input line.
+
+    expect(createFile).toHaveBeenCalledWith(
+      expect.objectContaining({ workspacePath: '/workspace', name: '帮我整理一份学习计划' }),
+    )
+    // Open: the file is in the registry (editor ready, write proxy resolvable) and is current.
+    const active = mindmapRegistry.getActiveFile()
+    expect(active?.filePath).toBe('/workspace/帮我整理一份学习计划.mindlane')
+    expect(useAiStore.getState().currentFileUuid).toBe(active?.fileUuid)
+
+    // Start stream: the context and the session both belong to the new file.
+    expect(chatStream).toHaveBeenCalledTimes(1)
+    expect(chatStream.mock.calls[0]![0].context).toMatchObject({
+      fileUuid: active?.fileUuid,
+      filePath: active?.filePath,
+    })
+
+    // The turn lands in that file's session.
+    const chat = useAiStore.getState().fileChats[active!.fileUuid]
+    expect(chatStream.mock.calls[0]![0].threadId).toBe(chat!.activeSessionId)
+    expect(chat?.chatMessages).toEqual([
+      expect.objectContaining({ role: 'user', content: '帮我整理一份学习计划' }),
+    ])
+    expect(chat?.busy).toBe(true)
+    expect(useAiStore.getState().activeStreamIds[chat!.activeSessionId]).toBe('stream-1')
+  })
+
+  it('takes the file title from the attached document name and keeps the attachment in the turn', async () => {
+    const { chatStream, createFile } = installApis()
+    useAiStore.setState({
+      attachedDocument: {
+        id: 'doc-1',
+        type: 'pdf',
+        source: '/报告.pdf',
+        filename: '报告.pdf',
+        importedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })
+
+    expect(await useAiStore.getState().sendChatMessage('')).toBe(true)
+
+    expect(createFile).toHaveBeenCalledWith(expect.objectContaining({ name: '报告' }))
+    const context = chatStream.mock.calls[0]![0].context
+    expect(context.attachedDocument?.filename).toBe('报告.pdf')
+  })
+
+  it('starts no stream when the file cannot be created', async () => {
+    const { chatStream, createFile } = installApis()
+    createFile.mockResolvedValueOnce({ ok: false as const, error: '创建文件失败' })
+
+    expect(await useAiStore.getState().sendChatMessage('你好')).toBe(false)
+
+    expect(chatStream).not.toHaveBeenCalled()
+    expect(mindmapRegistry.getActiveFile()).toBeNull()
+    expect(useAiStore.getState().currentFileUuid).toBeNull()
+  })
+
+  it('creates only one file for two sends racing before the first turn starts', async () => {
+    let resolveCreate!: (value: unknown) => void
+    const { chatStream, createFile } = installApis()
+    createFile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCreate = resolve
+        }) as never,
+    )
+
+    const first = useAiStore.getState().sendChatMessage('第一条')
+    const second = await useAiStore.getState().sendChatMessage('第二条')
+    resolveCreate({
+      ok: true,
+      data: {
+        filePath: '/workspace/第一条.mindlane',
+        data: (createFile.mock.calls[0]![0] as { data: unknown }).data,
+      },
+    })
+
+    expect(second).toBe(false)
+    expect(await first).toBe(true)
+    expect(createFile).toHaveBeenCalledTimes(1)
+    expect(chatStream).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops the entry turn when another file is activated while creating it', async () => {
+    let resolveSessions!: (value: unknown) => void
+    const { chatStream } = installApis()
+    window.mindlane.chat!.listSessions = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveSessions = resolve
+        }) as never,
+    )
+
+    const sending = useAiStore.getState().sendChatMessage('第一条')
+    await vi.waitFor(() => expect(resolveSessions).toBeTypeOf('function'))
+    useAiStore.setState({ currentFileUuid: 'other-file' })
+    resolveSessions({ ok: true, data: { sessions: [] } })
+
+    expect(await sending).toBe(false)
+    expect(chatStream).not.toHaveBeenCalled()
   })
 })

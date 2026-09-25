@@ -74,6 +74,15 @@ describe('SubgraphRouter.getToolSchemas', () => {
     expect(mindmapTool?.description).toContain('思维导图')
     expect(palaceTool?.description).toContain('记忆宫殿')
   })
+
+  it('导图生成工具的描述携带「何时该用子图」的判据（短内容自写 / 文档或长文本走本工具）', () => {
+    const mindmapTool = getToolSchemas().find((t) => t.name === GENERATE_MINDMAP_FRAGMENT_TOOL)
+
+    expect(mindmapTool?.description).toContain('insertXmlFragment')
+    expect(mindmapTool?.description).toContain('文档')
+    expect(mindmapTool?.description).toContain('长文本')
+    expect(mindmapTool?.description).toContain('短内容')
+  })
 })
 
 describe('SubgraphRouter.isSubgraphCall', () => {

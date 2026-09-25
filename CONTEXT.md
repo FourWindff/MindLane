@@ -164,7 +164,7 @@
 ### 轮次状态（Turn State）
 
 - 一次用户发送时点的编辑器状态快照：文件身份（fileUuid / filePath / fileTitle）与选中节点、附件、关联文档。
-- 文件身份是**源头不变量**：文件在创建时即落盘（`createInDirectory`），uuid / path / title 创建即存在；下游（发送、Runner）不做任何存在性检查。
+- 文件身份是**源头不变量**：文件在创建时即落盘（`createInDirectory`），uuid / path / title 创建即存在；下游（发送、Runner）不做文件存在性检查（唯一的前置检查在仍无文件身份的入口建文件那一步，只判工作区与编辑器是否就绪）。
 - 由主进程在消息持久化时从 `ChatContext` 序列化为 XML（根标签 `<EDITOR_STATE>`），附加到该轮用户消息的**末尾**，随消息一起持久化。
 - 模型输入**不过滤**（必须看到状态）；展示、滚动摘要、记忆提取三个消费方复用同一 strip 函数按末尾锚定剥离。
 - 模型每轮感知到的「当前导图上下文」只来自轮次状态与工具结果；不含导图全文摘要（`mindmapSummary` 已删除）。
@@ -204,6 +204,7 @@
 
 - 工作区已就绪但尚未打开任何文件时的那个对话框。
 - 发送即新建并打开一个 `.mindlane` 文件，该轮成为该文件的第一轮对话；是否生成导图由监督器判断，未生成时画布留空。
+- 文件标题先取附件名或输入首行（占位），产图后按图题回填（仅限入口建的文件）。
 
 ### 临时运行（Ephemeral Run）
 
@@ -319,7 +320,7 @@
 ### 保存守卫（Save Guard）
 
 - 保存协议内置的竞态防护：在 `toMindLaneFile()` 序列化前捕获 `nodes` / `edges` / `documentRefs` 的引用，IPC 保存完成后重新读取实例状态做引用相等比较，三者均未变才 `markClean`。
-- 比较字段与 `dirty` 的覆盖范围一一对应：`dirty` 只由 `setNodes` / `setEdges` / `addDocumentRef` 置位；`viewport` 与 `fileTitle` 不置 dirty，也不在守卫范围内。
+- 比较字段与 `dirty` 的覆盖范围并不完全重合：`dirty` 由 `setNodes` / `setEdges` / `addDocumentRef` / `setFileTitle` 置位；`viewport` 不置 dirty 也不在守卫范围内，`fileTitle` 置 dirty（标题变更要能被自动保存落盘）但不在守卫范围内（它不改变结构引用）。
 - 守卫失败即保持 dirty、**不重试**：交互保存路径靠 autosave 兜底，窗口关闭路径接受丢失竞态窗口（毫秒级）内的编辑。
 - 不存在无守卫的保存路径。
 
