@@ -38,6 +38,15 @@ skills-lock.json
 docs/
 .scratch/
 
+# teaching workspace (agent-run course, see MISSION.md)
+/MISSION.md
+/RESOURCES.md
+/NOTES.md
+/assets/
+/lessons/
+/reference/
+/learning-records/
+
 # agent instructions (root only)
 /AGENTS.md
 /CLAUDE.md
