@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { withRetry, withTimeout, linkSignals, sleepWithAbort } from '../middleware/index.js'
+import { withRetry, withTimeout } from '../middleware/index.js'
 import { TimeoutError } from '../middleware/timeout.js'
 
 describe('withRetry', () => {
@@ -165,52 +165,5 @@ describe('withTimeout', () => {
     const expectation = expect(promise).rejects.toThrow('user cancel')
     controller.abort(new Error('user cancel'))
     await expectation
-  })
-})
-
-describe('linkSignals', () => {
-  it('aborts when any input aborts', () => {
-    const a = new AbortController()
-    const b = new AbortController()
-    const linked = linkSignals([a.signal, b.signal])
-    expect(linked.signal.aborted).toBe(false)
-    b.abort(new Error('b cancelled'))
-    expect(linked.signal.aborted).toBe(true)
-    linked.cleanup()
-  })
-
-  it('aborts immediately if any input is already aborted', () => {
-    const a = new AbortController()
-    a.abort(new Error('already'))
-    const linked = linkSignals([a.signal])
-    expect(linked.signal.aborted).toBe(true)
-  })
-})
-
-describe('sleepWithAbort', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('resolves after delay', async () => {
-    const promise = sleepWithAbort(100)
-    await vi.advanceTimersByTimeAsync(100)
-    await expect(promise).resolves.toBeUndefined()
-  })
-
-  it('rejects when aborted mid-sleep', async () => {
-    const controller = new AbortController()
-    const promise = sleepWithAbort(1_000, controller.signal)
-    controller.abort(new Error('cancel sleep'))
-    await expect(promise).rejects.toThrow('cancel sleep')
-  })
-
-  it('rejects immediately if signal already aborted', async () => {
-    const controller = new AbortController()
-    controller.abort(new Error('preaborted'))
-    await expect(sleepWithAbort(100, controller.signal)).rejects.toThrow('preaborted')
   })
 })

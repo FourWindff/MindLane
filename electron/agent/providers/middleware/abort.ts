@@ -1,10 +1,9 @@
 /**
  * AbortSignal 工具集。
  *
- * - linkSignals: 合并多个外部 AbortSignal，任一触发则汇合的 controller 也 abort。
- * - createTimeoutSignal: 基于 setTimeout 生成一个会自动 abort 的 signal，可与外部 signal 联动。
- * - raceWithAbort: 给任意 Promise 包一层取消能力（被 abort 后立刻 reject AbortError）。
- * - sleepWithAbort: 可被中断的睡眠，用来替代裸 setTimeout 轮询间隔。
+ * 信号合流与可中断睡眠直接用平台实现（`AbortSignal.any` / `AbortSignal.timeout` /
+ * `node:timers/promises` 的 `setTimeout`）；本模块只保留平台没有的那一件：
+ * `raceWithAbort` —— 给任意 Promise 包一层取消能力。
  */
 
 export class TimeoutError extends Error {
@@ -19,78 +18,6 @@ class AbortError extends Error {
     super(message)
     this.name = 'AbortError'
   }
-}
-
-type LinkedAbort = {
-  signal: AbortSignal
-  cleanup: () => void
-}
-
-/**
- * 把多个 signal 合并为一个：任意一个 abort 都会触发合并 signal abort。
- * 返回 cleanup 来移除监听，避免长链路下的内存泄漏。
- */
-export function linkSignals(signals: Array<AbortSignal | undefined | null>): LinkedAbort {
-  const controller = new AbortController()
-  const active = signals.filter((s): s is AbortSignal => !!s)
-
-  // 任一已经 aborted -> 直接 abort
-  for (const s of active) {
-    if (s.aborted) {
-      controller.abort(s.reason)
-      return { signal: controller.signal, cleanup: () => {} }
-    }
-  }
-
-  const listeners: Array<{ signal: AbortSignal; handler: () => void }> = []
-  for (const s of active) {
-    const handler = () => controller.abort(s.reason)
-    s.addEventListener('abort', handler, { once: true })
-    listeners.push({ signal: s, handler })
-  }
-
-  const cleanup = () => {
-    for (const { signal, handler } of listeners) {
-      signal.removeEventListener('abort', handler)
-    }
-  }
-
-  return { signal: controller.signal, cleanup }
-}
-
-/**
- * 在 timeoutMs 后会自动 abort 的 signal；也可以接力外部 signal。
- * 返回值带 cleanup（清定时器与监听）。
- */
-export function createTimeoutSignal(
-  timeoutMs: number,
-  parent?: AbortSignal | null,
-): { signal: AbortSignal; cleanup: () => void } {
-  const controller = new AbortController()
-
-  if (parent?.aborted) {
-    controller.abort(parent.reason)
-    return { signal: controller.signal, cleanup: () => {} }
-  }
-
-  const timer = setTimeout(() => {
-    controller.abort(new TimeoutError(`操作超时（${timeoutMs}ms）`))
-  }, timeoutMs)
-
-  let parentHandler: (() => void) | null = null
-  if (parent) {
-    parentHandler = () => controller.abort(parent.reason)
-    parent.addEventListener('abort', parentHandler, { once: true })
-  }
-
-  const cleanup = () => {
-    clearTimeout(timer)
-    if (parent && parentHandler) {
-      parent.removeEventListener('abort', parentHandler)
-    }
-  }
-
-  return { signal: controller.signal, cleanup }
 }
 
 /**
@@ -117,31 +44,6 @@ export function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Prom
         reject(err)
       },
     )
-  })
-}
-
-/**
- * 可被 abort 的 sleep；signal abort 后立刻 reject AbortError。
- */
-export function sleepWithAbort(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(toAbortError(signal.reason))
-      return
-    }
-    const timer = setTimeout(() => {
-      if (signal && onAbort) signal.removeEventListener('abort', onAbort)
-      resolve()
-    }, ms)
-    const onAbort = signal
-      ? () => {
-          clearTimeout(timer)
-          reject(toAbortError(signal.reason))
-        }
-      : null
-    if (signal && onAbort) {
-      signal.addEventListener('abort', onAbort, { once: true })
-    }
   })
 }
 

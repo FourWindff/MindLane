@@ -1,6 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
-import { withRetry, withTimeout, sleepWithAbort, linkSignals } from './middleware/index.js'
+import { withRetry, withTimeout } from './middleware/index.js'
 
 const DASHSCOPE_COMPAT_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 const IMAGE_SYNTH_URL =
@@ -110,34 +111,29 @@ export class DashScopeProvider extends LLMProvider {
         const createData = await withRetry(() =>
           withTimeout(
             async (signal) => {
-              const linked = linkSignals([totalSignal, signal])
-              try {
-                const res = await fetch(IMAGE_SYNTH_URL, {
-                  method: 'POST',
-                  headers: {
-                    Authorization: `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json',
-                    'X-DashScope-Async': 'enable',
+              const res = await fetch(IMAGE_SYNTH_URL, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${this.apiKey}`,
+                  'Content-Type': 'application/json',
+                  'X-DashScope-Async': 'enable',
+                },
+                body: JSON.stringify({
+                  model: 'wanx-v1',
+                  input: { prompt },
+                  parameters: {
+                    style: '<auto>',
+                    size: input.size ?? '1024*1024',
+                    n: Math.min(4, Math.max(1, input.n ?? 1)),
                   },
-                  body: JSON.stringify({
-                    model: 'wanx-v1',
-                    input: { prompt },
-                    parameters: {
-                      style: '<auto>',
-                      size: input.size ?? '1024*1024',
-                      n: Math.min(4, Math.max(1, input.n ?? 1)),
-                    },
-                  }),
-                  signal: linked.signal,
-                })
-                const data = (await res.json().catch(() => null)) as TaskBody | null
-                if (!res.ok) {
-                  throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
-                }
-                return data
-              } finally {
-                linked.cleanup()
+                }),
+                signal: AbortSignal.any([totalSignal, signal]),
+              })
+              const data = (await res.json().catch(() => null)) as TaskBody | null
+              if (!res.ok) {
+                throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
               }
+              return data
             },
             HTTP_TIMEOUT_MS,
             { signal: totalSignal },
@@ -151,26 +147,21 @@ export class DashScopeProvider extends LLMProvider {
 
         const taskUrl = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
         for (let i = 0; i < POLL_MAX_TIMES; i++) {
-          // 可被中断的 sleep（替代裸 setTimeout，避免轮询卡死无法取消）
-          await sleepWithAbort(POLL_INTERVAL_MS, totalSignal)
+          // 可被中断的 sleep（轮询间隔不可取消会让停止请求卡住）
+          await sleep(POLL_INTERVAL_MS, undefined, { signal: totalSignal })
 
           const pollData = await withRetry(() =>
             withTimeout(
               async (signal) => {
-                const linked = linkSignals([totalSignal, signal])
-                try {
-                  const res = await fetch(taskUrl, {
-                    headers: { Authorization: `Bearer ${this.apiKey}` },
-                    signal: linked.signal,
-                  })
-                  const data = (await res.json().catch(() => null)) as TaskBody | null
-                  if (!res.ok) {
-                    throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
-                  }
-                  return data
-                } finally {
-                  linked.cleanup()
+                const res = await fetch(taskUrl, {
+                  headers: { Authorization: `Bearer ${this.apiKey}` },
+                  signal: AbortSignal.any([totalSignal, signal]),
+                })
+                const data = (await res.json().catch(() => null)) as TaskBody | null
+                if (!res.ok) {
+                  throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
                 }
+                return data
               },
               HTTP_TIMEOUT_MS,
               { signal: totalSignal },

@@ -8,7 +8,7 @@
  * - 不可重试错误：认证 4xx（除 429 外）、其他明确客户端错误。
  */
 
-import { TimeoutError, sleepWithAbort } from './abort.js'
+import { TimeoutError } from './abort.js'
 import { logger } from '../../../shared/logger.js'
 
 const log = logger.withContext('provider')
@@ -119,7 +119,8 @@ export async function withRetry<T>(
         err instanceof Error ? err.message : String(err),
         (delay / 1000).toFixed(1),
       )
-      await sleepWithAbort(delay)
+      // 全局 setTimeout：与测试假时钟兼容，且退避睡眠不需要取消能力。
+      await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
 
