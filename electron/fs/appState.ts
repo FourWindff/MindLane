@@ -72,11 +72,6 @@ export class AppState {
     }
   }
 
-  async getRecentFilesMax(): Promise<number> {
-    const settings = await this.load()
-    return settings.recentFilesMax
-  }
-
   /**
    * Compute the workspace session the app should launch into.
    * Dedupes and prunes stale recent-workspace entries, clears an invalid

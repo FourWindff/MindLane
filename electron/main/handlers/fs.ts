@@ -14,25 +14,6 @@ async function fileSha256(filePath: string): Promise<string> {
   return crypto.createHash('sha256').update(buffer).digest('hex')
 }
 
-function pathExists(targetPath: string | null | undefined): boolean {
-  if (!targetPath) return false
-  try {
-    fs.accessSync(targetPath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function directoryExists(targetPath: string | null | undefined): boolean {
-  if (!pathExists(targetPath)) return false
-  try {
-    return fs.statSync(targetPath!).isDirectory()
-  } catch {
-    return false
-  }
-}
-
 async function syncWorkspaceFromFile(
   ctx: HandlerContext,
   filePath: string,
@@ -49,11 +30,7 @@ async function syncWorkspaceFromFile(
   const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
 
   await ctx.fsService.appState.switchWorkspace(workspacePath).catch(() => {})
-  const title = data?.metadata.title || path.basename(filePath, path.extname(filePath))
-  const recentFilesMax = await ctx.fsService.appState.getRecentFilesMax()
-  await ctx.fsService.workspace
-    .openFile(workspacePath, filePath, title, recentFilesMax)
-    .catch(() => {})
+  await ctx.fsService.workspace.openFile(workspacePath, filePath).catch(() => {})
   // 顺手落盘会话文件索引；fileUuid 缺失（旧文件/无元数据）时静默跳过。
   const fileUuid = data?.metadata?.fileUuid
   if (fileUuid) {
@@ -98,14 +75,6 @@ export function registerFsHandlers(ctx: HandlerContext): void {
       await syncWorkspaceFromFile(ctx, result.data.filePath, result.data.data)
     }
     return result
-  })
-
-  ipcMain.handle(IPC.FileRecentList, async () => {
-    const settings = await ctx.fsService.appState.load()
-    if (!settings.lastWorkspacePath || !directoryExists(settings.lastWorkspacePath)) return []
-    await ctx.fsService.workspace.pruneRecentFiles(settings.lastWorkspacePath)
-    const recentResult = await ctx.fsService.workspace.getRecentFiles(settings.lastWorkspacePath)
-    return recentResult.ok ? recentResult.data : []
   })
 
   ipcMain.handle(

@@ -2,13 +2,12 @@ import type { McpServerUserState } from '../mcp/types.js'
 import type {
   IpcResult,
   PalaceArtworkStyle,
-  RecentFileEntry,
   WorkspaceFileEntry,
   WorkspaceTreeEntry,
 } from '../ipc.js'
 
 // 边界 DTO 与结果信封由契约模块单一声明，主进程 fs 域经 re-export 复用同一类型。
-export type { IpcResult, RecentFileEntry, WorkspaceFileEntry, WorkspaceTreeEntry }
+export type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry }
 
 export interface AppSettings {
   apiKey: string
@@ -21,6 +20,7 @@ export interface AppSettings {
   editor: {
     autoSaveIntervalMs: number
   }
+  /** 最近 workspace 路径列表的上限（命名沿用历史字段，作用于 workspace 而非文件）。 */
   recentFilesMax: number
   lastWorkspacePath: string | null
   recentWorkspacePaths: string[]
@@ -37,7 +37,6 @@ export interface WorkspaceState {
   /** 会话文件索引：fileUuid -> filePath 的持久映射，跨启动渲染胶囊条用。 */
   fileUuidPaths: Record<string, string>
   lastOpenedFilePath: string | null
-  recentFiles: RecentFileEntry[]
 }
 
 export interface ProviderConfig {

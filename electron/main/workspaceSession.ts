@@ -3,9 +3,9 @@ import { DEFAULT_SETTINGS } from '../fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from '../fs/workspace.js'
 import type { FileSystemService } from '../fs/index.js'
 
-/** 无用户痕迹的默认工作区：无最近打开文件，视为可安全迁移旧版全局 key。 */
+/** 无用户痕迹的默认工作区：从未打开过文件，视为可安全迁移旧版全局 key。 */
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
-  return state.lastOpenedFilePath === null && state.recentFiles.length === 0
+  return state.lastOpenedFilePath === null
 }
 
 /** 已执行过会话文件索引 prune 的 workspace（进程内只跑一次，避免每次 getSession 都写盘）。 */

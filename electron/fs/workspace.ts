@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
-import type { IpcResult, RecentFileEntry, WorkspaceState } from './types.js'
+import type { IpcResult, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
@@ -9,7 +9,6 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   activeSessionIds: {},
   fileUuidPaths: {},
   lastOpenedFilePath: null,
-  recentFiles: [],
 }
 
 function isMindlanePath(filePath: string): boolean {
@@ -35,19 +34,6 @@ export function coerceLastOpenedFilePath(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-/** Coerce an untrusted value into valid recent file entries. */
-export function coerceRecentFiles(value: unknown): RecentFileEntry[] {
-  if (!Array.isArray(value)) return []
-  return value.filter(
-    (entry): entry is RecentFileEntry =>
-      entry != null &&
-      typeof entry === 'object' &&
-      typeof (entry as Record<string, unknown>).filePath === 'string' &&
-      typeof (entry as Record<string, unknown>).title === 'string' &&
-      typeof (entry as Record<string, unknown>).lastOpenedAt === 'string',
-  )
-}
-
 const STATE_FILE = 'state.json'
 const MINDLANE_DIR = '.mindlane'
 
@@ -71,26 +57,8 @@ export class Workspace {
     return this.initializeIdentity(workspacePath, result.data)
   }
 
-  async openFile(
-    workspacePath: string,
-    filePath: string,
-    title: string,
-    maxEntries: number,
-  ): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => {
-      const current = await this.loadFromDisk(workspacePath)
-      const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
-      const filtered = state.recentFiles.filter((recentFile) => recentFile.filePath !== filePath)
-      filtered.unshift({
-        filePath,
-        title,
-        lastOpenedAt: new Date().toISOString(),
-      })
-      return {
-        lastOpenedFilePath: filePath,
-        recentFiles: filtered.slice(0, maxEntries),
-      }
-    })
+  async openFile(workspacePath: string, filePath: string): Promise<IpcResult<void>> {
+    return this.saveState(workspacePath, async () => ({ lastOpenedFilePath: filePath }))
   }
 
   async clearLastOpenedFile(workspacePath: string): Promise<IpcResult<void>> {
@@ -158,27 +126,6 @@ export class Workspace {
     partial: Partial<WorkspaceState>,
   ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => partial)
-  }
-
-  async getRecentFiles(workspacePath: string): Promise<IpcResult<RecentFileEntry[]>> {
-    const result = await this.load(workspacePath)
-    if (!result.ok) return result
-    return { ok: true, data: result.data.recentFiles }
-  }
-
-  async pruneRecentFiles(workspacePath: string): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => {
-      const current = await this.loadFromDisk(workspacePath)
-      const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
-      const valid = state.recentFiles.filter((entry) => {
-        try {
-          return fs.existsSync(entry.filePath)
-        } catch {
-          return false
-        }
-      })
-      return { recentFiles: valid }
-    })
   }
 
   /** 剔除路径已不存在的会话文件索引条目，避免失效路径长期残留。 */
@@ -255,7 +202,6 @@ export class Workspace {
               : {},
           fileUuidPaths: coerceFileUuidPaths(parsed.fileUuidPaths),
           lastOpenedFilePath,
-          recentFiles: coerceRecentFiles(parsed.recentFiles),
         }
         this.cache.set(workspacePath, merged)
         if (corrected) {

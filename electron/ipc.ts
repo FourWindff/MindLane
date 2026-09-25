@@ -27,7 +27,6 @@ export enum IPC {
   FileOpen = 'file:open',
   FileSave = 'file:save',
   FileSaveAs = 'file:save-as',
-  FileRecentList = 'file:recent-list',
   FileSaveThumbnail = 'file:save-thumbnail',
   FileSelectDocument = 'file:select-document',
   FileSettingsLoad = 'file:settings-load',
@@ -93,12 +92,6 @@ export interface McpAuthorizeUatPayload {
   serverId: string
   appId: string
   appSecret: string
-}
-
-export interface RecentFileEntry {
-  filePath: string
-  title: string
-  lastOpenedAt: string
 }
 
 export interface WorkspaceFileEntry {
@@ -523,7 +516,6 @@ export interface MindlaneBridge {
     saveAs: (payload: {
       data: unknown
     }) => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>
-    recentList: () => Promise<RecentFileEntry[]>
     saveThumbnail: (payload: {
       filePath: string
       imageData: string

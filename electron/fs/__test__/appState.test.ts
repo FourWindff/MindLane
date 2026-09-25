@@ -198,14 +198,6 @@ describe('AppState', () => {
     expect(migrated.data).toBeNull()
   })
 
-  it('getRecentFilesMax returns the configured limit', async () => {
-    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ recentFilesMax: 7 }))
-
-    const max = await appState.getRecentFilesMax()
-
-    expect(max).toBe(7)
-  })
-
   it('switchWorkspace updates lastWorkspacePath and dedupes recentWorkspacePaths', async () => {
     const workspaceA = path.join(tmpDir, 'workspace-a')
     const workspaceB = path.join(tmpDir, 'workspace-b')

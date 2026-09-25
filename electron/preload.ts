@@ -27,7 +27,6 @@ const api: MindlaneBridge = {
     open: () => ipcRenderer.invoke(IPC.FileOpen),
     save: (payload) => ipcRenderer.invoke(IPC.FileSave, payload),
     saveAs: (payload) => ipcRenderer.invoke(IPC.FileSaveAs, payload),
-    recentList: () => ipcRenderer.invoke(IPC.FileRecentList),
     saveThumbnail: (payload) => ipcRenderer.invoke(IPC.FileSaveThumbnail, payload),
     selectDocument: () => ipcRenderer.invoke(IPC.FileSelectDocument),
   },
