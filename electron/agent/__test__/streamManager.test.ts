@@ -89,7 +89,7 @@ function createRuntime(options?: {
     type?: 'tool'
     name?: string
     toolCallId?: string
-    /** 消息所属节点（默认 supervisor；tool 消息默认 subgraphResult） */
+    /** 消息所属节点（默认 supervisor；tool 消息默认子图收口节点） */
     node?: string
   }>
 }): StreamRuntime {
@@ -131,7 +131,7 @@ function createRuntime(options?: {
                 tool_call_id: chunk.toolCallId ?? '',
                 name: chunk.name,
               }),
-              { langgraph_node: chunk.node ?? 'subgraphResult' },
+              { langgraph_node: chunk.node ?? 'mindmapSubgraph' },
             ],
           ]
         } else {

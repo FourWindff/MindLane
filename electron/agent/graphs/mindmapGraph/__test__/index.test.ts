@@ -1,9 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
-import { StateGraph, START, END, Annotation } from '@langchain/langgraph'
+import { StateGraph, START, END } from '@langchain/langgraph'
+import { ToolMessage } from '@langchain/core/messages'
+import type { BaseMessage } from '@langchain/core/messages'
+import type { ChatToolCallStep } from '../../../../../src/shared/lib/fileFormat.js'
 import { Document } from '@langchain/core/documents'
 import { buildMindmapSubgraph } from '../index.js'
 import type { LLMProvider } from '../../../providers/index.js'
 import { MindmapSubgraphState } from '../../../state.js'
+import { GENERATE_MINDMAP_FRAGMENT_TOOL } from '../../../tools/subgraphRoutingTools.js'
 
 type InvokeMock = ReturnType<typeof vi.fn>
 
@@ -23,6 +27,17 @@ function invokeMock(provider: LLMProvider): InvokeMock {
   return provider.model.invoke as unknown as InvokeMock
 }
 
+/** The close-out ToolMessage payload: the subgraph's output contract. */
+function closeOutPayload(result: { messages: BaseMessage[] }): Record<string, unknown> {
+  return JSON.parse(String(findCloseOutMessage(result).content)) as Record<string, unknown>
+}
+
+function findCloseOutMessage(result: { messages: BaseMessage[] }): ToolMessage {
+  const toolMessage = result.messages.find((message) => message.type === 'tool')
+  if (!toolMessage) throw new Error('close-out ToolMessage missing')
+  return toolMessage as ToolMessage
+}
+
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     messages: [],
@@ -31,8 +46,6 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     mindmapResponse: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
-    mindmapXml: '',
-    mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,
     leafResults: [],
@@ -41,7 +54,6 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     mergeResults: [],
     finalTree: null,
     documentRef: null,
-    mindmapToolSteps: [],
     ...overrides,
   }
 }
@@ -100,8 +112,8 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('人工智能导论')
-    expect(result.mindmapTitle).toBe('人工智能导论')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('人工智能导论')
+    expect(closeOutPayload(result).title).toBe('人工智能导论')
     expect(result.leafResults).toHaveLength(1)
     expect(result.finalTree).toBeTruthy()
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
@@ -132,7 +144,7 @@ describe('mindmapGraph', () => {
     expect(steps).toEqual(['reading-doc', 'extracting', 'extracting', 'finalizing'])
   })
 
-  it('collects the stage trace into result.mindmapToolSteps (same source as step events)', async () => {
+  it('collects the run stage trace into the close-out ToolMessage (same source as step events)', async () => {
     const tail = 'TAIL_MARKER'
     const para1 = 'a'.repeat(1500)
     const para2 = 'b'.repeat(1500)
@@ -160,12 +172,13 @@ describe('mindmapGraph', () => {
       if (mode === 'values') result = event as typeof MindmapSubgraphState.State
     }
 
+    const toolSteps = findCloseOutMessage(result).additional_kwargs.toolSteps as ChatToolCallStep[]
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapToolSteps[0]).toEqual({ step: 'reading-doc' })
+    expect(toolSteps[0]).toEqual({ step: 'reading-doc' })
     // one phase-start entry plus one per completed batch
-    expect(result.mindmapToolSteps.filter((s) => s.step === 'extracting')).toHaveLength(4)
-    expect(result.mindmapToolSteps.some((s) => s.step === 'merging')).toBe(true)
-    expect(result.mindmapToolSteps.at(-1)).toEqual({ step: 'finalizing' })
+    expect(toolSteps.filter((s) => s.step === 'extracting')).toHaveLength(4)
+    expect(toolSteps.some((s) => s.step === 'merging')).toBe(true)
+    expect(toolSteps.at(-1)).toEqual({ step: 'finalizing' })
   })
 
   it('routes a long document through leaf batches and a final merge', async () => {
@@ -206,7 +219,7 @@ describe('mindmapGraph', () => {
     expect(result.mindmapError).toBe('')
     expect(result.documentBatches).toHaveLength(3)
     expect(result.leafResults).toHaveLength(3)
-    expect(result.mindmapXml).toContain('Merged Long Text')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Merged Long Text')
     expect(firstPrompt).not.toContain(tail)
     expect(thirdPrompt).toContain(tail)
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
@@ -254,7 +267,7 @@ describe('mindmapGraph', () => {
 
     expect(urlLoader).toHaveBeenCalledWith({ type: 'url', url: 'https://example.test/doc' })
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('URL Root')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('URL Root')
     expect(result.documentRef?.type).toBe('url')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
@@ -323,8 +336,6 @@ describe('mindmapGraph', () => {
         mindmapError: 'stale error',
         mindmapInputSource: { type: 'text', content: 'fresh text' },
         mindmapInputTitle: 'Fresh Root',
-        mindmapXml: 'Stale Root:\n  - Stale Child\n',
-        mindmapTitle: 'Stale Root',
         documentBatches: [[new Document({ pageContent: 'stale text' })]],
         batchIndex: 99,
         leafResults: [
@@ -338,9 +349,9 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('Fresh Root')
-    expect(result.mindmapXml).not.toContain('Stale Root')
-    expect(result.mindmapTitle).toBe('Fresh Root')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Fresh Root')
+    expect(String(closeOutPayload(result).xmlFragment)).not.toContain('Stale Root')
+    expect(closeOutPayload(result).title).toBe('Fresh Root')
     expect(result.leafResults).toHaveLength(1)
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
@@ -374,7 +385,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('人工智能导论')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('人工智能导论')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
 
@@ -388,7 +399,7 @@ describe('mindmapGraph', () => {
 
     expect(result.mindmapError).toContain('XML 校验失败：[xml_parse_error]')
     expect(result.mindmapError).toContain('标签 <node> 未闭合')
-    expect(result.mindmapXml).toBe('')
+    expect(closeOutPayload(result)).toMatchObject({ ok: false })
     expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
 
@@ -415,7 +426,7 @@ describe('mindmapGraph', () => {
     expect(result.mindmapError).toBe('')
     expect(result.leafResults).toHaveLength(2)
     expect(result.finalTree).toBeTruthy()
-    expect(result.mindmapXml).toContain('Merged Root')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Merged Root')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
 
@@ -433,11 +444,11 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('content="Batch 1"')
-    expect(result.mindmapXml).toContain('content="Part A"')
-    expect(result.mindmapXml).toContain('content="Part B"')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Batch 1"')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Part A"')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Part B"')
     // 合成根 label 与旧 YAML 行为一致：包合成根的 label 成为标题
-    expect(result.mindmapTitle).toBe('Batch 1')
+    expect(closeOutPayload(result).title).toBe('Batch 1')
   })
 
   it('keeps special characters complete and escaped in the output fragment', async () => {
@@ -455,10 +466,10 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toBe('')
-    expect(result.mindmapXml).toContain('content="R&amp;D &lt;fast&gt;"')
-    expect(result.mindmapXml).toContain('content="a &gt; b &amp; c"')
-    expect(result.mindmapXml).toContain('content="价格 100%"')
-    expect(result.mindmapXml).not.toContain('<node>R&D') // 模型原串不外泄
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="R&amp;D &lt;fast&gt;"')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="a &gt; b &amp; c"')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="价格 100%"')
+    expect(String(closeOutPayload(result).xmlFragment)).not.toContain('<node>R&D') // 模型原串不外泄
   })
 
   it('extracts all leaf batches before any merge starts', async () => {
@@ -497,45 +508,95 @@ describe('mindmapGraph', () => {
   })
 })
 
-describe('mindmapGraph writer propagation', () => {
-  it('surfaces subgraph progress events through a nested invoke from an outer stream', async () => {
-    // 断点：外层 stream + 节点内嵌套 invoke 子图 → 进度事件必须能冒出。
-    // langgraph 的 pickRunnableConfigKeys 不透传 custom writer，orchestrator 的
-    // invokeSubgraph 经 configurable.writer 显式传播；本用例是修复的唯一验证点。
+describe('mindmapGraph close-out', () => {
+  it('writes its own success ToolMessage (call id, name, payload, stage trace)', async () => {
     const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
-    // 最小外层图：节点内以 orchestrator 的方式嵌套 invoke 编译后的子图。
-    const S = Annotation.Root({
-      v: Annotation<number>({ reducer: (_prev: number, next: number) => next, default: () => 0 }),
+    const result = await app.invoke(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+        mindmapInputTitle: '人工智能导论',
+        mindmapToolCallId: 'call-mm',
+        mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
+      }),
+    )
+
+    expect(result.messages).toHaveLength(1)
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(toolMessage.tool_call_id).toBe('call-mm')
+    expect(toolMessage.name).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
+    // documentRef rides back with the payload: the main graph reads it after the run.
+    expect(JSON.parse(String(toolMessage.content))).toMatchObject({
+      ok: true,
+      title: '人工智能导论',
+      documentRef: { type: 'text', source: '这是一篇关于人工智能的文档。' },
     })
-    const outer = new StateGraph(S)
-      .addNode('sub', async (state) => {
-        await app.invoke(
-          baseInput({
-            mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-            mindmapInputTitle: '人工智能导论',
-          }),
-          { recursionLimit: 25, callbacks: [] },
-        )
-        return { v: state.v + 1 }
-      })
-      .addEdge(START, 'sub')
-      .addEdge('sub', END)
+    expect(String(JSON.parse(String(toolMessage.content)).xmlFragment)).toContain('人工智能导论')
+    // The persisted trace is the run's own trace, not a stale one from state.
+    expect(toolMessage.additional_kwargs.toolSteps).toEqual([
+      { step: 'reading-doc' },
+      { step: 'extracting' },
+      { step: 'extracting', completed: 1, total: 1 },
+      { step: 'finalizing' },
+    ])
+  })
+
+  it('writes the error payload with the call id and falls back to the default tool name', async () => {
+    const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
+    const app = buildMindmapSubgraph({ provider }).compile()
+
+    const result = await app.invoke(baseInput({ mindmapToolCallId: 'call-error' }))
+
+    expect(result.mindmapError).not.toBe('')
+    expect(result.messages).toHaveLength(1)
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(toolMessage.tool_call_id).toBe('call-error')
+    expect(toolMessage.name).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
+    expect(JSON.parse(String(toolMessage.content))).toEqual({
+      ok: false,
+      error: result.mindmapResponse,
+    })
+  })
+})
+
+describe('mindmapGraph mounted as a node', () => {
+  it('surfaces progress events and the ToolMessage on the host graph without writer forwarding', async () => {
+    const provider = mockProvider(() => ({ content: VALID_TREE_XML }))
+    const subgraph = buildMindmapSubgraph({ provider }).compile()
+
+    // Host shape mirrors the orchestrator: the compiled subgraph is mounted with
+    // addNode and inherits the run context — no `configurable.writer` passthrough.
+    const host = new StateGraph(MindmapSubgraphState)
+      .addNode('mindmapSubgraph', subgraph)
+      .addEdge(START, 'mindmapSubgraph')
+      .addEdge('mindmapSubgraph', END)
       .compile()
 
     const steps: string[] = []
-    const stream = await outer.stream(
-      { v: 0 },
-      { streamMode: ['custom', 'values'], configurable: { thread_id: 't1' } },
+    let result!: typeof MindmapSubgraphState.State
+    const stream = await host.stream(
+      baseInput({
+        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
+        mindmapInputTitle: '人工智能导论',
+        mindmapToolCallId: 'call-mm',
+        mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
+      }),
+      { streamMode: ['custom', 'values'] },
     )
+
     for await (const [mode, payload] of stream) {
       if (mode === 'custom') steps.push((payload as { step: string }).step)
+      if (mode === 'values') result = payload as typeof MindmapSubgraphState.State
     }
 
     expect(steps).toContain('reading-doc')
     expect(steps).toContain('extracting')
     expect(steps).toContain('finalizing')
+    // The subgraph's own close-out lands in the host graph's messages channel.
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(toolMessage.tool_call_id).toBe('call-mm')
+    expect(JSON.parse(String(toolMessage.content))).toMatchObject({ ok: true })
   })
 })
 
@@ -660,7 +721,7 @@ describe('mindmapGraph wave concurrency', () => {
     )
 
     expect(result.mindmapError).toContain('boom p1')
-    expect(result.mindmapXml).toBe('')
+    expect(closeOutPayload(result)).toMatchObject({ ok: false })
     // only the first wave (batches 0-3) ran; batches 4-5 were never dispatched
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
   })
@@ -693,7 +754,7 @@ describe('mindmapGraph wave concurrency', () => {
     // merge input is model-dialect XML, one <node> root per tree
     expect(mergePrompts[0]).toContain('<node>Root p1')
     expect(mergePrompts[0]).not.toContain('content="')
-    expect(result.mindmapXml).toContain('Merged Root')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Merged Root')
   })
 
   it('emits quantified progress events with the step enum unchanged', async () => {

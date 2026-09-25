@@ -192,7 +192,7 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.messages).toHaveLength(1)
-    expect(result.pendingSubgraph).toBeUndefined()
+    expect(result.pendingSubgraph).toBeNull()
   })
 
   it('ordinary tool calls take precedence over virtual routing tools', async () => {
@@ -223,7 +223,7 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.messages).toHaveLength(1)
-    expect(result.pendingSubgraph).toBeUndefined()
+    expect(result.pendingSubgraph).toBeNull()
   })
 
   it('direct response ends without subgraph routing', async () => {

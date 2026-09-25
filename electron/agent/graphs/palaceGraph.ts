@@ -14,6 +14,7 @@ import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
 import { resolveArtworkStyle } from '../../../src/shared/lib/palaceArtworkStyle.js'
+import { buildSubgraphToolMessage } from '../subgraphRouter.js'
 
 const log = logger.withContext('palace')
 
@@ -47,8 +48,51 @@ function beginStage(
 }
 
 /**
+ * Close out the run: this node owns the subgraph's ToolMessage (call id, tool
+ * name, stage trace). The host graph mounts this subgraph as a node, so the
+ * ToolMessage lands in the main graph's messages channel directly.
+ */
+function buildOutputNode(state: PalaceSubgraphStateType): Partial<PalaceSubgraphStateType> {
+  const content = state.palaceError
+    ? { ok: false, error: state.palaceResponse || state.palaceError }
+    : {
+        ok: true,
+        label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
+        stations: state.memoryRoute.map((s) => ({
+          order: s.order,
+          content: s.content,
+          anchorVisual: s.anchorVisual ?? '',
+          association: s.association,
+          x: s.x,
+          y: s.y,
+          linkedNodeId: s.linkedNodeId ?? '',
+        })),
+        // The palace subgraph normalizes remote URLs to data URLs inside the
+        // graph, so the first entry is already the persistable payload.
+        imageUrl: state.imageUrls[0] ?? '',
+        sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
+      }
+
+  const toolSteps = state.palaceToolSteps ?? []
+  return {
+    messages: [
+      buildSubgraphToolMessage({
+        subgraph: 'palace',
+        toolCallId: state.palaceToolCallId,
+        toolName: state.palaceToolName,
+        payload: content,
+        toolSteps,
+      }),
+    ],
+  }
+}
+
+/**
  * 构建 Palace Subgraph
- * 流程: START -> resolve_input -> analyze -> (svgGen | imageGen -> normalizeImages -> vision) -> END
+ * 流程: START -> resolve_input -> analyze -> (svgGen | imageGen -> normalizeImages -> vision) -> build_output -> END
+ *
+ * Compiled without a checkpointer and without its own stream: the host graph
+ * owns persistence and the run context (this graph is mounted as its node).
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const { provider } = options
@@ -149,22 +193,25 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       )
       return { ...result, palaceToolSteps: toolSteps }
     })
+    .addNode('build_output', buildOutputNode)
 
   // 基础边
   graph.addEdge(START, 'resolve_input')
-  graph.addConditionalEdges('resolve_input', (state) => (state.palaceError ? END : 'analyze'), [
-    'analyze',
-    END,
-  ])
+  graph.addConditionalEdges(
+    'resolve_input',
+    (state) => (state.palaceError ? 'build_output' : 'analyze'),
+    ['analyze', 'build_output'],
+  )
   graph.addConditionalEdges(
     'analyze',
     (state) => resolveArtworkStyle(state.artworkStyle, provider.capabilities),
     { vector: 'svgGen', raster: 'imageGen' },
   )
-  graph.addEdge('svgGen', END)
+  graph.addEdge('svgGen', 'build_output')
   graph.addEdge('imageGen', 'normalizeImages')
   graph.addEdge('normalizeImages', 'vision')
-  graph.addEdge('vision', END)
+  graph.addEdge('vision', 'build_output')
+  graph.addEdge('build_output', END)
 
   return graph
 }

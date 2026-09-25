@@ -198,7 +198,10 @@
 ### 子图运行（Subgraph Run）
 
 - 主图一次运行内某个子图节点的执行。
+- 两个子图以**编译后的图作为节点**挂进主图（as node），不是节点函数里嵌套 `invoke`：内部超步计入主图的共享递归预算，持久化由主图 checkpointer 承担，`getWriter()` 自动继承（无需透传）。
 - 与主图共享线程（checkpoint）与流（`streamId` / `writer`），因此可出阶段进度、可从超步边界续跑；续跑粒度是超步/波边界，不是叶粒度。
+- 收口在子图自己内部：执行完由子图自己的收口节点写回自己的 ToolMessage，主图侧没有单独的收口节点。
+- _Avoid_: 把子图说成「主图节点里调用的一次子运行」。
 
 ### 入口对话（Entry Conversation）
 
@@ -486,7 +489,8 @@
 
 ### 子图输出（Subgraph Output）
 
-- mindmap/palace 子图执行完毕后由 `packageResult` 包装、以 ToolMessage 形式喂回主图 agent 的 payload。
+- mindmap/palace 子图执行完毕后由**子图自己的收口节点**写回 ToolMessage 的 payload（由该 ToolMessage 喂回主图 agent）。
+- 该 ToolMessage 自带调用 id、工具名与阶段轨迹（`additional_kwargs.toolSteps`），因此并行时各子图各写各的。
 - mindmap 为 JSON 壳 `{ok, title, xmlFragment, documentRef}`，其中 `xmlFragment` 是存储方言的 XML 片段；palace 为 `{ok, label, stations, imageUrl, sourceNodeIds}`。
 - palace 的 `imageUrl` 恒为 data URL（矢量载体为 `image/svg+xml`）；落图时由落图应答器物化为**图片资源**（asset），节点数据只留 asset 引用。
 - palace 的落图由**代码**把 payload 序列化为 XML 后走写动作（手动触发与 AI 触发同一份），模型不复述 data URL。

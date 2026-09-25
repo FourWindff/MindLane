@@ -1,5 +1,5 @@
 import { ToolMessage } from '@langchain/core/messages'
-import type { MainGraphStateType } from './state.js'
+import type { ChatToolCallStep } from '../../src/shared/lib/fileFormat.js'
 import {
   createGenerateMindmapFragmentTool,
   createGeneratePalaceTool,
@@ -63,98 +63,32 @@ export function detect(toolCalls: ToolCallLike[]): SubgraphCall | null {
   return null
 }
 
-interface SubgraphResultPayload {
-  messages: ToolMessage[]
-  pendingSubgraph: null
-  mindmapToolCallId?: string
-  mindmapToolName?: string
-  palaceToolCallId?: string
-  palaceToolName?: string
-}
-
 /**
- * 将子图执行结果包装成 ToolMessage，并清理该子图自己的调用信息。
+ * Build the ToolMessage a subgraph node writes back for its own virtual call —
+ * the subgraph side of the virtual-tool interface.
  *
- * 标量通道按子图拆名后，收口只读自己那一份：另一个子图的错误/轨迹/调用信息
- * 不参与本次收口，也不被清除（并行时各收各的）。
+ * Both subgraphs close out through this one builder so the persisted shape
+ * (JSON payload + `additional_kwargs.toolSteps` trace) cannot drift between
+ * them; the payload itself stays each subgraph's own business.
  *
- * Palace 子图已经在内部将远程图片 URL 转换为 data URL，因此这里只读取 state.imageUrls。
+ * The call info rides in from the supervisor's declaration of the call; the
+ * default name covers a subgraph executed without one.
  */
-export function packageResult(state: MainGraphStateType): SubgraphResultPayload {
-  const subgraph: SubgraphName = state.pendingSubgraph === 'palace' ? 'palace' : 'mindmap'
-  const channels =
-    subgraph === 'palace'
-      ? {
-          toolName: state.palaceToolName,
-          toolCallId: state.palaceToolCallId,
-          error: state.palaceError,
-          response: state.palaceResponse,
-          toolSteps: state.palaceToolSteps,
-        }
-      : {
-          toolName: state.mindmapToolName,
-          toolCallId: state.mindmapToolCallId,
-          error: state.mindmapError,
-          response: state.mindmapResponse,
-          toolSteps: state.mindmapToolSteps,
-        }
-
-  const content = channels.error
-    ? { ok: false, error: channels.response || channels.error }
-    : buildSuccessPayload(state, subgraph)
-
-  return {
-    messages: [
-      new ToolMessage({
-        tool_call_id: channels.toolCallId,
-        name: channels.toolName || defaultToolName(subgraph),
-        content: JSON.stringify(content),
-        additional_kwargs: channels.toolSteps?.length
-          ? { toolSteps: channels.toolSteps }
-          : undefined,
-      }),
-    ],
-    pendingSubgraph: null,
-    ...(subgraph === 'palace'
-      ? { palaceToolCallId: '', palaceToolName: '' }
-      : { mindmapToolCallId: '', mindmapToolName: '' }),
-  }
+export function buildSubgraphToolMessage(params: {
+  subgraph: SubgraphName
+  toolCallId: string
+  toolName: string
+  payload: Record<string, unknown>
+  toolSteps: ChatToolCallStep[]
+}): ToolMessage {
+  return new ToolMessage({
+    tool_call_id: params.toolCallId,
+    name: params.toolName || defaultToolName(params.subgraph),
+    content: JSON.stringify(params.payload),
+    additional_kwargs: params.toolSteps.length ? { toolSteps: params.toolSteps } : undefined,
+  })
 }
 
 function defaultToolName(subgraph: SubgraphName): string {
   return subgraph === 'palace' ? GENERATE_PALACE_TOOL : GENERATE_MINDMAP_FRAGMENT_TOOL
-}
-
-function buildSuccessPayload(
-  state: MainGraphStateType,
-  subgraph: SubgraphName,
-): Record<string, unknown> {
-  return subgraph === 'palace' ? buildPalacePayload(state) : buildMindmapPayload(state)
-}
-
-function buildMindmapPayload(state: MainGraphStateType): Record<string, unknown> {
-  return {
-    ok: true,
-    title: state.mindmapTitle,
-    xmlFragment: state.mindmapXml,
-    documentRef: state.documentRef,
-  }
-}
-
-function buildPalacePayload(state: MainGraphStateType): Record<string, unknown> {
-  return {
-    ok: true,
-    label: state.palace?.theme || `记忆宫殿 (${state.memoryRoute.length} 站)`,
-    stations: state.memoryRoute.map((s) => ({
-      order: s.order,
-      content: s.content,
-      anchorVisual: s.anchorVisual ?? '',
-      association: s.association,
-      x: s.x,
-      y: s.y,
-      linkedNodeId: s.linkedNodeId ?? '',
-    })),
-    imageUrl: state.imageUrls[0] ?? '',
-    sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
-  }
 }

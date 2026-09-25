@@ -1,6 +1,6 @@
 import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { END, START, StateGraph, getWriter } from '@langchain/langgraph'
+import { END, START, StateGraph } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { LLMProvider } from './providers/index.js'
@@ -25,7 +25,7 @@ import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
-import { getToolSchemas, isSubgraphCall, packageResult } from './subgraphRouter.js'
+import { getToolSchemas, isSubgraphCall } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
@@ -284,37 +284,6 @@ export class AgentOrchestrator {
 
   buildGraph(toolRegistry = this.toolRegistry) {
     const toolNode = new ToolNode(toolRegistry.executableTools)
-    const invokeSubgraph = async <T extends { messages?: BaseMessage[] }>(
-      subgraph: {
-        invoke: (
-          state: MainGraphStateType,
-          config: {
-            recursionLimit: number
-            callbacks: []
-            configurable?: { writer?: unknown }
-          },
-        ) => Promise<T>
-      },
-      state: MainGraphStateType,
-    ): Promise<Partial<MainGraphStateType>> => {
-      // langgraph 的 pickRunnableConfigKeys 不透传 custom writer：把外层 getWriter()
-      // 显式经 configurable.writer 传入子图，子图节点内的 getWriter() 才能继续发进度事件。
-      const writer = getWriter()
-      const result = await subgraph.invoke(state, {
-        recursionLimit: AGENT_LIMITS.recursionLimit,
-        callbacks: [],
-        ...(writer ? { configurable: { writer } } : {}),
-      })
-      const updates = { ...(result as MainGraphStateType & T) }
-      delete (updates as Record<string, unknown>).messages
-      return updates as Partial<MainGraphStateType>
-    }
-
-    const mindmapSubgraphNode = async (state: MainGraphStateType) =>
-      invokeSubgraph(this.getCompiledMindmapSubgraph(), state)
-
-    const palaceSubgraphNode = async (state: MainGraphStateType) =>
-      invokeSubgraph(this.getCompiledPalaceSubgraph(), state)
 
     // Tool execution node: filter out virtual subgraph routing tools (already handled in supervisor.invoke).
     const normalizeToolMessages = async (messages: BaseMessage[]): Promise<BaseMessage[]> => {
@@ -392,8 +361,6 @@ export class AgentOrchestrator {
       }
     }
 
-    const subgraphResultNode = async (state: MainGraphStateType) => packageResult(state)
-
     const supervisor = new MindLaneAgent(this.provider, toolRegistry, this.services.memoryManager, {
       userDataPath: this.options.userDataPath,
       messagePipeline: this.options.messagePipeline,
@@ -416,14 +383,18 @@ export class AgentOrchestrator {
     // Unified routing function: MindLaneAgent.route() owns subgraph selection.
     const routeFn = (state: MainGraphStateType) => supervisor.route(state)
 
-    // Unified graph structure: always includes the palaceSubgraph node.
+    // Unified graph structure: both subgraphs are mounted as nodes of this graph.
+    // Mounting (rather than a node function nesting .invoke()) is what makes the
+    // subgraph share the main run: one checkpointer, one recursion budget, the
+    // same stream/writer, and the subgraph's own close-out node writes its
+    // ToolMessage straight into the messages channel. The model-visible interface
+    // stays the two virtual tool schemas the supervisor routes on.
     const graph = new StateGraph(MainGraphState)
       .addNode('contextCompact', contextCompactNode)
       .addNode('supervisor', (state) => supervisor.invoke(state))
       .addNode('tools', toolsNode)
-      .addNode('mindmapSubgraph', mindmapSubgraphNode)
-      .addNode('palaceSubgraph', palaceSubgraphNode)
-      .addNode('subgraphResult', subgraphResultNode)
+      .addNode('mindmapSubgraph', this.getCompiledMindmapSubgraph())
+      .addNode('palaceSubgraph', this.getCompiledPalaceSubgraph())
       .addEdge(START, 'contextCompact')
       .addEdge('contextCompact', 'supervisor')
       .addConditionalEdges('supervisor', routeFn, {
@@ -432,9 +403,8 @@ export class AgentOrchestrator {
         palaceSubgraph: 'palaceSubgraph',
         __end__: END,
       })
-      .addEdge('mindmapSubgraph', 'subgraphResult')
-      .addEdge('palaceSubgraph', 'subgraphResult')
-      .addEdge('subgraphResult', 'supervisor')
+      .addEdge('mindmapSubgraph', 'supervisor')
+      .addEdge('palaceSubgraph', 'supervisor')
       .addEdge('tools', 'supervisor')
 
     return graph

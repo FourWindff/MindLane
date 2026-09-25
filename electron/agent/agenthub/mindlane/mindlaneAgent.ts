@@ -104,10 +104,17 @@ export class MindLaneAgent extends BaseAgent {
         messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
         response: '处理请求时出错，请稍后重试。',
+        pendingSubgraph: null,
       }
     }
   }
 
+  /**
+   * Conditional-edge router. `pendingSubgraph` is a supervisor-owned key: this
+   * node sets it when the model declares a subgraph call and clears it on every
+   * other path, and no subgraph node writes it — so a consumed declaration can
+   * never re-route the graph back into a subgraph that already ran.
+   */
   route(state: MainGraphStateType): string {
     switch (state.pendingSubgraph) {
       case 'palace':
@@ -209,7 +216,9 @@ export class MindLaneAgent extends BaseAgent {
     }
 
     if (hasActionToolCall) {
-      return { messages: resultMessages }
+      // Plain tool round: no subgraph this time, so clear the supervisor's own
+      // routing key (see route()).
+      return { messages: resultMessages, pendingSubgraph: null }
     }
 
     const virtualRoute = subgraphCall

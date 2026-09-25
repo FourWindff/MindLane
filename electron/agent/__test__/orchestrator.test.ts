@@ -144,31 +144,37 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     const graphWithout = buildGraphWithout()
 
     expect(Object.keys(graphWith.nodes)).toContain('palaceSubgraph')
-    expect(Object.keys(graphWith.nodes)).toContain('subgraphResult')
+    expect(Object.keys(graphWith.nodes)).toContain('mindmapSubgraph')
+    expect(Object.keys(graphWith.nodes)).not.toContain('subgraphResult')
     expect(Object.keys(graphWithout.nodes)).toContain('palaceSubgraph')
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes))
   })
 
-  it('隔离独立子图的回调，避免父流重复结束同一 run', async () => {
-    const provider = createMockProvider()
-    const orchestrator = new AgentOrchestrator(provider, createMockServices())
-    const invoke = vi.fn().mockResolvedValue({ messages: [], response: 'done' })
+  it('两个子图以编译后的图作为节点挂载（不是节点函数里嵌套 invoke）', () => {
+    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
 
-    vi.spyOn(
-      orchestrator as unknown as { getCompiledMindmapSubgraph: () => { invoke: typeof invoke } },
-      'getCompiledMindmapSubgraph',
-    ).mockReturnValue({ invoke })
+    const graph = (
+      orchestrator as unknown as Record<string, () => { nodes: Record<string, unknown> }>
+    )['buildGraph'].bind(orchestrator)()
 
-    const graph = orchestrator.buildGraph()
-    const node = graph.nodes.mindmapSubgraph as unknown as {
-      runnable: { invoke: (state: Record<string, unknown>) => Promise<unknown> }
+    for (const name of ['mindmapSubgraph', 'palaceSubgraph']) {
+      const node = graph.nodes[name] as { runnable?: { constructor?: { name?: string } } }
+      expect(node.runnable?.constructor?.name).toBe('CompiledStateGraph')
     }
-    await node.runnable.invoke({ messages: [] })
+  })
 
-    expect(invoke).toHaveBeenCalledWith(
-      expect.objectContaining({ messages: [] }),
-      expect.objectContaining({ callbacks: [] }),
-    )
+  it('每个子图节点直接回到 supervisor：没有收口节点', () => {
+    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
+
+    const graph = (
+      orchestrator as unknown as {
+        buildGraph: () => { edges: Iterable<[string, string]> }
+      }
+    )['buildGraph'].bind(orchestrator)()
+    const edges = Array.from(graph.edges).map((edge) => edge.join('->'))
+
+    expect(edges).toContain('mindmapSubgraph->supervisor')
+    expect(edges).toContain('palaceSubgraph->supervisor')
   })
 })
 

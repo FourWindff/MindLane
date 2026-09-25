@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { StateGraph } from '@langchain/langgraph'
 import { SystemMessage } from '@langchain/core/messages'
-import {
-  MainGraphState,
-  MindmapSubgraphState,
-  PalaceSubgraphState,
-  type MainGraphStateType,
-} from '../state.js'
+import { MainGraphState, MindmapSubgraphState, PalaceSubgraphState } from '../state.js'
 
 describe('MindmapSubgraphState', () => {
   it('has mindmapInputSource field', async () => {
@@ -26,8 +21,6 @@ describe('MindmapSubgraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
       mindmapInputTitle: 'Test',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
@@ -60,8 +53,6 @@ describe('MindmapSubgraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
@@ -74,33 +65,6 @@ describe('MindmapSubgraphState', () => {
         importedAt: new Date().toISOString(),
         sha256: 'doc-1-hash',
       },
-    })
-  })
-
-  it('has mindmapXml field', async () => {
-    const graph = new StateGraph(MindmapSubgraphState)
-      .addNode('test', async (state) => {
-        expect(state.mindmapXml).toBe('root:\n  label: Test\n')
-        return {}
-      })
-      .addEdge('__start__', 'test')
-      .addEdge('test', '__end__')
-
-    const compiled = graph.compile()
-    await compiled.invoke({
-      messages: [],
-      context: null,
-      mindmapError: '',
-      mindmapResponse: '',
-      mindmapInputSource: null,
-      mindmapInputTitle: '',
-      mindmapXml: 'root:\n  label: Test\n',
-      mindmapTitle: '',
-      documentBatches: [],
-      leafResults: [],
-      mergeInputs: [],
-      mergeResults: [],
-      documentRef: null,
     })
   })
 
@@ -122,8 +86,6 @@ describe('MindmapSubgraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { label: 'a', children: [] } }],
       mergeInputs: [],
@@ -152,8 +114,6 @@ describe('MindmapSubgraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [{ batchIndex: 0, batchId: 'c1', tree: { label: 'a', children: [] } }],
       mergeInputs: [],
@@ -180,8 +140,6 @@ describe('MindmapSubgraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
@@ -220,8 +178,6 @@ describe('MainGraphState', () => {
       mindmapResponse: '',
       mindmapInputSource: { type: 'pdf', path: '/test.pdf' },
       mindmapInputTitle: 'Test',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
@@ -256,8 +212,6 @@ describe('MainGraphState', () => {
       error: '',
       mindmapInputSource: null,
       mindmapInputTitle: '',
-      mindmapXml: '',
-      mindmapTitle: '',
       documentBatches: [],
       leafResults: [],
       mergeInputs: [],
@@ -300,14 +254,9 @@ describe('子图通道与主图通道', () => {
 
     let seenInMainGraph: string | undefined
     const mainGraph = new StateGraph(MainGraphState)
-      .addNode('palaceSubgraph', async (state) => {
-        // Same hand-off as AgentOrchestrator.invokeSubgraph: the whole subgraph
-        // state is spread back into the main graph update.
-        const result = await palaceSubgraph.invoke(state, { recursionLimit: 80, callbacks: [] })
-        const updates = { ...(result as Record<string, unknown>) }
-        delete updates.messages
-        return updates as Partial<MainGraphStateType>
-      })
+      // Mounted the way AgentOrchestrator does it: the compiled subgraph is a
+      // node of the main graph and its writes land in the main graph's channels.
+      .addNode('palaceSubgraph', palaceSubgraph)
       .addNode('afterSubgraph', async (state) => {
         seenInMainGraph = state.imagePrompt
         return {}

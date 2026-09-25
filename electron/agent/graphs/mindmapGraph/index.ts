@@ -1,4 +1,5 @@
 import { StateGraph, START, END, Send, getWriter } from '@langchain/langgraph'
+import { ToolMessage } from '@langchain/core/messages'
 import type { LLMProvider } from '../../providers/index.js'
 import { MindmapSubgraphState } from '../../state.js'
 import { extractTextContent, formatAgentError } from '../../utils.js'
@@ -20,6 +21,7 @@ import { currentStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
 import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
 import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../../ipc.js'
+import { buildSubgraphToolMessage } from '../../subgraphRouter.js'
 
 const log = logger.withContext('mindmap')
 
@@ -109,8 +111,6 @@ function createMindmapRunReset(): typeof MindmapSubgraphState.Update {
   return {
     mindmapResponse: '',
     mindmapError: '',
-    mindmapXml: '',
-    mindmapTitle: '',
     documentBatches: [],
     batchIndex: -1,
     leafResults: null,
@@ -466,6 +466,11 @@ async function finalizeMergeNode(
   return { finalTree: state.mergeResults[0]?.tree ?? null }
 }
 
+/**
+ * Close out the run: this node owns the subgraph's ToolMessage (call id, tool
+ * name, stage trace) — the mindmap side of the graph boundary. No separate
+ * collection node in the main graph reads this subgraph's channels anymore.
+ */
 async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<typeof MindmapSubgraphState.Update> {
@@ -475,27 +480,42 @@ async function buildOutputNode(
   const runStart = takeRunStart()
   const toolSteps = takeStepTrace() ?? []
   resetItemProgress()
+
+  const closeOut = (payload: Record<string, unknown>): ToolMessage =>
+    buildSubgraphToolMessage({
+      subgraph: 'mindmap',
+      toolCallId: state.mindmapToolCallId,
+      toolName: state.mindmapToolName,
+      payload,
+      toolSteps,
+    })
+
   // Preserve the error written by an earlier stage of this run.
   if (state.mindmapError) {
-    return {}
+    const error = state.mindmapResponse || state.mindmapError
+    return { messages: [closeOut({ ok: false, error })] }
   }
 
   const tree = state.finalTree
   const title = state.mindmapInputTitle || '思维导图'
 
   if (!tree) {
+    const response = '生成思维导图失败：未能生成有效的结构'
     return {
       mindmapError: '未能生成有效的思维导图结构',
-      mindmapResponse: '生成思维导图失败：未能生成有效的结构',
+      mindmapResponse: response,
+      messages: [closeOut({ ok: false, error: response })],
     }
   }
 
   const finalTitle = tree.label.trim() || title
 
   if (tree.children.length === 0) {
+    const response = '生成思维导图失败：未提取到任何要点'
     return {
       mindmapError: '未提取到任何要点',
-      mindmapResponse: '生成思维导图失败：未提取到任何要点',
+      mindmapResponse: response,
+      messages: [closeOut({ ok: false, error: response })],
     }
   }
 
@@ -507,11 +527,17 @@ async function buildOutputNode(
     finalTitle,
   )
 
+  const mindmapXml = serializeStorageFragment(tree)
   return {
-    mindmapXml: serializeStorageFragment(tree),
-    mindmapTitle: finalTitle,
     mindmapResponse: `已生成思维导图「${finalTitle}」。`,
-    mindmapToolSteps: toolSteps,
+    messages: [
+      closeOut({
+        ok: true,
+        title: finalTitle,
+        xmlFragment: mindmapXml,
+        documentRef: state.documentRef,
+      }),
+    ],
   }
 }
 
@@ -604,6 +630,11 @@ function routeAfterMergeGate(state: typeof MindmapSubgraphState.State): string |
  *   -> (next wave, next round at reduced width, or finalize_merge)
  *   -> build_output -> END
  * A single leaf result skips merge and goes straight to finalize_single_leaf.
+ *
+ * The graph is compiled without a checkpointer and mounted as a node of the
+ * main graph: persistence, the recursion budget and the run context all come
+ * from the host graph, and build_output writes the ToolMessage the supervisor
+ * reads back.
  */
 export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
   const graph = new StateGraph(MindmapSubgraphState)
@@ -616,7 +647,7 @@ export function buildMindmapSubgraph(options: MindmapSubgraphOptions) {
     .addNode('merge_trees', (state) => mergeTreesNode(state, options))
     .addNode('merge_gate', () => mergeGateNode())
     .addNode('finalize_merge', (state) => finalizeMergeNode(state))
-    .addNode('build_output', (state) => buildOutputNode(state))
+    .addNode('build_output', buildOutputNode)
 
   // START -> resolve_input -> load_document
   graph.addEdge(START, 'resolve_input')

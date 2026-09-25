@@ -128,11 +128,6 @@ const SupervisorAnnotations = {
  * 两个虚拟工具的 schema 都是空对象，所以没有「调用输入」可留；等 schema 有了参数再加。
  */
 const MindmapScalarAnnotations = {
-  /** 子图阶段轨迹（与 step 流事件同源），由子图收口并随子图状态返回主图。 */
-  mindmapToolSteps: Annotation<ChatToolCallStep[]>({
-    reducer: replaceReducer,
-    default: () => [],
-  }),
   mindmapError: Annotation<string>({
     reducer: replaceReducer,
     default: () => '',
@@ -249,14 +244,6 @@ const MindmapStateAnnotations = {
     default: () => null,
   }),
   mindmapInputTitle: Annotation<string>({
-    reducer: replaceReducer,
-    default: () => '',
-  }),
-  mindmapXml: Annotation<string>({
-    reducer: replaceReducer,
-    default: () => '',
-  }),
-  mindmapTitle: Annotation<string>({
     reducer: replaceReducer,
     default: () => '',
   }),

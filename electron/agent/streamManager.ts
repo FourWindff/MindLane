@@ -209,9 +209,10 @@ export class Runner {
             },
             Record<string, unknown>,
           ]
-          // A subgraph ToolMessage arrived (subgraphResult node output,
-          // langgraph_node != supervisor): virtual subgraph calls do not go
-          // through ToolNode, so tools mode emits nothing; re-emit tool-end here.
+          // A subgraph ToolMessage arrived (written by the subgraph's own
+          // close-out node; langgraph_node != supervisor): virtual subgraph calls
+          // do not go through ToolNode, so tools mode emits nothing; re-emit
+          // tool-end here.
           // Progress-less runs also get their tool-start anchored here (before
           // the end), so the card is never declared at supervisor-chunk time.
           if (message.type === 'tool' && isSubgraphCall(message.name ?? '')) {

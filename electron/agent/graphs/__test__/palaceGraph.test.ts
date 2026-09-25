@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ToolMessage } from '@langchain/core/messages'
 import { buildPalaceSubgraph } from '../palaceGraph.js'
 import { ProviderCapability, type LLMProvider } from '../../providers/index.js'
 import type { ChatContext } from '../../../ipc.js'
 import { resolveArtworkStyle } from '../../../../src/shared/lib/palaceArtworkStyle.js'
+import { GENERATE_PALACE_TOOL } from '../../tools/subgraphRoutingTools.js'
 
 function createMockProvider(): LLMProvider {
   return {
@@ -229,6 +231,73 @@ describe('buildPalaceSubgraph', () => {
 
     expect(result.palaceError).toContain('请提供记忆宫殿的输入内容')
     expect(provider.model.invoke).not.toHaveBeenCalled()
+  })
+
+  it('close-out ToolMessage 携带调用信息、成功 payload 与阶段轨迹', async () => {
+    const provider = createStageProvider()
+    // A data URL keeps the run off the network and mirrors the persisted shape
+    // (CONTEXT: palace imageUrl is always a data URL).
+    const imageUrl = 'data:image/png;base64,iVBORw0KGgo='
+    ;(provider as unknown as { generateImage: ReturnType<typeof vi.fn> }).generateImage = vi
+      .fn()
+      .mockResolvedValue({ urls: [imageUrl] })
+    const graph = buildPalaceSubgraph({ provider: provider as unknown as LLMProvider }).compile()
+
+    const result = await graph.invoke({
+      messages: [],
+      artworkStyle: 'raster',
+      palaceToolCallId: 'call-palace',
+      palaceToolName: GENERATE_PALACE_TOOL,
+      context: {
+        fileUuid: 'file-a',
+        selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+      } satisfies ChatContext,
+    })
+
+    expect(result.messages).toHaveLength(1)
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(toolMessage.tool_call_id).toBe('call-palace')
+    expect(toolMessage.name).toBe(GENERATE_PALACE_TOOL)
+    expect(JSON.parse(String(toolMessage.content))).toEqual({
+      ok: true,
+      label: '测试宫殿',
+      stations: [
+        {
+          order: 1,
+          content: '第一站',
+          anchorVisual: '巨大的铜钟',
+          association: '',
+          x: 0.25,
+          y: 0.4,
+          linkedNodeId: 'n1',
+        },
+      ],
+      imageUrl,
+      sourceNodeIds: ['n1'],
+    })
+    expect(toolMessage.additional_kwargs.toolSteps).toEqual([
+      { step: 'planning-stations' },
+      { step: 'generating-image' },
+      { step: 'locating-stations' },
+    ])
+  })
+
+  it('close-out ToolMessage 在失败路径上写错误 payload 并回退到默认工具名', async () => {
+    const provider = createMockProvider()
+
+    const result = await buildPalaceSubgraph({ provider })
+      .compile()
+      .invoke({ messages: [], artworkStyle: 'vector', context: null, palaceToolCallId: 'call-x' })
+
+    expect(result.messages).toHaveLength(1)
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(toolMessage.tool_call_id).toBe('call-x')
+    expect(toolMessage.name).toBe(GENERATE_PALACE_TOOL)
+    expect(JSON.parse(String(toolMessage.content))).toEqual({
+      ok: false,
+      error: '请提供记忆宫殿的输入内容。',
+    })
+    expect(toolMessage.additional_kwargs.toolSteps).toBeUndefined()
   })
 
   it('新一轮开始时清掉上一轮的 palaceResponse：失败时不会把旧答复当成本轮答复', async () => {
