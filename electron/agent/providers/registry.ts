@@ -19,35 +19,35 @@ type ProviderConstructor = (new (config: ProviderConfig & { chatModel: string })
   defaultModels: ModelOption[]
 }
 
-type ProviderFactory = (config: ProviderConfig & { chatModel: string }) => LLMProvider
+const providers = new Map<string, ProviderConstructor>()
 
-const factories = new Map<string, ProviderFactory>()
-const metaMap = new Map<string, ProviderMeta>()
-
-function registerProvider(ctor: ProviderConstructor): void {
-  const meta: ProviderMeta = {
+function metaOf(ctor: ProviderConstructor): ProviderMeta {
+  return {
     id: ctor.id,
     displayName: ctor.displayName,
     capabilities: [...ctor.capabilities],
     defaultModels: ctor.defaultModels,
   }
-  factories.set(ctor.id, (config) => new ctor(config))
-  metaMap.set(ctor.id, meta)
+}
+
+function registerProvider(ctor: ProviderConstructor): void {
+  providers.set(ctor.id, ctor)
 }
 
 export function createProvider(
   providerId: string,
   config: ProviderConfig & { chatModel: string },
 ): LLMProvider {
-  const factory = factories.get(providerId)
-  if (!factory) {
+  const ctor = providers.get(providerId)
+  if (!ctor) {
     throw new Error(`未知的 provider: ${providerId}`)
   }
-  return factory(config)
+  return new ctor(config)
 }
 
 export function getProviderMeta(providerId: string): ProviderMeta | undefined {
-  return metaMap.get(providerId)
+  const ctor = providers.get(providerId)
+  return ctor ? metaOf(ctor) : undefined
 }
 
 /**
@@ -58,7 +58,7 @@ export function getProviderMeta(providerId: string): ProviderMeta | undefined {
  */
 export function resolveChatProvider(settings: AppSettings): LLMProvider {
   const providerId = settings.activeProviders.chat || 'dashscope'
-  const meta = metaMap.get(providerId)
+  const meta = getProviderMeta(providerId)
   if (!meta) {
     throw new Error(`未知的 provider: ${providerId}`)
   }
@@ -78,7 +78,7 @@ export function resolveChatProvider(settings: AppSettings): LLMProvider {
 }
 
 export function getRegisteredProviders(): ProviderMeta[] {
-  return Array.from(metaMap.values())
+  return Array.from(providers.values(), metaOf)
 }
 
 // --- Built-in provider registrations ---
