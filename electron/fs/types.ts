@@ -20,8 +20,6 @@ export interface AppSettings {
   providerConfigs: Record<string, ProviderConfig>
   editor: {
     autoSaveIntervalMs: number
-    maxBackups: number
-    cachePruneDays: number
   }
   recentFilesMax: number
   lastWorkspacePath: string | null
@@ -55,8 +53,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   providerConfigs: {},
   editor: {
     autoSaveIntervalMs: 30_000,
-    maxBackups: 5,
-    cachePruneDays: 30,
   },
   recentFilesMax: 10,
   lastWorkspacePath: null,

@@ -3,7 +3,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { AppState } from '../appState.js'
-import { DEFAULT_SETTINGS } from '../types.js'
 import type { AppSettings } from '../types.js'
 
 describe('AppState', () => {
@@ -82,8 +81,6 @@ describe('AppState', () => {
     expect(settings.activeProviders).toEqual({ chat: 'anthropic' })
     expect(settings.editor).toEqual({
       autoSaveIntervalMs: 10000,
-      maxBackups: DEFAULT_SETTINGS.editor.maxBackups,
-      cachePruneDays: DEFAULT_SETTINGS.editor.cachePruneDays,
     })
   })
 
