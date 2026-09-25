@@ -69,8 +69,11 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST
 
-// Enable remote debugging for MCP Electron tools (port 9222)
-app.commandLine.appendSwitch('remote-debugging-port', '9222')
+// Enable remote debugging for MCP Electron tools (port 9222). Development only:
+// packaged builds must not open a debug port.
+if (!app.isPackaged) {
+  app.commandLine.appendSwitch('remote-debugging-port', '9222')
+}
 
 let win: BrowserWindow | null
 let forceClose = false
