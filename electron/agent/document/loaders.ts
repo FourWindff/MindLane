@@ -1,5 +1,5 @@
 import { Document } from '@langchain/core/documents'
-import { load as loadHtml } from 'cheerio'
+import { parseHTML } from 'linkedom'
 import { readFile } from 'node:fs/promises'
 import { OfficeConverter, type OfficeChunk } from 'officeparser/slim'
 import { PDFParse } from 'pdf-parse'
@@ -94,14 +94,17 @@ async function loadUrl(source: DocumentSource): Promise<Document[]> {
     throw new Error(`链接返回 HTTP ${response.status},无法读取。`)
   }
 
-  // Dispatch on Content-Type so binary payloads never pass through cheerio.
+  // Dispatch on Content-Type so binary payloads never pass through the HTML parser.
   const mime = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase()
   if (mime === 'text/html') {
-    const $ = loadHtml(await response.text())
+    const { document } = parseHTML(await response.text())
+    // linkedom always creates a body, leaving it empty for fragment-only responses; fall
+    // back to the whole document so those pages still yield their text.
+    const pageContent = document.body?.textContent || document.documentElement?.textContent || ''
     return [
       new Document({
-        pageContent: $('body').text(),
-        metadata: { source: source.url, title: $('title').text() },
+        pageContent,
+        metadata: { source: source.url, title: document.querySelector('title')?.textContent ?? '' },
       }),
     ]
   }

@@ -26,7 +26,6 @@
     "@langchain/textsplitters": "^1.0.1",
     "@xyflow/react": "^12.10.1",
     "better-sqlite3": "^12.8.0",
-    "cheerio": "^1.2.0",
     "dagre": "^0.8.5",
     "html-to-image": "^1.11.13",
     "js-tiktoken": "^1.0.21",

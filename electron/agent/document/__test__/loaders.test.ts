@@ -255,7 +255,7 @@ describe('default URL loader', () => {
     return fetchMock
   }
 
-  it('dispatches text/html to cheerio extraction with title metadata', async () => {
+  it('dispatches text/html to HTML extraction with title metadata', async () => {
     stubFetchWith(
       '<html><head><title>Page</title></head><body><article>Body text</article></body></html>',
       200,
