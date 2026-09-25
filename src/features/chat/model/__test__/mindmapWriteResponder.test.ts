@@ -303,7 +303,7 @@ describe('MindmapWriteResponder', () => {
     stop()
   })
 
-  it('maps move validation failures to block_not_found with the shared recovery copy', async () => {
+  it('maps move validation failures to block_not_found with the shared error prefix', async () => {
     const fake = createFakeEditor()
     fake.state.nodes = [
       { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Root' } },
@@ -322,8 +322,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error:
-        '[block_not_found] 节点「missing」不存在，请先 readMindmap 重新定位。恢复策略：先调用 readMindmap 重新定位后再操作',
+      error: '[block_not_found] 节点「missing」不存在，请先 readMindmap 重新定位',
     })
     stop()
   })

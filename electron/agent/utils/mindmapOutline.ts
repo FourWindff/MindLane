@@ -11,9 +11,9 @@
  */
 
 import {
-  MindmapXmlError,
-  NODE_TAG,
   escapeXml,
+  formatXmlError,
+  NODE_TAG,
   normalizeSelfClosingTags,
   parseXmlTolerant,
   topLevelElements,
@@ -27,14 +27,6 @@ export interface MindmapOutlineNode {
 
 export type MindmapOutlineParseResult =
   { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string }
-
-/** 把共享错误格式化为 `[code] message`（与写工具错误回传约定一致）。 */
-function formatXmlError(error: unknown): string {
-  if (error instanceof MindmapXmlError) {
-    return `[${error.code}] ${error.message}`
-  }
-  return error instanceof Error ? error.message : String(error)
-}
 
 function isNodeElement(el: Element): boolean {
   return el.tagName.toLowerCase() === NODE_TAG
