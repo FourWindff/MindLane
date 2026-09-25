@@ -301,7 +301,7 @@ describe('MindLaneAgent.invoke()', () => {
       undefined,
       {
         messagePipeline: mergeMessagePreparationConfig(
-          { inputBudgetTokens: 20, toolResultMaxBytes: 0, microcompactToolNames: [] },
+          { inputBudgetTokens: 20, toolResultMaxBytes: 0 },
           32_768,
         ),
       },

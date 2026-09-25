@@ -1,6 +1,6 @@
 /**
  * Message preparation: the single answer to "what happens to the message array before a
- * model call" — the fixed 7-step order and all five step implementations live here.
+ * model call" — the fixed step order and all four step implementations live here.
  * Step functions are exported for tests and reuse, but callers must not compose them
  * individually: the order *is* the semantics — use prepareMessagesForModel.
  */
@@ -29,12 +29,6 @@ export interface MessagePreparationConfig {
   inputBudgetTokens: number
   /** 单条 tool_result 最大字节数，超过则转存磁盘 */
   toolResultMaxBytes: number
-  /** 仅对这些工具名的结果执行 microcompact */
-  microcompactToolNames: string[]
-  /** 触发 microcompact 的字符串长度阈值 */
-  microcompactThreshold: number
-  /** 保留最近多少条完整工具结果不压缩 */
-  microcompactKeepRecent: number
   /** snip 时是否始终保留 system 消息 */
   snipPreserveSystem: boolean
   /** snip 时是否始终保留最后一条 user 消息 */
@@ -44,9 +38,6 @@ export interface MessagePreparationConfig {
 const DEFAULT_MESSAGE_PREPARATION_CONFIG: Omit<MessagePreparationConfig, 'inputBudgetTokens'> = {
   enabled: true,
   toolResultMaxBytes: 8_000,
-  microcompactToolNames: [],
-  microcompactThreshold: 4_000,
-  microcompactKeepRecent: 3,
   snipPreserveSystem: true,
   snipPreserveLastUser: true,
 }
@@ -67,21 +58,17 @@ export function mergeMessagePreparationConfig(
     inputBudgetTokens:
       partial?.inputBudgetTokens ??
       contextWindow - AGENT_LIMITS.maxCompletionTokens - AGENT_LIMITS.consolidationSafetyBuffer,
-    microcompactToolNames: partial?.microcompactToolNames
-      ? [...partial.microcompactToolNames]
-      : [...DEFAULT_MESSAGE_PREPARATION_CONFIG.microcompactToolNames],
   }
 }
 
 /**
- * 预处理消息数组，按固定顺序组合 7 个步骤：
+ * 预处理消息数组，按固定顺序组合 6 步调用（4 个实现，配对修复前后各跑一次）：
  * 1. drop orphan tool_results (dropOrphanToolResults)
  * 2. backfill missing tool_results (backfillMissingToolResults)
- * 3. microcompact (microcompact)
- * 4. apply tool_result budget (applyToolResultBudget)
- * 5. snip history (snipHistory)
- * 6. drop orphan tool_results (dropOrphanToolResults)
- * 7. backfill missing tool_results (backfillMissingToolResults)
+ * 3. apply tool_result budget (applyToolResultBudget)
+ * 4. snip history (snipHistory)
+ * 5. drop orphan tool_results (dropOrphanToolResults)
+ * 6. backfill missing tool_results (backfillMissingToolResults)
  *
  * 返回处理后的新数组；不修改原始数组，也不写入 session。
  */
@@ -123,7 +110,6 @@ export async function prepareMessagesForModel(
 
   let result = dropOrphanToolResults(validMessages)
   result = backfillMissingToolResults(result)
-  result = microcompact(result, config)
   result = await applyToolResultBudget(result, config, userDataPath)
   result = snipHistory(result, config)
   result = dropOrphanToolResults(result)
@@ -215,86 +201,8 @@ export function backfillMissingToolResults(messages: BaseMessage[]): BaseMessage
   return result
 }
 
-const MICROCOMPACT_SUMMARY =
-  '[Content compressed by message pipeline: original text exceeded configured threshold.]'
-
 function getToolName(msg: ToolMessage): string {
   return msg.name ?? 'unknown'
-}
-
-function isTargetForMicrocompact(toolName: string, config: MessagePreparationConfig): boolean {
-  return config.microcompactToolNames.includes(toolName)
-}
-
-function compactStringContent(
-  content: ToolMessage['content'],
-  threshold: number,
-): ToolMessage['content'] {
-  if (typeof content === 'string' && content.length > threshold) {
-    return MICROCOMPACT_SUMMARY
-  }
-
-  if (Array.isArray(content)) {
-    return content.map((block) => {
-      if (
-        block &&
-        typeof block === 'object' &&
-        'type' in block &&
-        block.type === 'text' &&
-        'text' in block &&
-        typeof block.text === 'string' &&
-        block.text.length > threshold
-      ) {
-        return { ...block, text: MICROCOMPACT_SUMMARY }
-      }
-      return block
-    })
-  }
-
-  return content
-}
-
-/**
- * 对配置名单内的工具结果进行摘要替换。
- * 保留最近 N 条完整结果，旧结果按规则压缩。
- */
-export function microcompact(
-  messages: BaseMessage[],
-  config: MessagePreparationConfig,
-): BaseMessage[] {
-  const keepRecent = Math.max(0, config.microcompactKeepRecent)
-  const targetIndices: number[] = []
-
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
-    if (msg.type !== 'tool') continue
-    const toolMsg = msg as ToolMessage
-    if (isTargetForMicrocompact(getToolName(toolMsg), config)) {
-      targetIndices.push(i)
-    }
-  }
-
-  if (targetIndices.length === 0) return messages
-
-  const keepSet = keepRecent > 0 ? new Set(targetIndices.slice(-keepRecent)) : new Set<number>()
-
-  return messages.map((msg, idx) => {
-    if (msg.type !== 'tool') return msg
-    const toolMsg = msg as ToolMessage
-    if (!isTargetForMicrocompact(getToolName(toolMsg), config)) return msg
-
-    if (keepSet.has(idx)) return msg
-
-    const compacted = compactStringContent(toolMsg.content, config.microcompactThreshold)
-    if (compacted === toolMsg.content) return msg
-
-    return new ToolMessage({
-      tool_call_id: toolMsg.tool_call_id,
-      name: toolMsg.name,
-      content: compacted,
-      additional_kwargs: toolMsg.additional_kwargs,
-    })
-  })
 }
 
 /**

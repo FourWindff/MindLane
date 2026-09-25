@@ -8,7 +8,6 @@ import {
   prepareMessagesForModel,
   dropOrphanToolResults,
   backfillMissingToolResults,
-  microcompact,
   applyToolResultBudget,
   snipHistory,
   mergeMessagePreparationConfig,
@@ -30,9 +29,6 @@ function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePre
     enabled: true,
     inputBudgetTokens: 100,
     toolResultMaxBytes: 1_000,
-    microcompactToolNames: ['bigTool'],
-    microcompactThreshold: 50,
-    microcompactKeepRecent: 1,
     snipPreserveSystem: true,
     snipPreserveLastUser: true,
     ...partial,
@@ -54,7 +50,7 @@ describe('prepareMessagesForModel', () => {
 
     const result = await prepareMessagesForModel(
       messages,
-      makeConfig({ microcompactKeepRecent: 0 }),
+      makeConfig({ toolResultMaxBytes: 50 }),
       tmpDir,
     )
 
@@ -66,7 +62,7 @@ describe('prepareMessagesForModel', () => {
       (m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-1',
     ) as ToolMessage[]
     expect(bigToolResults.length).toBe(1)
-    expect(bigToolResults[0].content).toContain('compressed')
+    expect(bigToolResults[0].content).toContain('exceeded')
   })
 
   it('功能关闭时直接返回原数组', async () => {
@@ -243,87 +239,12 @@ describe('backfillMissingToolResults', () => {
   })
 })
 
-describe('microcompact', () => {
-  function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
-    return {
-      enabled: true,
-      inputBudgetTokens: 16_000,
-      toolResultMaxBytes: 8_000,
-      microcompactToolNames: ['bigTool'],
-      microcompactThreshold: 100,
-      microcompactKeepRecent: 2,
-      snipPreserveSystem: true,
-      snipPreserveLastUser: true,
-      ...partial,
-    }
-  }
-
-  it('压缩命中名单且超过阈值的工具结果', () => {
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'bigTool', content: 'x'.repeat(200) }),
-    ]
-
-    const result = microcompact(messages, makeConfig({ microcompactKeepRecent: 0 }))
-
-    expect((result[0] as ToolMessage).content).toContain('compressed')
-  })
-
-  it('不压缩未命中名单的工具', () => {
-    const original = 'x'.repeat(200)
-    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'otherTool', content: original })]
-
-    const result = microcompact(messages, makeConfig())
-
-    expect((result[0] as ToolMessage).content).toBe(original)
-  })
-
-  it('空工具名单不作为通配名单', () => {
-    const original = 'x'.repeat(200)
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'searchKnowledge', content: original }),
-    ]
-
-    const result = microcompact(
-      messages,
-      makeConfig({ microcompactToolNames: [], microcompactKeepRecent: 0 }),
-    )
-
-    expect((result[0] as ToolMessage).content).toBe(original)
-  })
-
-  it('保留最近 N 条完整结果', () => {
-    const messages = [
-      new ToolMessage({ tool_call_id: 't1', name: 'bigTool', content: 'x'.repeat(200) }),
-      new ToolMessage({ tool_call_id: 't2', name: 'bigTool', content: 'y'.repeat(200) }),
-      new ToolMessage({ tool_call_id: 't3', name: 'bigTool', content: 'z'.repeat(200) }),
-    ]
-
-    const result = microcompact(messages, makeConfig({ microcompactKeepRecent: 2 }))
-
-    expect((result[0] as ToolMessage).content).toContain('compressed')
-    expect((result[1] as ToolMessage).content).toBe('y'.repeat(200))
-    expect((result[2] as ToolMessage).content).toBe('z'.repeat(200))
-  })
-
-  it('不压缩未超过阈值的内容', () => {
-    const original = 'short'
-    const messages = [new ToolMessage({ tool_call_id: 't1', name: 'bigTool', content: original })]
-
-    const result = microcompact(messages, makeConfig())
-
-    expect((result[0] as ToolMessage).content).toBe(original)
-  })
-})
-
 describe('applyToolResultBudget', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
       enabled: true,
       inputBudgetTokens: 16_000,
       toolResultMaxBytes: 8_000,
-      microcompactToolNames: ['bigTool'],
-      microcompactThreshold: 100,
-      microcompactKeepRecent: 2,
       snipPreserveSystem: true,
       snipPreserveLastUser: true,
       ...partial,
@@ -382,9 +303,6 @@ describe('snipHistory', () => {
       enabled: true,
       inputBudgetTokens: 100,
       toolResultMaxBytes: 8_000,
-      microcompactToolNames: [],
-      microcompactThreshold: 4_000,
-      microcompactKeepRecent: 3,
       snipPreserveSystem: true,
       snipPreserveLastUser: true,
       ...partial,
