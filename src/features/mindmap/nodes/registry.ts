@@ -1,12 +1,12 @@
 import type { ComponentType } from 'react'
 import type { NodeProps } from '@xyflow/react'
-import { NodeTypeDescriptor } from './types'
+import { NODE_TYPE_DESCRIPTORS, type NodeTypeDescriptor } from './descriptors'
 
 class NodeRegistry {
-  private descriptors = new Map<string, NodeTypeDescriptor>()
+  private descriptors: Map<string, NodeTypeDescriptor>
 
-  register(descriptor: NodeTypeDescriptor): void {
-    this.descriptors.set(descriptor.typeId, descriptor as NodeTypeDescriptor)
+  constructor(descriptors: NodeTypeDescriptor[]) {
+    this.descriptors = new Map(descriptors.map((descriptor) => [descriptor.typeId, descriptor]))
   }
 
   get(typeId: string): NodeTypeDescriptor | undefined {
@@ -14,12 +14,13 @@ class NodeRegistry {
   }
 
   toReactFlowNodeTypes(): Record<string, ComponentType<NodeProps>> {
-    const result: Record<string, ComponentType<NodeProps>> = {}
-    for (const d of this.descriptors.values()) {
-      result[d.typeId] = d.component
-    }
-    return result
+    return Object.fromEntries(
+      Array.from(this.descriptors.values(), (descriptor) => [
+        descriptor.typeId,
+        descriptor.component,
+      ]),
+    )
   }
 }
 
-export const nodeRegistry = new NodeRegistry()
+export const nodeRegistry = new NodeRegistry(NODE_TYPE_DESCRIPTORS)
