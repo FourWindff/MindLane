@@ -66,48 +66,70 @@ export function detect(toolCalls: ToolCallLike[]): SubgraphCall | null {
 interface SubgraphResultPayload {
   messages: ToolMessage[]
   pendingSubgraph: null
-  pendingSubgraphToolCallId: string
-  pendingSubgraphToolName: string
+  mindmapToolCallId?: string
+  mindmapToolName?: string
+  palaceToolCallId?: string
+  palaceToolName?: string
 }
 
 /**
- * 将子图执行结果包装成 ToolMessage，并清理 pending subgraph 状态。
+ * 将子图执行结果包装成 ToolMessage，并清理该子图自己的调用信息。
+ *
+ * 标量通道按子图拆名后，收口只读自己那一份：另一个子图的错误/轨迹/调用信息
+ * 不参与本次收口，也不被清除（并行时各收各的）。
  *
  * Palace 子图已经在内部将远程图片 URL 转换为 data URL，因此这里只读取 state.imageUrls。
  */
 export function packageResult(state: MainGraphStateType): SubgraphResultPayload {
-  const toolName = state.pendingSubgraphToolName || defaultToolName(state.pendingSubgraph)
-  const toolCallId = state.pendingSubgraphToolCallId
+  const subgraph: SubgraphName = state.pendingSubgraph === 'palace' ? 'palace' : 'mindmap'
+  const channels =
+    subgraph === 'palace'
+      ? {
+          toolName: state.palaceToolName,
+          toolCallId: state.palaceToolCallId,
+          error: state.palaceError,
+          response: state.palaceResponse,
+          toolSteps: state.palaceToolSteps,
+        }
+      : {
+          toolName: state.mindmapToolName,
+          toolCallId: state.mindmapToolCallId,
+          error: state.mindmapError,
+          response: state.mindmapResponse,
+          toolSteps: state.mindmapToolSteps,
+        }
 
-  const content = state.error
-    ? { ok: false, error: state.response || state.error }
-    : buildSuccessPayload(state)
+  const content = channels.error
+    ? { ok: false, error: channels.response || channels.error }
+    : buildSuccessPayload(state, subgraph)
 
   return {
     messages: [
       new ToolMessage({
-        tool_call_id: toolCallId,
-        name: toolName,
+        tool_call_id: channels.toolCallId,
+        name: channels.toolName || defaultToolName(subgraph),
         content: JSON.stringify(content),
-        additional_kwargs: state.toolSteps?.length ? { toolSteps: state.toolSteps } : undefined,
+        additional_kwargs: channels.toolSteps?.length
+          ? { toolSteps: channels.toolSteps }
+          : undefined,
       }),
     ],
     pendingSubgraph: null,
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
+    ...(subgraph === 'palace'
+      ? { palaceToolCallId: '', palaceToolName: '' }
+      : { mindmapToolCallId: '', mindmapToolName: '' }),
   }
 }
 
-function defaultToolName(subgraph: MainGraphStateType['pendingSubgraph']): string {
+function defaultToolName(subgraph: SubgraphName): string {
   return subgraph === 'palace' ? GENERATE_PALACE_TOOL : GENERATE_MINDMAP_FRAGMENT_TOOL
 }
 
-function buildSuccessPayload(state: MainGraphStateType): Record<string, unknown> {
-  if (state.pendingSubgraph === 'palace') {
-    return buildPalacePayload(state)
-  }
-  // mindmap 或任何其他状态都走 mindmap 路径；palace 已在上方处理
-  return buildMindmapPayload(state)
+function buildSuccessPayload(
+  state: MainGraphStateType,
+  subgraph: SubgraphName,
+): Record<string, unknown> {
+  return subgraph === 'palace' ? buildPalacePayload(state) : buildMindmapPayload(state)
 }
 
 function buildMindmapPayload(state: MainGraphStateType): Record<string, unknown> {

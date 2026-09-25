@@ -8,11 +8,8 @@ function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSu
   return {
     messages: [],
     context: null,
-    pendingSubgraph: 'mindmap',
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
-    response: '',
-    error: '',
+    mindmapError: '',
+    mindmapResponse: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
     mindmapXml: '',
@@ -25,6 +22,9 @@ function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSu
     mergeResults: [],
     finalTree: null,
     documentRef: null,
+    mindmapToolSteps: [],
+    mindmapToolCallId: '',
+    mindmapToolName: '',
     ...partial,
   } as MindmapSubgraphStateType
 }

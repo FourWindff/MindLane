@@ -27,11 +27,8 @@ function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     messages: [],
     context: null,
-    pendingSubgraph: 'mindmap' as const,
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
-    response: '',
-    error: '',
+    mindmapError: '',
+    mindmapResponse: '',
     mindmapInputSource: null,
     mindmapInputTitle: '',
     mindmapXml: '',
@@ -44,7 +41,7 @@ function baseInput(overrides: Record<string, unknown> = {}) {
     mergeResults: [],
     finalTree: null,
     documentRef: null,
-    toolSteps: [],
+    mindmapToolSteps: [],
     ...overrides,
   }
 }
@@ -70,7 +67,7 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(baseInput({ mindmapInputSource: null }))
 
-    expect(result.error).toContain('请提供要生成思维导图的文档或文本')
+    expect(result.mindmapError).toContain('请提供要生成思维导图的文档或文本')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -85,7 +82,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.documentBatches).toHaveLength(1)
     expect(result.documentBatches[0]![0]).toBeInstanceOf(Document)
     expect(result.documentBatches[0]![0]!.pageContent).toContain('人工智能')
@@ -102,10 +99,9 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('人工智能导论')
     expect(result.mindmapTitle).toBe('人工智能导论')
-    expect(result.pendingSubgraph).toBeNull()
     expect(result.leafResults).toHaveLength(1)
     expect(result.finalTree).toBeTruthy()
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
@@ -136,7 +132,7 @@ describe('mindmapGraph', () => {
     expect(steps).toEqual(['reading-doc', 'extracting', 'extracting', 'finalizing'])
   })
 
-  it('collects the stage trace into result.toolSteps (same source as step events)', async () => {
+  it('collects the stage trace into result.mindmapToolSteps (same source as step events)', async () => {
     const tail = 'TAIL_MARKER'
     const para1 = 'a'.repeat(1500)
     const para2 = 'b'.repeat(1500)
@@ -164,12 +160,12 @@ describe('mindmapGraph', () => {
       if (mode === 'values') result = event as typeof MindmapSubgraphState.State
     }
 
-    expect(result.error).toBe('')
-    expect(result.toolSteps[0]).toEqual({ step: 'reading-doc' })
+    expect(result.mindmapError).toBe('')
+    expect(result.mindmapToolSteps[0]).toEqual({ step: 'reading-doc' })
     // one phase-start entry plus one per completed batch
-    expect(result.toolSteps.filter((s) => s.step === 'extracting')).toHaveLength(4)
-    expect(result.toolSteps.some((s) => s.step === 'merging')).toBe(true)
-    expect(result.toolSteps.at(-1)).toEqual({ step: 'finalizing' })
+    expect(result.mindmapToolSteps.filter((s) => s.step === 'extracting')).toHaveLength(4)
+    expect(result.mindmapToolSteps.some((s) => s.step === 'merging')).toBe(true)
+    expect(result.mindmapToolSteps.at(-1)).toEqual({ step: 'finalizing' })
   })
 
   it('routes a long document through leaf batches and a final merge', async () => {
@@ -207,7 +203,7 @@ describe('mindmapGraph', () => {
     const firstPrompt = String(calls[0]?.[0]?.[1]?.content ?? '')
     const thirdPrompt = String(calls[2]?.[0]?.[1]?.content ?? '')
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.documentBatches).toHaveLength(3)
     expect(result.leafResults).toHaveLength(3)
     expect(result.mindmapXml).toContain('Merged Long Text')
@@ -257,7 +253,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(urlLoader).toHaveBeenCalledWith({ type: 'url', url: 'https://example.test/doc' })
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('URL Root')
     expect(result.documentRef?.type).toBe('url')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
@@ -278,7 +274,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(docxLoader).toHaveBeenCalledWith({ type: 'docx', path: '/tmp/report.docx' })
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.documentRef).toEqual(
       expect.objectContaining({
         type: 'docx',
@@ -297,7 +293,7 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'pdf', path: '/tmp/blank.pdf' } }),
     )
 
-    expect(result.error).toContain('文档未能提取出任何文本内容')
+    expect(result.mindmapError).toContain('文档未能提取出任何文本内容')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -310,8 +306,8 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'url', url: 'https://example.test/missing' } }),
     )
 
-    expect(result.error).toContain('fetch failed')
-    expect(result.response).toContain('加载文档失败')
+    expect(result.mindmapError).toContain('fetch failed')
+    expect(result.mindmapResponse).toContain('加载文档失败')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -323,8 +319,8 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(
       baseInput({
-        response: 'stale response',
-        error: 'stale error',
+        mindmapResponse: 'stale response',
+        mindmapError: 'stale error',
         mindmapInputSource: { type: 'text', content: 'fresh text' },
         mindmapInputTitle: 'Fresh Root',
         mindmapXml: 'Stale Root:\n  - Stale Child\n',
@@ -341,7 +337,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('Fresh Root')
     expect(result.mindmapXml).not.toContain('Stale Root')
     expect(result.mindmapTitle).toBe('Fresh Root')
@@ -349,7 +345,7 @@ describe('mindmapGraph', () => {
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
   })
 
-  it('includes stack trace in state.error when generation fails', async () => {
+  it('includes stack trace in state.mindmapError when generation fails', async () => {
     const provider = mockProvider(() => {
       throw new Error('LLM timeout')
     })
@@ -359,8 +355,8 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
     )
 
-    expect(result.error).toContain('LLM timeout')
-    expect(result.error).toContain('at') // stack trace
+    expect(result.mindmapError).toContain('LLM timeout')
+    expect(result.mindmapError).toContain('at') // stack trace
   })
 
   it('retries leaf extraction when generated XML is invalid', async () => {
@@ -377,7 +373,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('人工智能导论')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
@@ -390,8 +386,8 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
     )
 
-    expect(result.error).toContain('XML 校验失败：[xml_parse_error]')
-    expect(result.error).toContain('标签 <node> 未闭合')
+    expect(result.mindmapError).toContain('XML 校验失败：[xml_parse_error]')
+    expect(result.mindmapError).toContain('标签 <node> 未闭合')
     expect(result.mindmapXml).toBe('')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
@@ -416,7 +412,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.leafResults).toHaveLength(2)
     expect(result.finalTree).toBeTruthy()
     expect(result.mindmapXml).toContain('Merged Root')
@@ -436,7 +432,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('content="Batch 1"')
     expect(result.mindmapXml).toContain('content="Part A"')
     expect(result.mindmapXml).toContain('content="Part B"')
@@ -458,7 +454,7 @@ describe('mindmapGraph', () => {
       }),
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.mindmapXml).toContain('content="R&amp;D &lt;fast&gt;"')
     expect(result.mindmapXml).toContain('content="a &gt; b &amp; c"')
     expect(result.mindmapXml).toContain('content="价格 100%"')
@@ -491,7 +487,7 @@ describe('mindmapGraph', () => {
       },
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.leafResults).toHaveLength(9)
     // two-phase map-reduce: all 9 leaves finish before the first merge,
     // then round 1 (8+1 → 2 merges) and round 2 (2 → 1 merge) converge
@@ -599,7 +595,7 @@ describe('mindmapGraph wave concurrency', () => {
       { recursionLimit: 100 },
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.leafResults).toHaveLength(10)
     expect(peak).toBeGreaterThan(1)
     expect(peak).toBeLessThanOrEqual(4)
@@ -631,7 +627,7 @@ describe('mindmapGraph wave concurrency', () => {
     slow.resolve({ content: '<node>Root p0\n  <node>item0</node>\n</node>' })
     const result = await resultPromise
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     const mergeCall = invokeMock(provider).mock.calls.find((call) =>
       String(call[0]?.[0]?.content ?? '').includes('merging assistant'),
     )
@@ -663,7 +659,7 @@ describe('mindmapGraph wave concurrency', () => {
       { recursionLimit: 100 },
     )
 
-    expect(result.error).toContain('boom p1')
+    expect(result.mindmapError).toContain('boom p1')
     expect(result.mindmapXml).toBe('')
     // only the first wave (batches 0-3) ran; batches 4-5 were never dispatched
     expect(invokeMock(provider)).toHaveBeenCalledTimes(4)
@@ -686,7 +682,7 @@ describe('mindmapGraph wave concurrency', () => {
       { recursionLimit: 100 },
     )
 
-    expect(result.error).toBe('')
+    expect(result.mindmapError).toBe('')
     expect(result.leafResults).toHaveLength(9)
     // round 1: 9 trees → groups of 8 + 1; round 2: 2 trees → 1 group
     expect(mergePrompts).toHaveLength(3)

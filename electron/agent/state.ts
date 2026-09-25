@@ -67,9 +67,11 @@ type PendingSubgraph = 'mindmap' | 'palace'
 // ===== 状态切片定义（用于组合和复用） =====
 
 /**
- * 基础状态切片 - 所有图共享的状态
+ * 轮次通道：主图与两个子图共享的输入通道。
+ *
+ * 两个子图都只**读** context，messages 走 append reducer，两种访问都不会互相覆盖。
  */
-const BaseStateAnnotations = {
+const TurnAnnotations = {
   messages: Annotation<BaseMessage[]>({
     reducer: messagesStateReducer,
     default: () => [],
@@ -78,17 +80,13 @@ const BaseStateAnnotations = {
     reducer: replaceReducer,
     default: () => null,
   }),
+}
+
+/** 主图独有：监督器自己的答复/错误、滚动摘要与路由判别键。 */
+const SupervisorAnnotations = {
   pendingSubgraph: Annotation<PendingSubgraph | null>({
     reducer: replaceReducer,
     default: () => null,
-  }),
-  pendingSubgraphToolCallId: Annotation<string>({
-    reducer: replaceReducer,
-    default: () => '',
-  }),
-  pendingSubgraphToolName: Annotation<string>({
-    reducer: replaceReducer,
-    default: () => '',
   }),
   response: Annotation<string>({
     reducer: replaceReducer,
@@ -108,15 +106,67 @@ const BaseStateAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
+}
+
+/**
+ * 子图自有标量通道：每个子图各一套，键名带子图前缀。
+ *
+ * 这些通道必须按子图拆名：它们都带替换型 reducer，两个子图在同一超步里写同一个键
+ * 会**静默**后写覆盖（只有不带 reducer 的通道才会响亮报错）。调用信息（调用 id、
+ * 工具名）同理每图一份，收口时不必猜是哪个子图发起的。
+ *
+ * 两个虚拟工具的 schema 都是空对象，所以没有「调用输入」可留；等 schema 有了参数再加。
+ */
+const MindmapScalarAnnotations = {
   /** 子图阶段轨迹（与 step 流事件同源），由子图收口并随子图状态返回主图。 */
-  toolSteps: Annotation<ChatToolCallStep[]>({
+  mindmapToolSteps: Annotation<ChatToolCallStep[]>({
     reducer: replaceReducer,
     default: () => [],
+  }),
+  mindmapError: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  mindmapResponse: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  mindmapToolCallId: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  mindmapToolName: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+}
+
+const PalaceScalarAnnotations = {
+  /** 子图阶段轨迹（与 step 流事件同源），由子图收口并随子图状态返回主图。 */
+  palaceToolSteps: Annotation<ChatToolCallStep[]>({
+    reducer: replaceReducer,
+    default: () => [],
+  }),
+  palaceError: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  palaceResponse: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  palaceToolCallId: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
+  palaceToolName: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
   }),
 }
 
 /**
- * 记忆宫殿状态切片
+ * 记忆宫殿状态切片（私有键：只此一图写，主图照走合并）
  */
 const PalaceStateAnnotations = {
   artworkStyle: Annotation<PalaceArtworkStyle>({
@@ -236,35 +286,36 @@ const MindmapStateAnnotations = {
 
 /**
  * 主图状态 - MindLaneAgent 使用
- * 包含：基础状态 + 思维导图状态 + Palace输入 + Palace输出
+ *
+ * 逐片展开（而不是挑几个键）是刻意的：子图写而主图未声明的键会被**静默丢弃**，
+ * 所以这里必须是两个子图通道的并集，新增子图键只能改这里一处。
  */
 export const MainGraphState = Annotation.Root({
-  ...BaseStateAnnotations,
+  ...TurnAnnotations,
+  ...SupervisorAnnotations,
+  ...MindmapScalarAnnotations,
+  ...PalaceScalarAnnotations,
   ...MindmapStateAnnotations,
-  palaceInputText: PalaceStateAnnotations.palaceInputText,
-  palaceInputNodes: PalaceStateAnnotations.palaceInputNodes,
-  artworkStyle: PalaceStateAnnotations.artworkStyle,
-  // Palace 子图输出（需要同步回主图用于构建响应）
-  palace: PalaceStateAnnotations.palace,
-  imageUrls: PalaceStateAnnotations.imageUrls,
-  memoryRoute: PalaceStateAnnotations.memoryRoute,
+  ...PalaceStateAnnotations,
 })
 
 /**
  * Palace 子图专用状态
- * 包含：基础状态 + Palace 完整状态
+ * 包含：轮次通道 + Palace 标量通道 + Palace 完整状态
  */
 export const PalaceSubgraphState = Annotation.Root({
-  ...BaseStateAnnotations,
+  ...TurnAnnotations,
+  ...PalaceScalarAnnotations,
   ...PalaceStateAnnotations,
 })
 
 /**
  * 思维导图子图专用状态
- * 包含：基础状态 + 思维导图状态
+ * 包含：轮次通道 + 思维导图标量通道 + 思维导图状态
  */
 export const MindmapSubgraphState = Annotation.Root({
-  ...BaseStateAnnotations,
+  ...TurnAnnotations,
+  ...MindmapScalarAnnotations,
   ...MindmapStateAnnotations,
 })
 

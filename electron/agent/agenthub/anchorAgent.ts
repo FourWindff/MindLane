@@ -155,7 +155,7 @@ export class AnchorAgent extends PalaceAgent {
   }
 
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
-    if (!state.palace || state.error) return {}
+    if (!state.palace || state.palaceError) return {}
 
     let memoryRoute: MemoryPalaceStation[]
     const hasImage = state.imageUrls.length > 0
@@ -214,7 +214,7 @@ export class AnchorAgent extends PalaceAgent {
 
     return {
       memoryRoute,
-      response: summary,
+      palaceResponse: summary,
     }
   }
 }

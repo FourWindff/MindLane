@@ -72,7 +72,7 @@ describe('AnchorAgent error logging', () => {
     const result = await agent.invoke(state)
 
     expect(consoleLogSpy).toHaveBeenCalled()
-    expect(result.response).toBeDefined()
-    expect(result.response!.length).toBeGreaterThan(0)
+    expect(result.palaceResponse).toBeDefined()
+    expect(result.palaceResponse!.length).toBeGreaterThan(0)
   })
 })

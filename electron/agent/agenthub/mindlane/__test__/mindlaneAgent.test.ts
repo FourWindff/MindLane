@@ -61,8 +61,6 @@ function createInitialState() {
     messages: [new HumanMessage('hello')] as BaseMessage[],
     context: null,
     pendingSubgraph: null,
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
     response: '',
     error: '',
     mindmapInputSource: null,
@@ -77,13 +75,26 @@ function createInitialState() {
     mergeResults: [],
     finalTree: null,
     documentRef: null,
-    toolSteps: [],
+    mindmapToolSteps: [],
+    mindmapError: '',
+    mindmapResponse: '',
+    mindmapToolCallId: '',
+    mindmapToolName: '',
+    palaceToolSteps: [],
+    palaceError: '',
+    palaceResponse: '',
+    palaceToolCallId: '',
+    palaceToolName: '',
     palaceInputText: '',
     palaceInputNodes: [],
+    memoryItems: [],
     palace: null,
-    artworkStyle: 'vector' as const,
+    imagePrompt: '',
     imageUrls: [],
+    imageError: undefined,
+    detectedCoords: [],
     memoryRoute: [],
+    artworkStyle: 'vector' as const,
     summary: '',
   }
 }
@@ -120,8 +131,8 @@ describe('MindLaneAgent.invoke()', () => {
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
     expect(result.pendingSubgraph).toBe('mindmap')
-    expect(result.pendingSubgraphToolCallId).toBe('call-1')
-    expect(result.pendingSubgraphToolName).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
+    expect(result.mindmapToolCallId).toBe('call-1')
+    expect(result.mindmapToolName).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
     expect(result.mindmapInputSource).toBeUndefined()
     expect(result.mindmapInputTitle).toBeUndefined()
     expect(result.messages).toHaveLength(1)
@@ -152,8 +163,8 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.pendingSubgraph).toBe('palace')
-    expect(result.pendingSubgraphToolCallId).toBe('call-2')
-    expect(result.pendingSubgraphToolName).toBe(GENERATE_PALACE_TOOL)
+    expect(result.palaceToolCallId).toBe('call-2')
+    expect(result.palaceToolName).toBe(GENERATE_PALACE_TOOL)
     expect(result.palaceInputText).toBeUndefined()
     expect(result.palaceInputNodes).toBeUndefined()
   })
@@ -225,6 +236,26 @@ describe('MindLaneAgent.invoke()', () => {
 
     expect(result.pendingSubgraph).toBeNull()
     expect(result.response).toBe('这是一个回答')
+  })
+
+  it('surfaces a failed subgraph as the turn answer without calling the model', async () => {
+    const mockInvoke = vi.fn()
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
+    const state = {
+      ...createInitialState(),
+      mindmapError: '[xml_parse_error] 标签 <node> 未闭合',
+      mindmapResponse: '生成思维导图失败：未能生成有效的结构',
+    }
+
+    const result = await agent.invoke(state)
+
+    expect(mockInvoke).not.toHaveBeenCalled()
+    expect((result.messages?.[0] as AIMessage).content).toBe('生成思维导图失败：未能生成有效的结构')
+    expect(result.response).toBe('生成思维导图失败：未能生成有效的结构')
+    expect(result.mindmapError).toBe('')
   })
 
   it('always exposes generatePalace alongside the other virtual route', () => {

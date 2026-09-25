@@ -122,7 +122,7 @@ function buildVectorRoute(
 
 export class SvgAgent extends PalaceAgent {
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
-    if (!state.palace || state.error) return {}
+    if (!state.palace || state.palaceError) return {}
 
     const stations = state.palace.stations
     const fallbackRoute = applyCanonicalLayout(stations, state.palace.routeStyle)
@@ -141,7 +141,7 @@ export class SvgAgent extends PalaceAgent {
         return {
           imageUrls: [],
           memoryRoute: fallbackRoute,
-          response: buildFallbackSummary(fallbackRoute, false),
+          palaceResponse: buildFallbackSummary(fallbackRoute, false),
         }
       }
 
@@ -158,14 +158,14 @@ export class SvgAgent extends PalaceAgent {
         return {
           imageUrls: [],
           memoryRoute,
-          response: buildFallbackSummary(memoryRoute, false),
+          palaceResponse: buildFallbackSummary(memoryRoute, false),
         }
       }
 
       return {
         imageUrls: [svgToDataUrl(artifact.svg)],
         memoryRoute,
-        response: buildFallbackSummary(memoryRoute, true),
+        palaceResponse: buildFallbackSummary(memoryRoute, true),
       }
     } catch (error) {
       logger
@@ -174,7 +174,7 @@ export class SvgAgent extends PalaceAgent {
       return {
         imageUrls: [],
         memoryRoute: fallbackRoute,
-        response: buildFallbackSummary(fallbackRoute, false),
+        palaceResponse: buildFallbackSummary(fallbackRoute, false),
       }
     }
   }

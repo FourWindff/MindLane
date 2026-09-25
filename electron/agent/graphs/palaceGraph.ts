@@ -34,16 +34,16 @@ interface PalaceSubgraphOptions {
 
 /**
  * Emit one stage and return the trace to carry in state: the live card reads
- * the custom event, the persisted ToolMessage reads state.toolSteps. Emitting
+ * the custom event, the persisted ToolMessage reads state.palaceToolSteps. Emitting
  * at node entry is the point — the running card must show the stage while the
  * node is still working, not when it finishes.
  */
 function beginStage(
-  state: Pick<PalaceSubgraphStateType, 'toolSteps'>,
+  state: Pick<PalaceSubgraphStateType, 'palaceToolSteps'>,
   step: SubgraphProgressStep,
 ): ChatToolCallStep[] {
   getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step })
-  return [...(state.toolSteps ?? []), { step }]
+  return [...(state.palaceToolSteps ?? []), { step }]
 }
 
 /**
@@ -65,11 +65,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       const resolution = await inputResolver.resolve(state)
       if (!resolution) {
         return {
-          error: '请提供记忆宫殿的输入内容。',
-          response: '请提供记忆宫殿的输入内容。',
+          palaceError: '请提供记忆宫殿的输入内容。',
+          palaceResponse: '请提供记忆宫殿的输入内容。',
           // Clear the trace carried in from the main graph: a previous subgraph run
           // must not leak its stages into this one's ToolMessage.
-          toolSteps: [],
+          palaceToolSteps: [],
         }
       }
       runStarts.set(runKey(), Date.now())
@@ -81,7 +81,10 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       return {
         palaceInputNodes: resolution.palaceInputNodes,
         palaceInputText: resolution.palaceInputText,
-        toolSteps: [],
+        // 新一轮开始：上一轮（或上一张子图）的答复与错误不得残留成本轮的收口依据。
+        palaceError: '',
+        palaceResponse: '',
+        palaceToolSteps: [],
       }
     })
     .addNode('analyze', async (state) => {
@@ -94,7 +97,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         stations?.length ?? 0,
         ((Date.now() - start) / 1000).toFixed(1),
       )
-      return { ...result, toolSteps }
+      return { ...result, palaceToolSteps: toolSteps }
     })
     .addNode('svgGen', async (state) => {
       const toolSteps = beginStage(state, 'generating-image')
@@ -106,7 +109,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         result.imageUrls?.length ? '可用' : '缺失',
         ((Date.now() - start) / 1000).toFixed(1),
       )
-      return { ...result, toolSteps }
+      return { ...result, palaceToolSteps: toolSteps }
     })
     .addNode('imageGen', async (state) => {
       const toolSteps = beginStage(state, 'generating-image')
@@ -121,7 +124,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
           urls?.length ?? 0,
           ((Date.now() - start) / 1000).toFixed(1),
         )
-      return { ...result, toolSteps }
+      return { ...result, palaceToolSteps: toolSteps }
     })
     .addNode('normalizeImages', (state) => normalizePalaceImageUrls(state))
     .addNode('vision', async (state) => {
@@ -144,12 +147,12 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         route?.length ?? 0,
         takeModelCallCount(currentStreamId() ?? ''),
       )
-      return { ...result, toolSteps }
+      return { ...result, palaceToolSteps: toolSteps }
     })
 
   // 基础边
   graph.addEdge(START, 'resolve_input')
-  graph.addConditionalEdges('resolve_input', (state) => (state.error ? END : 'analyze'), [
+  graph.addConditionalEdges('resolve_input', (state) => (state.palaceError ? END : 'analyze'), [
     'analyze',
     END,
   ])

@@ -107,8 +107,8 @@ function takeItemProgress(step: SubgraphProgressStep, total: number): number {
 
 function createMindmapRunReset(): typeof MindmapSubgraphState.Update {
   return {
-    response: '',
-    error: '',
+    mindmapResponse: '',
+    mindmapError: '',
     mindmapXml: '',
     mindmapTitle: '',
     documentBatches: [],
@@ -235,8 +235,8 @@ async function resolveInputNode(
   if (!resolution) {
     return {
       ...reset,
-      error: '请提供要生成思维导图的文档或文本。',
-      response: '请提供要生成思维导图的文档或文本。',
+      mindmapError: '请提供要生成思维导图的文档或文本。',
+      mindmapResponse: '请提供要生成思维导图的文档或文本。',
     }
   }
 
@@ -264,8 +264,8 @@ async function loadDocumentNode(
   if (!source) {
     return {
       ...reset,
-      error: '请提供输入来源。',
-      response: '请提供输入来源。',
+      mindmapError: '请提供输入来源。',
+      mindmapResponse: '请提供输入来源。',
     }
   }
 
@@ -283,8 +283,8 @@ async function loadDocumentNode(
     if (batches.length === 0) {
       return {
         ...reset,
-        error: '文档未能提取出任何文本内容。',
-        response: '文档未能提取出任何文本内容。',
+        mindmapError: '文档未能提取出任何文本内容。',
+        mindmapResponse: '文档未能提取出任何文本内容。',
       }
     }
 
@@ -308,8 +308,8 @@ async function loadDocumentNode(
     log.error('加载文档失败： %s', formatted.split('\n')[0])
     return {
       ...reset,
-      error: formatted,
-      response: `加载文档失败：${formatted.split('\n')[0]}`,
+      mindmapError: formatted,
+      mindmapResponse: `加载文档失败：${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -365,8 +365,8 @@ async function leafExtractNode(
     const formatted = formatAgentError(error)
     log.error('batch-%d 提取失败： %s', batchIndex + 1, formatted.split('\n')[0])
     return {
-      error: formatted,
-      response: `提取结构失败：${formatted.split('\n')[0]}`,
+      mindmapError: formatted,
+      mindmapResponse: `提取结构失败：${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -448,8 +448,8 @@ async function mergeTreesNode(
     const formatted = formatAgentError(error)
     log.error('merge group-%d 合并失败： %s', group.groupIndex + 1, formatted.split('\n')[0])
     return {
-      error: formatted,
-      response: `合并结构失败：${formatted.split('\n')[0]}`,
+      mindmapError: formatted,
+      mindmapResponse: `合并结构失败：${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -475,8 +475,8 @@ async function buildOutputNode(
   const runStart = takeRunStart()
   const toolSteps = takeStepTrace() ?? []
   resetItemProgress()
-  // Preserve existing error
-  if (state.error) {
+  // Preserve the error written by an earlier stage of this run.
+  if (state.mindmapError) {
     return {}
   }
 
@@ -485,8 +485,8 @@ async function buildOutputNode(
 
   if (!tree) {
     return {
-      error: '未能生成有效的思维导图结构',
-      response: '生成思维导图失败：未能生成有效的结构',
+      mindmapError: '未能生成有效的思维导图结构',
+      mindmapResponse: '生成思维导图失败：未能生成有效的结构',
     }
   }
 
@@ -494,8 +494,8 @@ async function buildOutputNode(
 
   if (tree.children.length === 0) {
     return {
-      error: '未提取到任何要点',
-      response: '生成思维导图失败：未提取到任何要点',
+      mindmapError: '未提取到任何要点',
+      mindmapResponse: '生成思维导图失败：未提取到任何要点',
     }
   }
 
@@ -508,18 +508,17 @@ async function buildOutputNode(
   )
 
   return {
-    pendingSubgraph: null,
     mindmapXml: serializeStorageFragment(tree),
     mindmapTitle: finalTitle,
-    response: `已生成思维导图「${finalTitle}」。`,
-    toolSteps,
+    mindmapResponse: `已生成思维导图「${finalTitle}」。`,
+    mindmapToolSteps: toolSteps,
   }
 }
 
 // ===== Edge routing functions =====
 
 function routeAfterResolveInput(state: typeof MindmapSubgraphState.State): string {
-  if (state.error) return 'build_output'
+  if (state.mindmapError) return 'build_output'
   return 'load_document'
 }
 
@@ -558,7 +557,7 @@ function mergeWaveSends(state: typeof MindmapSubgraphState.State, fromGroup: num
 }
 
 function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): string | Send[] {
-  if (state.error) return 'build_output'
+  if (state.mindmapError) return 'build_output'
   return leafWaveSends(state, 0)
 }
 
@@ -568,7 +567,7 @@ function routeAfterLoadDocument(state: typeof MindmapSubgraphState.State): strin
  * fail-fast guarantees no holes, so leafResults.length is the next index.
  */
 function routeAfterLeafGate(state: typeof MindmapSubgraphState.State): string | Send[] {
-  if (state.error) return 'build_output'
+  if (state.mindmapError) return 'build_output'
   const done = state.leafResults.length
   if (done < state.documentBatches.length) return leafWaveSends(state, done)
   if (done === 1) return 'finalize_single_leaf'
@@ -576,7 +575,7 @@ function routeAfterLeafGate(state: typeof MindmapSubgraphState.State): string | 
 }
 
 function routeAfterStartMergeRound(state: typeof MindmapSubgraphState.State): string | Send[] {
-  if (state.error) return 'build_output'
+  if (state.mindmapError) return 'build_output'
   return mergeWaveSends(state, 0)
 }
 
@@ -585,7 +584,7 @@ function routeAfterStartMergeRound(state: typeof MindmapSubgraphState.State): st
  * one result means convergence, more means another round at reduced width.
  */
 function routeAfterMergeGate(state: typeof MindmapSubgraphState.State): string | Send[] {
-  if (state.error) return 'build_output'
+  if (state.mindmapError) return 'build_output'
   const done = state.mergeResults.length
   const totalGroups = Math.ceil(state.mergeInputs.length / MERGE_GROUP_SIZE)
   if (done < totalGroups) return mergeWaveSends(state, done)

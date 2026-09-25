@@ -66,12 +66,19 @@ export class MindLaneAgent extends BaseAgent {
 
   async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {
     log.info('invoke called with %d messages', state.messages.length)
-    // Surface subgraph errors
-    if (state.error) {
+    // Surface subgraph errors / supervisor errors: whoever failed already wrote the
+    // user-facing text, so end the turn with that text instead of calling the model.
+    const failureText =
+      (state.mindmapError && (state.mindmapResponse || state.mindmapError)) ||
+      (state.palaceError && (state.palaceResponse || state.palaceError)) ||
+      (state.error && (state.response || state.error))
+    if (failureText) {
       return {
-        messages: [new AIMessage({ content: state.response || state.error })],
+        messages: [new AIMessage({ content: failureText })],
         pendingSubgraph: null,
-        response: state.response || state.error,
+        response: failureText,
+        mindmapError: '',
+        palaceError: '',
         error: '',
       }
     }
@@ -207,11 +214,21 @@ export class MindLaneAgent extends BaseAgent {
 
     const virtualRoute = subgraphCall
     if (virtualRoute) {
+      // 调用信息（调用 id / 工具名）写在子图自己的通道上：两个子图各有各的一份。
+      const callInfo =
+        virtualRoute.subgraph === 'palace'
+          ? {
+              palaceToolCallId: virtualRoute.toolCallId,
+              palaceToolName: virtualRoute.toolName,
+            }
+          : {
+              mindmapToolCallId: virtualRoute.toolCallId,
+              mindmapToolName: virtualRoute.toolName,
+            }
       const routeState = {
         messages: [createToolCallMessage(response, content)],
         pendingSubgraph: virtualRoute.subgraph,
-        pendingSubgraphToolCallId: virtualRoute.toolCallId,
-        pendingSubgraphToolName: virtualRoute.toolName,
+        ...callInfo,
         response: content,
       }
       if (didTrim) {

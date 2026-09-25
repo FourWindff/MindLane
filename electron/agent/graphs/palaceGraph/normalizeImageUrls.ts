@@ -10,9 +10,9 @@ import type { PalaceSubgraphStateType } from '../../state.js'
  * - imageUrls 为空时返回空数组
  */
 export async function normalizePalaceImageUrls(
-  state: Pick<PalaceSubgraphStateType, 'error' | 'imageUrls'>,
+  state: Pick<PalaceSubgraphStateType, 'palaceError' | 'imageUrls'>,
 ): Promise<Pick<PalaceSubgraphStateType, 'imageUrls'>> {
-  if (state.error || state.imageUrls.length === 0) {
+  if (state.palaceError || state.imageUrls.length === 0) {
     return { imageUrls: state.imageUrls }
   }
 

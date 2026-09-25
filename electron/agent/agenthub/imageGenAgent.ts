@@ -20,7 +20,7 @@ import { formatAgentError } from '../utils.js'
  */
 export class ImageGenAgent extends PalaceAgent {
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
-    if (!state.palace || state.error) return {}
+    if (!state.palace || state.palaceError) return {}
 
     try {
       let imagePrompt: string

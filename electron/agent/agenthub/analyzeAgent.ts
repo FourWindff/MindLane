@@ -147,7 +147,7 @@ export class AnalyzeAgent extends PalaceAgent {
 
     const text = state.palaceInputText
     if (!text) {
-      return { error: '未提供要记忆的内容' }
+      return { palaceError: '未提供要记忆的内容' }
     }
 
     const chatMessages = state.messages
@@ -190,7 +190,7 @@ export class AnalyzeAgent extends PalaceAgent {
         .map((item, index) => ({ ...item, order: index + 1 }))
 
       if (memoryItems.length === 0) {
-        return { error: '未拆解出有效记忆条目' }
+        return { palaceError: '未拆解出有效记忆条目' }
       }
 
       const designResult = (await this.designModel.invoke(
@@ -210,7 +210,7 @@ export class AnalyzeAgent extends PalaceAgent {
         .map((station, index) => ({ ...station, order: index + 1 }))
 
       if (stations.length !== memoryItems.length) {
-        return { error: '记忆站点数量与条目数量不一致' }
+        return { palaceError: '记忆站点数量与条目数量不一致' }
       }
 
       return {
@@ -222,7 +222,7 @@ export class AnalyzeAgent extends PalaceAgent {
       }
     } catch (error) {
       logger.withContext('AnalyzeAgent').error('analyzeFromText 失败:\n', formatAgentError(error))
-      return { error: formatAgentError(error) }
+      return { palaceError: formatAgentError(error) }
     }
   }
 
@@ -235,7 +235,7 @@ export class AnalyzeAgent extends PalaceAgent {
       const text = typeof response.content === 'string' ? response.content : ''
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
-        return { error: 'AI 未返回有效的 JSON 规划' }
+        return { palaceError: 'AI 未返回有效的 JSON 规划' }
       }
 
       const raw = JSON.parse(jsonMatch[0]) as {
@@ -259,7 +259,7 @@ export class AnalyzeAgent extends PalaceAgent {
 
       const stations = buildPlannedStations(raw.stations ?? [], selectedNodes)
       if (stations.length === 0) {
-        return { error: '未规划出有效站点' }
+        return { palaceError: '未规划出有效站点' }
       }
 
       const theme = raw.theme?.trim() || `记忆宫殿 (${selectedNodes.length} 站)`
@@ -285,7 +285,7 @@ export class AnalyzeAgent extends PalaceAgent {
       }
     } catch (error) {
       logger.withContext('AnalyzeAgent').error('analyzeFromNodes 失败:\n', formatAgentError(error))
-      return { error: formatAgentError(error) }
+      return { palaceError: formatAgentError(error) }
     }
   }
 }

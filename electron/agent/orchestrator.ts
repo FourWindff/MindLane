@@ -243,7 +243,7 @@ export class AgentOrchestrator {
             selectedNodes: selectedNodes.map((node) => ({ ...node, type: 'text' as const })),
           },
           artworkStyle,
-          error: '',
+          palaceError: '',
           palaceInputText: '',
           palaceInputNodes: selectedNodes,
           memoryItems: [],
@@ -256,8 +256,8 @@ export class AgentOrchestrator {
         { recursionLimit: AGENT_LIMITS.recursionLimit },
       )) as PalaceSubgraphStateType
 
-      if (result.error) {
-        return { ok: false, error: result.error }
+      if (result.palaceError) {
+        return { ok: false, error: result.palaceError }
       }
 
       const imageUrl = result.imageUrls[0] ?? ''

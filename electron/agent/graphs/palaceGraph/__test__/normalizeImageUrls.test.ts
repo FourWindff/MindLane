@@ -14,7 +14,7 @@ describe('normalizePalaceImageUrls', () => {
 
   it('保留已有的 data URL', async () => {
     const state = {
-      error: '',
+      palaceError: '',
       imageUrls: ['data:image/png;base64,abc123'],
     }
 
@@ -31,7 +31,7 @@ describe('normalizePalaceImageUrls', () => {
     })
 
     const state = {
-      error: '',
+      palaceError: '',
       imageUrls: ['https://example.com/image.png'],
     }
 
@@ -44,7 +44,7 @@ describe('normalizePalaceImageUrls', () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('network error'))
 
     const state = {
-      error: '',
+      palaceError: '',
       imageUrls: ['https://example.com/image.png'],
     }
 
@@ -55,7 +55,7 @@ describe('normalizePalaceImageUrls', () => {
 
   it('state 有错误时返回空更新', async () => {
     const state = {
-      error: '子图执行失败',
+      palaceError: '子图执行失败',
       imageUrls: ['https://example.com/image.png'],
     }
 
@@ -66,7 +66,7 @@ describe('normalizePalaceImageUrls', () => {
 
   it('空 imageUrls 返回空数组', async () => {
     const state = {
-      error: '',
+      palaceError: '',
       imageUrls: [],
     }
 

@@ -15,8 +15,6 @@ function createMinimalState(overrides: Partial<MainGraphStateType> = {}): MainGr
     messages: [],
     context: null,
     pendingSubgraph: null,
-    pendingSubgraphToolCallId: '',
-    pendingSubgraphToolName: '',
     response: '',
     error: '',
     mindmapInputSource: null,
@@ -31,7 +29,16 @@ function createMinimalState(overrides: Partial<MainGraphStateType> = {}): MainGr
     mergeResults: [],
     finalTree: null,
     documentRef: null,
-    toolSteps: [],
+    mindmapError: '',
+    mindmapResponse: '',
+    mindmapToolSteps: [],
+    mindmapToolCallId: '',
+    mindmapToolName: '',
+    palaceError: '',
+    palaceResponse: '',
+    palaceToolSteps: [],
+    palaceToolCallId: '',
+    palaceToolName: '',
     palaceInputText: '',
     palaceInputNodes: [],
     palace: null,
@@ -134,11 +141,11 @@ describe('SubgraphRouter.packageResult', () => {
   it('mindmap 成功路径生成正确 ToolMessage', () => {
     const state = createMinimalState({
       pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: 'call-mindmap',
-      pendingSubgraphToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
+      mindmapToolCallId: 'call-mindmap',
+      mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
       mindmapTitle: '测试导图',
       mindmapXml: 'root:\n  - child',
-      toolSteps: [
+      mindmapToolSteps: [
         { step: 'reading-doc' },
         { step: 'extracting', completed: 1, total: 1 },
         { step: 'finalizing' },
@@ -163,18 +170,20 @@ describe('SubgraphRouter.packageResult', () => {
       { step: 'finalizing' },
     ])
     expect(result.pendingSubgraph).toBeNull()
-    expect(result.pendingSubgraphToolCallId).toBe('')
-    expect(result.pendingSubgraphToolName).toBe('')
+    expect(result.mindmapToolCallId).toBe('')
+    expect(result.mindmapToolName).toBe('')
   })
 
   it('palace 成功路径把阶段轨迹带进 toolSteps', () => {
     const state = createMinimalState({
       pendingSubgraph: 'palace',
-      pendingSubgraphToolCallId: 'call-palace',
-      pendingSubgraphToolName: GENERATE_PALACE_TOOL,
+      palaceToolCallId: 'call-palace',
+      palaceToolName: GENERATE_PALACE_TOOL,
+      // 另一个子图的调用信息不属于本次收口，不该被清掉。
+      mindmapToolCallId: 'call-mindmap',
       palace: { theme: '测试宫殿', stations: [] },
       memoryRoute: [{ order: 1, content: '第一站', x: 0.1, y: 0.2 }],
-      toolSteps: [
+      palaceToolSteps: [
         { step: 'planning-stations' },
         { step: 'generating-image' },
         { step: 'locating-stations' },
@@ -188,13 +197,16 @@ describe('SubgraphRouter.packageResult', () => {
       { step: 'generating-image' },
       { step: 'locating-stations' },
     ])
+    expect(result.palaceToolCallId).toBe('')
+    expect(result.palaceToolName).toBe('')
+    expect(result.mindmapToolCallId).toBeUndefined()
   })
 
   it('palace 成功路径直接使用 state.imageUrls 中的 data URL', () => {
     const state = createMinimalState({
       pendingSubgraph: 'palace',
-      pendingSubgraphToolCallId: 'call-palace',
-      pendingSubgraphToolName: GENERATE_PALACE_TOOL,
+      palaceToolCallId: 'call-palace',
+      palaceToolName: GENERATE_PALACE_TOOL,
       palace: { theme: '测试宫殿', stations: [] },
       imageUrls: ['data:image/png;base64,abc123'],
       memoryRoute: [
@@ -235,8 +247,8 @@ describe('SubgraphRouter.packageResult', () => {
   it('palace 缺省 theme 时使用默认 label', () => {
     const state = createMinimalState({
       pendingSubgraph: 'palace',
-      pendingSubgraphToolCallId: 'call-palace',
-      pendingSubgraphToolName: GENERATE_PALACE_TOOL,
+      palaceToolCallId: 'call-palace',
+      palaceToolName: GENERATE_PALACE_TOOL,
       palace: null,
       memoryRoute: [{ order: 1, content: '站1', x: 0, y: 0 }],
     })
@@ -249,13 +261,13 @@ describe('SubgraphRouter.packageResult', () => {
     })
   })
 
-  it('state.error 时返回错误 payload', () => {
+  it('mindmapError 时返回错误 payload', () => {
     const state = createMinimalState({
       pendingSubgraph: 'mindmap',
-      pendingSubgraphToolCallId: 'call-error',
-      pendingSubgraphToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
-      error: '子图执行失败',
-      response: '执行时出错',
+      mindmapToolCallId: 'call-error',
+      mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
+      mindmapError: '子图执行失败',
+      mindmapResponse: '执行时出错',
     })
 
     const result = packageResult(state)
@@ -265,7 +277,7 @@ describe('SubgraphRouter.packageResult', () => {
       error: '执行时出错',
     })
     expect(result.pendingSubgraph).toBeNull()
-    expect(result.pendingSubgraphToolCallId).toBe('')
-    expect(result.pendingSubgraphToolName).toBe('')
+    expect(result.mindmapToolCallId).toBe('')
+    expect(result.mindmapToolName).toBe('')
   })
 })

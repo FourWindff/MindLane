@@ -33,7 +33,7 @@ describe('AnalyzeAgent error logging', () => {
     const result = await agent.invoke(state)
 
     expect(consoleErrorSpy).toHaveBeenCalled()
-    expect(result.error).toContain('structured output failed')
+    expect(result.palaceError).toContain('structured output failed')
   })
 
   it('logs error with stack when analyzeFromNodes fails', async () => {
@@ -54,6 +54,6 @@ describe('AnalyzeAgent error logging', () => {
     const result = await agent.invoke(state)
 
     expect(consoleErrorSpy).toHaveBeenCalled()
-    expect(result.error).toContain('model invocation failed')
+    expect(result.palaceError).toContain('model invocation failed')
   })
 })

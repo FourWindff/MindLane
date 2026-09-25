@@ -63,11 +63,11 @@ describe('buildPalaceSubgraph', () => {
     expect(edges).toContainEqual(['normalizeImages', 'vision'])
   })
 
-  it('streams the palace stages in order and collects them into toolSteps', async () => {
+  it('streams the palace stages in order and collects them into palaceToolSteps', async () => {
     const graph = buildPalaceSubgraph({ provider: createStageProvider() }).compile()
 
     const steps: string[] = []
-    let result!: { toolSteps: Array<{ step: string }> }
+    let result!: { palaceToolSteps: Array<{ step: string }> }
     const stream = await graph.stream(
       {
         messages: [],
@@ -78,7 +78,7 @@ describe('buildPalaceSubgraph', () => {
           selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
         } satisfies ChatContext,
         // A previous subgraph run's trace must be reset, not appended to.
-        toolSteps: [{ step: 'extracting' }],
+        palaceToolSteps: [{ step: 'extracting' }],
       },
       { streamMode: ['custom', 'values'] },
     )
@@ -90,7 +90,7 @@ describe('buildPalaceSubgraph', () => {
 
     expect(steps).toEqual(['planning-stations', 'generating-image', 'locating-stations'])
     // The persisted trace is the same source as the emitted events.
-    expect(result.toolSteps).toEqual([
+    expect(result.palaceToolSteps).toEqual([
       { step: 'planning-stations' },
       { step: 'generating-image' },
       { step: 'locating-stations' },
@@ -208,7 +208,7 @@ describe('buildPalaceSubgraph', () => {
         } satisfies ChatContext,
       })
 
-    expect(result.error).toBe('')
+    expect(result.palaceError).toBe('')
     expect(result.imageUrls).toEqual([])
     expect(result.memoryRoute[0]).toMatchObject({ x: 0.25, y: 0.4 })
   })
@@ -218,5 +218,40 @@ describe('buildPalaceSubgraph', () => {
     expect(resolveArtworkStyle('raster', new Set())).toBe('vector')
     expect(resolveArtworkStyle('vector', new Set([ProviderCapability.ImageGen]))).toBe('vector')
     expect(resolveArtworkStyle('vector', new Set())).toBe('vector')
+  })
+
+  it('无输入时以 palaceError 结束，不再调用模型', async () => {
+    const provider = createMockProvider()
+
+    const result = await buildPalaceSubgraph({ provider })
+      .compile()
+      .invoke({ messages: [], artworkStyle: 'vector', context: null })
+
+    expect(result.palaceError).toContain('请提供记忆宫殿的输入内容')
+    expect(provider.model.invoke).not.toHaveBeenCalled()
+  })
+
+  it('新一轮开始时清掉上一轮的 palaceResponse：失败时不会把旧答复当成本轮答复', async () => {
+    const provider = createMockProvider() as unknown as {
+      model: { invoke: ReturnType<typeof vi.fn> }
+    }
+    provider.model.invoke = vi.fn().mockRejectedValue(new Error('plan failed'))
+
+    const result = await buildPalaceSubgraph({
+      provider: provider as unknown as LLMProvider,
+    })
+      .compile()
+      .invoke({
+        messages: [],
+        artworkStyle: 'vector',
+        context: {
+          fileUuid: 'file-a',
+          selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+        } satisfies ChatContext,
+        palaceResponse: '上一轮已生成的记忆宫殿摘要',
+      })
+
+    expect(result.palaceError).toContain('plan failed')
+    expect(result.palaceResponse).toBe('')
   })
 })
