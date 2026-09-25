@@ -80,8 +80,13 @@ function takeStepTrace(): ChatToolCallStep[] | undefined {
   return trace
 }
 
-function emitProgress(step: SubgraphProgressStep): void {
-  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step })
+/**
+ * Emit one stage. `callId` is the virtual tool call this run answers: two
+ * subgraphs can run in the same super-step, so the stream event (and with it the
+ * card the renderer attributes it to) has to name its own call.
+ */
+function emitProgress(callId: string, step: SubgraphProgressStep): void {
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step, callId })
   pushStep({ step })
 }
 
@@ -98,11 +103,11 @@ function resetItemProgress(): void {
 }
 
 /** Count one finished branch item and emit its quantified progress event. */
-function takeItemProgress(step: SubgraphProgressStep, total: number): number {
+function takeItemProgress(callId: string, step: SubgraphProgressStep, total: number): number {
   const key = runKey()
   const completed = (itemProgressCounts.get(key) ?? 0) + 1
   itemProgressCounts.set(key, completed)
-  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step, completed, total })
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step, callId, completed, total })
   pushStep({ step, completed, total })
   return completed
 }
@@ -257,7 +262,7 @@ async function loadDocumentNode(
   state: typeof MindmapSubgraphState.State,
   options: MindmapSubgraphOptions,
 ): Promise<typeof MindmapSubgraphState.Update> {
-  emitProgress('reading-doc')
+  emitProgress(state.mindmapToolCallId, 'reading-doc')
   const source = state.mindmapInputSource
   const reset = createMindmapRunReset()
 
@@ -297,7 +302,7 @@ async function loadDocumentNode(
 
     // Phase-start event so the first (possibly long) extraction doesn't look
     // like the run is still stuck reading the document.
-    emitProgress('extracting')
+    emitProgress(state.mindmapToolCallId, 'extracting')
     return {
       ...reset,
       documentBatches: batches,
@@ -340,7 +345,7 @@ async function leafExtractNode(
       `Batch ${batchIndex + 1}`,
     )
 
-    const completed = takeItemProgress('extracting', total)
+    const completed = takeItemProgress(state.mindmapToolCallId, 'extracting', total)
     const branches = (tree as { children?: unknown[] }).children?.length ?? 0
     log.info(
       'batch-%d 完成，第 %d/%d 个, 提取 %d 分支, %ss, 重试 %d 次',
@@ -397,7 +402,7 @@ async function startMergeRoundNode(
       : [...state.mergeResults].sort((a, b) => a.groupIndex - b.groupIndex).map((r) => r.tree)
 
   resetItemProgress()
-  emitProgress('merging')
+  emitProgress(state.mindmapToolCallId, 'merging')
   return {
     mergeInputs: trees,
     mergeResults: null,
@@ -430,7 +435,7 @@ async function mergeTreesNode(
       `Merged Tree ${group.groupIndex + 1}`,
     )
 
-    const completed = takeItemProgress('merging', totalGroups)
+    const completed = takeItemProgress(state.mindmapToolCallId, 'merging', totalGroups)
     log.info(
       'merge group-%d 完成，第 %d/%d 个, 合并 %d 棵树, %ss, 重试 %d 次',
       group.groupIndex + 1,
@@ -474,7 +479,7 @@ async function finalizeMergeNode(
 async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<typeof MindmapSubgraphState.Update> {
-  emitProgress('finalizing')
+  emitProgress(state.mindmapToolCallId, 'finalizing')
   // build_output always terminates a run — consume the run start and the item
   // progress counter here so failed runs don't leak entries in either map.
   const runStart = takeRunStart()
@@ -554,8 +559,15 @@ function leafWaveSends(state: typeof MindmapSubgraphState.State, fromIndex: numb
   const sends: Send[] = []
   for (let i = fromIndex; i < end; i += 1) {
     // A Send branch sees only its payload (Pregel PUSH input = packet args),
-    // so the batches it needs must ride along with the batchIndex carrier.
-    sends.push(new Send('leaf_extract', { batchIndex: i, documentBatches: state.documentBatches }))
+    // so the batches it needs must ride along with the batchIndex carrier —
+    // and so must the answering call id, which the branch reports progress on.
+    sends.push(
+      new Send('leaf_extract', {
+        batchIndex: i,
+        documentBatches: state.documentBatches,
+        mindmapToolCallId: state.mindmapToolCallId,
+      }),
+    )
   }
   return sends
 }
@@ -576,6 +588,7 @@ function mergeWaveSends(state: typeof MindmapSubgraphState.State, fromGroup: num
             (groupIndex + 1) * MERGE_GROUP_SIZE,
           ),
         },
+        mindmapToolCallId: state.mindmapToolCallId,
       }),
     )
   }

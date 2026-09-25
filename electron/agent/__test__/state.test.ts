@@ -207,7 +207,7 @@ describe('MainGraphState', () => {
     const result = await compiled.invoke({
       messages: [new SystemMessage('sys')],
       context: null,
-      pendingSubgraph: null,
+      pendingSubgraphs: [],
       response: '',
       error: '',
       mindmapInputSource: null,

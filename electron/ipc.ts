@@ -398,10 +398,13 @@ export interface StreamResponse {
 }
 
 /**
- * `step` 事件载荷：步骤名 + 可选进度计数（streamManager 必须透传，不得丢弃计数）。
+ * `step` event payload: the stage name, the id of the subgraph call that emitted
+ * it (two subgraphs can run in parallel, so the card is attributed by this id),
+ * and optional progress counts (streamManager must pass the counts through).
  */
 export interface StreamStepPayload {
   step: StreamStep
+  callId?: string
   completed?: number
   total?: number
 }

@@ -319,29 +319,31 @@ export class Runner {
           const event = payload as {
             type?: string
             step?: string
+            callId?: string
             completed?: number
             total?: number
           }
           if (event.type === SUBGRAPH_PROGRESS_EVENT && isStreamStep(event.step)) {
             // First subgraph activity: create the pending subgraph card here, so
             // it is ordered by execution time (after any earlier tool) and stays
-            // ahead of later tools in the stream.
-            if (pendingSubgraphStarts.size > 0) {
-              const [pendingId, pending] = pendingSubgraphStarts.entries().next().value as [
-                string,
-                { name: string; input: Record<string, unknown> },
-              ]
-              pendingSubgraphStarts.delete(pendingId)
+            // ahead of later tools in the stream. Attribution is by call id —
+            // with two subgraphs in one super-step the declaration order says
+            // nothing about which one progresses first.
+            const callId = event.callId ?? ''
+            const pending = callId ? pendingSubgraphStarts.get(callId) : undefined
+            if (pending) {
+              pendingSubgraphStarts.delete(callId)
               this.emit('tool-start', {
-                id: toolEventId(pendingId, pending.name, 'subgraph tool-start'),
+                id: toolEventId(callId, pending.name, 'subgraph tool-start'),
                 name: pending.name,
                 input: pending.input,
               })
             }
-            // Contract: the step payload is { step, completed?, total? }; counts
-            // must pass through (cards render n/m).
+            // Contract: the step payload is { step, callId?, completed?, total? };
+            // counts must pass through (cards render n/m).
             this.emit('step', {
               step: event.step,
+              ...(callId ? { callId } : {}),
               ...(typeof event.completed === 'number' ? { completed: event.completed } : {}),
               ...(typeof event.total === 'number' ? { total: event.total } : {}),
             })

@@ -13,7 +13,8 @@ import {
 import { createMindmapActionTools } from '../../../tools/mindmapActions.js'
 import { mergeMessagePreparationConfig } from '../../../context/messagePreparation.js'
 import { ToolRegistry } from '../../../tools/registry.js'
-import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
+import { REMOVE_ALL_MESSAGES, Send } from '@langchain/langgraph'
+import type { MainGraphStateType } from '../../../state.js'
 
 function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
   return {
@@ -60,7 +61,7 @@ function createInitialState() {
   return {
     messages: [new HumanMessage('hello')] as BaseMessage[],
     context: null,
-    pendingSubgraph: null,
+    pendingSubgraphs: [],
     response: '',
     error: '',
     mindmapInputSource: null,
@@ -131,7 +132,7 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(mockInvoke).toHaveBeenCalledTimes(1)
-    expect(result.pendingSubgraph).toBe('mindmap')
+    expect(result.pendingSubgraphs).toEqual(['mindmap'])
     expect(result.mindmapToolCallId).toBe('call-1')
     expect(result.mindmapToolName).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
     expect(result.mindmapInputSource).toBeUndefined()
@@ -163,7 +164,7 @@ describe('MindLaneAgent.invoke()', () => {
 
     const result = await agent.invoke(createInitialState())
 
-    expect(result.pendingSubgraph).toBe('palace')
+    expect(result.pendingSubgraphs).toEqual(['palace'])
     expect(result.palaceToolCallId).toBe('call-2')
     expect(result.palaceToolName).toBe(GENERATE_PALACE_TOOL)
     expect(result.palaceInputText).toBeUndefined()
@@ -192,13 +193,13 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.messages).toHaveLength(1)
-    expect(result.pendingSubgraph).toBeNull()
+    expect(result.pendingSubgraphs).toEqual([])
   })
 
-  it('ordinary tool calls take precedence over virtual routing tools', async () => {
+  it('keeps the subgraph call when the same round also declares a plain tool', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '搜索后再生成',
+        content: '先读图再生成',
         tool_calls: [
           {
             name: 'searchKnowledge',
@@ -223,7 +224,30 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.messages).toHaveLength(1)
-    expect(result.pendingSubgraph).toBeNull()
+    expect(result.pendingSubgraphs).toEqual(['mindmap'])
+    expect(result.mindmapToolCallId).toBe('call-2')
+  })
+
+  it('declares both subgraphs when the model asks for both', async () => {
+    const mockInvoke = vi.fn().mockResolvedValue(
+      new AIMessage({
+        content: '两件都做',
+        tool_calls: [
+          { name: GENERATE_MINDMAP_FRAGMENT_TOOL, args: {}, id: 'call-mm', type: 'tool_call' },
+          { name: GENERATE_PALACE_TOOL, args: {}, id: 'call-pl', type: 'tool_call' },
+        ],
+      }),
+    )
+    const agent = new MindLaneAgent(
+      createMockProvider(mockInvoke),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
+
+    const result = await agent.invoke(createInitialState())
+
+    expect(result.pendingSubgraphs).toEqual(['mindmap', 'palace'])
+    expect(result.mindmapToolCallId).toBe('call-mm')
+    expect(result.palaceToolCallId).toBe('call-pl')
   })
 
   it('direct response ends without subgraph routing', async () => {
@@ -235,7 +259,7 @@ describe('MindLaneAgent.invoke()', () => {
 
     const result = await agent.invoke(createInitialState())
 
-    expect(result.pendingSubgraph).toBeNull()
+    expect(result.pendingSubgraphs).toEqual([])
     expect(result.response).toBe('这是一个回答')
   })
 
@@ -323,7 +347,7 @@ describe('MindLaneAgent.invoke()', () => {
 })
 
 describe('MindLaneAgent.route()', () => {
-  it('routes ordinary tool calls to tools', () => {
+  it('dispatches each ordinary tool call as its own Send to the tools node', () => {
     const agent = new MindLaneAgent(
       createMockProvider(vi.fn()),
       createTestRegistry({ extraTools: [mockSearchTool] }),
@@ -345,33 +369,69 @@ describe('MindLaneAgent.route()', () => {
       ],
     }
 
-    expect(agent.route(state)).toBe('tools')
+    const destinations = agent.route(state)
+
+    expect(destinations).toHaveLength(1)
+    const send = destinations[0] as Send
+    expect(send.node).toBe('tools')
+    expect(send.args).toMatchObject({ lg_tool_call: { id: 'call-1', name: 'searchKnowledge' } })
   })
 
-  it('routes pending mindmap subgraph', () => {
+  it('routes a pending mindmap subgraph', () => {
     const agent = new MindLaneAgent(
       createMockProvider(vi.fn()),
       createTestRegistry({ extraTools: [mockSearchTool] }),
     )
-    const state = {
+    const state: MainGraphStateType = {
       ...createInitialState(),
-      pendingSubgraph: 'mindmap' as const,
+      pendingSubgraphs: ['mindmap'],
     }
 
-    expect(agent.route(state)).toBe('mindmapSubgraph')
+    expect(agent.route(state)).toEqual(['mindmapSubgraph'])
   })
 
-  it('routes pending palace subgraph', () => {
+  it('routes both pending subgraphs in the same super-step', () => {
     const agent = new MindLaneAgent(
       createMockProvider(vi.fn()),
       createTestRegistry({ extraTools: [mockSearchTool] }),
     )
-    const state = {
+    const state: MainGraphStateType = {
       ...createInitialState(),
-      pendingSubgraph: 'palace' as const,
+      pendingSubgraphs: ['mindmap', 'palace'],
     }
 
-    expect(agent.route(state)).toBe('palaceSubgraph')
+    expect(agent.route(state)).toEqual(['mindmapSubgraph', 'palaceSubgraph'])
+  })
+
+  it('routes a plain tool and a subgraph together', () => {
+    const agent = new MindLaneAgent(
+      createMockProvider(vi.fn()),
+      createTestRegistry({ extraTools: [mockSearchTool] }),
+    )
+    const state: MainGraphStateType = {
+      ...createInitialState(),
+      pendingSubgraphs: ['palace'],
+      messages: [
+        new AIMessage({
+          content: '',
+          tool_calls: [
+            {
+              name: 'searchKnowledge',
+              args: { query: 'test' },
+              id: 'call-1',
+              type: 'tool_call',
+            },
+            { name: GENERATE_PALACE_TOOL, args: {}, id: 'call-2', type: 'tool_call' },
+          ],
+        }),
+      ],
+    }
+
+    const destinations = agent.route(state)
+
+    expect(destinations).toHaveLength(2)
+    expect((destinations[0] as Send).node).toBe('tools')
+    expect(destinations[1]).toBe('palaceSubgraph')
   })
 
   it('ends when there is no pending subgraph or action tool', () => {
@@ -380,7 +440,7 @@ describe('MindLaneAgent.route()', () => {
       createTestRegistry({ extraTools: [mockSearchTool] }),
     )
 
-    expect(agent.route(createInitialState())).toBe('__end__')
+    expect(agent.route(createInitialState())).toEqual(['__end__'])
   })
 
   it('routes palace regardless of provider capabilities', () => {
@@ -388,12 +448,12 @@ describe('MindLaneAgent.route()', () => {
       createMockProvider(vi.fn()),
       createTestRegistry({ extraTools: [mockSearchTool] }),
     )
-    const state = {
+    const state: MainGraphStateType = {
       ...createInitialState(),
-      pendingSubgraph: 'palace' as const,
+      pendingSubgraphs: ['palace'],
     }
 
-    expect(agent.route(state)).toBe('palaceSubgraph')
+    expect(agent.route(state)).toEqual(['palaceSubgraph'])
   })
 })
 

@@ -40,10 +40,10 @@ interface PalaceSubgraphOptions {
  * node is still working, not when it finishes.
  */
 function beginStage(
-  state: Pick<PalaceSubgraphStateType, 'palaceToolSteps'>,
+  state: Pick<PalaceSubgraphStateType, 'palaceToolSteps' | 'palaceToolCallId'>,
   step: SubgraphProgressStep,
 ): ChatToolCallStep[] {
-  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step })
+  getWriter()?.({ type: SUBGRAPH_PROGRESS_EVENT, step, callId: state.palaceToolCallId })
   return [...(state.palaceToolSteps ?? []), { step }]
 }
 

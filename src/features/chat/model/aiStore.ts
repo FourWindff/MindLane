@@ -761,13 +761,16 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
     case 'step': {
       // The only renderer consumer of step events: the running subgraph card's
       // stage trace. Without one there is nothing to render — no "current step"
-      // state exists anymore.
-      const { step, completed, total } = event.payload
+      // state exists anymore. Attribution is by call id; two subgraphs can run
+      // in parallel, and only a card that is still running can receive stages.
+      const { step, callId, completed, total } = event.payload
       const runningSubgraph = chat.toolCards.filter(
         (card) => card.status === 'running' && isSubgraphTool(card.name),
       )
-      if (runningSubgraph.length === 0) return chat
-      const target = runningSubgraph[runningSubgraph.length - 1]!
+      const target = callId
+        ? runningSubgraph.find((card) => card.id === callId)
+        : runningSubgraph[runningSubgraph.length - 1]
+      if (!target) return chat
       const stage: ChatToolCallStep = {
         step,
         ...(typeof completed === 'number' ? { completed } : {}),

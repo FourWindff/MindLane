@@ -42,25 +42,28 @@ export function isSubgraphCall(name: string): boolean {
 }
 
 /**
- * 从模型输出的 tool_calls 中识别出第一个虚拟子图调用。
+ * Detect **every** virtual subgraph call in the model's tool_calls, in
+ * declaration order.
  *
- * @returns 第一个子图调用，如果没有则返回 null
+ * Several calls in one round each become their own subgraph node in the same
+ * super-step, so returning only the first one (the old behaviour) silently
+ * dropped the rest.
  */
-export function detect(toolCalls: ToolCallLike[]): SubgraphCall | null {
+export function detect(toolCalls: ToolCallLike[]): SubgraphCall[] {
+  const calls: SubgraphCall[] = []
   for (const toolCall of toolCalls) {
     if (!isSubgraphCall(toolCall.name)) {
       continue
     }
 
-    const subgraph: SubgraphName = toolCall.name === GENERATE_PALACE_TOOL ? 'palace' : 'mindmap'
-    return {
-      subgraph,
+    calls.push({
+      subgraph: toolCall.name === GENERATE_PALACE_TOOL ? 'palace' : 'mindmap',
       toolCallId: toolCall.id ?? '',
       toolName: toolCall.name,
-    }
+    })
   }
 
-  return null
+  return calls
 }
 
 /**

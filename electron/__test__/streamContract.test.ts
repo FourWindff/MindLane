@@ -80,26 +80,27 @@ describe('ChatStreamEvent contract: tool-end carries id + status', () => {
   })
 })
 
-describe('ChatStreamEvent contract: step payload is { step, completed?, total? }', () => {
+describe('ChatStreamEvent contract: step payload is { step, callId?, completed?, total? }', () => {
   const sample: ChatStreamEvent = {
     streamId: 'stream-1',
     sessionId: 'session-1',
     type: 'step',
-    payload: { step: 'extracting', completed: 3, total: 8 },
+    payload: { step: 'extracting', callId: 'call-mm', completed: 3, total: 8 },
   }
 
-  it('narrows to a payload exposing step/completed/total', () => {
+  it('narrows to a payload exposing step/callId/completed/total', () => {
     expect(guardStep(sample)).toBe(true)
     if (guardStep(sample)) {
       const payload: StreamStepPayload = sample.payload
       expect(isStreamStep(payload.step)).toBe(true)
       expect(payload.step).toBe('extracting')
+      expect(payload.callId).toBe('call-mm')
       expect(payload.completed).toBe(3)
       expect(payload.total).toBe(8)
     }
   })
 
-  it('allows omitting both counts (bare step event)', () => {
+  it('allows omitting the call id and both counts (bare step event)', () => {
     const bare: ChatStreamEvent = {
       streamId: 's',
       sessionId: 's',

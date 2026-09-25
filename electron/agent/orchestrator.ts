@@ -1,4 +1,4 @@
-import { AIMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
+import { ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { ToolNode } from '@langchain/langgraph/prebuilt'
 import { END, START, StateGraph } from '@langchain/langgraph'
 import type { CompiledStateGraph } from '@langchain/langgraph'
@@ -25,7 +25,7 @@ import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
 import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
-import { getToolSchemas, isSubgraphCall } from './subgraphRouter.js'
+import { getToolSchemas } from './subgraphRouter.js'
 import { AGENT_LIMITS } from './config.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
@@ -285,7 +285,6 @@ export class AgentOrchestrator {
   buildGraph(toolRegistry = this.toolRegistry) {
     const toolNode = new ToolNode(toolRegistry.executableTools)
 
-    // Tool execution node: filter out virtual subgraph routing tools (already handled in supervisor.invoke).
     const normalizeToolMessages = async (messages: BaseMessage[]): Promise<BaseMessage[]> => {
       return Promise.all(
         messages.map(async (msg) => {
@@ -307,54 +306,35 @@ export class AgentOrchestrator {
       )
     }
 
-    const toolsNode = async (state: MainGraphStateType) => {
+    /**
+     * Tool execution node: one dispatch per plain tool call (the router sends each
+     * call as its own `Send`, so ToolNode executes exactly that call and never
+     * sees the virtual subgraph calls — no filtering of the supervisor message
+     * happens here).
+     */
+    const toolsNode = async (
+      state: MainGraphStateType & { lg_tool_call?: unknown },
+    ): Promise<{ messages: BaseMessage[] }> => {
       const log = logger.withContext('tools')
       try {
-        const lastMessage = state.messages[state.messages.length - 1]
-        log.debug(
-          'last message type: %s, tool_calls: %o',
-          lastMessage?.getType(),
-          (lastMessage as AIMessage)?.tool_calls?.map((tc) => ({ id: tc.id, name: tc.name })),
-        )
-        if (lastMessage && lastMessage.type === 'ai') {
-          const msg = lastMessage as AIMessage
-          const actionToolCalls = msg.tool_calls?.filter((tc) => !isSubgraphCall(tc.name)) ?? []
-          if (actionToolCalls.length === 0) {
-            return { messages: [] }
-          }
-          const filteredState = {
-            ...state,
-            messages: [
-              ...state.messages.slice(0, -1),
-              new AIMessage({
-                content: msg.content,
-                tool_calls: actionToolCalls,
-              }),
-            ],
-          }
-          log.debug('invoking toolNode with %d calls', actionToolCalls.length)
-          const result = await toolNode.invoke(filteredState)
-          const messages = result.messages ?? result
-          const normalized = await normalizeToolMessages(
-            Array.isArray(messages) ? messages : [messages],
-          )
-          log.debug(
-            'normalized messages: %o',
-            normalized.map((m) => ({
-              type: m.getType(),
-              content:
-                typeof m.content === 'string'
-                  ? m.content.slice(0, 200)
-                  : JSON.stringify(m.content).slice(0, 200),
-            })),
-          )
-          return { messages: normalized }
-        }
+        const call = state.lg_tool_call as { id?: string; name?: string } | undefined
+        log.debug('executing tool call: %o', call)
         const result = await toolNode.invoke(state)
-        const messages = result.messages ?? result
-        return {
-          messages: await normalizeToolMessages(Array.isArray(messages) ? messages : [messages]),
-        }
+        const messages = (result as { messages?: BaseMessage[] }).messages ?? result
+        const normalized = await normalizeToolMessages(
+          Array.isArray(messages) ? messages : [messages],
+        )
+        log.debug(
+          'normalized messages: %o',
+          normalized.map((m) => ({
+            type: m.getType(),
+            content:
+              typeof m.content === 'string'
+                ? m.content.slice(0, 200)
+                : JSON.stringify(m.content).slice(0, 200),
+          })),
+        )
+        return { messages: normalized }
       } catch (err) {
         log.error('error:', err)
         throw err
@@ -380,7 +360,9 @@ export class AgentOrchestrator {
     const contextCompactNode = (state: MainGraphStateType, config?: RunContextCompactConfig) =>
       runContextCompact(runAssemblyDeps, state, config)
 
-    // Unified routing function: MindLaneAgent.route() owns subgraph selection.
+    // Routing function: MindLaneAgent.route() owns dispatch. It returns several
+    // destinations at once (one `Send` per plain tool call, one node per pending
+    // subgraph), which is what puts them in the same super-step.
     const routeFn = (state: MainGraphStateType) => supervisor.route(state)
 
     // Unified graph structure: both subgraphs are mounted as nodes of this graph.

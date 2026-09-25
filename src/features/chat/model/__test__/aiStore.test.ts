@@ -1155,6 +1155,65 @@ describe('reduceStreamEvent', () => {
     })
   })
 
+  it('attributes stages of parallel subgraphs to their own card by call id', () => {
+    const mindmapRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-mm', name: 'generateMindmapFragment', input: {} },
+    })
+    const bothRunning = reduceStreamEvent(mindmapRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-pl', name: 'generatePalace', input: {} },
+    })
+    const palaceStep = reduceStreamEvent(bothRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'planning-stations', callId: 'call-pl' },
+    })
+    const mindmapStep = reduceStreamEvent(palaceStep, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'reading-doc', callId: 'call-mm' },
+    })
+
+    // The palace card was created last; its stage still lands on it, and the
+    // mindmap card keeps its own trace.
+    expect(mindmapStep.toolCards.map((card) => [card.id, card.step])).toEqual([
+      ['call-mm', 'reading-doc'],
+      ['call-pl', 'planning-stations'],
+    ])
+    expect(mindmapStep.toolCards[0]?.stages).toEqual([{ step: 'reading-doc' }])
+    expect(mindmapStep.toolCards[1]?.stages).toEqual([{ step: 'planning-stations' }])
+  })
+
+  it('falls back to the newest running subgraph card for a step without a call id', () => {
+    const mindmapRunning = reduceStreamEvent(base, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-mm', name: 'generateMindmapFragment', input: {} },
+    })
+    const bothRunning = reduceStreamEvent(mindmapRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'tool-start',
+      payload: { id: 'call-pl', name: 'generatePalace', input: {} },
+    })
+    const stepped = reduceStreamEvent(bothRunning, {
+      streamId: 's',
+      sessionId: 'session-a',
+      type: 'step',
+      payload: { step: 'planning-stations' },
+    })
+
+    expect(stepped.toolCards[1]?.step).toBe('planning-stations')
+  })
+
   it('accumulates the full stage sequence on the running subgraph card', () => {
     const withSubgraph = reduceStreamEvent(base, {
       streamId: 's',

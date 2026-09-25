@@ -66,6 +66,37 @@ function createHarness() {
   }
 }
 
+type MessageChunk = {
+  id: string
+  content: string
+  /** supervisor AI 消息携带的工具调用（子图补发 tool-start 用） */
+  toolCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>
+  /** tool 消息 chunk（子图 ToolMessage 补发 tool-end 用） */
+  type?: 'tool'
+  name?: string
+  toolCallId?: string
+  /** 消息所属节点（默认 supervisor；tool 消息默认子图收口节点） */
+  node?: string
+}
+
+/** The supervisor's streaming chunk: tool calls arrive as tool_call_chunks. */
+function aiChunk(chunk: MessageChunk): AIMessageChunk {
+  return new AIMessageChunk({
+    id: chunk.id,
+    content: chunk.content,
+    ...(chunk.toolCalls
+      ? {
+          tool_call_chunks: chunk.toolCalls.map((tc, index) => ({
+            id: tc.id ?? '',
+            name: tc.name ?? '',
+            args: JSON.stringify(tc.args ?? {}),
+            index,
+          })),
+        }
+      : {}),
+  })
+}
+
 function createRuntime(options?: {
   gate?: Promise<void>
   gatesBySession?: Record<string, Promise<void>>
@@ -78,20 +109,9 @@ function createRuntime(options?: {
   capturedStateThreadIds?: string[]
   omitAssistantState?: boolean
   includeToolState?: boolean
-  progress?: { step: string; completed?: number; total?: number }
+  progressEvents?: Array<{ step: string; callId?: string; completed?: number; total?: number }>
   toolEvents?: Array<Record<string, unknown>>
-  messageChunks?: Array<{
-    id: string
-    content: string
-    /** supervisor AI 消息携带的工具调用（子图补发 tool-start 用） */
-    toolCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>
-    /** tool 消息 chunk（子图 ToolMessage 补发 tool-end 用） */
-    type?: 'tool'
-    name?: string
-    toolCallId?: string
-    /** 消息所属节点（默认 supervisor；tool 消息默认子图收口节点） */
-    node?: string
-  }>
+  messageChunks?: MessageChunk[]
 }): StreamRuntime {
   const registry = new ToolRegistry()
   registry.registerTool({ name: 'initial-tool' } as never)
@@ -109,9 +129,6 @@ function createRuntime(options?: {
       options?.capturedThreadIds?.push(sessionId)
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
-      if (options?.progress) {
-        yield ['custom', { type: 'subgraph-progress', ...options.progress }]
-      }
       for (const toolEvent of options?.toolEvents ?? []) {
         yield ['tools', toolEvent]
       }
@@ -121,41 +138,29 @@ function createRuntime(options?: {
           content: options?.tokensBySession?.[sessionId] ?? options?.token ?? 'hello',
         },
       ]
-      for (const chunk of messageChunks) {
-        if (chunk.type === 'tool') {
-          yield [
-            'messages',
-            [
-              new ToolMessage({
-                content: chunk.content,
-                tool_call_id: chunk.toolCallId ?? '',
-                name: chunk.name,
-              }),
-              { langgraph_node: chunk.node ?? 'mindmapSubgraph' },
-            ],
-          ]
-        } else {
-          yield [
-            'messages',
-            [
-              new AIMessageChunk({
-                id: chunk.id,
-                content: chunk.content,
-                ...(chunk.toolCalls
-                  ? {
-                      tool_call_chunks: chunk.toolCalls.map((tc, index) => ({
-                        id: tc.id ?? '',
-                        name: tc.name ?? '',
-                        args: JSON.stringify(tc.args ?? {}),
-                        index,
-                      })),
-                    }
-                  : {}),
-              }),
-              { langgraph_node: chunk.node ?? 'supervisor' },
-            ],
-          ]
-        }
+      // Real stream order: the supervisor's declaration chunks first, then the
+      // subgraphs actually running (custom progress), then their ToolMessages.
+      // Card anchoring only sees a declaration if progress arrives after it, and
+      // progress only lands on the right card while no ToolMessage has answered
+      // the call yet — so the fixture keeps both halves of that order.
+      for (const chunk of messageChunks.filter((chunk) => chunk.type !== 'tool')) {
+        yield ['messages', [aiChunk(chunk), { langgraph_node: chunk.node ?? 'supervisor' }]]
+      }
+      for (const event of options?.progressEvents ?? []) {
+        yield ['custom', { type: 'subgraph-progress', ...event }]
+      }
+      for (const chunk of messageChunks.filter((chunk) => chunk.type === 'tool')) {
+        yield [
+          'messages',
+          [
+            new ToolMessage({
+              content: chunk.content,
+              tool_call_id: chunk.toolCallId ?? '',
+              name: chunk.name,
+            }),
+            { langgraph_node: chunk.node ?? 'mindmapSubgraph' },
+          ],
+        ]
       }
       await options?.gatesBySession?.[sessionId]
       await options?.gate
@@ -302,7 +307,7 @@ describe('StreamManager + Runner', () => {
 
   it('emits subgraph pipeline progress', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
-    setRuntimeFactory(() => createRuntime({ progress: { step: 'extracting' } }))
+    setRuntimeFactory(() => createRuntime({ progressEvents: [{ step: 'extracting' }] }))
 
     const streamId = manager.startStream({
       sessionId: 'session-a',
@@ -321,7 +326,7 @@ describe('StreamManager + Runner', () => {
 
   it('forwards palace subgraph stages through the same channel', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
-    setRuntimeFactory(() => createRuntime({ progress: { step: 'planning-stations' } }))
+    setRuntimeFactory(() => createRuntime({ progressEvents: [{ step: 'planning-stations' }] }))
 
     const streamId = manager.startStream({
       sessionId: 'session-a',
@@ -341,7 +346,7 @@ describe('StreamManager + Runner', () => {
   it('passes completed/total counts through step events (counts are not dropped)', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() =>
-      createRuntime({ progress: { step: 'extracting', completed: 3, total: 8 } }),
+      createRuntime({ progressEvents: [{ step: 'extracting', completed: 3, total: 8 }] }),
     )
 
     const streamId = manager.startStream({
@@ -617,7 +622,7 @@ describe('StreamManager + Runner', () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() =>
       createRuntime({
-        progress: { step: 'extracting', completed: 2, total: 5 },
+        progressEvents: [{ step: 'extracting', completed: 2, total: 5 }],
         messageChunks: [
           {
             id: 'm1',
@@ -719,6 +724,84 @@ describe('StreamManager + Runner', () => {
         (e.payload as { name?: string }).name === 'generateMindmapFragment',
     )
     expect(subgraphStarts).toEqual([])
+  })
+
+  it('anchors each parallel subgraph card by its own call id, not by declaration order', async () => {
+    const { manager, events, setRuntimeFactory } = createHarness()
+    const mindmapResult = JSON.stringify({ ok: true, title: 'T', xmlFragment: 'root:' })
+    const palaceResult = JSON.stringify({
+      ok: true,
+      label: '宫殿',
+      stations: [],
+      imageUrl: '',
+      sourceNodeIds: [],
+    })
+    setRuntimeFactory(() =>
+      createRuntime({
+        messageChunks: [
+          {
+            id: 'm1',
+            content: '',
+            toolCalls: [
+              { id: 'call-mm', name: 'generateMindmapFragment', args: { doc: 'x' } },
+              { id: 'call-pl', name: 'generatePalace', args: {} },
+            ],
+          },
+          {
+            id: 'm1',
+            content: palaceResult,
+            type: 'tool',
+            name: 'generatePalace',
+            toolCallId: 'call-pl',
+          },
+          {
+            id: 'm1',
+            content: mindmapResult,
+            type: 'tool',
+            name: 'generateMindmapFragment',
+            toolCallId: 'call-mm',
+          },
+          { id: 'm2', content: '完成' },
+        ],
+        // The palace progresses first although it was declared second: FIFO
+        // anchoring would put its stages on the mindmap card.
+        progressEvents: [
+          { step: 'planning-stations', callId: 'call-pl' },
+          { step: 'reading-doc', callId: 'call-mm' },
+        ],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'session-a',
+      message: 'question',
+      ...defaultRequestFields,
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(events.filter((e) => e.type === 'tool-start').map((e) => e.payload)).toEqual([
+      { id: 'call-pl', name: 'generatePalace', input: {} },
+      { id: 'call-mm', name: 'generateMindmapFragment', input: { doc: 'x' } },
+    ])
+    expect(events.filter((e) => e.type === 'step').map((e) => e.payload)).toEqual([
+      { step: 'planning-stations', callId: 'call-pl' },
+      { step: 'reading-doc', callId: 'call-mm' },
+    ])
+    expect(events.filter((e) => e.type === 'tool-end').map((e) => e.payload)).toEqual([
+      {
+        id: 'call-pl',
+        name: 'generatePalace',
+        status: 'success',
+        output: palaceResult,
+      },
+      {
+        id: 'call-mm',
+        name: 'generateMindmapFragment',
+        status: 'success',
+        output: mindmapResult,
+      },
+    ])
+    expect(streamId).toMatch(/^stream_/)
   })
 
   it('anchors the subgraph card after an earlier real tool, matching final history order', async () => {
@@ -956,7 +1039,7 @@ describe('StreamManager + Runner', () => {
         capturedThreadIds,
         capturedStateThreadIds,
         capturedInputs,
-        progress: { step: 'planning-stations' },
+        progressEvents: [{ step: 'planning-stations' }],
         toolEvents: [
           { event: 'on_tool_start', toolCallId: 'call-1', name: 'insertXmlFragment', input: {} },
           {
@@ -990,14 +1073,14 @@ describe('StreamManager + Runner', () => {
     expect(capturedStateThreadIds).toEqual(['palace-thread-1'])
     expect(capturedInputs[0]?.runEntry).toBe('palace')
     expect(capturedInputs[0]?.messages).toEqual([])
-    // Stream events still flow: subgraph step, tool card, token, end; the
-    // second step is the write tool's generating-map.
+    // Stream events still flow: the write tool's generating-map step, the tool
+    // card, the token, the palace run's own progress, then end.
     expect(events.map((event) => event.type)).toEqual([
-      'step',
       'step',
       'tool-start',
       'tool-end',
       'token',
+      'step',
       'end',
     ])
   })

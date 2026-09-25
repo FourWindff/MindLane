@@ -63,11 +63,13 @@ describe('SubgraphRouter.detect', () => {
 
     const result = detect(toolCalls)
 
-    expect(result).toEqual({
-      subgraph: 'mindmap',
-      toolCallId: 'call-1',
-      toolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
-    })
+    expect(result).toEqual([
+      {
+        subgraph: 'mindmap',
+        toolCallId: 'call-1',
+        toolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
+      },
+    ])
   })
 
   it('识别 generatePalace 为 palace 子图调用', () => {
@@ -75,14 +77,16 @@ describe('SubgraphRouter.detect', () => {
 
     const result = detect(toolCalls)
 
-    expect(result).toEqual({
-      subgraph: 'palace',
-      toolCallId: 'call-2',
-      toolName: GENERATE_PALACE_TOOL,
-    })
+    expect(result).toEqual([
+      {
+        subgraph: 'palace',
+        toolCallId: 'call-2',
+        toolName: GENERATE_PALACE_TOOL,
+      },
+    ])
   })
 
-  it('返回列表中第一个子图调用', () => {
+  it('返回全部子图调用（同一轮里的第二个调用不再被丢弃）', () => {
     const toolCalls: ToolCallLike[] = [
       { name: 'batchAddMindmapNodes', id: 'call-1' },
       { name: GENERATE_PALACE_TOOL, id: 'call-2' },
@@ -91,17 +95,17 @@ describe('SubgraphRouter.detect', () => {
 
     const result = detect(toolCalls)
 
-    expect(result?.subgraph).toBe('palace')
-    expect(result?.toolCallId).toBe('call-2')
+    expect(result.map((call) => call.subgraph)).toEqual(['palace', 'mindmap'])
+    expect(result.map((call) => call.toolCallId)).toEqual(['call-2', 'call-3'])
   })
 
-  it('没有子图调用时返回 null', () => {
+  it('没有子图调用时返回空列表', () => {
     const toolCalls: ToolCallLike[] = [{ name: 'batchAddMindmapNodes', id: 'call-1' }]
 
-    expect(detect(toolCalls)).toBeNull()
+    expect(detect(toolCalls)).toEqual([])
   })
 
-  it('空列表返回 null', () => {
-    expect(detect([])).toBeNull()
+  it('空列表返回空列表', () => {
+    expect(detect([])).toEqual([])
   })
 })

@@ -94,9 +94,16 @@ const TurnAnnotations = {
 
 /** 主图独有：监督器自己的答复/错误、滚动摘要与路由判别键。 */
 const SupervisorAnnotations = {
-  pendingSubgraph: Annotation<PendingSubgraph | null>({
+  /**
+   * Subgraph calls declared this round and still awaiting execution, in
+   * declaration order. The supervisor writes it, the conditional edge reads it,
+   * subgraph nodes never write it — a leftover value would route the graph back
+   * into a subgraph that already ran. A list rather than a single value because
+   * one round can declare several.
+   */
+  pendingSubgraphs: Annotation<PendingSubgraph[]>({
     reducer: replaceReducer,
-    default: () => null,
+    default: () => [],
   }),
   response: Annotation<string>({
     reducer: replaceReducer,

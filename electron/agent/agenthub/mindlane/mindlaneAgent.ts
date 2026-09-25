@@ -8,8 +8,12 @@ import { extractTextContent, formatAgentError, sanitizeAIMessageContent } from '
 import { MemoryManager } from '../../memory/memoryManager.js'
 import { logger } from '../../../shared/logger.js'
 import { ToolRegistry } from '../../tools/registry.js'
-import { detect as detectSubgraphCall, isSubgraphCall } from '../../subgraphRouter.js'
-import { REMOVE_ALL_MESSAGES } from '@langchain/langgraph'
+import {
+  detect as detectSubgraphCall,
+  isSubgraphCall,
+  type SubgraphName,
+} from '../../subgraphRouter.js'
+import { REMOVE_ALL_MESSAGES, Send } from '@langchain/langgraph'
 import { isPromptTooLongError, trimToRecentWindow } from '../../memory/contextCompact.js'
 import { AGENT_LIMITS } from '../../config.js'
 import {
@@ -75,7 +79,7 @@ export class MindLaneAgent extends BaseAgent {
     if (failureText) {
       return {
         messages: [new AIMessage({ content: failureText })],
-        pendingSubgraph: null,
+        pendingSubgraphs: [],
         response: failureText,
         mindmapError: '',
         palaceError: '',
@@ -104,34 +108,41 @@ export class MindLaneAgent extends BaseAgent {
         messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
         error: formatted,
         response: '处理请求时出错，请稍后重试。',
-        pendingSubgraph: null,
+        pendingSubgraphs: [],
       }
     }
   }
 
   /**
-   * Conditional-edge router. `pendingSubgraph` is a supervisor-owned key: this
-   * node sets it when the model declares a subgraph call and clears it on every
-   * other path, and no subgraph node writes it — so a consumed declaration can
-   * never re-route the graph back into a subgraph that already ran.
+   * Conditional-edge router.
+   *
+   * Every declared call is dispatched, and dispatch is per call: plain tool
+   * calls go to the tools node as one `Send` each (ToolNode executes exactly
+   * the call it is handed), each pending subgraph goes to its own node. Several
+   * destinations mean one super-step, so two subgraphs — or a tool and a
+   * subgraph — run in parallel.
+   *
+   * `pendingSubgraphs` is a supervisor-owned key: this node sets it when the
+   * model declares subgraph calls and clears it on every other path, and no
+   * subgraph node writes it — so a consumed declaration can never re-route the
+   * graph back into a subgraph that already ran.
    */
-  route(state: MainGraphStateType): string {
-    switch (state.pendingSubgraph) {
-      case 'palace':
-        return 'palaceSubgraph'
-      case 'mindmap':
-        return 'mindmapSubgraph'
-      default: {
-        const lastMessage = state.messages[state.messages.length - 1]
-        if (lastMessage && lastMessage.type === 'ai') {
-          const msg = lastMessage as AIMessage
-          if ((msg.tool_calls?.length ?? 0) > 0) {
-            return 'tools'
-          }
+  route(state: MainGraphStateType): Array<string | Send> {
+    const destinations: Array<string | Send> = []
+    const lastMessage = state.messages[state.messages.length - 1]
+    if (lastMessage && lastMessage.type === 'ai') {
+      for (const toolCall of (lastMessage as AIMessage).tool_calls ?? []) {
+        if (!isSubgraphCall(toolCall.name)) {
+          destinations.push(new Send('tools', { ...state, lg_tool_call: toolCall }))
         }
-        return '__end__'
       }
     }
+
+    for (const subgraph of state.pendingSubgraphs) {
+      destinations.push(subgraph === 'palace' ? 'palaceSubgraph' : 'mindmapSubgraph')
+    }
+
+    return destinations.length > 0 ? destinations : ['__end__']
   }
 
   private async invokeModel(
@@ -183,15 +194,14 @@ export class MindLaneAgent extends BaseAgent {
     const content = extractTextContent(response.content)
     const toolCalls = response.tool_calls ?? []
 
-    const subgraphCall = detectSubgraphCall(toolCalls)
-    const hasActionToolCall = toolCalls.some((tc) => !isSubgraphCall(tc.name))
+    const subgraphCalls = detectSubgraphCall(toolCalls)
 
     // info: decision summary only; full content/args go to debug (file).
     log.info(
       'model 输出: 内容 %d 字符, tool_calls=[%s], routed=%s',
       content.length,
       toolCalls.map((tc) => tc.name).join(', '),
-      subgraphCall?.subgraph ?? 'none',
+      subgraphCalls.map((call) => call.subgraph).join('+') || 'none',
     )
     log.debug('model 输出全量:', {
       rawContent: summarizeMessageContent(response.content),
@@ -200,8 +210,7 @@ export class MindLaneAgent extends BaseAgent {
         name: tc.name,
         args: tc.args,
       })),
-      routedSubgraph: subgraphCall?.subgraph ?? null,
-      hasActionToolCall,
+      routedSubgraphs: subgraphCalls.map((call) => call.subgraph),
     })
 
     let resultMessages: BaseMessage[]
@@ -215,42 +224,47 @@ export class MindLaneAgent extends BaseAgent {
       resultMessages = [response]
     }
 
-    if (hasActionToolCall) {
-      // Plain tool round: no subgraph this time, so clear the supervisor's own
-      // routing key (see route()).
-      return { messages: resultMessages, pendingSubgraph: null }
+    if (subgraphCalls.length === 0) {
+      // No subgraph this round: clear the supervisor's own routing key (see
+      // route()). Only a direct answer carries the turn text as `response`; a
+      // plain tool round must not overwrite the turn text with its preamble.
+      const isDirectAnswer = toolCalls.length === 0
+      return isDirectAnswer
+        ? { messages: resultMessages, pendingSubgraphs: [], response: content }
+        : { messages: resultMessages, pendingSubgraphs: [] }
     }
 
-    const virtualRoute = subgraphCall
-    if (virtualRoute) {
-      // 调用信息（调用 id / 工具名）写在子图自己的通道上：两个子图各有各的一份。
-      const callInfo =
-        virtualRoute.subgraph === 'palace'
-          ? {
-              palaceToolCallId: virtualRoute.toolCallId,
-              palaceToolName: virtualRoute.toolName,
-            }
-          : {
-              mindmapToolCallId: virtualRoute.toolCallId,
-              mindmapToolName: virtualRoute.toolName,
-            }
-      const routeState = {
-        messages: [createToolCallMessage(response, content)],
-        pendingSubgraph: virtualRoute.subgraph,
-        ...callInfo,
-        response: content,
+    // The call info (call id + tool name) rides on the subgraph's own channels:
+    // one set per subgraph, so neither can overwrite the other. A subgraph
+    // declared more than once keeps its first call — one node run, one call
+    // slot; the extras are answered by message preparation's backfill instead
+    // of leaving a dangling tool_call_id. Running the same subgraph twice in one
+    // super-step is not supported anyway: its progress/trace bookkeeping is
+    // keyed per stream, not per run.
+    const callInfo: Partial<MainGraphStateType> = {}
+    const pendingSubgraphs: SubgraphName[] = []
+    for (const call of subgraphCalls) {
+      if (pendingSubgraphs.includes(call.subgraph)) continue
+      pendingSubgraphs.push(call.subgraph)
+      if (call.subgraph === 'palace') {
+        callInfo.palaceToolCallId = call.toolCallId
+        callInfo.palaceToolName = call.toolName
+      } else {
+        callInfo.mindmapToolCallId = call.toolCallId
+        callInfo.mindmapToolName = call.toolName
       }
-      if (didTrim) {
-        return { ...routeState, messages: resultMessages }
-      }
-      return routeState
     }
 
-    return {
-      messages: resultMessages,
-      pendingSubgraph: null,
+    const routeState = {
+      messages: [createToolCallMessage(response, content)],
+      pendingSubgraphs,
+      ...callInfo,
       response: content,
     }
+    if (didTrim) {
+      return { ...routeState, messages: resultMessages }
+    }
+    return routeState
   }
 }
 
