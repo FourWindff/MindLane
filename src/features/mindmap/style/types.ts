@@ -51,7 +51,6 @@ export interface ColorSchemeDef {
   id: ColorSchemeId
   label: string
   /** 在选色器中显示的代表色 */
-  swatch: string
 }
 
 export interface MindmapStyleState {

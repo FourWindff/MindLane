@@ -17,9 +17,7 @@ export interface BranchPalette {
 /** 一套配色方案的完整定义 */
 export interface SchemePalette {
   /** 画布背景色 */
-  canvasBg: string
   /** 画布点阵颜色 */
-  canvasDot: string
   /** 根节点样式（depth=0，不参与分支着色） */
   root: { nodeBg: string; nodeBorder: string; nodeText: string }
   /** 各分支配色，按 branchIndex % 6 循环使用 */
@@ -30,8 +28,6 @@ export interface SchemePalette {
 
 /** 默认（xyflow 风格灰）：所有分支同灰，不做彩虹区分 */
 const DEFAULT_GRAY: SchemePalette = {
-  canvasBg: '#f8f8f8',
-  canvasDot: 'rgba(0,0,0,0.06)',
   root: { nodeBg: '#ffffff', nodeBorder: '#b1b1b7', nodeText: '#222222' },
   branches: [
     {
@@ -56,8 +52,6 @@ const DEFAULT_GRAY: SchemePalette = {
 
 /** 彩虹：6 种鲜明色相按分支循环，节点背景带竖向渐变 */
 const RAINBOW: SchemePalette = {
-  canvasBg: '#fafafa',
-  canvasDot: 'rgba(0,0,0,0.06)',
   root: { nodeBg: '#ffffff', nodeBorder: '#d1d5db', nodeText: '#111827' },
   branches: [
     // 红
@@ -172,8 +166,6 @@ const RAINBOW: SchemePalette = {
 }
 
 const WARM: SchemePalette = {
-  canvasBg: '#f5f4f2',
-  canvasDot: 'rgba(0,0,0,0.07)',
   root: { nodeBg: '#ffffff', nodeBorder: '#d1cec9', nodeText: '#2d2a26' },
   branches: [
     // 珊瑚红
@@ -288,8 +280,6 @@ const WARM: SchemePalette = {
 }
 
 const OCEAN: SchemePalette = {
-  canvasBg: '#eef6fb',
-  canvasDot: 'rgba(13,45,69,0.07)',
   root: { nodeBg: '#ffffff', nodeBorder: '#b0d4ec', nodeText: '#0d2d45' },
   branches: [
     // 深海蓝
@@ -404,8 +394,6 @@ const OCEAN: SchemePalette = {
 }
 
 const FOREST: SchemePalette = {
-  canvasBg: '#edf5ec',
-  canvasDot: 'rgba(26,51,32,0.07)',
   root: { nodeBg: '#ffffff', nodeBorder: '#a8d5a2', nodeText: '#1a3320' },
   branches: [
     // 苔绿
@@ -520,8 +508,6 @@ const FOREST: SchemePalette = {
 }
 
 const SUNSET: SchemePalette = {
-  canvasBg: '#fdf3ea',
-  canvasDot: 'rgba(61,31,10,0.07)',
   root: { nodeBg: '#ffffff', nodeBorder: '#e8bfa0', nodeText: '#3d1f0a' },
   branches: [
     // 暮橙
@@ -636,8 +622,6 @@ const SUNSET: SchemePalette = {
 }
 
 const NIGHT: SchemePalette = {
-  canvasBg: '#1a1b2e',
-  canvasDot: 'rgba(255,255,255,0.04)',
   root: { nodeBg: '#252640', nodeBorder: '#4a4e7a', nodeText: '#e2e4f0' },
   branches: [
     // 霓虹紫
