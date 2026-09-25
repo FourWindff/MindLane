@@ -19,7 +19,6 @@ import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
 import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryProvider'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
-import { ToastContainer } from '@/shared/components/ToastContainer'
 import {
   connectAiStore,
   subscribeToChatStreamEvents,
@@ -33,7 +32,6 @@ import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
-import '@/shared/components/toast.css'
 import '@/app/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
 
@@ -222,7 +220,6 @@ function AppContent() {
             </aside>
             <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
-            <ToastContainer />
           </div>
         )}
       </div>

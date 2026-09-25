@@ -1,7 +1,7 @@
+import { useState } from 'react'
 import { FileText, Link, FileType, Paperclip } from 'lucide-react'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
-import { showToast } from '@/shared/model/toastStore'
 
 function DocumentRefIcon({ type }: { type: DocumentRef['type'] }) {
   switch (type) {
@@ -24,11 +24,13 @@ function getDocumentRefLabel(doc: DocumentRef): string {
 
 export function DocumentRefsPanel({ onClose }: { onClose?: () => void }) {
   const documentRefs = useActiveMindmapStore((s) => s.documentRefs)
+  const [error, setError] = useState<string | null>(null)
 
   const handleOpen = async (doc: DocumentRef) => {
+    setError(null)
     const result = await window.mindlane?.shell.openDocumentRef(doc)
     if (result && !result.ok) {
-      showToast(result.error)
+      setError(result.error)
     }
   }
 
@@ -62,6 +64,12 @@ export function DocumentRefsPanel({ onClose }: { onClose?: () => void }) {
           </li>
         ))}
       </ul>
+
+      {error && (
+        <p className="document-refs-panel__error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
