@@ -10,6 +10,16 @@ import type { MindmapOutlineNode } from './utils/mindmapOutline.js'
 export type { DocumentRef }
 export type { MindmapInputSource }
 
+/**
+ * Run entry: which edge the main graph takes out of START.
+ *
+ * `palace` is the entry of the manual-palace ephemeral run (straight to the
+ * palace subgraph, skipping compaction and the supervisor); plain chat runs
+ * are always `chat` (the channel default). ADR-0023 lands the conditional
+ * edge that reads this marker.
+ */
+export type RunEntry = 'chat' | 'palace'
+
 /** 简单替换型 reducer：直接用新值覆盖旧值。 */
 function replaceReducer<T>(_prev: T, next: T): T {
   return next
@@ -166,6 +176,18 @@ const PalaceScalarAnnotations = {
 }
 
 /**
+ * Run-level entry channel: main graph only (subgraphs never read the entry).
+ * The START conditional edge consumes it; until that edge lands, every run
+ * still traverses compaction and the supervisor.
+ */
+const RunAnnotations = {
+  runEntry: Annotation<RunEntry>({
+    reducer: replaceReducer,
+    default: () => 'chat',
+  }),
+}
+
+/**
  * 记忆宫殿状态切片（私有键：只此一图写，主图照走合并）
  */
 const PalaceStateAnnotations = {
@@ -291,6 +313,7 @@ const MindmapStateAnnotations = {
  * 所以这里必须是两个子图通道的并集，新增子图键只能改这里一处。
  */
 export const MainGraphState = Annotation.Root({
+  ...RunAnnotations,
   ...TurnAnnotations,
   ...SupervisorAnnotations,
   ...MindmapScalarAnnotations,

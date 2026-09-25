@@ -64,12 +64,33 @@ function summarizeToolResult(output: string): string {
   return `${size}, ${preview}`
 }
 
+/**
+ * Ephemeral run (CONTEXT.md 「Ephemeral Run」): the manual palace run lives on a
+ * private thread and writes no session record, but still emits stream events.
+ */
+export interface EphemeralRunRequest {
+  /**
+   * Private checkpoint thread: resume by re-running with the same id and empty
+   * input. Distinct from `sessionId`, which stays the stream-event correlation
+   * id and is never persisted for this run.
+   */
+  privateThreadId: string
+  /** Graph entry: only the palace entry has an ephemeral trigger today. */
+  runEntry: 'palace'
+}
+
 export interface StreamRequest {
   sessionId: string
   message: string
   workspaceUuid: string
   context: ChatContext
   documentRef?: DocumentRef
+  /**
+   * Ephemeral mode (manual palace): no session read or write, private thread.
+   * Omitted means normal session mode (default): persist, build history, and
+   * use sessionId as the checkpoint thread.
+   */
+  ephemeral?: EphemeralRunRequest
 }
 
 /**
@@ -120,6 +141,11 @@ export class Runner {
     this.abortController.abort()
   }
 
+  /** Ephemeral runs use the private thread; session runs use sessionId. */
+  private get checkpointThreadId(): string {
+    return this.options.request.ephemeral?.privateThreadId ?? this.options.request.sessionId
+  }
+
   async run(): Promise<void> {
     const { sessionManager } = this.options
     const execute = () =>
@@ -148,13 +174,14 @@ export class Runner {
         context: request.context,
         documentRef: request.documentRef ?? null,
         artworkStyle: runtime.artworkStyle,
+        runEntry: request.ephemeral?.runEntry ?? 'chat',
       }
       const config = {
         signal: this.abortController.signal,
         recursionLimit: AGENT_LIMITS.recursionLimit,
         streamMode: ['messages', 'tools', 'custom'],
         configurable: {
-          thread_id: request.sessionId,
+          thread_id: this.checkpointThreadId,
           tool_names: this.toolSnapshot.map(
             (tool) => (tool as { name?: string }).name ?? 'unknown',
           ),
@@ -346,6 +373,9 @@ export class Runner {
 
   private async prepareHistory(): Promise<BaseMessage[]> {
     const { request, sessionManager } = this.options
+    // Ephemeral runs build no history: the private thread's state comes from its
+    // checkpoint alone — no session read, no session write.
+    if (request.ephemeral) return []
     // Turn state: on persist, the main process serializes the editor state into
     // an `<EDITOR_STATE>` block appended to the end of that turn's user message
     // (`question\n<EDITOR_STATE>…</EDITOR_STATE>`) before saving. Model input and
@@ -369,7 +399,7 @@ export class Runner {
   private async readResult(): Promise<MainGraphStateType | null> {
     try {
       const snapshot = await this.options.runtime.graph.getState({
-        configurable: { thread_id: this.options.request.sessionId },
+        configurable: { thread_id: this.checkpointThreadId },
       })
       return snapshot.values
     } catch (error) {
@@ -380,6 +410,8 @@ export class Runner {
 
   private async persistResult(result: MainGraphStateType): Promise<void> {
     const { sessionManager, request } = this.options
+    // Ephemeral runs keep their result in the private thread's checkpoint only.
+    if (request.ephemeral) return
     const { current } = splitCurrentTurn(result.messages)
     if (current.length > 0) {
       await sessionManager.saveMessages(request.sessionId, current, request.context.fileUuid)
@@ -387,11 +419,12 @@ export class Runner {
   }
 
   private async persistPartialContent(content: string): Promise<void> {
-    if (!content) return
-    await this.options.sessionManager.saveMessage(
-      this.options.request.sessionId,
+    const { sessionManager, request } = this.options
+    if (!content || request.ephemeral) return
+    await sessionManager.saveMessage(
+      request.sessionId,
       new AIMessage(content),
-      this.options.request.context.fileUuid,
+      request.context.fileUuid,
     )
   }
 

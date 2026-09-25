@@ -73,7 +73,9 @@ function createRuntime(options?: {
   tokensBySession?: Record<string, string>
   fail?: Error
   capturedToolNames?: string[][]
-  capturedInputs?: Array<{ messages: BaseMessage[]; artworkStyle?: unknown }>
+  capturedInputs?: Array<{ messages: BaseMessage[]; artworkStyle?: unknown; runEntry?: unknown }>
+  capturedThreadIds?: string[]
+  capturedStateThreadIds?: string[]
   omitAssistantState?: boolean
   includeToolState?: boolean
   progress?: { step: string; completed?: number; total?: number }
@@ -95,14 +97,16 @@ function createRuntime(options?: {
   registry.registerTool({ name: 'initial-tool' } as never)
   const graph = {
     stream: vi.fn().mockImplementation(async function* (
-      input: { messages: BaseMessage[]; artworkStyle?: unknown },
+      input: { messages: BaseMessage[]; artworkStyle?: unknown; runEntry?: unknown },
       config: { configurable?: { thread_id?: string; tool_names?: string[] } },
     ) {
       options?.capturedInputs?.push({
         messages: input.messages,
         artworkStyle: input.artworkStyle,
+        runEntry: input.runEntry,
       })
       const sessionId = config.configurable?.thread_id ?? ''
+      options?.capturedThreadIds?.push(sessionId)
       options?.capturedToolNames?.push(config.configurable?.tool_names ?? [])
       if (options?.fail) throw options.fail
       if (options?.progress) {
@@ -156,20 +160,31 @@ function createRuntime(options?: {
       await options?.gatesBySession?.[sessionId]
       await options?.gate
     }),
-    getState: vi.fn().mockResolvedValue({
-      values: {
-        messages: [
-          new HumanMessage('question'),
-          ...(options?.omitAssistantState ? [] : [new AIMessage(options?.token ?? 'hello')]),
-          ...(options?.includeToolState
-            ? [new ToolMessage({ content: 'tool result', tool_call_id: 'call-1', name: 'tool' })]
-            : []),
-        ],
-        response: options?.token ?? 'hello',
-        memoryRoute: [],
-        imageUrls: [],
-      },
-    }),
+    getState: vi
+      .fn()
+      .mockImplementation(async (config: { configurable?: { thread_id?: string } }) => {
+        options?.capturedStateThreadIds?.push(config.configurable?.thread_id ?? '')
+        return {
+          values: {
+            messages: [
+              new HumanMessage('question'),
+              ...(options?.omitAssistantState ? [] : [new AIMessage(options?.token ?? 'hello')]),
+              ...(options?.includeToolState
+                ? [
+                    new ToolMessage({
+                      content: 'tool result',
+                      tool_call_id: 'call-1',
+                      name: 'tool',
+                    }),
+                  ]
+                : []),
+            ],
+            response: options?.token ?? 'hello',
+            memoryRoute: [],
+            imageUrls: [],
+          },
+        }
+      }),
   }
 
   return {
@@ -929,5 +944,102 @@ describe('StreamManager + Runner', () => {
     manager.startStream({ sessionId: 'session-c', message: 'question', ...defaultRequestFields })
     await waitUntil(() => manager.getActiveStreamCount() === 0)
     expect(createRuntimeSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('ephemeral run: zero session writes, private thread with entry, events still stream', async () => {
+    const { manager, events, sessionManager, setRuntimeFactory } = createHarness()
+    const capturedThreadIds: string[] = []
+    const capturedStateThreadIds: string[] = []
+    const capturedInputs: Array<{ messages: BaseMessage[]; runEntry?: unknown }> = []
+    setRuntimeFactory(() =>
+      createRuntime({
+        capturedThreadIds,
+        capturedStateThreadIds,
+        capturedInputs,
+        progress: { step: 'planning-stations' },
+        toolEvents: [
+          { event: 'on_tool_start', toolCallId: 'call-1', name: 'insertXmlFragment', input: {} },
+          {
+            event: 'on_tool_end',
+            toolCallId: 'call-1',
+            name: 'insertXmlFragment',
+            output: '{"ok":true}',
+          },
+        ],
+        messageChunks: [{ id: 'm1', content: 'palace done' }],
+      }),
+    )
+
+    const streamId = manager.startStream({
+      sessionId: 'palace-run-1',
+      message: '',
+      workspaceUuid: 'workspace-a',
+      context: { fileUuid: 'file-a' },
+      ephemeral: { privateThreadId: 'palace-thread-1', runEntry: 'palace' },
+    })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(streamId).toMatch(/^stream_/)
+    // Session write count is 0: no user message, no result, no history read.
+    const sessionWrites =
+      sessionManager.saveMessage.mock.calls.length + sessionManager.saveMessages.mock.calls.length
+    expect(sessionWrites).toBe(0)
+    expect(sessionManager.loadSessionBaseMessages).not.toHaveBeenCalled()
+    // Private thread + entry marker reach the graph and getState.
+    expect(capturedThreadIds).toEqual(['palace-thread-1'])
+    expect(capturedStateThreadIds).toEqual(['palace-thread-1'])
+    expect(capturedInputs[0]?.runEntry).toBe('palace')
+    expect(capturedInputs[0]?.messages).toEqual([])
+    // Stream events still flow: subgraph step, tool card, token, end; the
+    // second step is the write tool's generating-map.
+    expect(events.map((event) => event.type)).toEqual([
+      'step',
+      'step',
+      'tool-start',
+      'tool-end',
+      'token',
+      'end',
+    ])
+  })
+
+  it('stopped ephemeral run persists nothing but still ends', async () => {
+    const { manager, events, sessionManager, setRuntimeFactory } = createHarness()
+    const gate = deferred<void>()
+    setRuntimeFactory(() => createRuntime({ gate: gate.promise, token: 'partial palace' }))
+
+    const streamId = manager.startStream({
+      sessionId: 'palace-run-2',
+      message: '',
+      workspaceUuid: 'workspace-a',
+      context: { fileUuid: 'file-a' },
+      ephemeral: { privateThreadId: 'palace-thread-2', runEntry: 'palace' },
+    })
+    await waitUntil(() => events.some((event) => event.type === 'token'))
+
+    manager.stopStream(streamId)
+    gate.resolve()
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(sessionManager.saveMessage).not.toHaveBeenCalled()
+    expect(sessionManager.saveMessages).not.toHaveBeenCalled()
+    expect(events.some((event) => event.streamId === streamId && event.type === 'end')).toBe(true)
+  })
+
+  it('session runs keep the session thread, chat entry and persistence (default mode regression)', async () => {
+    const { manager, sessionManager, setRuntimeFactory } = createHarness()
+    const capturedThreadIds: string[] = []
+    const capturedInputs: Array<{ messages: BaseMessage[]; runEntry?: unknown }> = []
+    setRuntimeFactory(() => createRuntime({ capturedThreadIds, capturedInputs }))
+
+    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    await waitUntil(() => manager.getActiveStreamCount() === 0)
+
+    expect(capturedThreadIds).toEqual(['session-a'])
+    expect(capturedInputs[0]?.runEntry).toBe('chat')
+    expect(sessionManager.saveMessage).toHaveBeenCalledTimes(1)
+    expect(sessionManager.saveMessages).toHaveBeenCalledTimes(1)
+    expect(sessionManager.loadSessionBaseMessages).toHaveBeenCalledWith('session-a', {
+      includeSystem: false,
+    })
   })
 })

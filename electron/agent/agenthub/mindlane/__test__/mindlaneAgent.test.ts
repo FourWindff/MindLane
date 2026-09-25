@@ -96,6 +96,7 @@ function createInitialState() {
     memoryRoute: [],
     artworkStyle: 'vector' as const,
     summary: '',
+    runEntry: 'chat' as const,
   }
 }
 
