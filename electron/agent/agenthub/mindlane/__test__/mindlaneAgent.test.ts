@@ -84,6 +84,7 @@ function createInitialState() {
     palaceToolSteps: [],
     palaceError: '',
     palaceResponse: '',
+    palaceLandingError: '',
     palaceToolCallId: '',
     palaceToolName: '',
     palaceInputText: '',

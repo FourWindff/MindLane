@@ -77,12 +77,20 @@ function manyBatchText(batches: number): string {
   return Array.from({ length: batches }, (_, i) => `p${i}${'w'.repeat(1898)}`).join('\n\n')
 }
 
+interface WriteRequestRecord {
+  fileUuid: string
+  action: string
+  args: Record<string, unknown>
+}
+
 interface Harness {
   manager: StreamManager
   orchestrator: AgentOrchestrator
   events: ChatStreamEvent[]
   persisted: Map<string, BaseMessage[]>
   savedUserMessages: BaseMessage[]
+  /** Palace landing requests the run emitted through the fake write proxy. */
+  writeRequests: WriteRequestRecord[]
 }
 
 function createHarness(provider: LLMProvider, withCheckpointer = true): Harness {
@@ -103,14 +111,22 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
       persisted.set(sessionId, [...(persisted.get(sessionId) ?? []), ...messages])
     },
   }
+  const writeRequests: WriteRequestRecord[] = []
   const orchestrator = new AgentOrchestrator(
     provider,
     {
       checkpointer: { getAdapter: () => (withCheckpointer ? new MemorySaver() : undefined) },
       sessionManager,
     } as unknown as AgentServices,
-    // Read-only mindmap access for the mixed tool + subgraph round.
-    { mindmapReadProvider: async () => '<node id="root">root</node>' },
+    {
+      // Read-only mindmap access for the mixed tool + subgraph round.
+      mindmapReadProvider: async () => '<node id="root">root</node>',
+      // Fake landing proxy: records what each run asks the renderer to land.
+      mindmapWriteProxy: async (fileUuid, action, args) => {
+        writeRequests.push({ fileUuid, action, args })
+        return { ok: true, action, data: { nodeId: 'landed-palace' } }
+      },
+    },
   )
   const events: ChatStreamEvent[] = []
   const manager = new StreamManager({
@@ -119,7 +135,7 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
     createRuntime: () => orchestrator.getStreamRuntime(),
   })
 
-  return { manager, orchestrator, events, persisted, savedUserMessages }
+  return { manager, orchestrator, events, persisted, savedUserMessages, writeRequests }
 }
 
 async function waitUntil(predicate: () => boolean): Promise<void> {
@@ -249,6 +265,16 @@ describe('手动宫殿：一次临时运行', () => {
     expect(harness.savedUserMessages).toEqual([])
     expect(harness.persisted.size).toBe(0)
 
+    // Deterministic landing: exactly one palace write request, carrying the
+    // code-serialized XML (the image data URL rides the request, not the model).
+    const palaceWrites = harness.writeRequests.filter((request) => request.action === 'landPalace')
+    expect(palaceWrites).toHaveLength(1)
+    expect(palaceWrites[0]).toMatchObject({ fileUuid: 'file-a' })
+    expect(Object.keys(palaceWrites[0]!.args)).toEqual(['xml'])
+    expect(String(palaceWrites[0]!.args.xml)).toContain('type="palace"')
+    expect(String(palaceWrites[0]!.args.xml)).toContain('imageUrl="data:image/svg+xml')
+    expect(String(palaceWrites[0]!.args.xml)).toContain('sourceNodeIds="n1"')
+
     const ends = harness.events.filter((event) => event.type === 'end')
     const landingPayloads = ends.filter(
       (event) => (event.payload as { palaceData?: unknown }).palaceData,
@@ -260,6 +286,42 @@ describe('手动宫殿：一次临时运行', () => {
       sourceNodeIds: ['n1'],
       imageUrl: expect.stringMatching(/^data:image\/svg\+xml/),
     })
+  })
+
+  it('两条触发路径发出的宫殿写请求形状一致（同一份落图代码）', async () => {
+    // Manual trigger: one ephemeral entry run, same scripted palace stages.
+    const manual = createHarness(palaceRunProvider().provider)
+    manual.manager.startStream(palaceRequest('palace-shape-manual', 'palace-thread-shape'))
+    await waitUntil(() => manual.manager.getActiveStreamCount() === 0)
+
+    // AI trigger: the supervisor declares generatePalace, the same subgraph runs.
+    const ai = createHarness(multiCallProvider([{ name: 'generatePalace', id: 'call-pl' }]))
+    ai.manager.startStream({
+      sessionId: 'session-shape-ai',
+      message: '给选中的节点建个宫殿',
+      workspaceUuid: 'workspace-a',
+      context: {
+        fileUuid: 'file-a',
+        filePath: '/a.mindlane',
+        fileTitle: '读书笔记',
+        selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
+      },
+    })
+    await waitUntil(() => ai.manager.getActiveStreamCount() === 0)
+
+    const [manualRequest] = manual.writeRequests
+    const [aiRequest] = ai.writeRequests
+    expect(manualRequest?.action).toBe('landPalace')
+    expect(aiRequest?.action).toBe('landPalace')
+    expect(manualRequest?.fileUuid).toBe('file-a')
+    expect(aiRequest?.fileUuid).toBe('file-a')
+    expect(Object.keys(manualRequest!.args)).toEqual(['xml'])
+    expect(Object.keys(aiRequest!.args)).toEqual(['xml'])
+    // One serializer: the two fragments differ only in the minted node id.
+    const withoutMintedId = (xml: string) => xml.replace(/ id="[^"]+"/, '')
+    expect(withoutMintedId(String(aiRequest!.args.xml))).toBe(
+      withoutMintedId(String(manualRequest!.args.xml)),
+    )
   })
 
   it('中止后同线程空输入续跑：已完成的超步不重跑，落图仍在同一载荷上收尾', async () => {
@@ -567,11 +629,14 @@ describe('主图以节点形式挂载两个子图', () => {
       'call-pl:generatePalace',
     ])
     const palaceMessage = messages.find((message) => message.tool_call_id === 'call-pl')!
+    // The model reads a landed palace summary, never the artwork data URL: the
+    // landing already went to the renderer through the write request.
     expect(JSON.parse(String(palaceMessage.content))).toMatchObject({
       ok: true,
-      imageUrl: expect.stringMatching(/^data:image\/svg\+xml/),
+      landed: true,
       sourceNodeIds: ['n1'],
     })
+    expect(String(palaceMessage.content)).not.toContain('data:image')
     expect(palaceMessage.additional_kwargs.toolSteps).toEqual([
       { step: 'planning-stations' },
       { step: 'generating-image' },

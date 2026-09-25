@@ -167,6 +167,14 @@ const PalaceScalarAnnotations = {
     reducer: replaceReducer,
     default: () => '',
   }),
+  /**
+   * 落图应答器的结果（空 = 成功）：宫殿生成成功但写动作失败时，子图收口把它写进
+   * ToolMessage 与运行 `end` 载荷，渲染层据此把占位节点标成待继续。
+   */
+  palaceLandingError: Annotation<string>({
+    reducer: replaceReducer,
+    default: () => '',
+  }),
   palaceToolCallId: Annotation<string>({
     reducer: replaceReducer,
     default: () => '',

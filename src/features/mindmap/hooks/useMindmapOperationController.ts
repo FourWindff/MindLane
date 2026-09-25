@@ -146,7 +146,7 @@ export function useMindmapOperationController() {
   )
 
   const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapPersistence()
-  const generatePalace = usePalaceGeneration({ nodes, edges, selectedId, editor, visualVariant })
+  const generatePalace = usePalaceGeneration({ nodes, selectedId, editor })
 
   useEffect(() => {
     if (!hasDocumentOpen || nodes.length === 0) return

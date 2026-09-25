@@ -17,8 +17,9 @@ export {
   serializeTreeFragment,
   serializeMindmapSection,
   serializeNodeElement,
+  serializePalaceNodeXml,
 } from './serializer.js'
-export type { MindmapSectionQuery } from './serializer.js'
+export type { MindmapSectionQuery, PalaceNodePayload } from './serializer.js'
 export { parseXmlFragment, deserializeMindlaneFile } from './deserializer.js'
 export type { ParsedFragment } from './deserializer.js'
 export { validateFragmentForInsert, validateMove, buildValidationContext } from './validate.js'

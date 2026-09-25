@@ -114,15 +114,7 @@ export class AgentOrchestrator {
    * XML 写工具（固定 4 个）先注册，随后是路由工具。
    */
   private registerDefaultTools(): void {
-    // 写工具渲染层代理：参数转发给渲染层落盘应答器；未装配代理时调用即报错
-    const writeProxy: MindmapWriteProxy = (fileUuid, action, args) => {
-      const proxy = this.options.mindmapWriteProxy
-      if (!proxy) {
-        return Promise.reject(new Error('落盘通道不可用，无法执行写操作'))
-      }
-      return proxy(fileUuid, action, args)
-    }
-    const actionTools = createMindmapActionTools(writeProxy)
+    const actionTools = createMindmapActionTools(this.getWriteProxy())
 
     this.toolRegistry.registerTool(actionTools.insertXmlFragmentTool)
     this.toolRegistry.registerTool(actionTools.updateNodeTool)
@@ -183,9 +175,23 @@ export class AgentOrchestrator {
     if (!this.compiledPalaceSubgraph) {
       this.compiledPalaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
+        // The palace subgraph lands its own payload through the same write
+        // responder the model's write tools use (CONTEXT.md「确定性落图」).
+        writeProxy: this.getWriteProxy(),
       }).compile()
     }
     return this.compiledPalaceSubgraph
+  }
+
+  /** 写工具渲染层代理：参数转发给渲染层落盘应答器；未装配代理时调用即报错。 */
+  private getWriteProxy(): MindmapWriteProxy {
+    return (fileUuid, action, args) => {
+      const proxy = this.options.mindmapWriteProxy
+      if (!proxy) {
+        return Promise.reject(new Error('落盘通道不可用，无法执行写操作'))
+      }
+      return proxy(fileUuid, action, args)
+    }
   }
 
   buildGraph(toolRegistry = this.toolRegistry) {

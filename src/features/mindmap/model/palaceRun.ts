@@ -1,6 +1,4 @@
-import type { Node } from '@xyflow/react'
-import type { ChatContext, ChatStreamEvent, PalaceRunPayload } from '../../../../electron/ipc'
-import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
+import type { ChatContext, ChatStreamEvent } from '../../../../electron/ipc'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { mindmapRegistry } from './mindmapRegistry'
@@ -12,11 +10,11 @@ import type { MindmapEditor } from './mindmapEditor'
  *
  * One run = one `chatStream` carrying an entry marker; the main process mounts
  * the palace subgraph straight off START (no compaction, no supervisor), writes
- * no session record, and emits the same stream events as any other run. This
- * module is the renderer end of that contract: it owns the run registry (the
- * private thread to resume on, the node showing progress), routes the run's
- * events away from the chat history, and lands the payload with code — the model
- * never repeats the image data URL.
+ * no session record, and emits the same stream events as any other run. The
+ * subgraph's close-out lands the palace itself through the `landPalace` write
+ * action (deterministic landing, shared with the AI trigger), so this module
+ * routes the run's events away from the chat history, shows progress on the
+ * placeholder node and keeps the private thread resumable — it never lands.
  *
  * Events can arrive before `chatStream` resolves with the streamId, so they wait
  * in a buffer keyed by the correlation id (same handshake as a chat send).
@@ -181,8 +179,14 @@ function handleRunEvent(run: ActiveRun, event: ChatStreamEvent): void {
     case 'end': {
       const payload = event.payload.palaceData
       forgetStream(run)
-      if (payload?.ok) void landPalace(run, payload)
-      else settleStopped(run, payload?.error)
+      // ok = the subgraph's `landPalace` write request already updated the
+      // placeholder through the write responder; nothing to apply here.
+      if (payload?.ok) {
+        forgetRun(run)
+        run.handlers.settle()
+      } else {
+        settleStopped(run, payload?.error)
+      }
       break
     }
     case 'error':
@@ -214,76 +218,5 @@ function settleStopped(run: ActiveRun, error?: string): void {
   const editor = editorOf(run)
   editor?.clearNodeFlag(run.nodeId, 'runStage')
   editor?.setNodeFlag(run.nodeId, 'runStopped', true)
-  run.handlers.settle()
-}
-
-/**
- * Deterministic landing: the payload's artwork becomes an embedded asset and the
- * placeholder node turns into the palace node. No model round is involved — the
- * picture never travels back through a prompt.
- */
-async function landPalace(run: ActiveRun, payload: PalaceRunPayload & { ok: true }): Promise<void> {
-  try {
-    const instance = mindmapRegistry.getByFileUuid(run.fileUuid)
-    const editor = instance?.editor
-    if (!instance || !editor) {
-      settleStopped(run, '目标文件未打开，宫殿未落图')
-      return
-    }
-
-    // Absent artwork is not a failed palace (CONTEXT.md 「宫殿图」): any hiccup on
-    // the picture lands an image-less palace instead of losing the landing.
-    let assetId: string | undefined
-    if (payload.imageUrl) {
-      try {
-        const dataUrl = parseDataUrl(payload.imageUrl)
-          ? payload.imageUrl
-          : // The subgraph normalizes remote URLs to data URLs inside the graph; a
-            // URL that survived that step is the degraded case, retried here.
-            await window.mindlane?.ai
-              .urlToDataUrl({ url: payload.imageUrl })
-              .then((result) => (result.ok ? result.data.dataUrl : null))
-        const asset = dataUrl ? await assetFromDataUrl(dataUrl) : null
-        if (asset) assetId = instance.store.getState().addAsset(asset)
-        else reportRendererError('宫殿画面无法内嵌，本次落图不带画面')
-      } catch (error) {
-        reportRendererError(
-          `宫殿画面内嵌失败：${error instanceof Error ? error.message : String(error)}`,
-        )
-      }
-    }
-
-    editor.batch([
-      {
-        type: 'updateNode',
-        nodeId: run.nodeId,
-        patch: (node: Node) => ({
-          ...node,
-          data: {
-            label: payload.label,
-            ...(assetId ? { assetId } : {}),
-            imageUrl: '',
-            stations: payload.stations,
-            sourceNodeIds: payload.sourceNodeIds,
-            expanded: true,
-            generating: undefined,
-          },
-        }),
-      },
-      ...payload.sourceNodeIds.map((nodeId) => ({
-        type: 'updateNode' as const,
-        nodeId,
-        patch: (node: Node) => ({
-          ...node,
-          data: { ...node.data, processing: undefined },
-        }),
-      })),
-    ])
-    forgetRun(run)
-  } catch (error) {
-    reportRendererError(`宫殿落图失败：${error instanceof Error ? error.message : String(error)}`)
-    settleStopped(run)
-    return
-  }
   run.handlers.settle()
 }

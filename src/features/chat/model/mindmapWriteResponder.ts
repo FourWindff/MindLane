@@ -1,4 +1,8 @@
+import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { MindmapCommand } from '@/features/mindmap/model/types'
+import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
+import { findParentId, newId } from '@/shared/lib/mindmapTree'
 import {
   MindmapXmlError,
   buildValidationContext,
@@ -106,6 +110,7 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
 const DEFAULT_POSITION = 'child'
 const INSERT_POSITIONS = new Set(['root', 'child', 'after', 'before'])
 const MOVE_POSITIONS = new Set(['child', 'after', 'before'])
+const PALACE_TYPE = 'palace'
 
 function decodeBase64Utf8(data: string): string | null {
   try {
@@ -127,7 +132,7 @@ async function materializePalaceArtwork(
   let changed = false
 
   for (const node of parsed.nodes) {
-    if (node.type !== 'palace') continue
+    if (node.type !== PALACE_TYPE) continue
     const data = node.data as Record<string, unknown>
     if (typeof data.assetId === 'string' && data.assetId) continue
     if (typeof data.imageUrl !== 'string') continue
@@ -165,6 +170,205 @@ async function materializePalaceArtwork(
 }
 
 /**
+ * MindmapEditor.batch + editor.getState().addAsset use the same store: this
+ * responder is the sole writer for both, so it can leave the batch
+ * bookkeeping to the editor.
+ */
+function clearProcessingCommands(sourceNodeIds: string[]): MindmapCommand[] {
+  return sourceNodeIds.map((nodeId) => ({
+    type: 'updateNode' as const,
+    nodeId,
+    patch: (node: Node) => ({ ...node, data: { ...node.data, processing: undefined } }),
+  }))
+}
+
+/**
+ * Deterministic palace placement (CONTEXT.md「确定性落图」): under the parent of
+ * the first source node, at that node's position (so the palace takes the slot
+ * and the source nodes move under it). No source nodes → a new child of root.
+ */
+function palacePlacement(
+  editor: MindmapEditor,
+  sourceNodeIds: string[],
+): { parentId: string; position: { x: number; y: number } } {
+  const { nodes, edges, style } = editor.getState()
+  const firstSource = sourceNodeIds[0]
+    ? nodes.find((node) => node.id === sourceNodeIds[0])
+    : undefined
+  const parentId = (firstSource ? findParentId(edges, firstSource.id) : null) ?? 'root'
+  if (firstSource) return { parentId, position: firstSource.position }
+  const parentNode = nodes.find((node) => node.id === parentId)
+  const offsetX = VISUAL_VARIANTS[style.visualVariant].spacing.offsetX
+  return {
+    parentId,
+    position: {
+      x: (parentNode?.position.x ?? 0) + offsetX,
+      y: parentNode?.position.y ?? 0,
+    },
+  }
+}
+
+/**
+ * 手动运行的占位宫殿：payload 还没生成时先给出进度与「继续」入口。放置代码与
+ * 落图的插入分支共用，所以占位节点与最终宫殿落在同一位置。
+ * 返回节点 id（渲染层运行登记表按它定位）。
+ */
+export function insertPalacePlaceholder(
+  editor: MindmapEditor,
+  sourceNodeIds: string[],
+): { nodeId: string } {
+  const palaceId = newId()
+  const { parentId, position } = palacePlacement(editor, sourceNodeIds)
+  for (const nodeId of sourceNodeIds) editor.setNodeFlag(nodeId, 'processing', true)
+  editor.batch([
+    {
+      type: 'addNode',
+      node: {
+        id: palaceId,
+        type: PALACE_TYPE,
+        position,
+        data: {
+          label: '生成中…',
+          imageUrl: '',
+          stations: [],
+          sourceNodeIds,
+          generating: true,
+        },
+      },
+      edge: {
+        id: `e-${parentId}-${palaceId}`,
+        source: parentId,
+        target: palaceId,
+        type: 'mindmap',
+        className: 'mindmap-edge',
+      },
+    },
+    ...placeSourceNodesCommands(editor, palaceId, sourceNodeIds),
+  ])
+  return { nodeId: palaceId }
+}
+
+/**
+ * Rewire: parent → palace → each source node. Every incoming edge of a source
+ * node is replaced (whichever parent it had), so the selection can span several
+ * parents without breaking the pure-tree invariant. The root anchor is never
+ * reparented — it stays the tree's root.
+ */
+function placeSourceNodesCommands(
+  editor: MindmapEditor,
+  palaceId: string,
+  sourceNodeIds: string[],
+): MindmapCommand[] {
+  const { edges, nodes } = editor.getState()
+  const live = new Set(nodes.map((node) => node.id))
+  // A source node deleted mid-run must not leave a dangling edge behind.
+  const sourceIds = new Set(sourceNodeIds.filter((nodeId) => nodeId !== 'root' && live.has(nodeId)))
+  const childEdges: Edge[] = [...sourceIds].map((nodeId) => ({
+    id: `e-${palaceId}-${nodeId}`,
+    source: palaceId,
+    target: nodeId,
+    type: 'mindmap',
+    className: 'mindmap-edge',
+  }))
+  return [
+    ...childEdges.map((edge) => ({ type: 'addEdge' as const, edge })),
+    ...edges
+      .filter((edge) => sourceIds.has(edge.target))
+      .map((edge) => ({ type: 'removeEdge' as const, edgeId: edge.id })),
+  ]
+}
+
+/**
+ * The manual run's placeholder for these source nodes — found by content, so the
+ * landing request stays identical for both trigger surfaces (no placeholder id
+ * rides over IPC). Two concurrent palaces from the same selection would collide;
+ * that is not a reachable user flow (one run per file at a time).
+ */
+function findPalacePlaceholder(editor: MindmapEditor, sourceNodeIds: string[]): Node | undefined {
+  const key = [...sourceNodeIds].sort().join('\0')
+  return editor.getState().nodes.find((node) => {
+    if (node.type !== PALACE_TYPE || node.data.generating !== true) return false
+    const ids = Array.isArray(node.data.sourceNodeIds) ? (node.data.sourceNodeIds as string[]) : []
+    return [...ids].sort().join('\0') === key
+  })
+}
+
+/**
+ * 宫殿落图（写动作 landPalace）：XML 由代码从子图 payload 序列化而来（模型不复述
+ * 图片 data URL）。占位节点按 sourceNodeIds 就地更新；没有占位节点则新建，并按
+ * 「新宫殿 → 选中节点」重挂父边。图片资源在此物化（与 insertXmlFragment 同一闸门）。
+ */
+async function applyPalaceLanding(
+  editor: MindmapEditor,
+  materialized: Awaited<ReturnType<typeof materializePalaceArtwork>>,
+): Promise<{ nodeId: string; updatedPlaceholder: boolean; sourceNodeIds: string[] }> {
+  const parsed = await parseXmlFragment(materialized.xml)
+  const palaceNode = parsed.nodes.find((node) => node.type === PALACE_TYPE)
+  if (!palaceNode) {
+    throw new MindmapXmlError('invalid_type', '落图片段缺少 palace 节点')
+  }
+  const data = palaceNode.data as {
+    label?: unknown
+    assetId?: unknown
+    stations?: unknown
+    sourceNodeIds?: unknown
+  }
+  const sourceNodeIds = Array.isArray(data.sourceNodeIds) ? (data.sourceNodeIds as string[]) : []
+  const landedData: Record<string, unknown> = {
+    label: typeof data.label === 'string' ? data.label : '',
+    stations: Array.isArray(data.stations) ? data.stations : [],
+    sourceNodeIds,
+    expanded: true,
+  }
+  if (typeof data.assetId === 'string' && data.assetId) landedData.assetId = data.assetId
+
+  // Assets become live before the node points at them, same as insertFromXml.
+  for (const asset of materialized.assets) editor.getState().addAsset(asset)
+
+  const placeholder = findPalacePlaceholder(editor, sourceNodeIds)
+  if (placeholder) {
+    // The run's own transient flags live only on the placeholder; a fresh node
+    // never carries them.
+    const clearedFlags = {
+      generating: undefined,
+      runStage: undefined,
+      runStopped: undefined,
+    }
+    editor.batch([
+      {
+        type: 'updateNode',
+        nodeId: placeholder.id,
+        patch: (node: Node) => ({
+          ...node,
+          data: { ...node.data, ...clearedFlags, ...landedData },
+        }),
+      },
+      ...clearProcessingCommands(sourceNodeIds),
+    ])
+    return { nodeId: placeholder.id, updatedPlaceholder: true, sourceNodeIds }
+  }
+
+  const { parentId, position } = palacePlacement(editor, sourceNodeIds)
+  const palaceId = materialized.rootId
+  editor.batch([
+    {
+      type: 'addNode',
+      node: { id: palaceId, type: PALACE_TYPE, position, data: landedData },
+      edge: {
+        id: `e-${parentId}-${palaceId}`,
+        source: parentId,
+        target: palaceId,
+        type: 'mindmap',
+        className: 'mindmap-edge',
+      },
+    },
+    ...placeSourceNodesCommands(editor, palaceId, sourceNodeIds),
+    ...clearProcessingCommands(sourceNodeIds),
+  ])
+  return { nodeId: palaceId, updatedPlaceholder: false, sourceNodeIds }
+}
+
+/**
  * 原子校验 + 落图：校验失败抛 MindmapXmlError（错误码 + 恢复策略由 formatXmlError
  * 统一格式化），不触碰编辑器；成功返回 `data` 载荷（ack 的一部分）。
  * 校验顺序与主进程快照校验一致（01 移入共享库后同一词汇表）。
@@ -176,6 +380,15 @@ async function applyWriteAction(
   warn: (message: string) => void,
 ): Promise<unknown> {
   switch (action) {
+    case 'landPalace': {
+      const { xml } = args as WriteActionArgs['landPalace']
+      if (typeof xml !== 'string') {
+        throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
+      }
+      const materialized = await materializePalaceArtwork(xml, editor, warn)
+      return applyPalaceLanding(editor, materialized)
+    }
+
     case 'insertXmlFragment': {
       const { xml, parentId, position } = args as WriteActionArgs['insertXmlFragment']
       if (typeof xml !== 'string') {

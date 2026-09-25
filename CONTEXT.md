@@ -84,7 +84,7 @@
 - 渲染层是唯一落图方（文件持久化仍经主进程保存路径，见 CLAUDE.md「主进程处理文件 IO」）；主进程不再对写工具做快照校验（`EditorSnapshotProvider` 随之移除），校验错误码格式由共享库提供。
 - 渲染层按 fileUuid 串行化落盘队列，避免并发工具调用交错。
 - 落盘失败 = 工具失败：错误结果回给模型（可 readMindmap 恢复），卡片 ✗，流不中断；超时按失败处理。
-- 读工具与子图虚拟工具不参与落盘握手，只展示卡片（子图卡片含进度）。
+- 读工具与子图虚拟工具本身不参与落盘握手，只展示卡片（子图卡片含进度）；palace 的确定性落图由子图收口另发一条 `landPalace` 写请求完成（与模型写工具共用同一通道与应答器，但不产生工具卡片）。
 - 停止语义：已落盘的工具保留，未执行的不执行，进行中卡片标记为取消。
 
 ### ChatCapsuleBar
@@ -219,8 +219,9 @@
 
 ### 确定性落图（Deterministic Landing）
 
-- 手动触发的落图由代码完成（模型不参与选择位置），与 AI 触发共用同一个写动作。
+- 手动触发与 AI 触发的落图都由代码完成（模型不参与选择位置），共用同一个 `landPalace` 写动作。
 - 宫殿的 payload → XML 由代码序列化，模型不复述图片 data URL。
+- 位置与层级确定：挂到**首个输入节点的父节点**之下，输入节点改为它的子节点；有手动运行的占位节点时（按输入节点集合识别）就地更新，不新建节点。
 
 ## 渲染层状态
 
@@ -496,9 +497,9 @@
 
 - mindmap/palace 子图执行完毕后由**子图自己的收口节点**写回 ToolMessage 的 payload（由该 ToolMessage 喂回主图 agent）。
 - 该 ToolMessage 自带调用 id、工具名与阶段轨迹（`additional_kwargs.toolSteps`），因此并行时各子图各写各的。
-- mindmap 为 JSON 壳 `{ok, title, xmlFragment, documentRef}`，其中 `xmlFragment` 是存储方言的 XML 片段；palace 为 `{ok, label, stations, imageUrl, sourceNodeIds}`。
-- palace 的 `imageUrl` 恒为 data URL（矢量载体为 `image/svg+xml`）；落图时由落图应答器物化为**图片资源**（asset），节点数据只留 asset 引用。
-- palace 的落图由**代码**把 payload 序列化为 XML 后走写动作（手动触发与 AI 触发同一份），模型不复述 data URL。
+- mindmap 为 JSON 壳 `{ok, title, xmlFragment, documentRef}`，其中 `xmlFragment` 是存储方言的 XML 片段；palace 为 `{ok, landed, label, stations, sourceNodeIds}`——图片 data URL 不随 ToolMessage 进模型上下文，改由落图写请求携带。
+- palace 的 `imageUrl` 恒为 data URL（矢量载体为 `image/svg+xml`），由落图应答器物化为**图片资源**（asset），节点数据只留 asset 引用。
+- palace 的落图由**代码**把 payload 序列化为 XML 后经 `landPalace` 写动作完成（手动触发与 AI 触发同一份），模型不复述 data URL；落图结果（成功/失败）写回 ToolMessage 与运行的 `end` 载荷。
 - _Avoid_: 模型协议（子图内部契约，见上条）
 
 ## 记忆宫殿

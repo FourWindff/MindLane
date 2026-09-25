@@ -6,7 +6,8 @@ import { MindmapHistory } from '@/features/mindmap/model/mindmapHistory'
 import { createMindmapStore } from '@/features/mindmap/model/mindmapStore'
 import { MindmapXmlError, formatXmlError } from '@/shared/lib/mindmapXml'
 import type { MindmapWriteRequest } from '../../../../../electron/ipc'
-import { createMindmapWriteResponder } from '../mindmapWriteResponder'
+import { createMindmapWriteResponder, insertPalacePlaceholder } from '../mindmapWriteResponder'
+import { serializePalaceNodeXml } from '@/shared/lib/mindmapXml'
 
 /** 可观察的假编辑器：记录方法调用，state 可注入，落图方法可挂起/放行。 */
 function createFakeEditor() {
@@ -561,6 +562,179 @@ describe('MindmapWriteResponder', () => {
       action: 'updateMindmapNode',
       data: { xml: '<node id="n1" type="text" content="B" />', nodeId: 'n1', nodeCount: 1 },
     })
+    stop()
+  })
+})
+
+/**
+ * 宫殿落图（landPalace）：手动与 AI 两条触发面共用的新写动作。位置、层级与
+ * 图片物化都由代码确定（不依模型选择），XML 由代码从子图 payload 序列化而来。
+ */
+describe('MindmapWriteResponder landPalace', () => {
+  const station = (order: number, content: string) => ({ order, content, x: 0.2, y: 0.3 })
+
+  it('无占位节点时新建宫殿，并按「新宫殿 → 选中节点」重挂父边', async () => {
+    const { editor, store } = createRealEditor()
+    const chapter = editor.addChild('root', { label: '章节' }).nodeId
+    const first = editor.addChild(chapter, { label: '第一站' }).nodeId
+    const second = editor.addChild(chapter, { label: '第二站' }).nodeId
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const xml = serializePalaceNodeXml({
+      label: '测试宫殿',
+      imageUrl: svgDataUrl('<svg viewBox="0 0 10 10"><g data-station="1" /></svg>'),
+      stations: [station(1, '第一站')],
+      sourceNodeIds: [first, second],
+    })
+
+    send({ requestId: 'palace-land', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')!
+    expect(state.assets).toHaveLength(1)
+    expect(palace.data).toMatchObject({
+      label: '测试宫殿',
+      assetId: state.assets[0]!.id,
+      sourceNodeIds: [first, second],
+      expanded: true,
+    })
+    expect(palace.data).not.toHaveProperty('imageUrl')
+    expect(palace.data).not.toHaveProperty('generating')
+    const hasEdge = (source: string, target: string) =>
+      state.edges.some((edge) => edge.source === source && edge.target === target)
+    expect(hasEdge(chapter, palace.id)).toBe(true)
+    expect(hasEdge(palace.id, first)).toBe(true)
+    expect(hasEdge(palace.id, second)).toBe(true)
+    expect(hasEdge(chapter, first)).toBe(false)
+    expect(hasEdge(chapter, second)).toBe(false)
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'palace-land',
+      ok: true,
+      action: 'landPalace',
+      data: { nodeId: palace.id, updatedPlaceholder: false, sourceNodeIds: [first, second] },
+    })
+    stop()
+  })
+
+  it('跨父选择全部收进新宫殿下，纯树不破且 root 不被重挂', async () => {
+    const { editor, store } = createRealEditor()
+    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const nested = editor.addChild(first, { label: '嵌套站' }).nodeId
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const xml = serializePalaceNodeXml({
+      label: '测试宫殿',
+      imageUrl: '',
+      stations: [station(1, '第一站')],
+      // A selection spanning parents, plus the root anchor itself.
+      sourceNodeIds: ['root', first, nested],
+    })
+
+    send({ requestId: 'palace-tree', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')!
+    const incoming = (target: string) => state.edges.filter((edge) => edge.target === target)
+    // Parent derivation: the palace sits where the first source node was.
+    expect(incoming(palace.id)).toEqual([expect.objectContaining({ source: 'root' })])
+    expect(incoming(first)).toEqual([expect.objectContaining({ source: palace.id })])
+    expect(incoming(nested)).toEqual([expect.objectContaining({ source: palace.id })])
+    // The root anchor stays the tree's root.
+    expect(incoming('root')).toEqual([])
+    stop()
+  })
+
+  it('有手动运行的占位节点时就地更新：id 不变、运行标记清掉、图片物化', async () => {
+    const { editor, store } = createRealEditor()
+    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const { nodeId: placeholderId } = insertPalacePlaceholder(editor, [first])
+
+    // Placeholder: progress node under root, source node rewired under it.
+    const placed = store.getState()
+    expect(placed.nodes.find((node) => node.id === placeholderId)?.data).toMatchObject({
+      generating: true,
+      sourceNodeIds: [first],
+    })
+    expect(
+      placed.edges.some((edge) => edge.source === 'root' && edge.target === placeholderId),
+    ).toBe(true)
+    expect(
+      placed.edges.some((edge) => edge.source === placeholderId && edge.target === first),
+    ).toBe(true)
+    expect(placed.edges.some((edge) => edge.source === 'root' && edge.target === first)).toBe(false)
+    expect(placed.nodes.find((node) => node.id === first)?.data.processing).toBe(true)
+
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const xml = serializePalaceNodeXml({
+      label: '测试宫殿',
+      imageUrl: svgDataUrl('<svg viewBox="0 0 10 10"><g data-station="1" /></svg>'),
+      stations: [station(1, '第一站')],
+      sourceNodeIds: [first],
+    })
+    send({ requestId: 'palace-update', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    expect(state.nodes.filter((node) => node.type === 'palace')).toHaveLength(1)
+    const palace = state.nodes.find((node) => node.id === placeholderId)!
+    expect(state.assets).toHaveLength(1)
+    expect(palace.data).toMatchObject({ label: '测试宫殿', assetId: state.assets[0]!.id })
+    expect(palace.data.generating).toBeUndefined()
+    expect(palace.data.runStage).toBeUndefined()
+    expect(palace.data.runStopped).toBeUndefined()
+    expect(state.nodes.find((node) => node.id === first)?.data.processing).toBeUndefined()
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'palace-update',
+      ok: true,
+      action: 'landPalace',
+      data: { nodeId: placeholderId, updatedPlaceholder: true, sourceNodeIds: [first] },
+    })
+    stop()
+  })
+
+  it('输入节点已不存在时跳过它，不产生悬空边', async () => {
+    const { editor, store } = createRealEditor()
+    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const xml = serializePalaceNodeXml({
+      label: '测试宫殿',
+      imageUrl: '',
+      stations: [station(1, '第一站')],
+      sourceNodeIds: [first, 'ghost'],
+    })
+
+    send({ requestId: 'palace-ghost', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    const palace = state.nodes.find((node) => node.type === 'palace')!
+    expect(state.edges.some((edge) => edge.target === 'ghost')).toBe(false)
+    expect(state.edges.some((edge) => edge.source === palace.id && edge.target === first)).toBe(
+      true,
+    )
+    stop()
+  })
+
+  it('没有画面时仍然落图（宫殿可以没有画面）', async () => {
+    const { editor, store } = createRealEditor()
+    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const { send, respond, stop } = setupResponder({ 'file-a': editor })
+    const xml = serializePalaceNodeXml({
+      label: '无图宫殿',
+      imageUrl: '',
+      stations: [station(1, '第一站')],
+      sourceNodeIds: [first],
+    })
+
+    send({ requestId: 'palace-no-art', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
+    await vi.waitFor(() => expect(respond).toHaveBeenCalled())
+
+    const state = store.getState()
+    expect(state.assets).toHaveLength(0)
+    expect(state.nodes.find((node) => node.type === 'palace')?.data).toMatchObject({
+      label: '无图宫殿',
+    })
+    expect(respond).toHaveBeenCalledWith(expect.objectContaining({ ok: true }))
     stop()
   })
 })

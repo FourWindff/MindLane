@@ -181,9 +181,10 @@ export interface PalaceSimInput {
 }
 
 /**
- * 重放记忆宫殿的用户操作（不调主进程、不需要 API Key）：与 usePalaceGeneration 同序
- * 同形——插占位 → 重挂选中节点 + 处理标记 + busy/analyzing → 假子图等 2.4s → 内嵌图片
- * → 提交展开。站点与图片按选中节点生成，站点内容取自节点标签。
+ * 重放记忆宫殿的用户操作（不调主进程、不需要 API Key）：与真实流程同序——插占位 →
+ * 重挂选中节点 + 处理标记 + busy/analyzing → 假子图等 2.4s → 内嵌图片 → 提交展开。
+ * 真实流程的占位与落图都在落图应答器里（`landPalace` 写动作），本 panel 保留一份独立
+ * 副本以便脱离主进程演示；站点与图片按选中节点生成，站点内容取自节点标签。
  */
 // eslint-disable-next-line react-refresh/only-export-components -- 由本 panel 的测试直接调用，代价只是 HMR 整页刷新
 export async function simulatePalaceInsert({

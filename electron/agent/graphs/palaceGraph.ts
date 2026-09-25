@@ -18,6 +18,8 @@ import {
   type SubgraphProgressStep,
 } from '../../ipc.js'
 import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
+import { serializePalaceNodeXml } from '../../../src/shared/lib/mindmapXml/index.js'
+import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
@@ -38,6 +40,11 @@ function runKey(): string {
 
 interface PalaceSubgraphOptions {
   provider: LLMProvider
+  /**
+   * 落盘代理（主进程 → 渲染层落图应答器）：宫殿 payload 由代码序列化为 XML，
+   * 经新增的 `landPalace` 写动作落图。手动运行与 AI 触发都经这里，形状一致。
+   */
+  writeProxy?: MindmapWriteProxy
 }
 
 // ===== Subgraph 构建器 =====
@@ -63,6 +70,7 @@ function beginStage(
 export function buildPalacePayload(state: {
   palaceError: string
   palaceResponse: string
+  palaceLandingError: string
   palace: { theme: string } | null
   memoryRoute: MemoryPalaceStation[]
   imageUrls: string[]
@@ -70,6 +78,9 @@ export function buildPalacePayload(state: {
 }): PalaceRunPayload {
   if (state.palaceError) {
     return { ok: false, error: state.palaceResponse || state.palaceError }
+  }
+  if (state.palaceLandingError) {
+    return { ok: false, error: landingFailureText(state.palaceLandingError) }
   }
 
   return {
@@ -91,24 +102,79 @@ export function buildPalacePayload(state: {
   }
 }
 
+/** One wording for a generated-but-unlanded palace (ToolMessage and the run's end payload). */
+function landingFailureText(error: string): string {
+  return `宫殿已生成，但落图失败：${error}`
+}
+
+/**
+ * 落图：把成功 payload 序列化为 XML，经 `landPalace` 写动作落到渲染层。
+ * 返回错误文案（空串 = 成功）；缺代理即视为落图失败，不静默跳过。
+ */
+async function requestPalaceLanding(
+  writeProxy: MindmapWriteProxy | undefined,
+  fileUuid: string,
+  payload: PalaceRunPayload & { ok: true },
+): Promise<string> {
+  if (!writeProxy) return '落盘通道不可用'
+  try {
+    const ack = (await writeProxy(fileUuid, 'landPalace', {
+      xml: serializePalaceNodeXml(payload),
+    })) as { ok?: unknown; error?: unknown } | undefined
+    if (ack?.ok === false) {
+      return typeof ack.error === 'string' ? ack.error : '落图请求被拒绝'
+    }
+    return ''
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+}
+
+/**
+ * The ToolMessage reads what the model needs: a landed palace, not the artwork.
+ * The data URL stays out of the model context — the write request carries it.
+ */
+function toModelPalacePayload(payload: PalaceRunPayload): Record<string, unknown> {
+  if (!payload.ok) return payload
+  return {
+    ok: true,
+    landed: true,
+    label: payload.label,
+    stations: payload.stations,
+    sourceNodeIds: payload.sourceNodeIds,
+  }
+}
+
 /**
  * Close out the run: this node owns the subgraph's ToolMessage (call id, tool
- * name, stage trace). The host graph mounts this subgraph as a node, so the
- * ToolMessage lands in the main graph's messages channel directly.
+ * name, stage trace) and performs the deterministic landing (both trigger
+ * surfaces run through here). The host graph mounts this subgraph as a node, so
+ * the ToolMessage lands in the main graph's messages channel directly.
  */
-function buildOutputNode(state: PalaceSubgraphStateType): Partial<PalaceSubgraphStateType> {
-  const content = buildPalacePayload(state)
-  const toolSteps = state.palaceToolSteps ?? []
+async function buildOutputNode(
+  state: PalaceSubgraphStateType,
+  writeProxy: MindmapWriteProxy | undefined,
+): Promise<Partial<PalaceSubgraphStateType>> {
+  // A previous run's landing outcome must not decide this run's payload: rebuild
+  // the generated payload with the landing key cleared, then land for real.
+  const generated = buildPalacePayload({ ...state, palaceLandingError: '' })
+  const landingError = generated.ok
+    ? await requestPalaceLanding(writeProxy, state.context?.fileUuid ?? '', generated)
+    : ''
+  const payload = landingError
+    ? ({ ok: false, error: landingFailureText(landingError) } as const)
+    : generated
   return {
     messages: [
       buildSubgraphToolMessage({
         subgraph: 'palace',
         toolCallId: state.palaceToolCallId,
         toolName: state.palaceToolName,
-        payload: content,
-        toolSteps,
+        payload: toModelPalacePayload(payload),
+        toolSteps: state.palaceToolSteps ?? [],
       }),
     ],
+    palaceLandingError: landingError,
   }
 }
 
@@ -120,7 +186,7 @@ function buildOutputNode(state: PalaceSubgraphStateType): Partial<PalaceSubgraph
  * owns persistence and the run context (this graph is mounted as its node).
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
-  const { provider } = options
+  const { provider, writeProxy } = options
 
   const analyze = new AnalyzeAgent(provider)
   const imageGen = new ImageGenAgent(provider)
@@ -153,6 +219,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         // 新一轮开始：上一轮（或上一张子图）的答复与错误不得残留成本轮的收口依据。
         palaceError: '',
         palaceResponse: '',
+        palaceLandingError: '',
         palaceToolSteps: [],
       }
     })
@@ -218,7 +285,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       )
       return { ...result, palaceToolSteps: toolSteps }
     })
-    .addNode('build_output', buildOutputNode)
+    .addNode('build_output', (state: PalaceSubgraphStateType) => buildOutputNode(state, writeProxy))
 
   // 基础边
   graph.addEdge(START, 'resolve_input')

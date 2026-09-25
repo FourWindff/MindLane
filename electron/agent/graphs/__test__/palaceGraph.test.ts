@@ -243,7 +243,7 @@ describe('buildPalaceSubgraph', () => {
     expect(provider.model.invoke).not.toHaveBeenCalled()
   })
 
-  it('close-out ToolMessage 携带调用信息、成功 payload 与阶段轨迹', async () => {
+  it('close-out ToolMessage 携带调用信息、落图请求与阶段轨迹', async () => {
     const provider = createStageProvider()
     // A data URL keeps the run off the network and mirrors the persisted shape
     // (CONTEXT: palace imageUrl is always a data URL).
@@ -251,7 +251,11 @@ describe('buildPalaceSubgraph', () => {
     ;(provider as unknown as { generateImage: ReturnType<typeof vi.fn> }).generateImage = vi
       .fn()
       .mockResolvedValue({ urls: [imageUrl] })
-    const graph = buildPalaceSubgraph({ provider: provider as unknown as LLMProvider }).compile()
+    const writeProxy = vi.fn(async () => ({ ok: true, action: 'landPalace', data: {} }))
+    const graph = buildPalaceSubgraph({
+      provider: provider as unknown as LLMProvider,
+      writeProxy,
+    }).compile()
 
     const result = await graph.invoke({
       messages: [],
@@ -264,12 +268,30 @@ describe('buildPalaceSubgraph', () => {
       } satisfies ChatContext,
     })
 
+    // Deterministic landing: the payload is serialized to XML by code and lands
+    // through the shared write action; the image data URL rides the request, not
+    // the model context.
+    expect(writeProxy).toHaveBeenCalledTimes(1)
+    const [fileUuid, action, args] = writeProxy.mock.calls[0] as unknown as [
+      string,
+      string,
+      { xml: string },
+    ]
+    expect(fileUuid).toBe('file-a')
+    expect(action).toBe('landPalace')
+    expect(args.xml).toContain('<node id=')
+    expect(args.xml).toContain('type="palace"')
+    expect(args.xml).toContain(`imageUrl="${imageUrl}"`)
+    expect(args.xml).toContain('sourceNodeIds="n1"')
+    expect(args.xml).toContain('<station order="1" x="0.25" y="0.4" linkedNodeId="n1"')
+
     expect(result.messages).toHaveLength(1)
     const toolMessage = result.messages[0] as ToolMessage
     expect(toolMessage.tool_call_id).toBe('call-palace')
     expect(toolMessage.name).toBe(GENERATE_PALACE_TOOL)
     expect(JSON.parse(String(toolMessage.content))).toEqual({
       ok: true,
+      landed: true,
       label: '测试宫殿',
       stations: [
         {
@@ -282,7 +304,6 @@ describe('buildPalaceSubgraph', () => {
           linkedNodeId: 'n1',
         },
       ],
-      imageUrl,
       sourceNodeIds: ['n1'],
     })
     expect(toolMessage.additional_kwargs.toolSteps).toEqual([
@@ -290,6 +311,33 @@ describe('buildPalaceSubgraph', () => {
       { step: 'generating-image' },
       { step: 'locating-stations' },
     ])
+  })
+
+  it('落图请求失败时把原因写进 ToolMessage 与落地错误通道', async () => {
+    const provider = createStageProvider()
+    const writeProxy = vi.fn(async () => ({ ok: false, error: '该文件未打开，无法落盘' }))
+    const graph = buildPalaceSubgraph({
+      provider: provider as unknown as LLMProvider,
+      writeProxy,
+    }).compile()
+
+    const result = await graph.invoke({
+      messages: [],
+      artworkStyle: 'vector',
+      palaceToolCallId: 'call-palace',
+      palaceToolName: GENERATE_PALACE_TOOL,
+      context: {
+        fileUuid: 'file-a',
+        selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+      } satisfies ChatContext,
+    })
+
+    expect(result.palaceLandingError).toBe('该文件未打开，无法落盘')
+    const toolMessage = result.messages[0] as ToolMessage
+    expect(JSON.parse(String(toolMessage.content))).toEqual({
+      ok: false,
+      error: '宫殿已生成，但落图失败：该文件未打开，无法落盘',
+    })
   })
 
   it('close-out ToolMessage 在失败路径上写错误 payload 并回退到默认工具名', async () => {

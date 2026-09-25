@@ -318,6 +318,12 @@ export interface WriteActionArgs {
   updateMindmapNode: { xml: string }
   moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
   deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
+  /**
+   * Palace landing (CONTEXT.md「确定性落图」): code serializes the subgraph
+   * payload to a palace XML fragment and both trigger surfaces land through
+   * this one action — the model never repeats the image data URL.
+   */
+  landPalace: { xml: string }
 }
 
 /** 写动作名 = 参数形状映射的键位（动作名单与参数形状收敛到同一处声明，不再手抄词表）。 */
@@ -390,7 +396,7 @@ export interface StreamResponse {
   messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
   toolCalls?: ChatToolCall[]
   mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[]; title: string }
-  /** Palace landing payload (the renderer lands a manual run with it). */
+  /** Palace run outcome: a manual run's node settles on it (the landing itself happened already). */
   palaceData?: PalaceRunPayload
 }
 
@@ -427,8 +433,10 @@ export type ChatStreamEvent =
 
 /**
  * Palace landing payload (CONTEXT.md「确定性落图」): the palace subgraph's output,
- * written by its close-out node and carried on the run's `end` event.
- * The renderer lands it with code — the model never repeats the image data URL.
+ * carried on the run's `end` event (a manual run's node settles on it) and —
+ * minus the artwork — written into the close-out ToolMessage the model reads.
+ * The landing itself is the code-serialized `landPalace` write request, so the
+ * model never repeats the image data URL.
  */
 export interface PalaceStationPayload {
   order: number

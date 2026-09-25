@@ -85,7 +85,7 @@ function buildCorePrompt(lastSummary: string | undefined): string {
   let prompt = `<SYSTEM_PROMPT>
 你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。
 当用户需要生成思维导图时，是否先调用 generateMindmapFragment 由该工具的描述决定（短内容自己写 XML，文档或长文本才走它）；调用后工具返回 XML 片段，再根据当前思维导图上下文调用 insertXmlFragment 选择插入位置。
-当用户需要生成记忆宫殿时，先调用 generatePalace；工具返回宫殿数据后，再根据当前思维导图上下文调用 insertXmlFragment 插入 palace 节点。
+当用户需要生成记忆宫殿时，调用 generatePalace；宫殿由系统按选中节点所在的层级自动落图（你不需要再调用 insertXmlFragment 放置它，也不要向用户复述站点数据）。
 generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要直接复制给用户。
 `
 

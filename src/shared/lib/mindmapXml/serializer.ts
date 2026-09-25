@@ -8,7 +8,7 @@ import type { MindLaneFile } from '../fileFormat.js'
 import { escapeXml } from './escape.js'
 import { xmlNodeTypeRegistry } from './registry.js'
 import { MINDLANE_XML_VERSION, MINDLANE_ROOT_TAG, NODE_TAG } from './types.js'
-import { getChildIdsOrdered } from '../mindmapTree'
+import { getChildIdsOrdered, newId } from '../mindmapTree'
 
 /**
  * 子节点顺序：视觉顺序（position.y 升序，同 getChildIdsOrdered），保证序列化的
@@ -87,6 +87,38 @@ export function serializeTreeFragment(nodes: Node[], edges: Edge[]): string {
   const childrenOf = buildChildrenMap(nodes, edges)
   const roots = findRootIds(nodes, edges)
   return roots.map((rid) => serializeSubtree(rid, nodesById, childrenOf, 0)).join('\n')
+}
+
+/**
+ * Palace landing input: the subgraph payload (CONTEXT.md「子图输出」) minus the
+ * kind/error envelope.
+ */
+export interface PalaceNodePayload {
+  label: string
+  imageUrl: string
+  stations: readonly unknown[]
+  sourceNodeIds: readonly string[]
+}
+
+/**
+ * 宫殿 payload → XML 片段（确定性落图：由**代码**序列化，模型不复述图片 data URL）。
+ *
+ * id 在序列化时铸出：解析器对缺 id 的片段会自行铸一个，落图方需要的是同一个 id；
+ * 节点形状复用 palace 注册表 writer，避免出现第二份 XML 契约。
+ */
+export function serializePalaceNodeXml(input: PalaceNodePayload): string {
+  const node = {
+    id: newId(),
+    type: 'palace',
+    position: { x: 0, y: 0 },
+    data: {
+      label: input.label,
+      imageUrl: input.imageUrl,
+      stations: input.stations,
+      sourceNodeIds: input.sourceNodeIds,
+    },
+  } as unknown as Node
+  return serializeNodeElement(node, '', 0)
 }
 
 /** 序列化 mindmap 节的子树（readMindmap 输出 / 轮次状态）。 */

@@ -20,7 +20,7 @@ export function createGeneratePalaceTool(): DynamicStructuredTool {
   return new DynamicStructuredTool({
     name: GENERATE_PALACE_TOOL,
     description:
-      '根据当前选中的节点、用户输入或附加文档生成记忆宫殿设计。该工具不需要参数；系统会自动从当前上下文选择输入来源。得到结果后你需要根据当前思维导图上下文再调用 insertXmlFragment 插入 palace 节点（type="palace"，站点为 <station> 子元素）。',
+      '根据当前选中的节点、用户输入或附加文档生成记忆宫殿设计。该工具不需要参数；系统会自动从当前上下文选择输入来源，生成完成后按选中节点所在的层级自动落图（你不需要再调用 insertXmlFragment 放置宫殿，只需向用户说明结果）。',
     schema: z.object({}).strict(),
     func: async () => '',
   })
