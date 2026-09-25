@@ -61,8 +61,3 @@ export const COLOR_SCHEMES: ColorSchemeDef[] = [
   { id: 'sunset', label: '暮橙' },
   { id: 'night', label: '暗夜' },
 ]
-
-/** 取某视觉变体的完整配置 */
-export function getVisualVariantDef(variant: VisualVariant): VisualVariantDef {
-  return VISUAL_VARIANTS[variant]
-}
