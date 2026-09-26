@@ -10,7 +10,7 @@ import type { Node } from '@xyflow/react'
 import { escapeXml } from './escape.js'
 import type { MindlaneAsset, XmlElementLike } from './types.js'
 
-export interface XmlNodeReaderContext {
+interface XmlNodeReaderContext {
   /** XML 属性（键小写，实体已反转义） */
   attrs: Record<string, string>
   /** 类型专属子元素（不含 <node> 树子节点，text 已去空白） */
@@ -25,7 +25,7 @@ export function attrOf(attrs: Record<string, string>, name: string): string | un
   return attrs[name] ?? attrs[name.toLowerCase()]
 }
 
-export interface XmlNodeTypeDescriptor {
+interface XmlNodeTypeDescriptor {
   typeId: string
   /** 展示名（注入系统提示） */
   name: string

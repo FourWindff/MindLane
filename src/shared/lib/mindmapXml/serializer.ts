@@ -28,7 +28,7 @@ function findRootIds(nodes: Node[], edges: Edge[]): string[] {
 }
 
 /** 序列化单个 <node> 元素（含类型专属子元素与树子树）。 */
-export function serializeNodeElement(node: Node, childrenXml: string, depth: number): string {
+function serializeNodeElement(node: Node, childrenXml: string, depth: number): string {
   const indent = '  '.repeat(depth)
   const descriptor = xmlNodeTypeRegistry.get(node.type ?? '')
   const typeAttrs = descriptor ? descriptor.write(node) : { content: '' }
@@ -91,7 +91,7 @@ export function serializeTreeFragment(nodes: Node[], edges: Edge[]): string {
  * Palace landing input: the subgraph payload (CONTEXT.md「子图输出」) minus the
  * kind/error envelope.
  */
-export interface PalaceNodePayload {
+interface PalaceNodePayload {
   label: string
   imageUrl: string
   stations: readonly unknown[]
@@ -120,7 +120,7 @@ export function serializePalaceNodeXml(input: PalaceNodePayload): string {
 }
 
 /** 序列化 mindmap 节的子树（readMindmap 输出 / 轮次状态）。 */
-export interface MindmapSectionQuery {
+interface MindmapSectionQuery {
   subtreeId?: string
   type?: string
   textContains?: string

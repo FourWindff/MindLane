@@ -6,7 +6,7 @@
  */
 
 /** 解析/校验错误码（PRD 5.4）。 */
-export type MindmapXmlErrorCode =
+type MindmapXmlErrorCode =
   | 'xml_parse_error'
   | 'empty_xml'
   | 'block_not_found'

@@ -9,7 +9,7 @@
 import { MindmapXmlError } from './types.js'
 import type { ParsedFragment } from './deserializer.js'
 
-export interface EditorValidationContext {
+interface EditorValidationContext {
   /** 编辑器当前全部节点 id（含 root） */
   nodeIds: Set<string>
   /** 编辑器当前 asset id 集合 */

@@ -13,7 +13,7 @@ export function parseDataUrl(dataUrl: string): { mime: string; data: string } | 
 }
 
 /** sha256 hex（渲染层 crypto.subtle / 主进程 node:crypto）。 */
-export async function sha256Hex(data: string): Promise<string> {
+async function sha256Hex(data: string): Promise<string> {
   const globalNode = globalThis as { require?: (id: string) => unknown }
   if (typeof globalNode.require === 'function') {
     const crypto = globalNode.require('node:crypto') as {
