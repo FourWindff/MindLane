@@ -7,11 +7,11 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>
 }
 
-export interface RequesterRequest {
+interface RequesterRequest {
   requestId: string
 }
 
-export interface RequesterResponse {
+interface RequesterResponse {
   requestId: string
   ok: boolean
   error?: string
