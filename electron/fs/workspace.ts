@@ -17,7 +17,7 @@ function isMindlanePath(filePath: string): boolean {
 }
 
 /** Coerce an untrusted value into a valid `fileUuidPaths` map. */
-export function coerceFileUuidPaths(value: unknown): Record<string, string> {
+function coerceFileUuidPaths(value: unknown): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).filter(
