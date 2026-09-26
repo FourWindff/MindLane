@@ -50,7 +50,7 @@ const nodeFileSinkIO: FileSinkIO = {
   ensureDir: (path) => mkdirSync(path, { recursive: true }),
 }
 
-export interface FileSinkOptions {
+interface FileSinkOptions {
   filePath: string
   /** Bytes per generation before rotating; default 5 MB. */
   maxBytes?: number
