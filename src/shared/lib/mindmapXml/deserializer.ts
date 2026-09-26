@@ -125,9 +125,7 @@ function nodeFromElement(
     edges.push({ id: `e-${parentId}-${id}`, source: parentId, target: id, type: 'mindmap' })
   }
 
-  for (const child of Array.from(el.childNodes)) {
-    if (child.nodeType !== 1) continue
-    const childEl = child as Element
+  for (const childEl of Array.from(el.children)) {
     if (!isNodeElement(childEl)) continue
     const sub = nodeFromElement(childEl, seenIds, id, allowRoot)
     edges.push(...sub.edges)
@@ -137,6 +135,39 @@ function nodeFromElement(
   }
 
   return { node, edges }
+}
+
+/** 把一组候选元素中的 <node> 顶层元素解析为节点/边（片段面与文件面共用）。 */
+function collectNodes(
+  candidates: Iterable<Element>,
+  allowRoot: boolean,
+): { nodes: Node[]; edges: Edge[]; rootIds: string[] } {
+  const seenIds = new Set<string>()
+  const nodes: Node[] = []
+  const edges: Edge[] = []
+  const rootIds: string[] = []
+
+  for (const el of candidates) {
+    if (!isNodeElement(el)) continue
+    const { node, edges: subEdges } = nodeFromElement(el, seenIds, null, allowRoot)
+    nodes.push(node)
+    rootIds.push(node.id)
+    edges.push(...subEdges)
+  }
+  return { nodes, edges, rootIds }
+}
+
+/** 展开 `__children` 中间态为平铺 nodes（父先于子）。 */
+function flattenChildren(nodes: Node[]): Node[] {
+  const flat: Node[] = []
+  const visit = (n: Node) => {
+    const children = ((n.data as Record<string, unknown>).__children ?? []) as Node[]
+    delete (n.data as Record<string, unknown>).__children
+    flat.push(n)
+    for (const child of children) visit(child)
+  }
+  for (const n of nodes) visit(n)
+  return flat
 }
 
 /**
@@ -159,49 +190,24 @@ export async function parseXmlFragment(xml: string): Promise<ParsedFragment> {
   const normalized = normalizeSelfClosingTags(trimmed)
   const doc = await parseXmlTolerant(normalized)
 
-  const seenIds = new Set<string>()
-  const nodes: Node[] = []
-  const edges: Edge[] = []
-  const rootIds: string[] = []
-
-  for (const el of topLevelElements(doc)) {
-    if (!isNodeElement(el)) continue
-    const { node, edges: subEdges } = nodeFromElement(el, seenIds, null)
-    nodes.push(node)
-    rootIds.push(node.id)
-    edges.push(...subEdges)
-  }
-
+  const { nodes, edges, rootIds } = collectNodes(topLevelElements(doc), false)
   if (nodes.length === 0) {
     throw new MindmapXmlError('empty_xml', 'XML 片段中未找到任何 <node> 元素')
   }
 
-  // 展开 __children 中间态为平铺 nodes（父先于子）
-  const flatNodes: Node[] = []
-  const flatten = (n: Node) => {
-    const children = ((n.data as Record<string, unknown>).__children ?? []) as Node[]
-    delete (n.data as Record<string, unknown>).__children
-    flatNodes.push(n)
-    for (const c of children) flatten(c)
-  }
-  for (const n of nodes) flatten(n)
-
-  return { nodes: flatNodes, edges, rootIds }
+  return { nodes: flattenChildren(nodes), edges, rootIds }
 }
 
 // ─── 文件面 ──────────────────────────────────────────────────────────────────
 
 function sectionElement(doc: ParsedDocumentLike, tag: string): Element | undefined {
-  return Array.from(doc.documentElement.childNodes).find(
-    (n): n is Element => n.nodeType === 1 && (n as Element).tagName.toLowerCase() === tag,
-  )
+  return Array.from(doc.documentElement.children).find((el) => el.tagName.toLowerCase() === tag)
 }
 
 function childElementText(el: Element, tag: string): string | undefined {
   const lowerTag = tag.toLowerCase()
-  for (const child of Array.from(el.childNodes)) {
-    if (child.nodeType !== 1) continue
-    if ((child as Element).tagName.toLowerCase() === lowerTag) {
+  for (const child of Array.from(el.children)) {
+    if (child.tagName.toLowerCase() === lowerTag) {
       return (child.textContent ?? '').trim()
     }
   }
@@ -209,9 +215,7 @@ function childElementText(el: Element, tag: string): string | undefined {
 }
 
 function childElements(el: Element, tag: string): Element[] {
-  return Array.from(el.childNodes).filter(
-    (n): n is Element => n.nodeType === 1 && (n as Element).tagName.toLowerCase() === tag,
-  )
+  return Array.from(el.children).filter((child) => child.tagName.toLowerCase() === tag)
 }
 
 function parseMetadata(el: Element | undefined, fileUuid: string): MindLaneFile['metadata'] {
@@ -291,20 +295,7 @@ function parseMindmapSection(el: Element | undefined): {
   edges: MindLaneEdgeLike[]
 } {
   if (!el) return { nodes: [], edges: [] }
-  const seenIds = new Set<string>()
-  const nodes: Node[] = []
-  const edges: Edge[] = []
-  const rootIds: string[] = []
-
-  for (const child of Array.from(el.childNodes)) {
-    if (child.nodeType !== 1) continue
-    const childEl = child as Element
-    if (!isNodeElement(childEl)) continue
-    const { node, edges: subEdges } = nodeFromElement(childEl, seenIds, null, true)
-    nodes.push(node)
-    rootIds.push(node.id)
-    edges.push(...subEdges)
-  }
+  const { nodes, edges, rootIds } = collectNodes(Array.from(el.children), true)
 
   if (nodes.length === 0) {
     throw new MindmapXmlError('empty_xml', 'mindmap 节为空：没有根节点')
@@ -323,14 +314,7 @@ function parseMindmapSection(el: Element | undefined): {
   }
 
   // 展开 __children 中间态
-  const flat: Node[] = []
-  const flatten = (n: Node) => {
-    const children = ((n.data as Record<string, unknown>).__children ?? []) as Node[]
-    delete (n.data as Record<string, unknown>).__children
-    flat.push(n)
-    for (const c of children) flatten(c)
-  }
-  for (const n of nodes) flatten(n)
+  const flat = flattenChildren(nodes)
 
   return {
     nodes: flat.map(

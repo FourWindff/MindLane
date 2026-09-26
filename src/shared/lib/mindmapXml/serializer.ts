@@ -16,12 +16,7 @@ import { getChildIdsOrdered, newId } from '../mindmapTree'
  */
 function buildChildrenMap(nodes: Node[], edges: Edge[]): Map<string, string[]> {
   const map = new Map<string, string[]>()
-  for (const edge of edges) {
-    const list = map.get(edge.source)
-    if (list) list.push(edge.target)
-    else map.set(edge.source, [edge.target])
-  }
-  for (const parentId of map.keys()) {
+  for (const parentId of new Set(edges.map((edge) => edge.source))) {
     map.set(parentId, getChildIdsOrdered(nodes, edges, parentId))
   }
   return map
@@ -59,8 +54,9 @@ export function serializeNodeElement(node: Node, childrenXml: string, depth: num
 }
 
 /**
- * 序列化一棵子树（递归）。
- * @param nodes 全部节点（按 id 索引）
+ * 序列化一棵子树（递归）。`query` 存在时按查询过滤（`serializeMindmapSection`）：
+ * 被过滤掉的中间节点用子树内容提升，`maxDepth` 截断。
+ * @param nodesById 全部节点（按 id 索引）
  * @param childrenOf 父 → 有序子节点 id
  */
 function serializeSubtree(
@@ -68,13 +64,18 @@ function serializeSubtree(
   nodesById: Map<string, Node>,
   childrenOf: Map<string, string[]>,
   depth: number,
+  query?: MindmapSectionQuery,
 ): string {
   const node = nodesById.get(nodeId)
   if (!node) return ''
-  const childIds = childrenOf.get(nodeId) ?? []
-  const childrenXml = childIds
-    .map((cid) => serializeSubtree(cid, nodesById, childrenOf, depth + 1))
+  if (query?.maxDepth !== undefined && depth > query.maxDepth) return ''
+
+  const childrenXml = (childrenOf.get(nodeId) ?? [])
+    .map((childId) => serializeSubtree(childId, nodesById, childrenOf, depth + 1, query))
+    .filter(Boolean)
     .join('\n')
+
+  if (!matchesQuery(node, query)) return childrenXml
   return serializeNodeElement(node, childrenXml, depth)
 }
 
@@ -83,10 +84,7 @@ function serializeSubtree(
  * 位置、边、临时 UI 标记一律不落盘（PRD 2.2）。
  */
 export function serializeTreeFragment(nodes: Node[], edges: Edge[]): string {
-  const nodesById = new Map(nodes.map((n) => [n.id, n]))
-  const childrenOf = buildChildrenMap(nodes, edges)
-  const roots = findRootIds(nodes, edges)
-  return roots.map((rid) => serializeSubtree(rid, nodesById, childrenOf, 0)).join('\n')
+  return serializeMindmapSection(nodes, edges)
 }
 
 /**
@@ -154,35 +152,20 @@ export function serializeMindmapSection(
   const childrenOf = buildChildrenMap(nodes, edges)
   const roots = query.subtreeId ? [query.subtreeId] : findRootIds(nodes, edges)
 
-  const hasTypeFilter = query.type !== undefined
-  const hasTextFilter = query.textContains !== undefined
-
-  const walk = (nodeId: string, depth: number): string => {
-    const node = nodesById.get(nodeId)
-    if (!node) return ''
-    if (query.maxDepth !== undefined && depth > query.maxDepth) return ''
-
-    const childIds = childrenOf.get(nodeId) ?? []
-    // 类型/内容过滤下，子树只在满足条件的节点处保留（子树过滤后重组）。
-    const keepNode = matchesQuery(node, query)
-    const childrenXml = childIds
-      .map((cid) => walk(cid, depth + 1))
-      .filter(Boolean)
-      .join('\n')
-
-    if (!keepNode) return childrenXml
-    return serializeNodeElement(node, childrenXml, depth)
-  }
-
-  const isFiltered = hasTypeFilter || hasTextFilter || query.maxDepth !== undefined
-  if (isFiltered && !query.subtreeId && roots.length === 1) {
+  if (isFiltered(query) && !query.subtreeId && roots.length === 1) {
     // 过滤查询：保留根链，被过滤的中间节点用子树内容提升
-    return walk(roots[0]!, 0)
+    return serializeSubtree(roots[0]!, nodesById, childrenOf, 0, query)
   }
   return roots
-    .map((rid) => walk(rid, 0))
+    .map((rid) => serializeSubtree(rid, nodesById, childrenOf, 0, query))
     .filter(Boolean)
     .join('\n')
+}
+
+function isFiltered(query: MindmapSectionQuery): boolean {
+  return (
+    query.type !== undefined || query.textContains !== undefined || query.maxDepth !== undefined
+  )
 }
 
 function textOf(value: string | undefined): string {

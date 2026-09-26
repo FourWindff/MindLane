@@ -17,12 +17,12 @@ export interface XmlNodeReaderContext {
   elements: XmlElementLike[]
 }
 
-/** 大小写不敏感地读取属性（XML 属性名区分大小写，HTML parser 会小写化）。 */
+/**
+ * 大小写不敏感地读取属性：`elementView` 为每个属性同时存原名与小写键，
+ * 所以「精确 + 小写」两次查表就够（XML 区分大小写，HTML parser 会小写化）。
+ */
 export function attrOf(attrs: Record<string, string>, name: string): string | undefined {
-  if (attrs[name] !== undefined) return attrs[name]
-  const lower = name.toLowerCase()
-  const key = Object.keys(attrs).find((k) => k.toLowerCase() === lower)
-  return key ? attrs[key] : undefined
+  return attrs[name] ?? attrs[name.toLowerCase()]
 }
 
 export interface XmlNodeTypeDescriptor {
@@ -39,41 +39,32 @@ export interface XmlNodeTypeDescriptor {
   read(ctx: XmlNodeReaderContext): Record<string, unknown>
 }
 
-class XmlNodeTypeRegistry {
-  private descriptors = new Map<string, XmlNodeTypeDescriptor>()
+const descriptors = new Map<string, XmlNodeTypeDescriptor>()
 
-  register(descriptor: XmlNodeTypeDescriptor): void {
-    this.descriptors.set(descriptor.typeId, descriptor)
-  }
+/** 注册（或覆盖）一个节点类型：内置三个类型，新增类型 = 在此加一条。 */
+function register(descriptor: XmlNodeTypeDescriptor): void {
+  descriptors.set(descriptor.typeId, descriptor)
+}
 
+export const xmlNodeTypeRegistry = {
   get(typeId: string): XmlNodeTypeDescriptor | undefined {
-    return this.descriptors.get(typeId)
-  }
-
-  has(typeId: string): boolean {
-    return this.descriptors.has(typeId)
-  }
-
-  all(): XmlNodeTypeDescriptor[] {
-    return [...this.descriptors.values()]
-  }
+    return descriptors.get(typeId)
+  },
 
   /** 全部类型的 name/description/形状契约，注入系统提示稳定前缀。 */
   describeAll(): string {
-    return this.all()
+    return [...descriptors.values()]
       .map(
         (d) =>
           `- ${d.typeId}（${d.name}）：${d.description}；XML 形状见类型校验规则（type 属性必填，未知类型报 invalid_type）`,
       )
       .join('\n')
-  }
+  },
 }
-
-export const xmlNodeTypeRegistry = new XmlNodeTypeRegistry()
 
 // ─── text ────────────────────────────────────────────────────────────────────
 
-xmlNodeTypeRegistry.register({
+register({
   typeId: 'text',
   name: '文本节点',
   description:
@@ -101,7 +92,7 @@ xmlNodeTypeRegistry.register({
 
 // ─── image ───────────────────────────────────────────────────────────────────
 
-xmlNodeTypeRegistry.register({
+register({
   typeId: 'image',
   name: '图片节点',
   description:
@@ -129,7 +120,7 @@ xmlNodeTypeRegistry.register({
 
 // ─── palace ──────────────────────────────────────────────────────────────────
 
-xmlNodeTypeRegistry.register({
+register({
   typeId: 'palace',
   name: '记忆宫殿节点',
   description:
