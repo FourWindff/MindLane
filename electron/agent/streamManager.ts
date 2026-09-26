@@ -583,8 +583,4 @@ export class StreamManager {
     runner.abort()
     return true
   }
-
-  getActiveStreamCount(): number {
-    return this.runners.size
-  }
 }

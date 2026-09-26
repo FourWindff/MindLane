@@ -200,6 +200,16 @@ function createRuntime(options?: {
   }
 }
 
+/**
+ * Ids of streams that reached their terminal event: one `end` per finished run,
+ * or `error` when the runtime never started.
+ */
+function settledStreamIds(events: ReadonlyArray<{ streamId: string; type: string }>): string[] {
+  return events
+    .filter((event) => event.type === 'end' || event.type === 'error')
+    .map((event) => event.streamId)
+}
+
 async function waitUntil(predicate: () => boolean): Promise<void> {
   for (let attempts = 0; attempts < 50; attempts += 1) {
     if (predicate()) return
@@ -223,7 +233,7 @@ describe('StreamManager + Runner', () => {
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane' },
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(streamId).toMatch(/^stream_/)
     expect(events).toEqual(
@@ -235,7 +245,7 @@ describe('StreamManager + Runner', () => {
   })
 
   it('passes the runtime palace artwork style into the initial graph state', async () => {
-    const { manager, setRuntimeFactory } = createHarness()
+    const { manager, events, setRuntimeFactory } = createHarness()
     const capturedInputs: Array<{ messages: BaseMessage[]; artworkStyle?: unknown }> = []
     setRuntimeFactory(() => {
       const runtime = createRuntime({ capturedInputs })
@@ -248,13 +258,13 @@ describe('StreamManager + Runner', () => {
       message: '生成记忆宫殿',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(capturedInputs[0]?.artworkStyle).toBe('raster')
   })
 
   it('persists the user message with a trailing EDITOR_STATE turn-state block', async () => {
-    const { manager, persisted, setRuntimeFactory } = createHarness()
+    const { manager, events, persisted, setRuntimeFactory } = createHarness()
     const capturedInputs: Array<{ messages: BaseMessage[] }> = []
     setRuntimeFactory(() => createRuntime({ capturedInputs }))
 
@@ -269,7 +279,7 @@ describe('StreamManager + Runner', () => {
         selectedNodes: [{ id: 'n1', type: 'text', label: '选中节点' }],
       },
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     // 持久化格式：`问题\n<EDITOR_STATE>…</EDITOR_STATE>`
     const userMessage = persisted.get('session-a')?.find((m) => m.getType() === 'human')
@@ -290,7 +300,7 @@ describe('StreamManager + Runner', () => {
   })
 
   it('persists an explicit empty selection as count="0"', async () => {
-    const { manager, persisted, setRuntimeFactory } = createHarness()
+    const { manager, events, persisted, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime())
 
     manager.startStream({
@@ -299,7 +309,7 @@ describe('StreamManager + Runner', () => {
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: 'A' },
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     const userMessage = persisted.get('session-empty')?.find((m) => m.getType() === 'human')
     expect(String(userMessage!.content)).toContain('<SELECTED_NODES count="0">')
@@ -314,7 +324,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -333,7 +343,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -354,7 +364,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -402,7 +412,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -455,7 +465,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -493,7 +503,7 @@ describe('StreamManager + Runner', () => {
         message: 'question',
         ...defaultRequestFields,
       })
-      await waitUntil(() => manager.getActiveStreamCount() === 0)
+      await waitUntil(() => settledStreamIds(events).length === 1)
 
       expect(errors.some((line) => line.includes('[ERROR]'))).toBe(true)
       expect(events).toContainEqual({
@@ -546,7 +556,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     // 子图虚拟调用不走 ToolNode：tool-start 由 supervisor 消息 chunk 补发（带 id），
     // tool-end 由子图 ToolMessage 到达补发（状态来自结果 ok 字段）。
@@ -597,7 +607,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -646,7 +656,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events.filter((e) => e.type === 'step')).toEqual([
       {
@@ -682,7 +692,7 @@ describe('StreamManager + Runner', () => {
     )
 
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     // 回归：无子图调用时，不产生任何子图 tool-start/tool-end 补发。
     const subgraphEvents = events.filter(
@@ -716,7 +726,7 @@ describe('StreamManager + Runner', () => {
     )
 
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     const subgraphStarts = events.filter(
       (e) =>
@@ -777,7 +787,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events.filter((e) => e.type === 'tool-start').map((e) => e.payload)).toEqual([
       { id: 'call-pl', name: 'generatePalace', input: {} },
@@ -835,7 +845,7 @@ describe('StreamManager + Runner', () => {
       message: 'question',
       ...defaultRequestFields,
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     const names = events
       .filter((e) => e.type === 'tool-start')
@@ -866,7 +876,7 @@ describe('StreamManager + Runner', () => {
     )
 
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events.map((event) => event.type)).toEqual(['token', 'message-start', 'token', 'end'])
   })
@@ -895,11 +905,11 @@ describe('StreamManager + Runner', () => {
       context: { fileUuid: 'file-b' },
     })
 
-    await waitUntil(() => manager.getActiveStreamCount() === 2)
+    await waitUntil(() => events.filter((event) => event.type === 'token').length === 2)
     expect(streamA).not.toBe(streamB)
     gateA.resolve()
     gateB.resolve()
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 2)
     expect(events.filter((event) => event.type === 'end').map((event) => event.streamId)).toEqual(
       expect.arrayContaining([streamA, streamB]),
     )
@@ -934,10 +944,10 @@ describe('StreamManager + Runner', () => {
     await waitUntil(() =>
       events.some((event) => event.streamId === streamA && event.type === 'end'),
     )
-    expect(manager.getActiveStreamCount()).toBe(1)
+    expect(settledStreamIds(events)).toHaveLength(1)
 
     gateB.resolve()
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 2)
     expect(events.some((event) => event.streamId === streamB && event.type === 'end')).toBe(true)
   })
 
@@ -962,7 +972,7 @@ describe('StreamManager + Runner', () => {
 
     manager.stopStream(streamId)
     gate.resolve()
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(
       persisted.get('session-a')?.some((message) => message.content === 'partial answer'),
@@ -982,7 +992,7 @@ describe('StreamManager + Runner', () => {
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a' },
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events).toContainEqual({
       streamId,
@@ -993,7 +1003,7 @@ describe('StreamManager + Runner', () => {
   })
 
   it('snapshots tools before later registry changes', async () => {
-    const { manager, setRuntimeFactory } = createHarness()
+    const { manager, events, setRuntimeFactory } = createHarness()
     const gate = deferred<void>()
     const capturedToolNames: string[][] = []
     const runtime = createRuntime({ gate: gate.promise, capturedToolNames })
@@ -1008,24 +1018,24 @@ describe('StreamManager + Runner', () => {
     runtime.toolRegistry.registerTool({ name: 'late-tool' } as never)
     await waitUntil(() => capturedToolNames.length === 1)
     gate.resolve()
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(capturedToolNames).toEqual([['initial-tool']])
   })
 
   it('shares the compiled runtime across concurrent streams', async () => {
-    const { manager, setRuntimeFactory } = createHarness()
+    const { manager, events, setRuntimeFactory } = createHarness()
     const createRuntimeSpy = vi.fn(() => createRuntime())
     setRuntimeFactory(createRuntimeSpy)
 
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     manager.startStream({ sessionId: 'session-b', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 2)
 
     expect(createRuntimeSpy).toHaveBeenCalledTimes(1)
     manager.invalidateRuntime()
     manager.startStream({ sessionId: 'session-c', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 3)
     expect(createRuntimeSpy).toHaveBeenCalledTimes(2)
   })
 
@@ -1060,7 +1070,7 @@ describe('StreamManager + Runner', () => {
       context: { fileUuid: 'file-a' },
       ephemeral: { privateThreadId: 'palace-thread-1', runEntry: 'palace' },
     })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(streamId).toMatch(/^stream_/)
     // Session write count is 0: no user message, no result, no history read.
@@ -1101,7 +1111,7 @@ describe('StreamManager + Runner', () => {
 
     manager.stopStream(streamId)
     gate.resolve()
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(sessionManager.saveMessage).not.toHaveBeenCalled()
     expect(sessionManager.saveMessages).not.toHaveBeenCalled()
@@ -1109,13 +1119,13 @@ describe('StreamManager + Runner', () => {
   })
 
   it('session runs keep the session thread, chat entry and persistence (default mode regression)', async () => {
-    const { manager, sessionManager, setRuntimeFactory } = createHarness()
+    const { manager, events, sessionManager, setRuntimeFactory } = createHarness()
     const capturedThreadIds: string[] = []
     const capturedInputs: Array<{ messages: BaseMessage[]; runEntry?: unknown }> = []
     setRuntimeFactory(() => createRuntime({ capturedThreadIds, capturedInputs }))
 
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
-    await waitUntil(() => manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(capturedThreadIds).toEqual(['session-a'])
     expect(capturedInputs[0]?.runEntry).toBe('chat')

@@ -138,6 +138,16 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
   return { manager, orchestrator, events, persisted, savedUserMessages, writeRequests }
 }
 
+/**
+ * Ids of streams that reached their terminal event: one `end` per finished run,
+ * or `error` when the runtime never started.
+ */
+function settledStreamIds(events: ReadonlyArray<{ streamId: string; type: string }>): string[] {
+  return events
+    .filter((event) => event.type === 'end' || event.type === 'error')
+    .map((event) => event.streamId)
+}
+
 async function waitUntil(predicate: () => boolean): Promise<void> {
   for (let attempts = 0; attempts < 200; attempts += 1) {
     if (predicate()) return
@@ -243,7 +253,7 @@ describe('手动宫殿：一次临时运行', () => {
     const harness = createHarness(scripted.provider)
 
     harness.manager.startStream(palaceRequest('palace-run-1', 'palace-thread-1'))
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     // Stage progress flows like any other run (same channel, same vocabulary).
     // The manual run answers no virtual tool call, so no callId rides along and
@@ -292,7 +302,7 @@ describe('手动宫殿：一次临时运行', () => {
     // Manual trigger: one ephemeral entry run, same scripted palace stages.
     const manual = createHarness(palaceRunProvider().provider)
     manual.manager.startStream(palaceRequest('palace-shape-manual', 'palace-thread-shape'))
-    await waitUntil(() => manual.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(manual.events).length === 1)
 
     // AI trigger: the supervisor declares generatePalace, the same subgraph runs.
     const ai = createHarness(multiCallProvider([{ name: 'generatePalace', id: 'call-pl' }]))
@@ -307,7 +317,7 @@ describe('手动宫殿：一次临时运行', () => {
         selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
       },
     })
-    await waitUntil(() => ai.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(ai.events).length === 1)
 
     const [manualRequest] = manual.writeRequests
     const [aiRequest] = ai.writeRequests
@@ -342,7 +352,7 @@ describe('手动宫殿：一次临时运行', () => {
     expect(scripted.calls('请为以下')).toBe(1)
     harness.manager.stopStream(firstStreamId)
     scripted.releaseArtwork()
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
     // A stopped run lands nothing: no palace payload on its end event.
     expect(
       harness.events
@@ -352,7 +362,7 @@ describe('手动宫殿：一次临时运行', () => {
 
     // Resume: same private thread, empty input.
     harness.manager.startStream(palaceRequest('palace-run-3', 'palace-thread-2', true))
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 2)
 
     // The completed stage did not re-run (one plan call across both runs), the
     // interrupted one did, and the resumed run still lands.
@@ -457,7 +467,7 @@ describe('主图以节点形式挂载两个子图', () => {
     }
 
     const streamId = harness.manager.startStream(request)
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     const steps = harness.events
       .filter((event) => event.type === 'step')
@@ -517,7 +527,7 @@ describe('主图以节点形式挂载两个子图', () => {
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '读书笔记' },
     })
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     // `pendingSubgraphs` is cleared by the supervisor on every non-subgraph path;
     // if it were left set, the graph would re-enter the subgraph node forever.
@@ -587,7 +597,7 @@ describe('主图以节点形式挂载两个子图', () => {
         selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
       },
     })
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     const payloads = (type: ChatStreamEvent['type']) =>
       harness.events
@@ -664,7 +674,7 @@ describe('主图以节点形式挂载两个子图', () => {
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '读书笔记' },
     })
-    await waitUntil(() => harness.manager.getActiveStreamCount() === 0)
+    await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     const messages = toolMessages(harness.persisted.get(sessionId))
     expect(messages.map((message) => `${message.tool_call_id}:${message.name}`).sort()).toEqual([
