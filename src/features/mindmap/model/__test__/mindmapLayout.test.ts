@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
-import { mindmapLayout } from '../mindmapLayout'
+import { layoutInitial, layoutReflow } from '../mindmapLayout'
 
 describe('mindmapLayout', () => {
-  it('lays out imported nodes through the initial layout adapter', () => {
+  it('lays out imported nodes through the initial layout', () => {
     const nodes: Node[] = [
       { id: 'root', position: { x: 99, y: 99 }, data: {} },
       { id: 'child', position: { x: 99, y: 99 }, data: {} },
     ]
     const edges: Edge[] = [{ id: 'root-child', source: 'root', target: 'child' }]
 
-    const result = mindmapLayout.initial(nodes, edges, { rootX: 10, rootY: 20 })
+    const result = layoutInitial(nodes, edges, { rootX: 10, rootY: 20 })
     const root = result.find((node) => node.id === 'root')!
     const child = result.find((node) => node.id === 'child')!
 
@@ -19,7 +19,7 @@ describe('mindmapLayout', () => {
     expect(child.position.y).toBe(root.position.y)
   })
 
-  it('reflows a forest through the incremental tree adapter', () => {
+  it('reflows a forest through the incremental tree layout', () => {
     const nodes: Node[] = [
       { id: 'root', position: { x: 0, y: 0 }, data: {} },
       { id: 'a', position: { x: 0, y: 0 }, data: {} },
@@ -30,7 +30,7 @@ describe('mindmapLayout', () => {
       { id: 'root-b', source: 'root', target: 'b' },
     ]
 
-    const result = mindmapLayout.reflow(nodes, edges, 'logic')
+    const result = layoutReflow(nodes, edges, 'logic')
 
     expect(result.find((node) => node.id === 'a')?.position).toEqual({ x: 200, y: -26 })
     expect(result.find((node) => node.id === 'b')?.position).toEqual({ x: 200, y: 26 })

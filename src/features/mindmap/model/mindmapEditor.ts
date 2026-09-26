@@ -21,7 +21,7 @@ import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
-import { mindmapLayout, type MindmapStructureType } from './mindmapLayout'
+import { layoutInitial, layoutReflow, type MindmapStructureType } from './mindmapLayout'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   type MindmapCommand,
@@ -82,12 +82,7 @@ export class MindmapEditor {
       },
     )
     const nodes = this.shouldReflowAfter(transaction.commands)
-      ? mindmapLayout.reflow(
-          appliedNodes,
-          appliedEdges,
-          this.structureType,
-          this.state.style.visualVariant,
-        )
+      ? layoutReflow(appliedNodes, appliedEdges, this.structureType, this.state.style.visualVariant)
       : appliedNodes
     // redo is time travel: strip entrance/exit/cascade markers baked into the
     // replayed commands (the undo snapshot is already stripped), so redo never
@@ -129,7 +124,7 @@ export class MindmapEditor {
       edges = result.edges
     }
     if (!skipReflow && this.shouldReflowAfter(commands)) {
-      nodes = mindmapLayout.reflow(nodes, edges, this.structureType, this.state.style.visualVariant)
+      nodes = layoutReflow(nodes, edges, this.structureType, this.state.style.visualVariant)
     }
     this.state.setNodes(nodes)
     this.state.setEdges(edges)
@@ -728,7 +723,7 @@ export class MindmapEditor {
     anchorX: number,
     anchorY: number,
   ): void {
-    const laidOut = mindmapLayout.initial(parsed.nodes, parsed.edges, {
+    const laidOut = layoutInitial(parsed.nodes, parsed.edges, {
       rootX: 0,
       rootY: 0,
       direction: 'LR',
@@ -973,7 +968,7 @@ export class MindmapEditor {
   // ─── 布局与生命周期 ───
 
   reflow(): void {
-    const nodes = mindmapLayout.reflow(
+    const nodes = layoutReflow(
       this.state.nodes,
       this.state.edges,
       this.structureType,

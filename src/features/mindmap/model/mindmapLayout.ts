@@ -1,31 +1,87 @@
+import dagre from 'dagre'
 import type { Edge, Node } from '@xyflow/react'
-import { DagreLayoutAdapter, type InitialLayoutOptions } from './layout/dagreLayoutAdapter'
-import { TreeLayoutAdapter } from './layout/treeLayoutAdapter'
-import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
+import { reflowChildren } from '@/shared/lib/mindmapTree'
+import { defaultNodeSize } from '@/shared/lib/nodeSize'
+import { DEFAULT_STYLE, VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import type { VisualVariant } from '@/features/mindmap/style/types'
 
 export type MindmapStructureType = 'logic' | 'mindmap'
 
-class MindmapLayout {
-  constructor(
-    private initialAdapter: DagreLayoutAdapter,
-    private incrementalAdapter: TreeLayoutAdapter,
-  ) {}
-
-  initial(nodes: Node[], edges: Edge[], options: InitialLayoutOptions = {}): Node[] {
-    return this.initialAdapter.layout(nodes, edges, options)
-  }
-
-  reflow(
-    nodes: Node[],
-    edges: Edge[],
-    structureType: MindmapStructureType = 'logic',
-    visualVariant: VisualVariant = DEFAULT_STYLE.visualVariant,
-  ): Node[] {
-    return this.incrementalAdapter.layout(nodes, edges, structureType, visualVariant)
-  }
+export interface InitialLayoutOptions {
+  horizontalGap?: number
+  verticalGap?: number
+  rootX?: number
+  rootY?: number
+  direction?: 'LR' | 'TB'
 }
 
-export type { InitialLayoutOptions }
+const DEFAULT_OPTIONS = {
+  horizontalGap: 260,
+  verticalGap: 24,
+  rootX: 0,
+  rootY: 0,
+  direction: 'LR' as const,
+}
 
-export const mindmapLayout = new MindmapLayout(new DagreLayoutAdapter(), new TreeLayoutAdapter())
+/** Initial layout (dagre); used when a whole graph first lands on the canvas. */
+export function layoutInitial(
+  nodes: Node[],
+  edges: Edge[],
+  options: InitialLayoutOptions = {},
+): Node[] {
+  if (nodes.length === 0) return nodes
+
+  const resolved = { ...DEFAULT_OPTIONS, ...options }
+  const graph = new dagre.graphlib.Graph()
+  graph.setDefaultEdgeLabel(() => ({}))
+  graph.setGraph({
+    rankdir: resolved.direction,
+    ranksep: resolved.horizontalGap,
+    nodesep: resolved.verticalGap,
+    marginx: 0,
+    marginy: 0,
+  })
+
+  for (const node of nodes) {
+    const size = defaultNodeSize(node.type)
+    graph.setNode(node.id, {
+      width: node.measured?.width ?? size.width,
+      height: node.measured?.height ?? size.height,
+    })
+  }
+  for (const edge of edges) {
+    if (graph.hasNode(edge.source) && graph.hasNode(edge.target)) {
+      graph.setEdge(edge.source, edge.target)
+    }
+  }
+
+  dagre.layout(graph)
+  return nodes.map((node) => {
+    const position = graph.node(node.id)
+    if (!position) return node
+    return {
+      ...node,
+      position: {
+        x: position.x - position.width / 2 + resolved.rootX,
+        y: position.y - position.height / 2 + resolved.rootY,
+      },
+    }
+  })
+}
+
+/** Incremental reflow of a forest; reads the spacing of the active visual variant. */
+export function layoutReflow(
+  nodes: Node[],
+  edges: Edge[],
+  structureType: MindmapStructureType = 'logic',
+  visualVariant: VisualVariant = DEFAULT_STYLE.visualVariant,
+): Node[] {
+  const { spacing } = VISUAL_VARIANTS[visualVariant]
+  const targetIds = new Set(edges.map((edge) => edge.target))
+  const roots = nodes.filter((node) => !targetIds.has(node.id))
+  let result = nodes
+  for (const root of roots) {
+    result = reflowChildren(root.id, result, edges, spacing.offsetX, spacing.gapY, structureType)
+  }
+  return result
+}

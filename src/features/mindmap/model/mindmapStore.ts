@@ -10,7 +10,7 @@ import {
 import { nodeRegistry } from '@/features/mindmap/nodes'
 import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
-import { mindmapLayout } from './mindmapLayout'
+import { layoutReflow } from './mindmapLayout'
 
 export interface MindmapState {
   nodes: Node[]
@@ -144,7 +144,7 @@ export function createMindmapStore(): MindmapStore {
       const style = data.mindmap.style
         ? { ...DEFAULT_STYLE, ...data.mindmap.style }
         : { ...DEFAULT_STYLE }
-      const laidOut = mindmapLayout.reflow(
+      const laidOut = layoutReflow(
         hydratedNodes as Node[],
         data.mindmap.edges as Edge[],
         style.structureType,
