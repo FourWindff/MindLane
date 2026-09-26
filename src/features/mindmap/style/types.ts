@@ -12,14 +12,14 @@ export type VisualVariant = 'card' | 'outline' | 'minimal'
 export type ColorSchemeId = 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 
 /** 边路径算法 */
-export type EdgePathKind = 'bezier' | 'smooth-step' | 'step'
+type EdgePathKind = 'bezier' | 'smooth-step' | 'step'
 /** trunk=树干渐变填充（卡片式）；line=普通描边 */
-export type EdgeStrokeKind = 'trunk' | 'line'
+type EdgeStrokeKind = 'trunk' | 'line'
 /** 边连接节点的位置：side=侧边中点；bottom=节点下边框 */
 export type ConnectPosition = 'side' | 'bottom'
 
 /** 某个视觉变体的边配置 */
-export interface EdgeModeConfig {
+interface EdgeModeConfig {
   path: EdgePathKind
   stroke: EdgeStrokeKind
   connect: ConnectPosition

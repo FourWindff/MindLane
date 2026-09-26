@@ -23,14 +23,14 @@ type OperationEditor = Pick<
   | 'redo'
 >
 
-export interface MindmapOperationState {
+interface MindmapOperationState {
   nodes: Node[]
   edges: Edge[]
   selectedId: string | null
   aiBusy: boolean
 }
 
-export interface MindmapFlowPort {
+interface MindmapFlowPort {
   getNode(id: string): Node | undefined
   setCenter(x: number, y: number, options: { zoom: number; duration: number }): Promise<unknown>
   getViewport(): Viewport

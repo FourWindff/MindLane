@@ -1,7 +1,7 @@
 import type { MindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
 import type { ShortcutRow } from '@/shared/shortcuts/useRegisterShortcut'
 
-export type MindmapShortcutContext = {
+type MindmapShortcutContext = {
   controller: MindmapOperationController
   selectedId: string | null
   canAddSibling: boolean

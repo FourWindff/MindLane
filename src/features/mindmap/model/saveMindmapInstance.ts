@@ -1,6 +1,6 @@
 import type { MindmapInstance } from './mindmapInstance'
 
-export interface SaveMindmapInstanceOptions {
+interface SaveMindmapInstanceOptions {
   syncAfterFileSaved: (filePath: string) => Promise<void>
   onError?: (message: string) => void
   afterSave?: (filePath: string) => void

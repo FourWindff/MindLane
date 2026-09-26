@@ -2,7 +2,7 @@ import { Position } from '@xyflow/react'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
 import type { ConnectPosition } from '@/features/mindmap/style/types'
 
-export interface EdgeNodeLike {
+interface EdgeNodeLike {
   type?: string
   position: { x: number; y: number }
   measured?: { width?: number; height?: number }
@@ -19,7 +19,7 @@ export interface EdgeGeometry {
   targetPosition: Position
 }
 
-export interface EdgeGeometryParams {
+interface EdgeGeometryParams {
   sourceNode?: EdgeNodeLike
   targetNode?: EdgeNodeLike
   fallback: EdgeGeometry

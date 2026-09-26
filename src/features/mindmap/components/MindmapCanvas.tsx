@@ -12,7 +12,7 @@ import {
 type ReactFlowProps = ComponentProps<typeof ReactFlow>
 type EdgeTypes = NonNullable<ReactFlowProps['edgeTypes']>
 
-export interface MindmapCanvasProps {
+interface MindmapCanvasProps {
   nodes: Node[]
   edges: Edge[]
   nodeTypes: NodeTypes

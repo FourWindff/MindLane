@@ -20,12 +20,12 @@ import type { MindmapEditor } from './mindmapEditor'
  * in a buffer keyed by the correlation id (same handshake as a chat send).
  */
 
-export interface PalaceRunHandlers {
+interface PalaceRunHandlers {
   /** Run settled — landed, stopped or failed: release the chat busy flag. */
   settle: () => void
 }
 
-export interface StartPalaceRunOptions {
+interface StartPalaceRunOptions {
   fileUuid: string
   /** Placeholder palace node the caller inserted into the canvas. */
   nodeId: string

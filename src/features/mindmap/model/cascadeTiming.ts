@@ -14,11 +14,11 @@ import { getChildIdsOrdered } from '@/shared/lib/mindmapTree'
  */
 
 /** Fixed tick: the stagger step between consecutive nodes. */
-export const CASCADE_BASE_TICK_MS = 100
+const CASCADE_BASE_TICK_MS = 100
 /** Enter budget cap: the last node's delay of a large fragment never exceeds it. */
-export const CASCADE_ENTER_BUDGET_MS = 2000
+const CASCADE_ENTER_BUDGET_MS = 2000
 /** Exit budget cap (the reverse cascade is compressed the same way). */
-export const CASCADE_EXIT_BUDGET_MS = 1000
+const CASCADE_EXIT_BUDGET_MS = 1000
 
 /**
  * One DFS pre-order sequence per root subtree: parent before child, siblings in

@@ -1,21 +1,21 @@
 import type { ColorSchemeId } from './types'
 
 /** 单个颜色层级：对应节点的某个深度级别 */
-export interface DepthColor {
+interface DepthColor {
   nodeBg: string
   nodeBorder: string
   nodeText: string
 }
 
 /** 单条分支的颜色：root子节点（depth1）→ 孙节点（depth2）→ 更深（depth3+） */
-export interface BranchPalette {
+interface BranchPalette {
   depth1: DepthColor
   depth2: DepthColor
   depth3: DepthColor // depth≥3 复用此层
 }
 
 /** 一套配色方案的完整定义 */
-export interface SchemePalette {
+interface SchemePalette {
   /** 画布背景色 */
   /** 画布点阵颜色 */
   /** 根节点样式（depth=0，不参与分支着色） */
