@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════
-   StylePanel — 样式面板
+   StylePanel — mindmap appearance panel
    ══════════════════════════════════════════════════════ */
 
 .style-panel {
@@ -27,7 +27,7 @@
   }
 }
 
-/* ── 头部 ── */
+/* ── Header ── */
 .style-panel__header {
   display: flex;
   align-items: center;
@@ -65,7 +65,7 @@
   color: var(--ml-text);
 }
 
-/* ── 标签栏 ── */
+/* ── Tabs ── */
 .style-panel__tabs {
   display: flex;
   border-bottom: 1px solid var(--ml-border);
@@ -101,7 +101,7 @@
   border-bottom-color: var(--ml-accent);
 }
 
-/* ── 内容区 ── */
+/* ── Content ── */
 .style-panel__section {
   padding: 8px;
   display: flex;
@@ -109,49 +109,7 @@
   gap: 3px;
 }
 
-/* ── 选项按钮 ── */
-.style-panel__option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 9px;
-  background: transparent;
-  border: 1.5px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    background 0.14s,
-    border-color 0.14s;
-}
-
-.style-panel__option:hover {
-  background: var(--ml-fill-soft);
-}
-
-.style-panel__option--active {
-  background: var(--ml-accent-soft);
-  border-color: var(--ml-accent);
-}
-
-.style-panel__option-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--ml-text);
-  line-height: 1.2;
-}
-
-.style-panel__option-desc {
-  display: block;
-  font-size: 0.7rem;
-  color: var(--ml-text-muted);
-  margin-top: 1px;
-  line-height: 1.2;
-}
-
-/* 预览 SVG */
+/* Preview SVG */
 .style-panel__preview {
   flex-shrink: 0;
   width: 40px;
@@ -159,11 +117,7 @@
   color: var(--ml-text-muted);
 }
 
-.style-panel__option--active .style-panel__preview {
-  color: var(--ml-accent);
-}
-
-/* ── 配色方案列表 ── */
+/* ── Color scheme list ── */
 .style-panel__section--colors {
   display: flex;
   flex-direction: column;
@@ -220,7 +174,7 @@
   font-weight: 600;
 }
 
-/* ── 风格网格 — 3列，每格一个 SVG 预览 + 文字标签 ── */
+/* ── Style grid: 3 columns, one SVG preview + label per cell ── */
 .style-panel__style-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -264,14 +218,14 @@
   font-weight: 600;
 }
 
-/* 风格预览 SVG：比配色 swatch 更宽 */
+/* Style preview SVG: wider than a color swatch */
 .style-panel__preview {
   flex-shrink: 0;
   width: 54px;
   height: 36px;
 }
 
-/* ── 分组标签 ── */
+/* ── Group label ── */
 .style-panel__group-label {
   font-size: 0.68rem;
   font-weight: 600;
