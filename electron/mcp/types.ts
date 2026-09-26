@@ -3,7 +3,7 @@ import type { McpCredentialStore } from './credentials.js'
 import type { LoopbackOAuthProvider } from './oauth.js'
 
 /** MCP server 的连接状态（MCP 用户态，持久化到 settings.json） */
-export type McpConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed'
+type McpConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed'
 
 /** settings.json 中每个 server 的用户态条目：只有连接状态与非敏感展示信息 */
 export interface McpServerUserState {
@@ -42,7 +42,7 @@ export interface McpServerStatusInfo extends McpServerStatus {
 }
 
 /** 传给 server 授权工厂的上下文 */
-export interface McpAuthContext {
+interface McpAuthContext {
   credentialStore: McpCredentialStore
   /** loopback 回调地址（交互式授权时由临时 HTTP 服务决定端口） */
   redirectUrl: string

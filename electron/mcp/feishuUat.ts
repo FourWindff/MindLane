@@ -3,10 +3,10 @@ import { startLoopbackCallbackServer } from './oauth.js'
 
 /** 飞书 UAT 授权回调的固定端口——回调地址 `http://127.0.0.1:44664/callback`
  *  需在飞书开放平台后台（安全设置 → 重定向 URL）一次性登记，之后每次走同一地址。 */
-export const FEISHU_UAT_CALLBACK_PORT = 44664
+const FEISHU_UAT_CALLBACK_PORT = 44664
 
 /** 授权成功拿到的用户身份凭证（UAT），供设置面板回填进连接表单 */
-export interface FeishuUatResult {
+interface FeishuUatResult {
   uat: string
   refreshToken: string
   expiresIn: number
@@ -35,7 +35,7 @@ async function readFeishuTokenBody(
 }
 
 /** token 交换器抽象，测试可注入 mock */
-export type FeishuUatExchanger = (
+type FeishuUatExchanger = (
   appId: string,
   appSecret: string,
   code: string,

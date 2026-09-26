@@ -12,7 +12,7 @@ export interface McpCredentialCrypto {
   decrypt(cipherText: string): string
 }
 
-export interface McpStoredCredentials {
+interface McpStoredCredentials {
   /** DCR 动态注册拿到的 client 凭据（必须持久化，重复注册会使既有授权成为孤儿） */
   clientInformation?: OAuthClientInformationMixed
   tokens?: OAuthTokens
