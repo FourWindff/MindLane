@@ -4,11 +4,16 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import type { MindLaneFile } from '../../../src/shared/lib/fileFormat.js'
 import { IPC } from '../../ipc.js'
-import { detectDocumentType } from '../documentType.js'
+import { detectDocumentType, documentTypeByExtension } from '../documentType.js'
 import { getWorkspaceSessionForService } from '../workspaceSession.js'
 import type { HandlerContext } from './context.js'
 import { isWithinWorkspace } from '../../fs/paths.js'
 import type { WorkspaceState } from '../../fs/types.js'
+
+/** Extensions the open dialog offers: the same set `detectDocumentType` accepts, without the dot. */
+const DOCUMENT_EXTENSIONS = Object.keys(documentTypeByExtension).map((extension) =>
+  extension.slice(1),
+)
 
 async function fileSha256(filePath: string): Promise<string> {
   const buffer = await fs.promises.readFile(filePath)
@@ -95,9 +100,7 @@ export function registerFsHandlers(ctx: HandlerContext): void {
 
     const result = await dialog.showOpenDialog(win, {
       properties: ['openFile'],
-      filters: [
-        { name: 'Documents', extensions: ['pdf', 'docx', 'pptx', 'xlsx', 'md', 'markdown'] },
-      ],
+      filters: [{ name: 'Documents', extensions: DOCUMENT_EXTENSIONS }],
     })
 
     if (result.canceled || result.filePaths.length === 0) {

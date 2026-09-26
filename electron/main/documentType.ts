@@ -1,7 +1,8 @@
 import path from 'node:path'
 import type { DocumentRef } from '../../src/shared/lib/fileFormat.js'
 
-const documentTypeByExtension: Record<string, DocumentRef['type']> = {
+/** Extension (leading dot included) → document type. Also drives the open-dialog filter list. */
+export const documentTypeByExtension: Record<string, DocumentRef['type']> = {
   '.pdf': 'pdf',
   '.docx': 'docx',
   '.pptx': 'pptx',

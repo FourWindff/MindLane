@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectDocumentType } from '../documentType.js'
+import { detectDocumentType, documentTypeByExtension } from '../documentType.js'
 
 describe('detectDocumentType', () => {
   it.each([
@@ -13,6 +13,17 @@ describe('detectDocumentType', () => {
     ['/documents/Report.Docx', 'docx'],
   ] as const)('detects %s as %s', (filePath, type) => {
     expect(detectDocumentType(filePath)).toBe(type)
+  })
+
+  it('lists the open-dialog extensions without the leading dot', () => {
+    expect(Object.keys(documentTypeByExtension).map((extension) => extension.slice(1))).toEqual([
+      'pdf',
+      'docx',
+      'pptx',
+      'xlsx',
+      'md',
+      'markdown',
+    ])
   })
 
   it.each(['/documents/report.doc', '/documents/slides.ppt', '/documents/archive.zip'])(
