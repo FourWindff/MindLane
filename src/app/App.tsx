@@ -17,7 +17,6 @@ import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
 import { AppToolbar } from '@/app/shell/components/AppToolbar'
 import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
-import { ShortcutRegistryProvider } from '@/shared/shortcuts/ShortcutRegistryProvider'
 import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
 import {
   connectAiStore,
@@ -229,10 +228,8 @@ function AppContent() {
 
 export function App() {
   return (
-    <ShortcutRegistryProvider>
-      <MindmapEditorProvider>
-        <AppContent />
-      </MindmapEditorProvider>
-    </ShortcutRegistryProvider>
+    <MindmapEditorProvider>
+      <AppContent />
+    </MindmapEditorProvider>
   )
 }

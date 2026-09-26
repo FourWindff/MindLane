@@ -13,8 +13,4 @@ export type ShortcutRegistration = {
   handler: (e: KeyboardEvent) => boolean | void
   /** 为 false 时不触发 */
   enabled?: () => boolean
-  /** 越大越先匹配，默认 0 */
-  priority?: number
-  /** 为 false 时不列入帮助面板（默认 true） */
-  showInHelp?: boolean
 }

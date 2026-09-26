@@ -1,6 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { formatComboLabel } from './formatComboLabel'
-import { useShortcutRegistry } from './useShortcutRegistry'
+import { shortcutRegistry } from './ShortcutRegistry'
 import type { ShortcutRegistration } from './types'
 import './shortcuts.css'
 
@@ -16,18 +16,15 @@ function groupLabel(id: string): string {
 }
 
 export function ShortcutsList() {
-  const registry = useShortcutRegistry()
   const entries = useSyncExternalStore(
-    registry.subscribe,
-    () => registry.getSnapshot(),
-    () => registry.getSnapshot(),
+    shortcutRegistry.subscribe,
+    shortcutRegistry.getSnapshot,
+    shortcutRegistry.getSnapshot,
   )
-
-  const visible = useMemo(() => entries.filter((e) => e.showInHelp !== false), [entries])
 
   const grouped = useMemo(() => {
     const map = new Map<string, ShortcutRegistration[]>()
-    for (const e of visible) {
+    for (const e of entries) {
       const list = map.get(e.group)
       if (list) list.push(e)
       else map.set(e.group, [e])
@@ -45,7 +42,7 @@ export function ShortcutsList() {
       label: groupLabel(id),
       items,
     }))
-  }, [visible])
+  }, [entries])
 
   return (
     <>
