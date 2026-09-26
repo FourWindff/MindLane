@@ -11,6 +11,7 @@ import {
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import type { ChatContext } from '../../../../../electron/ipc'
 
@@ -148,7 +149,7 @@ describe('sendChatMessage handshake', () => {
   })
 
   afterEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('rejects the send when busy, not chat-ready, or input is empty', async () => {
@@ -275,7 +276,7 @@ describe('sendChatMessage handshake', () => {
 describe('sendChatMessage entry conversation (no file open)', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    mindmapRegistry.releaseAll()
+    resetRegistry()
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,
@@ -300,7 +301,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
   })
 
   afterEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('creates and opens a .mindlane file, then runs the turn inside that file', async () => {

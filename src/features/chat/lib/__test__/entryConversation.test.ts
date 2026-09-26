@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backfillEntryFileTitle, createEntryFile, entryFileTitle } from '../entryConversation'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { createEmptyFile, type DocumentRef } from '@/shared/lib/fileFormat'
@@ -77,7 +78,7 @@ describe('entryFileTitle', () => {
 
 describe('entry conversation file lifecycle', () => {
   beforeEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
     useAiStore.setState({
       currentFileUuid: null,
       currentFilePath: null,
@@ -96,7 +97,7 @@ describe('entry conversation file lifecycle', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('creates and opens the file (editor ready) under the derived title', async () => {
@@ -147,7 +148,7 @@ describe('entry conversation file lifecycle', () => {
     const { renameItem } = installBridge()
     await createEntryFile('先起个占位标题', null)
     const closed = mindmapRegistry.getActiveFile()!
-    mindmapRegistry.releaseAll()
+    resetRegistry()
 
     backfillEntryFileTitle(closed.fileUuid, 'Ruby 学习路线')
     expect(renameItem).not.toHaveBeenCalled()

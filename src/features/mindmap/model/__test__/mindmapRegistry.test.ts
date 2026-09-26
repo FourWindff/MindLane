@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { mindmapRegistry } from '../mindmapRegistry'
+import { resetRegistry } from './registryReset'
 
 describe('MindmapRegistry', () => {
   beforeEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('should reuse the same instance for the same key', () => {

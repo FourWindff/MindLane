@@ -7,6 +7,7 @@ import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindma
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 
 function ProbeComponent() {
   const instance = useActiveMindmapInstance()
@@ -27,7 +28,7 @@ function ProbeComponent() {
 }
 
 function prepareActiveInstance(key: string) {
-  mindmapRegistry.releaseAll()
+  resetRegistry()
   const instance = mindmapRegistry.getOrCreate(key)
   instance.newFile('测试')
   mindmapRegistry.setActive(key)
@@ -36,7 +37,7 @@ function prepareActiveInstance(key: string) {
 
 describe('MindmapEditorProvider', () => {
   afterEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('should provide the active MindmapInstance with editor and store', () => {

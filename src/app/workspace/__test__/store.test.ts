@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '../store'
@@ -58,7 +59,7 @@ function activateLegacyFile(filePath = '/old.mindlane') {
 
 describe('workspace file switching', () => {
   beforeEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
     useWorkspaceStore.setState({ busy: false, lastError: null })
   })
 
@@ -99,7 +100,7 @@ describe('workspace file switching', () => {
 describe('workspace switch restore protocol', () => {
   beforeEach(() => {
     vi.unstubAllGlobals()
-    mindmapRegistry.releaseAll()
+    resetRegistry()
     useWorkspaceStore.setState({
       busy: false,
       lastError: null,
@@ -180,7 +181,7 @@ describe('workspace switch restore protocol', () => {
 
 describe('file deletion capsule cleanup', () => {
   beforeEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
     useWorkspaceStore.setState({ busy: false, lastError: null })
     useAiStore.setState({
       fileUuidPaths: {},

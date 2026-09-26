@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import { buildChatContext } from '../buildChatContext'
 
 describe('buildChatContext workspace files', () => {
   afterEach(() => {
-    mindmapRegistry.releaseAll()
+    resetRegistry()
   })
 
   it('derives workspaceFiles from the tree, nested files included', () => {

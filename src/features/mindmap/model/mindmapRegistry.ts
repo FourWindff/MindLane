@@ -80,16 +80,6 @@ export class MindmapRegistry {
     this.emit()
   }
 
-  releaseAll(): void {
-    for (const instance of this.instances.values()) {
-      instance.dispose()
-    }
-    this.instances.clear()
-    this.activeKey = null
-    this.resetDefault()
-    this.emit()
-  }
-
   resetDefault(): void {
     this.defaultInstance?.dispose()
     this.defaultInstance = new MindmapInstance(DEFAULT_KEY)
