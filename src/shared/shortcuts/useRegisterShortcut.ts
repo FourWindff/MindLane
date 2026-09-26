@@ -11,7 +11,7 @@ export type ShortcutRow = readonly [
 ]
 
 /** 一张表的公共元信息 */
-export type ShortcutDefaults = {
+type ShortcutDefaults = {
   group: string
   preventWhenTyping: boolean
 }
