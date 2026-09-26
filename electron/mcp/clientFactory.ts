@@ -3,7 +3,8 @@ import type { Connection } from '@langchain/mcp-adapters'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { Agent } from 'undici'
-import type { McpClientFactory, McpClientLike } from './types.js'
+import type { LoopbackOAuthProvider } from './oauth.js'
+import type { McpClientLike, McpServerDefinition } from './types.js'
 
 /**
  * 生产环境的 client 工厂：按 catalog 定义构建 MultiServerMCPClient。
@@ -11,7 +12,11 @@ import type { McpClientFactory, McpClientLike } from './types.js'
  * 本机回环 https 端点（如 Obsidian Local REST API 加密端口 27124）用自签证书，
  * 走裸 SDK client + 仅限该 transport 的放宽 TLS 校验，不做全局降级。
  */
-export const createMcpClient: McpClientFactory = (serverDef, authProvider, headers) => {
+export const createMcpClient = (
+  serverDef: McpServerDefinition,
+  authProvider?: LoopbackOAuthProvider,
+  headers?: Record<string, string>,
+): McpClientLike => {
   const url = serverDef.connection.url
   if (serverDef.transport === 'http' && url && isLoopbackHttps(url)) {
     return createLoopbackHttpsClient(serverDef.id, url, authProvider, headers)
@@ -54,7 +59,7 @@ function isLoopbackHttps(url: string): boolean {
 function createLoopbackHttpsClient(
   serverId: string,
   url: string,
-  authProvider: Parameters<McpClientFactory>[1],
+  authProvider: LoopbackOAuthProvider | undefined,
   headers?: Record<string, string>,
 ): McpClientLike {
   const client = new Client({ name: 'mindlane-mcp', version: '1.0.0' }, { capabilities: {} })

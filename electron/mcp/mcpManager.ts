@@ -9,7 +9,6 @@ import {
   type LoopbackCallbackServer,
 } from './oauth.js'
 import type {
-  McpClientFactory,
   McpClientLike,
   McpServerDefinition,
   McpServerStatus,
@@ -26,7 +25,12 @@ const NON_INTERACTIVE_REDIRECT_URL = 'http://127.0.0.1/callback'
 export interface McpManagerOptions {
   userDataPath: string
   /** 唯一测试接缝：client 创建工厂 */
-  createClient: McpClientFactory
+  createClient: (
+    serverDef: McpServerDefinition,
+    authProvider?: LoopbackOAuthProvider,
+    /** 非 OAuth 模式：createAuthHeaders 解析出的认证头，透传到 http transport */
+    headers?: Record<string, string>,
+  ) => McpClientLike
   servers?: McpServerDefinition[]
   /** 凭据加密；缺失时凭据仅保存在内存并警告 */
   credentialCrypto?: McpCredentialCrypto

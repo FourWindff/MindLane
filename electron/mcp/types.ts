@@ -89,10 +89,3 @@ export interface McpClientLike {
   getTools(): Promise<StructuredToolInterface[]>
   close(): Promise<void>
 }
-
-export type McpClientFactory = (
-  serverDef: McpServerDefinition,
-  authProvider?: LoopbackOAuthProvider,
-  /** 非 OAuth 模式：createAuthHeaders 解析出的认证头，透传到 http transport */
-  headers?: Record<string, string>,
-) => McpClientLike
