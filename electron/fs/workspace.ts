@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
+import { isWithinWorkspace } from './paths.js'
 import type { IpcResult, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
 
@@ -243,7 +244,7 @@ export class Workspace {
       candidate &&
       this.pathExists(candidate) &&
       this.isSupportedFile(candidate) &&
-      this.isWithinWorkspace(candidate, workspacePath)
+      isWithinWorkspace(candidate, workspacePath)
     ) {
       return candidate
     }
@@ -260,12 +261,5 @@ export class Workspace {
 
   private isSupportedFile(filePath: string): boolean {
     return isMindlanePath(filePath)
-  }
-
-  private isWithinWorkspace(filePath: string, workspacePath: string): boolean {
-    const resolvedWorkspacePath = path.resolve(workspacePath)
-    const resolvedFilePath = path.resolve(filePath)
-    const relativePath = path.relative(resolvedWorkspacePath, resolvedFilePath)
-    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
   }
 }

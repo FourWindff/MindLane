@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { isWithinWorkspace } from '../../fs/paths.js'
 import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
 
@@ -27,11 +28,6 @@ type ReadFileResult = ReadFileOk | ReadFileError
 
 function fail(error: string): ReadFileError {
   return { ok: false, error }
-}
-
-function isWithinWorkspace(resolvedPath: string, workspaceRoot: string): boolean {
-  const relative = path.relative(workspaceRoot, resolvedPath)
-  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
 /**

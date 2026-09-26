@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { shell } from 'electron'
+import { isWithinWorkspace } from './paths.js'
 import { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
@@ -138,7 +139,7 @@ export class WorkspaceTree {
       const targetPath = path.join(resolvedParent, trimmedName)
 
       if (
-        !this.isWithinWorkspace(targetPath, workspacePath) &&
+        !isWithinWorkspace(targetPath, workspacePath) &&
         path.resolve(targetPath) !== path.resolve(workspacePath)
       ) {
         throw new Error('目标路径不在工作区内')
@@ -154,7 +155,7 @@ export class WorkspaceTree {
   async deleteItem(targetPath: string, workspacePath: string): Promise<IpcResult<void>> {
     return this.guard(async () => {
       const resolved = path.resolve(targetPath)
-      if (!this.isWithinWorkspace(resolved, workspacePath)) {
+      if (!isWithinWorkspace(resolved, workspacePath)) {
         throw new Error('目标路径不在工作区内')
       }
       if (!fs.existsSync(resolved)) {
@@ -179,7 +180,7 @@ export class WorkspaceTree {
       }
 
       const resolvedOld = path.resolve(oldPath)
-      if (!this.isWithinWorkspace(resolvedOld, workspacePath)) {
+      if (!isWithinWorkspace(resolvedOld, workspacePath)) {
         throw new Error('目标路径不在工作区内')
       }
       if (!fs.existsSync(resolvedOld)) {
@@ -212,12 +213,12 @@ export class WorkspaceTree {
       const resolvedSource = path.resolve(sourcePath)
       const resolvedTarget = path.resolve(targetDirPath)
 
-      if (!this.isWithinWorkspace(resolvedSource, workspacePath)) {
+      if (!isWithinWorkspace(resolvedSource, workspacePath)) {
         throw new Error('源路径不在工作区内')
       }
 
       const targetIsWorkspaceRoot = resolvedTarget === path.resolve(workspacePath)
-      if (!targetIsWorkspaceRoot && !this.isWithinWorkspace(resolvedTarget, workspacePath)) {
+      if (!targetIsWorkspaceRoot && !isWithinWorkspace(resolvedTarget, workspacePath)) {
         throw new Error('目标目录不在工作区内')
       }
 
@@ -252,13 +253,6 @@ export class WorkspaceTree {
       await fs.promises.rename(resolvedSource, newPath)
       return newPath
     })
-  }
-
-  isWithinWorkspace(filePath: string, workspacePath: string): boolean {
-    const resolvedWorkspacePath = path.resolve(workspacePath)
-    const resolvedFilePath = path.resolve(filePath)
-    const relativePath = path.relative(resolvedWorkspacePath, resolvedFilePath)
-    return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
   }
 
   private async guard<T>(action: () => Promise<T>): Promise<IpcResult<T>> {

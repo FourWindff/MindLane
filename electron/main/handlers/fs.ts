@@ -7,6 +7,7 @@ import { IPC } from '../../ipc.js'
 import { detectDocumentType } from '../documentType.js'
 import { getWorkspaceSessionForService } from '../workspaceSession.js'
 import type { HandlerContext } from './context.js'
+import { isWithinWorkspace } from '../../fs/paths.js'
 import type { WorkspaceState } from '../../fs/types.js'
 
 async function fileSha256(filePath: string): Promise<string> {
@@ -24,8 +25,7 @@ async function syncWorkspaceFromFile(
   const currentWorkspace = settings.lastWorkspacePath
     ? path.resolve(settings.lastWorkspacePath)
     : null
-  const fileIsInCurrentWorkspace =
-    currentWorkspace && ctx.fsService.workspaceTree.isWithinWorkspace(filePath, currentWorkspace)
+  const fileIsInCurrentWorkspace = currentWorkspace && isWithinWorkspace(filePath, currentWorkspace)
 
   const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
 
