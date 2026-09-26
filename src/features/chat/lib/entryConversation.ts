@@ -33,7 +33,7 @@ export function entryFileTitle(text: string, document: DocumentRef | null): stri
   return cleaned.slice(0, MAX_TITLE_LENGTH) || '未命名'
 }
 
-export interface EntryFile {
+interface EntryFile {
   fileUuid: string
   filePath: string
 }

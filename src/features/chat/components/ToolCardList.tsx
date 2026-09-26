@@ -4,7 +4,7 @@ import type { ChatToolCall, ChatToolCallStep } from '@/shared/lib/fileFormat'
 import { isSubgraphTool, toolDisplayName } from '@/features/chat/lib/chatUtils'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 
-export type ToolCardStatus = NonNullable<ChatToolCall['status']>
+type ToolCardStatus = NonNullable<ChatToolCall['status']>
 
 /** Normalized card: streaming (ToolCard) and history (ChatToolCall) share one render contract. */
 export interface ToolCardItem {

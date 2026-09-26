@@ -31,7 +31,7 @@ import type {
  * 并发工具调用不得交错修改同一编辑器：按 fileUuid 串行化落盘队列，
  * 逐文件排队执行；不同 fileUuid 互不阻塞。超时语义归主进程，这里只保证单次应答。
  */
-export interface MindmapWriteResponderDependencies {
+interface MindmapWriteResponderDependencies {
   /** 订阅主进程落盘请求通道（返回取消订阅函数）。 */
   subscribe: (listener: (request: MindmapWriteRequest) => void) => () => void
   /** fileUuid → 活编辑器；未打开返回 undefined。 */

@@ -15,7 +15,7 @@ import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
  * the write responder during the stream; this module no longer touches editor
  * write operations.
  */
-export interface MindmapEndEffectsDependencies {
+interface MindmapEndEffectsDependencies {
   /** Subscribe to stream events (returns an unsubscribe function). */
   subscribe: (listener: (event: ChatStreamEvent) => void) => () => void
   resolveFileUuid: (sessionId: string) => string | undefined
