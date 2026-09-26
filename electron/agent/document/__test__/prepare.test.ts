@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, readFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { prepareDocument } from '../prepare.js'
-import { hashText } from '../../graphs/mindmapGraph/documentTextCache.js'
+import { hashText } from '../documentTextCache.js'
 
 function textSource(content: string) {
   return { type: 'text' as const, content }

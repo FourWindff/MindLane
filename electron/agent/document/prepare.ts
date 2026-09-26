@@ -10,7 +10,7 @@ import {
   shortHash,
   saveDocumentTextCache,
   buildTextPreview,
-} from '../graphs/mindmapGraph/documentTextCache.js'
+} from './documentTextCache.js'
 
 type PrepareDocumentInput = {
   source: DocumentSource
