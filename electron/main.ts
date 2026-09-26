@@ -35,8 +35,12 @@ import { registerSettingsHandlers } from './main/handlers/settings.js'
 import { registerMcpHandlers, persistMcpStatus } from './main/handlers/mcp.js'
 import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
-import { MindmapReadRequester } from './main/mindmapRead.js'
-import { MindmapWriteRequester } from './main/mindmapWrite.js'
+import {
+  buildMindmapReadRequest,
+  buildMindmapWriteRequest,
+  createMindmapReadRequester,
+  createMindmapWriteRequester,
+} from './main/mindmapRequesters.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -310,11 +314,10 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
-  // 主进程 → 渲染层读导图请求器：`win` 是模块级可变引用（窗口可重建），
+  // 主进程 → 渲染层读导图/落盘请求器：`win` 是模块级可变引用（窗口可重建），
   // 经 getter 注入，窗口销毁时请求立即报错而非挂起。
-  const mindmapReadRequester = new MindmapReadRequester(() => win)
-  // 主进程 → 渲染层落盘请求器：同读导图模式（requestId 关联 + 超时按失败处理）。
-  const mindmapWriteRequester = new MindmapWriteRequester(() => win)
+  const mindmapReadRequester = createMindmapReadRequester(() => win)
+  const mindmapWriteRequester = createMindmapWriteRequester(() => win)
 
   // 唯一装配点：惰性创建（或复用）当前 orchestrator。createRuntime 与
   // 就绪门控后的聊天运行都从这里取，避免两条构造路径漂移。
@@ -325,9 +328,10 @@ app.whenReady().then(async () => {
       // 惰性创建仅发生在就绪门控通过之后，services 必非空。
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
-        mindmapReadProvider: (fileUuid, query) => mindmapReadRequester.request(fileUuid, query),
+        mindmapReadProvider: (fileUuid, query) =>
+          mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
         mindmapWriteProxy: (fileUuid, action, args) =>
-          mindmapWriteRequester.request(fileUuid, action, args),
+          mindmapWriteRequester.request(() => buildMindmapWriteRequest(fileUuid, action, args)),
       })
     }
     return chatOrchestrator

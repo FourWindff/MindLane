@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
-import { MindmapWriteRequester } from '../mindmapWrite.js'
+import { buildMindmapWriteRequest, createMindmapWriteRequester } from '../mindmapRequesters.js'
 
 /** 伪 BrowserWindow：只记录发出的请求，不真正触达渲染层。 */
 function fakeWindow(): {
@@ -50,9 +50,11 @@ describe('MindmapWriteRequester', () => {
 
   it('sends the request with requestId + fileUuid + action + args and resolves the renderer ack as-is', async () => {
     const { window, sent } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request('file-a', 'insertXmlFragment', { xml: '<node/>' })
+    const promise = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'insertXmlFragment', { xml: '<node/>' }),
+    )
     const request = sent[0]!
     expect(request.fileUuid).toBe('file-a')
     expect(request.action).toBe('insertXmlFragment')
@@ -75,9 +77,11 @@ describe('MindmapWriteRequester', () => {
 
   it('clears the request timer once the renderer answers (no dangling timer per request)', async () => {
     const { window, sent } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request('file-a', 'insertXmlFragment', { xml: '<node/>' })
+    const promise = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'insertXmlFragment', { xml: '<node/>' }),
+    )
     expect(vi.getTimerCount()).toBe(1)
 
     requester.respond({
@@ -96,9 +100,11 @@ describe('MindmapWriteRequester', () => {
 
   it('rejects with the renderer error when the response signals failure', async () => {
     const { window, sent } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request('file-a', 'updateMindmapNode', {})
+    const promise = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'updateMindmapNode', {}),
+    )
     requester.respond({
       requestId: sent[0]!.requestId,
       ok: false,
@@ -110,9 +116,9 @@ describe('MindmapWriteRequester', () => {
 
   it('ignores responses for unknown requestIds (already timed out / answered)', async () => {
     const { window, sent } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request('file-a', 'deleteNode', {})
+    const promise = requester.request(() => buildMindmapWriteRequest('file-a', 'deleteNode', {}))
     requester.respond({ requestId: 'unknown', ok: true, action: 'x', data: null })
     expect(requester.pendingCount).toBe(1)
 
@@ -131,10 +137,14 @@ describe('MindmapWriteRequester', () => {
 
   it('correlates concurrent requests so parallel tools do not cross wires', async () => {
     const { window, sent } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promiseA = requester.request('file-a', 'insertXmlFragment', { xml: 'A' })
-    const promiseB = requester.request('file-a', 'updateMindmapNode', { xml: 'B' })
+    const promiseA = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'insertXmlFragment', { xml: 'A' }),
+    )
+    const promiseB = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'updateMindmapNode', { xml: 'B' }),
+    )
     expect(sent.map((r) => r.action)).toEqual(['insertXmlFragment', 'updateMindmapNode'])
 
     requester.respond({
@@ -164,9 +174,11 @@ describe('MindmapWriteRequester', () => {
 
   it('times out with a clear error', async () => {
     const { window } = fakeWindow()
-    const requester = new MindmapWriteRequester(() => window as unknown as BrowserWindow)
+    const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request('file-a', 'insertXmlFragment', {})
+    const promise = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'insertXmlFragment', {}),
+    )
     const assertion = expect(promise).rejects.toThrow('落盘超时（3s 内未收到渲染层应答）')
     await vi.advanceTimersByTimeAsync(3000)
     await assertion
@@ -174,10 +186,10 @@ describe('MindmapWriteRequester', () => {
   })
 
   it('rejects immediately when the window is unavailable (file closed / app window gone)', async () => {
-    const requester = new MindmapWriteRequester(() => null)
+    const requester = createMindmapWriteRequester(() => null)
 
-    await expect(requester.request('file-a', 'insertXmlFragment', {})).rejects.toThrow(
-      '编辑器不可用（窗口已关闭），无法落盘',
-    )
+    await expect(
+      requester.request(() => buildMindmapWriteRequest('file-a', 'insertXmlFragment', {})),
+    ).rejects.toThrow('编辑器不可用（窗口已关闭），无法落盘')
   })
 })

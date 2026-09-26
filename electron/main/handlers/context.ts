@@ -6,8 +6,13 @@ import type { FileSystemService } from '../../fs/index.js'
 import type { AppSettings } from '../../fs/types.js'
 import type { ChatStreamEvent } from '../../ipc.js'
 import type { McpManager } from '../../mcp/mcpManager.js'
-import type { MindmapReadRequester } from '../mindmapRead.js'
-import type { MindmapWriteRequester } from '../mindmapWrite.js'
+import type {
+  MindmapReadRequest,
+  MindmapReadResponse,
+  MindmapWriteRequest,
+  MindmapWriteResponse,
+} from '../../ipc.js'
+import type { RendererRequester } from '../rendererRequester.js'
 
 /**
  * 所有 handler 模块共享的依赖载体。模块内部不构造任何服务——
@@ -21,9 +26,9 @@ export interface HandlerContext {
   editLogStore: EditLogStore | null
   getWindow: () => BrowserWindow | null
   /** 主进程 → 渲染层读导图请求器（requestId 关联 + 超时），装配时创建。 */
-  mindmapReadRequester: MindmapReadRequester
+  mindmapReadRequester: RendererRequester<MindmapReadRequest, MindmapReadResponse>
   /** 主进程 → 渲染层落盘请求器（requestId 关联 + 超时），装配时创建。 */
-  mindmapWriteRequester: MindmapWriteRequester
+  mindmapWriteRequester: RendererRequester<MindmapWriteRequest, MindmapWriteResponse>
   getStreamManager: () => StreamManager | null
   getMcpManager: () => McpManager | null
   isAiServiceReady: () => boolean
