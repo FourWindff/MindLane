@@ -22,8 +22,13 @@ const mockState = vi.hoisted(() => ({
   workspace: { workspacePath: '/workspace' as string | null },
 }))
 
-vi.mock('@/features/chat/hooks/useChatContext', () => ({
-  useChatContext: () => ({ selectedNodes: [], clearNodeSelection: vi.fn() }),
+vi.mock('@/features/mindmap/hooks/useActiveMindmapStore', () => ({
+  useActiveMindmapStore: (selector: (state: { nodes: never[] }) => unknown) =>
+    selector({ nodes: [] }),
+}))
+
+vi.mock('@/features/mindmap/hooks/useActiveMindmapEditor', () => ({
+  useActiveMindmapEditor: () => ({ clearNodeSelection: vi.fn() }),
 }))
 
 vi.mock('@/features/chat/model/aiStore', async () => {

@@ -72,18 +72,6 @@ vi.mock('@/features/chat/model/aiStore', async () => {
   }
 })
 
-vi.mock('@/features/chat/hooks/useChatContext', () => ({
-  useChatContext: () => ({
-    emptyHint: 'AI 助手可以生成思维导图',
-    quickActions: [
-      { label: '生成思维导图', prompt: '请帮我生成一个思维导图' },
-      { label: '总结内容', prompt: '请总结当前思维导图的内容' },
-      { label: '头脑风暴', prompt: '请帮我进行头脑风暴，生成一些创意想法' },
-      { label: '优化结构', prompt: '请帮我优化当前思维导图的结构' },
-    ],
-  }),
-}))
-
 function fileChat(patch: Partial<MockFileChat>): MockFileChat {
   return {
     activeSessionId: '',

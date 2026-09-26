@@ -11,7 +11,6 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '@/features/chat/model/aiStore'
-import { useChatContext } from '@/features/chat/hooks/useChatContext'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCardList } from './ToolCardList'
 
@@ -20,6 +19,15 @@ import '../styles/chat-message-list.css'
 function cx(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ')
 }
+
+const EMPTY_HINT = 'AI 助手可以生成思维导图、生成记忆宫殿'
+
+const QUICK_ACTIONS = [
+  { label: '生成思维导图', prompt: '请帮我生成一个思维导图' },
+  { label: '总结内容', prompt: '请总结当前思维导图的内容' },
+  { label: '头脑风暴', prompt: '请帮我进行头脑风暴，生成一些创意想法' },
+  { label: '优化结构', prompt: '请帮我优化当前思维导图的结构' },
+]
 
 /**
  * Fold pure-tool assistant messages (no text, only tool calls) into the next
@@ -70,7 +78,6 @@ export function ChatMessageList() {
   const streamingText = useAiStore(selectCurrentChatStreamText)
   const toolCards = useAiStore(selectCurrentChatToolCards)
   const setInputDraft = useAiStore((s) => s.setInputDraft)
-  const { emptyHint, quickActions } = useChatContext()
 
   const handleLoadSession = useCallback(
     (sessionId: string) => {
@@ -199,9 +206,9 @@ export function ChatMessageList() {
             <Sparkles size={24} strokeWidth={1.5} />
           </div>
           <h3 className="chat-message-list__empty-title">Neural Assistant</h3>
-          <span className="chat-message-list__empty-hint">{emptyHint}</span>
+          <span className="chat-message-list__empty-hint">{EMPTY_HINT}</span>
           <div className="chat-message-list__empty-actions">
-            {quickActions.map((action, i) => (
+            {QUICK_ACTIONS.map((action, i) => (
               <button
                 key={`${action.label}-${i}`}
                 type="button"

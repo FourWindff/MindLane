@@ -15,7 +15,8 @@ import {
   selectCurrentChatBusy,
   selectCurrentChatHasFile,
 } from '@/features/chat/model/aiStore'
-import { useChatContext } from '@/features/chat/hooks/useChatContext'
+import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
@@ -38,7 +39,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const sendChatMessage = useAiStore((s) => s.sendChatMessage)
   const stopChatStream = useAiStore((s) => s.stopChatStream)
 
-  const { selectedNodes, clearNodeSelection } = useChatContext()
+  const editor = useActiveMindmapEditor()
+  const selectedCount = useActiveMindmapStore((s) => s.nodes.filter((n) => n.selected).length)
 
   const chatReady = useSettingsStore(selectChatReady)
   const settingsLoaded = useSettingsStore((s) => s.loaded)
@@ -251,16 +253,16 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             {urlError && <span className="chat-input-bar__url-error">{urlError}</span>}
           </div>
         )}
-        {(selectedNodes.length > 0 || attachedDocument) && (
+        {(selectedCount > 0 || attachedDocument) && (
           <div className="chat-input-bar__tags">
-            {selectedNodes.length > 0 && (
+            {selectedCount > 0 && (
               <span className="chat-input-bar__tag">
                 <CircleDot size={12} strokeWidth={2} />
-                {selectedNodes.length}
+                {selectedCount}
                 <button
                   type="button"
                   className="chat-input-bar__tag-remove"
-                  onClick={clearNodeSelection}
+                  onClick={() => editor.clearNodeSelection()}
                   aria-label="清除节点选择"
                 >
                   <X size={10} strokeWidth={2} />
