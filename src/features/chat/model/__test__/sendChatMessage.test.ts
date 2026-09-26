@@ -295,7 +295,6 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       busy: false,
       lastError: null,
       workspacePath: '/workspace',
-      files: [],
       tree: [],
     })
   })

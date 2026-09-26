@@ -1,9 +1,3 @@
-export interface WorkspaceFileEntry {
-  filePath: string
-  name: string
-  lastModifiedAt: string
-}
-
 export interface WorkspaceTreeEntry {
   name: string
   path: string

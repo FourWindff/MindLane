@@ -90,7 +90,6 @@ describe('entry conversation file lifecycle', () => {
       busy: false,
       lastError: null,
       workspacePath: '/workspace',
-      files: [],
       tree: [],
     })
   })

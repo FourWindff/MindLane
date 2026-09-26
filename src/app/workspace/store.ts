@@ -3,7 +3,7 @@ import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import type { WorkspaceFileEntry, WorkspaceTreeEntry, WorkspaceSessionState } from './types'
+import type { WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
 type WorkspaceSwitchResult =
   { ok: true; data: { workspacePath: string } } | { ok: false; error?: string }
@@ -13,7 +13,6 @@ interface WorkspaceStore {
   initializing: boolean
   busy: boolean
   workspacePath: string | null
-  files: WorkspaceFileEntry[]
   tree: WorkspaceTreeEntry[]
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
@@ -50,29 +49,11 @@ function dirname(filePath: string): string {
   return index <= 0 ? normalizedPath : normalizedPath.slice(0, index)
 }
 
-function flattenTreeFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileEntry[] {
-  const result: WorkspaceFileEntry[] = []
-  for (const entry of entries) {
-    if (entry.type === 'file') {
-      result.push({ filePath: entry.path, name: entry.name, lastModifiedAt: entry.lastModifiedAt })
-    }
-    if (entry.children) {
-      result.push(...flattenTreeFiles(entry.children))
-    }
-  }
-  return result
-}
-
 function updateWorkspaceState(
   session: WorkspaceSessionState,
-  files: WorkspaceFileEntry[],
-): Pick<
-  WorkspaceStore,
-  'workspacePath' | 'files' | 'recentWorkspacePaths' | 'restoreLastWorkspaceOnLaunch'
-> {
+): Pick<WorkspaceStore, 'workspacePath' | 'recentWorkspacePaths' | 'restoreLastWorkspaceOnLaunch'> {
   return {
     workspacePath: session.workspacePath,
-    files,
     recentWorkspacePaths: dedupePaths(session.recentWorkspacePaths),
     restoreLastWorkspaceOnLaunch: session.restoreLastWorkspaceOnLaunch,
   }
@@ -94,17 +75,6 @@ async function loadSessionFromBackend(): Promise<WorkspaceSessionState | null> {
   const api = window.mindlane?.workspace
   if (!api) return null
   return api.getSession()
-}
-
-async function listWorkspaceFiles(workspacePath: string | null): Promise<WorkspaceFileEntry[]> {
-  if (!workspacePath) return []
-  const api = window.mindlane?.workspace
-  if (!api) return []
-  const result = await api.listFiles({ workspacePath })
-  if (!result.ok) {
-    throw new Error(result.error)
-  }
-  return result.data
 }
 
 async function listWorkspaceTree(workspacePath: string | null): Promise<WorkspaceTreeEntry[]> {
@@ -200,9 +170,8 @@ async function syncWorkspaceState(
   session: WorkspaceSessionState,
   options?: { clearMindmapWhenEmpty?: boolean },
 ): Promise<void> {
-  const files = await listWorkspaceFiles(session.workspacePath)
   const tree = await listWorkspaceTree(session.workspacePath)
-  useWorkspaceStore.setState({ ...updateWorkspaceState(session, files), tree })
+  useWorkspaceStore.setState({ ...updateWorkspaceState(session), tree })
   if (!session.workspacePath && options?.clearMindmapWhenEmpty) {
     clearMindLaneFile()
   }
@@ -233,7 +202,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   initializing: false,
   busy: false,
   workspacePath: null,
-  files: [],
   tree: [],
   recentWorkspacePaths: [],
   restoreLastWorkspaceOnLaunch: true,
@@ -272,7 +240,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         initialized: true,
         initializing: false,
         workspacePath: null,
-        files: [],
         tree: [],
         lastError: error instanceof Error ? error.message : String(error),
       })
@@ -375,12 +342,10 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       loadMindLaneFile(result.data.filePath, result.data.data, workspacePath)
       const session = await loadSessionFromBackend()
-      const files = await listWorkspaceFiles(workspacePath)
       const tree = await listWorkspaceTree(workspacePath)
       set({
         ...updateWorkspaceState(
           session ?? makeFallbackSession(workspacePath, result.data.filePath),
-          files,
         ),
         tree,
       })
@@ -393,14 +358,13 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   refreshWorkspaceFiles: async (workspacePath) => {
     const targetWorkspacePath = workspacePath ?? get().workspacePath
     if (!targetWorkspacePath) {
-      set({ files: [], tree: [] })
+      set({ tree: [] })
       return
     }
 
     try {
-      const files = await listWorkspaceFiles(targetWorkspacePath)
       const tree = await listWorkspaceTree(targetWorkspacePath)
-      set({ files, tree, workspacePath: targetWorkspacePath })
+      set({ tree, workspacePath: targetWorkspacePath })
     } catch (error) {
       set({ lastError: error instanceof Error ? error.message : String(error) })
     }
@@ -414,11 +378,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (currentWorkspacePath && fallbackSession.workspacePath !== currentWorkspacePath) {
       fallbackSession.workspacePath = currentWorkspacePath
     }
-    const [files, tree] = await Promise.all([
-      listWorkspaceFiles(fallbackSession.workspacePath),
-      listWorkspaceTree(fallbackSession.workspacePath),
-    ])
-    set({ ...updateWorkspaceState(fallbackSession, files), tree })
+    const tree = await listWorkspaceTree(fallbackSession.workspacePath)
+    set({ ...updateWorkspaceState(fallbackSession), tree })
   },
 
   updateFilePreviewUrl: (filePath: string, previewUrl: string) => {
@@ -510,8 +471,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const tree = await listWorkspaceTree(workspacePath)
-      const files = flattenTreeFiles(tree)
-      set({ tree, files })
+      set({ tree })
       // 删除后重拉胶囊条输入（持久映射已被主进程 prune，会话仍在，重新投影即隐藏已删文件的胶囊）。
       void useAiStore.getState().refreshCapsuleData()
       return true
@@ -552,8 +512,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const tree = await listWorkspaceTree(workspacePath)
-      const files = flattenTreeFiles(tree)
-      set({ tree, files })
+      set({ tree })
       return result.data.newPath
     } finally {
       set({ busy: false })
@@ -592,8 +551,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       const tree = await listWorkspaceTree(workspacePath)
-      const files = flattenTreeFiles(tree)
-      set({ tree, files })
+      set({ tree })
       return result.data.newPath
     } finally {
       set({ busy: false })

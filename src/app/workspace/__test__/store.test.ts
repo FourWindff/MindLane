@@ -104,7 +104,6 @@ describe('workspace switch restore protocol', () => {
       busy: false,
       lastError: null,
       workspacePath: null,
-      files: [],
       tree: [],
     })
   })
@@ -145,12 +144,10 @@ describe('workspace switch restore protocol', () => {
       run: () => useWorkspaceStore.getState().switchWorkspace('/ws'),
     },
   ])(
-    '$name restores the scene from freshly fetched files/tree and clears the active mindlane',
+    '$name restores the scene from a freshly fetched tree and clears the active mindlane',
     async ({ run }) => {
       const api = installWorkspaceApis()
-      useWorkspaceStore.setState({
-        files: [{ filePath: '/stale.mindlane', name: 'stale', lastModifiedAt: 'old' }],
-      })
+      useWorkspaceStore.setState({ tree: [] })
       activateLegacyFile('/old.mindlane')
 
       const ok = await run()
@@ -158,9 +155,6 @@ describe('workspace switch restore protocol', () => {
       expect(ok).toBe(true)
       const state = useWorkspaceStore.getState()
       expect(state.workspacePath).toBe('/ws')
-      expect(state.files).toEqual([
-        { filePath: '/ws/a.mindlane', name: 'a', lastModifiedAt: '2026-01-01T00:00:00.000Z' },
-      ])
       expect(state.tree).toEqual([
         {
           name: 'a',
@@ -169,7 +163,7 @@ describe('workspace switch restore protocol', () => {
           lastModifiedAt: '2026-01-01T00:00:00.000Z',
         },
       ])
-      expect(api.listFiles).toHaveBeenCalledWith({ workspacePath: '/ws' })
+      expect(api.listFiles).not.toHaveBeenCalled()
       expect(api.listTree).toHaveBeenCalledWith({ workspacePath: '/ws' })
       expect(mindmapRegistry.getActive()).toBeNull()
     },
