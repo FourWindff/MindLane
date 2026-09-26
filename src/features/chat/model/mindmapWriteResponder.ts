@@ -1,8 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
-import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
-import { findParentId, newId } from '@/shared/lib/mindmapTree'
+import { CHILD_OFFSET_X, findParentId, newId } from '@/shared/lib/mindmapTree'
 import {
   MindmapXmlError,
   buildValidationContext,
@@ -191,18 +190,17 @@ function palacePlacement(
   editor: MindmapEditor,
   sourceNodeIds: string[],
 ): { parentId: string; position: { x: number; y: number } } {
-  const { nodes, edges, style } = editor.getState()
+  const { nodes, edges } = editor.getState()
   const firstSource = sourceNodeIds[0]
     ? nodes.find((node) => node.id === sourceNodeIds[0])
     : undefined
   const parentId = (firstSource ? findParentId(edges, firstSource.id) : null) ?? 'root'
   if (firstSource) return { parentId, position: firstSource.position }
   const parentNode = nodes.find((node) => node.id === parentId)
-  const offsetX = VISUAL_VARIANTS[style.visualVariant].spacing.offsetX
   return {
     parentId,
     position: {
-      x: (parentNode?.position.x ?? 0) + offsetX,
+      x: (parentNode?.position.x ?? 0) + CHILD_OFFSET_X,
       y: parentNode?.position.y ?? 0,
     },
   }

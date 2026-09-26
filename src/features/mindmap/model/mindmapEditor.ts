@@ -8,6 +8,8 @@ import {
   buildValidationContext,
 } from '@/shared/lib/mindmapXml'
 import {
+  CHILD_GAP_Y,
+  CHILD_OFFSET_X,
   collectSubtreeIds,
   createInitialEdges,
   createInitialNodes,
@@ -17,11 +19,10 @@ import {
   newId,
 } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
-import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
 import type { MindmapState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
-import { layoutInitial, layoutReflow, type MindmapStructureType } from './mindmapLayout'
+import { layoutInitial, layoutReflow } from './mindmapLayout'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   type MindmapCommand,
@@ -41,7 +42,6 @@ export type SiblingInsertMode = 'end' | 'above' | 'below'
  * 都应通过此类的方法执行，以便自动记录历史并支持撤销/重做。
  */
 export class MindmapEditor {
-  private structureType: MindmapStructureType = 'logic'
   private pendingDeleteTimers = new Set<ReturnType<typeof setTimeout>>()
 
   constructor(
@@ -82,7 +82,7 @@ export class MindmapEditor {
       },
     )
     const nodes = this.shouldReflowAfter(transaction.commands)
-      ? layoutReflow(appliedNodes, appliedEdges, this.structureType, this.state.style.visualVariant)
+      ? layoutReflow(appliedNodes, appliedEdges, this.state.style.structureType)
       : appliedNodes
     // redo is time travel: strip entrance/exit/cascade markers baked into the
     // replayed commands (the undo snapshot is already stripped), so redo never
@@ -124,7 +124,7 @@ export class MindmapEditor {
       edges = result.edges
     }
     if (!skipReflow && this.shouldReflowAfter(commands)) {
-      nodes = layoutReflow(nodes, edges, this.structureType, this.state.style.visualVariant)
+      nodes = layoutReflow(nodes, edges, this.state.style.structureType)
     }
     this.state.setNodes(nodes)
     this.state.setEdges(edges)
@@ -159,7 +159,7 @@ export class MindmapEditor {
     }
 
     const parentNode = nodes.find((n) => n.id === parentId)
-    const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    const offsetX = CHILD_OFFSET_X
     const position =
       options.position ??
       (parentNode
@@ -200,7 +200,7 @@ export class MindmapEditor {
   private endChildY(parentId: string, parent: Node, nodes: Node[], edges: Edge[]): number {
     const siblings = getChildIdsOrdered(nodes, edges, parentId)
     if (siblings.length === 0) return parent.position.y
-    const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+    const gapY = CHILD_GAP_Y
     let maxY = -Infinity
     for (const id of siblings) {
       const y = nodes.find((n) => n.id === id)?.position.y
@@ -234,8 +234,8 @@ export class MindmapEditor {
     const side = sibling?.data?.side
     let position: { x: number; y: number } | undefined
     if (sibling && mode !== 'end') {
-      const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
-      const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+      const offsetX = CHILD_OFFSET_X
+      const gapY = CHILD_GAP_Y
       position = {
         x: (parent?.position.x ?? sibling.position.x) + offsetX,
         y: sibling.position.y + (mode === 'above' ? -gapY : gapY),
@@ -262,8 +262,8 @@ export class MindmapEditor {
     const node = nodes.find((n) => n.id === nodeId)
     if (!parentId || !parent || !node || nodeId === 'root') return null
 
-    const offsetX = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
-    const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+    const offsetX = CHILD_OFFSET_X
+    const gapY = CHILD_GAP_Y
     const newNodeId = newId()
     const newNode: Node = {
       id: newNodeId,
@@ -390,7 +390,7 @@ export class MindmapEditor {
       if (sibling && node) {
         const siblingH = sibling.measured?.height ?? defaultNodeSize(sibling.type).height
         const nodeH = node.measured?.height ?? defaultNodeSize(node.type).height
-        const gapY = VISUAL_VARIANTS[this.state.style.visualVariant].spacing.gapY
+        const gapY = CHILD_GAP_Y
         const align =
           position === 'before'
             ? sibling.position.y - gapY - nodeH
@@ -676,8 +676,7 @@ export class MindmapEditor {
       return
     }
 
-    const anchorX =
-      parentNode.position.x + VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    const anchorX = parentNode.position.x + CHILD_OFFSET_X
     this.insertParsedFragmentAt(parsed, targetParentId, anchorX, parentNode.position.y)
   }
 
@@ -703,14 +702,12 @@ export class MindmapEditor {
     const parentNode = nodes.find((n) => n.id === parentId)
     if (!parentNode) return
 
-    const spacing = VISUAL_VARIANTS[this.state.style.visualVariant].spacing
     const siblingH = sibling.measured?.height ?? defaultNodeSize(sibling.type).height
     const firstH = defaultNodeSize(parsed.nodes[0]?.type ?? 'text').height
-    const anchorX =
-      parentNode.position.x + VISUAL_VARIANTS[this.state.style.visualVariant].spacing.offsetX
+    const anchorX = parentNode.position.x + CHILD_OFFSET_X
     const anchorY = options.before
-      ? sibling.position.y - spacing.gapY - firstH
-      : sibling.position.y + siblingH + spacing.gapY
+      ? sibling.position.y - CHILD_GAP_Y - firstH
+      : sibling.position.y + siblingH + CHILD_GAP_Y
     this.insertParsedFragmentAt(parsed, parentId, anchorX, anchorY)
   }
 
@@ -859,9 +856,7 @@ export class MindmapEditor {
 
   // ─── ReactFlow 原生变化转发 ───
 
-  applyNativeNodeChanges(changes: NodeChange[], structureType: MindmapStructureType): void {
-    this.structureType = structureType
-
+  applyNativeNodeChanges(changes: NodeChange[]): void {
     const positionChanges: Array<{ id: string; position: { x: number; y: number } }> = []
     const removeNodeIds: string[] = []
     const transientChanges: NodeChange[] = []
@@ -968,18 +963,8 @@ export class MindmapEditor {
   // ─── 布局与生命周期 ───
 
   reflow(): void {
-    const nodes = layoutReflow(
-      this.state.nodes,
-      this.state.edges,
-      this.structureType,
-      this.state.style.visualVariant,
-    )
+    const nodes = layoutReflow(this.state.nodes, this.state.edges, this.state.style.structureType)
     this.state.setNodesTransient(nodes)
-  }
-
-  setStructureType(structureType: MindmapStructureType): void {
-    this.structureType = structureType
-    this.reflow()
   }
 
   reset(): void {
@@ -991,21 +976,18 @@ export class MindmapEditor {
 
   loadFile(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
     this.state.loadFile(filePath, data, workspacePath)
-    this.structureType = this.state.style.structureType
     this.history.clear()
     this.syncHistoryState()
   }
 
   newFile(title?: string): void {
     this.state.newFile(title)
-    this.structureType = this.state.style.structureType
     this.history.clear()
     this.syncHistoryState()
   }
 
   clearDocument(): void {
     this.state.clearDocument()
-    this.structureType = this.state.style.structureType
     this.history.clear()
     this.syncHistoryState()
   }

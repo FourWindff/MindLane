@@ -48,7 +48,6 @@ export function useMindmapOperationController() {
   const chatReady = useSettingsStore(selectChatReady)
   const palaceEnabled = chatReady
   const structureType = useActiveMindmapStore((state) => state.style.structureType)
-  const visualVariant = useActiveMindmapStore((state) => state.style.visualVariant)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
   const documentRefs = useActiveMindmapStore((state) => state.documentRefs)
@@ -64,8 +63,8 @@ export function useMindmapOperationController() {
   const lastClickRef = useRef<{ id: string; time: number } | null>(null)
   const lastRestoredFileRef = useRef<string | null>(null)
   const viewportDebounceRef = useRef<number | null>(null)
-  const operationStateRef = useRef({ nodes, edges, selectedId, aiBusy, structureType })
-  operationStateRef.current = { nodes, edges, selectedId, aiBusy, structureType }
+  const operationStateRef = useRef({ nodes, edges, selectedId, aiBusy })
+  operationStateRef.current = { nodes, edges, selectedId, aiBusy }
 
   const controller = useMemo(
     () =>
@@ -324,18 +323,10 @@ export function useMindmapOperationController() {
   useEffect(() => {
     if (previousStructureTypeRef.current === structureType) return
     previousStructureTypeRef.current = structureType
-    editor.setStructureType(structureType)
+    editor.reflow()
     const timer = window.setTimeout(() => reactFlow.fitView({ padding: 0.2, duration: 300 }), 50)
     return () => window.clearTimeout(timer)
   }, [editor, reactFlow, structureType])
-
-  // 视觉变体切换（间距不同）需重新布局；结构未变时仅重排位置
-  const previousVisualVariantRef = useRef(visualVariant)
-  useEffect(() => {
-    if (previousVisualVariantRef.current === visualVariant) return
-    previousVisualVariantRef.current = visualVariant
-    editor.reflow()
-  }, [editor, visualVariant])
 
   return {
     nodes: canvasNodes,

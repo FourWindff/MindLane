@@ -58,7 +58,6 @@ describe('MindmapOperationController', () => {
         edges,
         selectedId,
         aiBusy: overrides.aiBusy ?? false,
-        structureType: 'logic',
       }),
       selection: {
         setSelectedId,
@@ -83,7 +82,7 @@ describe('MindmapOperationController', () => {
     controller.handleNodesChange(nodeChanges)
     controller.handleEdgesChange(edgeChanges)
 
-    expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(nodeChanges, 'logic')
+    expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(nodeChanges)
     expect(editor.applyNativeEdgeChanges).toHaveBeenCalledWith(edgeChanges)
     // 纯树约束：任意连线入口移除后，控制器不再暴露 handleConnect
     expect((controller as Record<string, unknown>).handleConnect).toBeUndefined()
@@ -140,9 +139,8 @@ describe('MindmapOperationController', () => {
 
     // Dimensions keep flowing so freshly inserted nodes get measured and their
     // edges connect at real sizes mid-stream; interaction changes stay blocked.
-    expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(
-      [{ id: 'a', type: 'dimensions', dimensions: { width: 80, height: 30 } }],
-      'logic',
-    )
+    expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith([
+      { id: 'a', type: 'dimensions', dimensions: { width: 80, height: 30 } },
+    ])
   })
 })

@@ -5,10 +5,8 @@ import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindma
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
+import { CHILD_OFFSET_X, findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
-import { VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
-import type { VisualVariant } from '@/features/mindmap/style/types'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import type { MindmapState } from '@/features/mindmap/model/mindmapStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
@@ -176,7 +174,6 @@ export interface PalaceSimInput {
   edges: Edge[]
   /** 当前选中节点，保持选中顺序 */
   selectedNodes: Array<{ id: string; label: string }>
-  visualVariant: VisualVariant
   addAsset: MindmapState['addAsset']
 }
 
@@ -192,7 +189,6 @@ export async function simulatePalaceInsert({
   nodes,
   edges,
   selectedNodes,
-  visualVariant,
   addAsset,
 }: PalaceSimInput): Promise<void> {
   const ai = useAiStore.getState()
@@ -204,7 +200,6 @@ export async function simulatePalaceInsert({
   const parentId = findParentId(edges, first.id) ?? 'root'
   const parentNode = nodes.find((node) => node.id === parentId)
   const firstSelected = nodes.find((node) => node.id === first.id)
-  const offsetX = VISUAL_VARIANTS[visualVariant].spacing.offsetX
   const selectedIds = selectedNodes.map((node) => node.id)
   const selectedIdSet = new Set(selectedIds)
 
@@ -213,7 +208,7 @@ export async function simulatePalaceInsert({
     id: palaceId,
     type: 'palace',
     position: {
-      x: firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + offsetX,
+      x: firstSelected?.position.x ?? (parentNode?.position.x ?? 0) + CHILD_OFFSET_X,
       y: firstSelected?.position.y ?? parentNode?.position.y ?? 0,
     },
     data: {
@@ -322,7 +317,6 @@ export function AgentWriteSimulator() {
   // into an infinite re-render (white screen).
   const nodes = useActiveMindmapStore((s) => s.nodes)
   const edges = useActiveMindmapStore((s) => s.edges)
-  const visualVariant = useActiveMindmapStore((s) => s.style.visualVariant)
   const rootChildren = getChildIdsOrdered(nodes, edges, 'root')
   const canUpdate = rootChildren.length >= 1
   const canMove = rootChildren.length >= 2
@@ -365,8 +359,8 @@ export function AgentWriteSimulator() {
       .filter((node) => node.selected && node.type === 'text')
       .map((node) => ({ id: node.id, label: String(node.data?.label ?? '') }))
     if (selectedNodes.length === 0) return
-    void simulatePalaceInsert({ editor, nodes, edges, selectedNodes, visualVariant, addAsset })
-  }, [addAsset, editor, edges, nodes, visualVariant])
+    void simulatePalaceInsert({ editor, nodes, edges, selectedNodes, addAsset })
+  }, [addAsset, editor, edges, nodes])
 
   return (
     <div className="agent-write-sim" aria-label="AI 写操作模拟面板">

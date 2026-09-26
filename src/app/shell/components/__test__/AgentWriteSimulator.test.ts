@@ -30,7 +30,6 @@ describe('simulatePalaceInsert', () => {
         { id: first, label: '要点一' },
         { id: second, label: '要点二' },
       ],
-      visualVariant: store.getState().style.visualVariant,
       addAsset: store.getState().addAsset,
     })
 

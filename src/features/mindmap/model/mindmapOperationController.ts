@@ -1,6 +1,5 @@
 import type { Edge, EdgeChange, Node, NodeChange, Viewport } from '@xyflow/react'
 import type { MindmapEditor } from './mindmapEditor'
-import type { MindmapStructureType } from './mindmapLayout'
 import {
   collectSubtreeIds,
   findParentId,
@@ -29,7 +28,6 @@ export interface MindmapOperationState {
   edges: Edge[]
   selectedId: string | null
   aiBusy: boolean
-  structureType: MindmapStructureType
 }
 
 export interface MindmapFlowPort {
@@ -74,13 +72,10 @@ export function createMindmapOperationController({
         // their edges connect at the wrong points until a later interaction
         // forces a re-measure. The dimension-triggered reflow is also what
         // spreads siblings after a fragment insert.
-        editor.applyNativeNodeChanges(
-          changes.filter((c) => c.type === 'dimensions'),
-          state.structureType,
-        )
+        editor.applyNativeNodeChanges(changes.filter((c) => c.type === 'dimensions'))
         return
       }
-      editor.applyNativeNodeChanges(changes, state.structureType)
+      editor.applyNativeNodeChanges(changes)
     },
 
     handleEdgesChange(changes: EdgeChange[]) {

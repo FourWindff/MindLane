@@ -22,7 +22,6 @@ describe('MindmapOperationController integration', () => {
         edges: store.getState().edges,
         selectedId,
         aiBusy: false,
-        structureType: 'logic',
       }),
       selection: {
         setSelectedId: (id) => {

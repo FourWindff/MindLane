@@ -27,28 +27,25 @@ export const STRUCTURE_TYPES: StructureTypeDef[] = [
   },
 ]
 
-/** 视觉轴：决定节点样式、边样式与连接方式、布局间距 */
+/** 视觉轴：决定节点样式、边样式与连接方式 */
 export const VISUAL_VARIANTS: Record<VisualVariant, VisualVariantDef> = {
   card: {
     id: 'card',
     label: '卡片式',
     description: '圆角卡片节点，贝塞尔树干渐变边',
     edge: { path: 'bezier', stroke: 'trunk', connect: 'side', strokeWidth: 1.5 },
-    spacing: { offsetX: 200, gapY: 12 },
   },
   outline: {
     id: 'outline',
     label: '线框式',
     description: '轻量边框节点，平滑折线',
     edge: { path: 'smooth-step', stroke: 'line', connect: 'side', strokeWidth: 1.5 },
-    spacing: { offsetX: 200, gapY: 12 },
   },
   minimal: {
     id: 'minimal',
     label: '极简式',
     description: '纯文字下划线，直角分支线连接节点下边框',
     edge: { path: 'step', stroke: 'line', connect: 'bottom', strokeWidth: 2 },
-    spacing: { offsetX: 200, gapY: 12 },
   },
 }
 

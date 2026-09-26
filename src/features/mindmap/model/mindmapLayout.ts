@@ -1,13 +1,11 @@
 import dagre from 'dagre'
 import type { Edge, Node } from '@xyflow/react'
-import { reflowChildren } from '@/shared/lib/mindmapTree'
+import { CHILD_GAP_Y, CHILD_OFFSET_X, reflowChildren } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
-import { DEFAULT_STYLE, VISUAL_VARIANTS } from '@/features/mindmap/style/presets'
-import type { VisualVariant } from '@/features/mindmap/style/types'
 
-export type MindmapStructureType = 'logic' | 'mindmap'
+type MindmapStructureType = 'logic' | 'mindmap'
 
-export interface InitialLayoutOptions {
+interface InitialLayoutOptions {
   horizontalGap?: number
   verticalGap?: number
   rootX?: number
@@ -69,19 +67,17 @@ export function layoutInitial(
   })
 }
 
-/** Incremental reflow of a forest; reads the spacing of the active visual variant. */
+/** Incremental reflow of a forest; node spacing is fixed (the visual variant no longer affects layout). */
 export function layoutReflow(
   nodes: Node[],
   edges: Edge[],
   structureType: MindmapStructureType = 'logic',
-  visualVariant: VisualVariant = DEFAULT_STYLE.visualVariant,
 ): Node[] {
-  const { spacing } = VISUAL_VARIANTS[visualVariant]
   const targetIds = new Set(edges.map((edge) => edge.target))
   const roots = nodes.filter((node) => !targetIds.has(node.id))
   let result = nodes
   for (const root of roots) {
-    result = reflowChildren(root.id, result, edges, spacing.offsetX, spacing.gapY, structureType)
+    result = reflowChildren(root.id, result, edges, CHILD_OFFSET_X, CHILD_GAP_Y, structureType)
   }
   return result
 }

@@ -16,8 +16,6 @@ describe('导图样式模块配置', () => {
       expect(v.edge.stroke, `${v.id} edge.stroke`).toBeTruthy()
       expect(v.edge.connect, `${v.id} edge.connect`).toBeTruthy()
       expect(v.edge.strokeWidth, `${v.id} edge.strokeWidth`).toBeGreaterThan(0)
-      expect(v.spacing.offsetX, `${v.id} spacing.offsetX`).toBeGreaterThan(0)
-      expect(v.spacing.gapY, `${v.id} spacing.gapY`).toBeGreaterThan(0)
     }
   })
 

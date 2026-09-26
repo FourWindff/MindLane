@@ -148,7 +148,6 @@ export function createMindmapStore(): MindmapStore {
         hydratedNodes as Node[],
         data.mindmap.edges as Edge[],
         style.structureType,
-        style.visualVariant,
       )
       set({
         nodes: laidOut,

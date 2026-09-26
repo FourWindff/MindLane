@@ -27,12 +27,6 @@ export interface EdgeModeConfig {
   strokeWidth: number
 }
 
-/** 布局间距（子节点与父节点的水平偏移 / 兄弟节点垂直间距） */
-export interface MindmapSpacing {
-  offsetX: number
-  gapY: number
-}
-
 export interface StructureTypeDef {
   id: StructureType
   label: string
@@ -44,7 +38,6 @@ export interface VisualVariantDef {
   label: string
   description: string
   edge: EdgeModeConfig
-  spacing: MindmapSpacing
 }
 
 export interface ColorSchemeDef {

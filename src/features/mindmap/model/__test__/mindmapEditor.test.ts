@@ -282,10 +282,9 @@ describe('MindmapEditor', () => {
       const { nodeId } = editor.addChild(rootId())
       const beforeX = store.getState().nodes.find((n) => n.id === nodeId)!.position.x
 
-      editor.applyNativeNodeChanges(
-        [{ id: nodeId, type: 'position', position: { x: beforeX + 100, y: 0 } }],
-        'logic',
-      )
+      editor.applyNativeNodeChanges([
+        { id: nodeId, type: 'position', position: { x: beforeX + 100, y: 0 } },
+      ])
 
       expect(store.getState().nodes.find((n) => n.id === nodeId)!.position.x).toBe(beforeX + 100)
       expect(store.getState().canUndo).toBe(true)
@@ -418,7 +417,8 @@ describe('MindmapEditor', () => {
     })
 
     it('setNodeSideCollapsed toggles only the requested side flag', () => {
-      editor.setStructureType('mindmap')
+      store.getState().setStyle({ structureType: 'mindmap' })
+      editor.reflow()
       editor.addChild(rootId())
       editor.addChild(rootId())
 
@@ -432,7 +432,8 @@ describe('MindmapEditor', () => {
     })
 
     it('expanding one side of a whole-collapsed root clears collapsed and keeps the other side folded via its flag', () => {
-      editor.setStructureType('mindmap')
+      store.getState().setStyle({ structureType: 'mindmap' })
+      editor.reflow()
       editor.addChild(rootId())
       editor.addChild(rootId())
       editor.setNodeCollapsed(rootId(), true)

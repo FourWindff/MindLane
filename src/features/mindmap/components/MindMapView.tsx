@@ -8,7 +8,7 @@ import { PalaceModal } from './PalaceModal'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
 import { DocumentRefsPanel } from './DocumentRefsPanel'
-import { StyleProvider } from '@/features/mindmap/style/StyleContext'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindmapOperationController'
 
 function MindMapWorkspace({
@@ -27,9 +27,10 @@ function MindMapWorkspace({
   aiReady: boolean
 }) {
   const view = useMindmapOperationController()
+  const { visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)
 
   return (
-    <div className="mindmap-shell">
+    <div className="mindmap-shell" data-map-style={visualVariant} data-color-scheme={colorScheme}>
       <MindMapHeader
         onAddChild={view.actions.addChild}
         onAddSibling={view.actions.addSibling}
@@ -144,17 +145,15 @@ export function MindMapView({
   aiReady: boolean
 }) {
   return (
-    <StyleProvider>
-      <ReactFlowProvider>
-        <MindMapWorkspace
-          onSwitchWorkspace={onSwitchWorkspace}
-          onOpenSettings={onOpenSettings}
-          chatOpen={chatOpen}
-          capsuleExpanded={capsuleExpanded}
-          onToggleChat={onToggleChat}
-          aiReady={aiReady}
-        />
-      </ReactFlowProvider>
-    </StyleProvider>
+    <ReactFlowProvider>
+      <MindMapWorkspace
+        onSwitchWorkspace={onSwitchWorkspace}
+        onOpenSettings={onOpenSettings}
+        chatOpen={chatOpen}
+        capsuleExpanded={capsuleExpanded}
+        onToggleChat={onToggleChat}
+        aiReady={aiReady}
+      />
+    </ReactFlowProvider>
   )
 }
