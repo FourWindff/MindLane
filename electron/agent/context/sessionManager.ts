@@ -1,7 +1,6 @@
 import path from 'node:path'
 import type { BaseMessage } from '@langchain/core/messages'
 import { SessionMessageStore, type SessionMeta } from './sessionMessageStore.js'
-import { uiMessageToBaseMessages } from './sessionMessageStore.js'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
 import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
 import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
@@ -65,13 +64,6 @@ export class SessionManager {
   runInWorkspace<T>(workspaceUuid: string, action: () => T): T {
     if (!this.store) throw new Error('SessionManager not initialized')
     return this.store.runInWorkspace(workspaceUuid, action)
-  }
-
-  /**
-   * 检查存储是否已完成初始化。
-   */
-  isReady(): boolean {
-    return this.store !== null
   }
 
   /**
@@ -155,85 +147,12 @@ export class SessionManager {
   }
 
   /**
-   * 保存会话元数据和 UI 消息历史。
-   *
-   * 仅追加本地尚未持久化的新消息，避免重复写入。
-   */
-  async saveSession(sessionId: string, messages: ChatMessage[], fileUuid: string): Promise<void> {
-    if (!this.store) throw new Error('SessionManager not initialized')
-
-    const storedMessages = await this.store.loadMessages(sessionId)
-    const existingMeta = this.store.getSessionMeta(sessionId)
-    const now = new Date().toISOString()
-
-    // 按 UI 消息（ChatMessage）数量进行追加去重，避免 assistant 消息带
-    // toolCalls 时 BaseMessage 数量膨胀导致切片错误。
-    const storedChatMessages = checkpointMessagesToSessionMessages(storedMessages)
-    const messagesToAppend = messages.slice(storedChatMessages.length)
-
-    const baseMessagesToAppend: BaseMessage[] = []
-    for (const msg of messagesToAppend) {
-      baseMessagesToAppend.push(...uiMessageToBaseMessages(msg))
-    }
-
-    if (baseMessagesToAppend.length > 0) {
-      await this.store.saveMessages(
-        sessionId,
-        baseMessagesToAppend,
-        existingMeta?.fileUuid ?? fileUuid,
-      )
-    }
-
-    // 更新标题与元数据
-    let title: string
-    if (existingMeta?.title) {
-      title = existingMeta.title
-    } else {
-      const firstUserMessage = messages.find((m) => m.role === 'user')
-      if (firstUserMessage) {
-        const content = firstUserMessage.content
-        title = content.slice(0, 30) + (content.length > 30 ? '...' : '')
-      } else {
-        title = `新对话 ${new Date().toLocaleString('zh-CN', {
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}`
-      }
-    }
-
-    if (title !== existingMeta?.title) {
-      const meta: SessionMeta = {
-        id: sessionId,
-        fileUuid: existingMeta?.fileUuid ?? fileUuid,
-        title,
-        createdAt: existingMeta?.createdAt ?? now,
-        updatedAt: now,
-        messageCount: storedMessages.length + baseMessagesToAppend.length,
-        lastConsolidated: existingMeta?.lastConsolidated,
-        _lastSummary: existingMeta?._lastSummary,
-      }
-      await this.store.updateSessionMeta(sessionId, meta)
-    }
-  }
-
-  /**
    * 删除会话（包括元数据文件和 checkpoint）
    */
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
     await this.store.deleteSession(sessionId)
     await this.checkpointer?.deleteThread(sessionId)
-  }
-
-  /**
-   * 获取最近使用的会话 ID
-   */
-  async getMostRecentSessionId(): Promise<string | null> {
-    if (!this.store) throw new Error('SessionManager not initialized')
-    const sessions = await this.store.listSessions(this.store.getWorkspaceUuid())
-    return sessions[0]?.id ?? null
   }
 
   /**
