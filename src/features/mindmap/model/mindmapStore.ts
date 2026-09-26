@@ -7,7 +7,7 @@ import {
   type MindlaneAsset,
   migrateDocumentRef,
 } from '@/shared/lib/fileFormat'
-import { nodeRegistry } from '@/features/mindmap/nodes'
+import { nodeRegistry } from '@/features/mindmap/nodes/registry'
 import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
 import { layoutReflow } from './mindmapLayout'

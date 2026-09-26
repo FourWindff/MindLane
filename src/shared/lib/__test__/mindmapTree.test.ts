@@ -11,7 +11,7 @@ import {
 } from '../mindmapTree'
 
 // registry 副作用注册 text 节点类型
-import '@/features/mindmap/nodes'
+import '@/features/mindmap/nodes/registry'
 
 type Tree = { nodes: Node[]; edges: Edge[] }
 

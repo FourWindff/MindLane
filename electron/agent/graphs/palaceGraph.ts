@@ -3,7 +3,7 @@ import type { LLMProvider } from '../providers/index.js'
 import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
 import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
 import { AnchorAgent } from '../agenthub/anchorAgent.js'
-import { SvgAgent } from '../agenthub/svgAgent.js'
+import { SvgAgent } from '../agenthub/svgArtwork.js'
 import {
   PalaceSubgraphState,
   type MemoryPalaceStation,

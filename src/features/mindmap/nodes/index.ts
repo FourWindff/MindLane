@@ -1,1 +1,0 @@
-export { nodeRegistry } from './registry'

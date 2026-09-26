@@ -7,7 +7,7 @@ import {
   type NodeTypes,
   type ReactFlowInstance,
 } from '@xyflow/react'
-import { nodeRegistry } from '@/features/mindmap/nodes'
+import { nodeRegistry } from '@/features/mindmap/nodes/registry'
 
 type EdgeTypes = NonNullable<React.ComponentProps<typeof ReactFlow>['edgeTypes']>
 
