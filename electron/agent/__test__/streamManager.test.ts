@@ -1015,6 +1015,9 @@ describe('StreamManager + Runner', () => {
       ...defaultRequestFields,
       context: { fileUuid: 'file-a' },
     })
+    // getRuntime always resolves through a microtask, so yield once to let the
+    // Runner take its tool snapshot before the registry changes.
+    await Promise.resolve()
     runtime.toolRegistry.registerTool({ name: 'late-tool' } as never)
     await waitUntil(() => capturedToolNames.length === 1)
     gate.resolve()

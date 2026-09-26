@@ -493,39 +493,24 @@ export class StreamManager {
     string,
     { abort: () => void; runner: Runner | null; aborted: boolean }
   >()
-  private runtime: StreamRuntime | null = null
   private runtimePromise: Promise<StreamRuntime> | null = null
 
   constructor(private readonly options: StreamManagerOptions) {}
 
   invalidateRuntime(): void {
-    this.runtime = null
     this.runtimePromise = null
   }
 
-  private getRuntime(request: StreamRequest): StreamRuntime | Promise<StreamRuntime> {
-    if (this.runtime) return this.runtime
+  private getRuntime(request: StreamRequest): Promise<StreamRuntime> {
     if (this.runtimePromise) return this.runtimePromise
-    const created = this.options.createRuntime(request)
-    if (created instanceof Promise) {
-      const pending = created.then(
-        (runtime) => {
-          if (this.runtimePromise === pending) {
-            this.runtime = runtime
-            this.runtimePromise = null
-          }
-          return runtime
-        },
-        (error) => {
-          if (this.runtimePromise === pending) this.runtimePromise = null
-          throw error
-        },
-      )
-      this.runtimePromise = pending
-      return pending
-    }
-    this.runtime = created
-    return created
+    // Promise.resolve absorbs both the sync and async createRuntime contracts.
+    const pending = Promise.resolve(this.options.createRuntime(request))
+    this.runtimePromise = pending
+    // Drop a failed runtime so the next stream retries instead of replaying the error.
+    void pending.catch(() => {
+      if (this.runtimePromise === pending) this.runtimePromise = null
+    })
+    return pending
   }
 
   startStream(request: StreamRequest): string {
@@ -545,9 +530,9 @@ export class StreamManager {
       if (entry.aborted) runner.abort()
       await runner.run()
     }
-    let runtimeOrPromise: StreamRuntime | Promise<StreamRuntime>
+    let runtime: Promise<StreamRuntime>
     try {
-      runtimeOrPromise = this.getRuntime(request)
+      runtime = this.getRuntime(request)
     } catch (error) {
       this.options.eventSink({
         streamId,
@@ -558,11 +543,8 @@ export class StreamManager {
       this.runners.delete(streamId)
       return streamId
     }
-    const completion =
-      runtimeOrPromise instanceof Promise
-        ? runtimeOrPromise.then(runWithRuntime)
-        : runWithRuntime(runtimeOrPromise)
-    void completion
+    void runtime
+      .then(runWithRuntime)
       .catch((error) => {
         this.options.eventSink({
           streamId,
