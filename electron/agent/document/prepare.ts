@@ -12,7 +12,7 @@ import {
   buildTextPreview,
 } from '../graphs/mindmapGraph/documentTextCache.js'
 
-export type PrepareDocumentInput = {
+type PrepareDocumentInput = {
   source: DocumentSource
   loaders: DocumentLoaderRegistry
   budgetChars: number
@@ -20,7 +20,7 @@ export type PrepareDocumentInput = {
   userDataPath?: string
 }
 
-export type PreparedDocument = {
+type PreparedDocument = {
   batches: Document[][]
   documentRef: DocumentRef
 }

@@ -25,7 +25,7 @@ export interface MindmapOutlineNode {
   children: MindmapOutlineNode[]
 }
 
-export type MindmapOutlineParseResult =
+type MindmapOutlineParseResult =
   { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string }
 
 function isNodeElement(el: Element): boolean {

@@ -13,7 +13,7 @@ const MEMORY_TAG = 'MEMORY'
  * 由 `loadMemoryContext` 一次性读盘产出，供预算估算路径复用，
  * 避免每轮估算重复读盘；supervisor 真实调用仍现读现用（新鲜优先）。
  */
-export interface MemoryContext {
+interface MemoryContext {
   memory: string
 }
 
@@ -104,7 +104,7 @@ generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要�
  * 内容完全由代码定义（xmlNodeTypeRegistry），跨轮次逐字节稳定，不破坏前缀缓存命中；
  * 新增节点类型只需注册条目，提示词段落自动更新，无需手写。
  */
-export function buildMindmapXmlContract(): string {
+function buildMindmapXmlContract(): string {
   return `<MINDLANE_XML_CONTRACT>
 ## 导图 XML 契约
 

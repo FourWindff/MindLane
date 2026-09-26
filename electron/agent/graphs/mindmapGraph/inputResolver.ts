@@ -2,7 +2,7 @@ import type { MindmapInputSource, MindmapSubgraphStateType } from '../../state.j
 import type { DocumentRef } from '../../state.js'
 import { findLatestUserMessageText } from '../../utils.js'
 
-export interface MindmapInputResolution {
+interface MindmapInputResolution {
   /** 解析后的输入源 */
   source: MindmapInputSource
   /** 用于生成的标题默认值 */

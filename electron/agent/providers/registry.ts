@@ -1,7 +1,7 @@
 import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
 import type { AppSettings, ProviderConfig } from '../../fs/types.js'
 
-export type ProviderMeta = {
+type ProviderMeta = {
   id: string
   displayName: string
   capabilities: ProviderCapability[]

@@ -11,7 +11,7 @@ export { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL }
 
 export type SubgraphName = 'mindmap' | 'palace'
 
-export interface SubgraphCall {
+interface SubgraphCall {
   /** 目标子图名称 */
   subgraph: SubgraphName
   /** 原始 tool_call id */

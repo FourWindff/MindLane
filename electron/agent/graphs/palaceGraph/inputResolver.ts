@@ -1,7 +1,7 @@
 import { findLatestUserMessageText } from '../../utils.js'
 import type { PalaceSubgraphStateType, SelectedNodeContent } from '../../state.js'
 
-export interface PalaceInputResolution {
+interface PalaceInputResolution {
   palaceInputNodes: SelectedNodeContent[]
   palaceInputText: string
 }

@@ -23,7 +23,7 @@ export function shortHash(hash: string): string {
 }
 
 /** 清洗文件名，去掉扩展名和非法字符 */
-export function sanitizeBaseFilename(filename: string): string {
+function sanitizeBaseFilename(filename: string): string {
   const withoutExt = path.basename(filename, path.extname(filename))
   return withoutExt
     .replace(/[\\/:*?"'<>|]/g, '_')
@@ -33,13 +33,13 @@ export function sanitizeBaseFilename(filename: string): string {
 }
 
 /** 构建缓存文件的相对路径 */
-export function buildCacheRelativePath(baseFilename: string, hash: string): string {
+function buildCacheRelativePath(baseFilename: string, hash: string): string {
   const safeName = sanitizeBaseFilename(baseFilename) || '未命名'
   return path.join(DOCUMENTS_DIR, `${safeName}_${hash}.txt`)
 }
 
 /** 把相对路径转成 userData 下的绝对路径 */
-export function resolveCacheAbsolutePath(userDataPath: string, relativePath: string): string {
+function resolveCacheAbsolutePath(userDataPath: string, relativePath: string): string {
   return path.join(userDataPath, relativePath)
 }
 

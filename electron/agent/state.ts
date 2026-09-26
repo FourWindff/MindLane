@@ -18,7 +18,7 @@ export type { MindmapInputSource }
  * are always `chat` (the channel default). ADR-0023 lands the conditional
  * edge that reads this marker.
  */
-export type RunEntry = 'chat' | 'palace'
+type RunEntry = 'chat' | 'palace'
 
 /** 简单替换型 reducer：直接用新值覆盖旧值。 */
 function replaceReducer<T>(_prev: T, next: T): T {

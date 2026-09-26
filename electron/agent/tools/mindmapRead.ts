@@ -9,9 +9,7 @@ export type { MindmapReadQuery }
  * 由装配方注入（主进程经反向 IPC 向渲染层请求），工具自身不接触 IPC——
  * 与 readFile 工具的 getter 注入同一模式，保持工具无状态、可单测。
  */
-export type MindmapSnapshotProvider = (fileUuid: string, query: MindmapReadQuery) => Promise<string>
-
-export type MindmapReadToolResult = { ok: true; summary: string } | { ok: false; error: string }
+type MindmapSnapshotProvider = (fileUuid: string, query: MindmapReadQuery) => Promise<string>
 
 /**
  * 创建按需读导图工具（PRD 6.2，原 getMindmapContext 改造）。
