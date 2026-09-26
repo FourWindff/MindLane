@@ -168,7 +168,7 @@ const PALACE_SIM_STATIONS = [
   },
 ] as const
 
-export interface PalaceSimInput {
+interface PalaceSimInput {
   editor: MindmapEditor
   nodes: Node[]
   edges: Edge[]
