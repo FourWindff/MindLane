@@ -14,10 +14,11 @@ import {
   type ReactFlowInstance,
   type Viewport,
 } from '@xyflow/react'
-import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
+import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { mindmapShortcutRows } from './mindmapShortcutTable'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
@@ -314,134 +315,10 @@ export function useMindmapOperationController() {
   )
   const canRemove = Boolean(selectedId && selectedId !== 'root')
 
-  useShortcut({
-    id: 'mindmap.addChild',
-    combo: 'mod+enter',
-    description: '添加子主题',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.addChild,
-  })
-  useShortcut({
-    id: 'mindmap.addSibling',
-    combo: 'mod+shift+enter',
-    description: '添加同级主题',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: () => shortcutsEnabled() && canAddSibling,
-    handler: () => controller.addSibling(),
-  })
-  useShortcut({
-    id: 'mindmap.delete',
-    combo: 'delete',
-    description: '删除选中节点（含子树）',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.removeSelected,
-  })
-  useShortcut({
-    id: 'mindmap.backspace',
-    combo: 'backspace',
-    description: '删除选中节点（含子树）',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.removeSelected,
-  })
-  useShortcut({
-    id: 'mindmap.edit',
-    combo: 'f2',
-    description: '编辑选中节点',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: () => {
-      if (selectedId) controller.startEditing(selectedId)
-    },
-  })
-  useShortcut({
-    id: 'mindmap.reset',
-    combo: 'mod+shift+r',
-    description: '重置为示例导图',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.reset,
-  })
-  useShortcut({
-    id: 'mindmap.navLeft',
-    combo: 'arrowleft',
-    description: '选中父节点',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.navigateLeft,
-  })
-  useShortcut({
-    id: 'mindmap.navRight',
-    combo: 'arrowright',
-    description: '选中第一个子节点',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.navigateRight,
-  })
-  useShortcut({
-    id: 'mindmap.navUp',
-    combo: 'arrowup',
-    description: '选中上方兄弟节点',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.navigateUp,
-  })
-  useShortcut({
-    id: 'mindmap.navDown',
-    combo: 'arrowdown',
-    description: '选中下方兄弟节点',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.navigateDown,
-  })
-  useShortcut({
-    id: 'mindmap.centerRoot',
-    combo: 'mod+0',
-    description: '回到中心主题',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: () => void controller.centerRoot(),
-  })
-  useShortcut({
-    id: 'mindmap.undo',
-    combo: 'mod+z',
-    description: '撤销',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.undo,
-  })
-  useShortcut({
-    id: 'mindmap.redo',
-    combo: 'mod+shift+z',
-    description: '重做',
-    group: 'mindmap',
-    preventWhenTyping: true,
-    enabled: shortcutsEnabled,
-    handler: controller.redo,
-  })
-  useShortcut({
-    id: 'mindmap.save',
-    combo: 'mod+s',
-    description: '保存文件',
-    group: 'mindmap',
-    preventWhenTyping: false,
-    enabled: shortcutsEnabled,
-    handler: () => void save(),
-  })
+  useShortcuts(
+    mindmapShortcutRows({ controller, selectedId, canAddSibling, enabled: shortcutsEnabled, save }),
+    { group: 'mindmap', preventWhenTyping: true },
+  )
 
   const previousStructureTypeRef = useRef(structureType)
   useEffect(() => {

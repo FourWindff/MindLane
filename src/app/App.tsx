@@ -17,7 +17,7 @@ import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
 import { AppToolbar } from '@/app/shell/components/AppToolbar'
 import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
-import { useShortcut } from '@/shared/shortcuts/useRegisterShortcut'
+import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
 import {
   connectAiStore,
   subscribeToChatStreamEvents,
@@ -142,27 +142,18 @@ function AppContent() {
     void initializeWorkspaceSession()
   }, [loaded, workspaceInitialized, workspaceInitializing])
 
-  useShortcut({
-    id: 'app.openSettings',
-    combo: 'mod+comma',
-    description: '打开设置',
-    group: 'app',
-    preventWhenTyping: false,
-    handler: () => {
-      setSettingsOpen(true)
-    },
-  })
-
-  useShortcut({
-    id: 'app.openFileManager',
-    combo: 'mod+shift+f',
-    description: '打开文件管理器',
-    group: 'app',
-    preventWhenTyping: false,
-    handler: () => {
-      setFileManagerOpen((open) => !open)
-    },
-  })
+  useShortcuts(
+    [
+      ['app.openSettings', 'mod+comma', '打开设置', () => setSettingsOpen(true)],
+      [
+        'app.openFileManager',
+        'mod+shift+f',
+        '打开文件管理器',
+        () => setFileManagerOpen((open) => !open),
+      ],
+    ],
+    { group: 'app', preventWhenTyping: false },
+  )
 
   return (
     <div className="app-frame">

@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { MindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
+import { mindmapShortcutRows } from '@/features/mindmap/hooks/mindmapShortcutTable'
+import { registerShortcutRows } from '../useRegisterShortcut'
 import { shortcutRegistry } from '../ShortcutRegistry'
 import type { ShortcutRegistration } from '../types'
 
@@ -143,5 +146,98 @@ describe('shortcutRegistry', () => {
     expect(shortcutRegistry.getSnapshot()).toHaveLength(1)
     expect(listener).toHaveBeenCalledTimes(3)
     unsubscribe()
+  })
+})
+
+const CASES: Array<{ code: string; modifiers: Modifiers; action: string }> = [
+  { code: 'Enter', modifiers: { meta: true }, action: 'addChild' },
+  { code: 'Enter', modifiers: { meta: true, shift: true }, action: 'addSibling' },
+  { code: 'Delete', modifiers: {}, action: 'removeSelected' },
+  { code: 'Backspace', modifiers: {}, action: 'removeSelected' },
+  { code: 'F2', modifiers: {}, action: 'startEditing' },
+  { code: 'KeyR', modifiers: { meta: true, shift: true }, action: 'reset' },
+  { code: 'ArrowLeft', modifiers: {}, action: 'navigateLeft' },
+  { code: 'ArrowRight', modifiers: {}, action: 'navigateRight' },
+  { code: 'ArrowUp', modifiers: {}, action: 'navigateUp' },
+  { code: 'ArrowDown', modifiers: {}, action: 'navigateDown' },
+  { code: 'Digit0', modifiers: { meta: true }, action: 'centerRoot' },
+  { code: 'KeyZ', modifiers: { meta: true }, action: 'undo' },
+  { code: 'KeyZ', modifiers: { meta: true, shift: true }, action: 'redo' },
+  { code: 'KeyS', modifiers: { meta: true }, action: 'save' },
+]
+
+const COMBOS = [
+  'mod+enter',
+  'mod+shift+enter',
+  'delete',
+  'backspace',
+  'f2',
+  'mod+shift+r',
+  'arrowleft',
+  'arrowright',
+  'arrowup',
+  'arrowdown',
+  'mod+0',
+  'mod+z',
+  'mod+shift+z',
+  'mod+s',
+]
+
+describe('mindmap shortcut table', () => {
+  function buildTable(enabled: () => boolean = () => true) {
+    const spies = {
+      addChild: vi.fn(),
+      addSibling: vi.fn(),
+      removeSelected: vi.fn(),
+      startEditing: vi.fn(),
+      reset: vi.fn(),
+      navigateLeft: vi.fn(),
+      navigateRight: vi.fn(),
+      navigateUp: vi.fn(),
+      navigateDown: vi.fn(),
+      centerRoot: vi.fn(),
+      undo: vi.fn(),
+      redo: vi.fn(),
+    }
+    const save = vi.fn()
+    const rows = mindmapShortcutRows({
+      controller: spies as unknown as MindmapOperationController,
+      selectedId: 'n1',
+      canAddSibling: true,
+      enabled,
+      save,
+    })
+    registered.push(
+      registerShortcutRows({ current: rows }, { group: 'mindmap', preventWhenTyping: true }),
+    )
+    return { spies, save, rows }
+  }
+
+  it('routes every combo to exactly one action', () => {
+    const { spies, save, rows } = buildTable()
+    expect(rows).toHaveLength(CASES.length)
+    expect(rows.map((row) => row[1])).toEqual(COMBOS)
+
+    for (const [index, { code, modifiers, action }] of CASES.entries()) {
+      for (const spy of [...Object.values(spies), save]) spy.mockClear()
+
+      const event = keyEvent(code, { modifiers })
+      const label = COMBOS[index]!
+      expect(shortcutRegistry.dispatch(event as unknown as KeyboardEvent), label).toBe(true)
+      expect(event.preventDefault, label).toHaveBeenCalledTimes(1)
+      expect(
+        Object.entries({ save, ...spies })
+          .filter(([, spy]) => spy.mock.calls.length > 0)
+          .map(([name]) => name),
+        label,
+      ).toEqual([action])
+    }
+  })
+
+  it('disables the whole table while the AI streams', () => {
+    const { spies } = buildTable(() => false)
+    const event = keyEvent('Enter', { modifiers: { meta: true } })
+    expect(shortcutRegistry.dispatch(event as unknown as KeyboardEvent)).toBe(false)
+    expect(spies.addChild).not.toHaveBeenCalled()
   })
 })
