@@ -45,34 +45,22 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' })
   const [navigationPath, setNavigationPath] = useState<string[]>([])
 
-  const currentLevelItems = useMemo((): WorkspaceTreeEntry[] => {
-    if (navigationPath.length === 0) return tree
+  // One walk of the tree resolves both the items and the breadcrumb path.
+  const { items: currentLevelItems, path: currentDirectoryPath } = useMemo((): {
+    items: WorkspaceTreeEntry[]
+    path: string | null
+  } => {
     let current = tree
+    let currentPath = workspacePath ?? null
     for (const segment of navigationPath) {
       const found = current.find((e) => e.name === segment && e.type === 'directory')
-      if (found?.children) {
-        current = found.children
-      } else {
-        return []
-      }
-    }
-    return current
-  }, [tree, navigationPath])
-  const currentFolder = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null
-  const currentDirectoryPath = useMemo((): string | null => {
-    if (!workspacePath) return null
-    if (navigationPath.length === 0) return workspacePath
-
-    let current = tree
-    let currentPath = workspacePath
-    for (const segment of navigationPath) {
-      const found = current.find((e) => e.name === segment && e.type === 'directory')
-      if (!found?.children) return null
+      if (!found?.children) return { items: [], path: null }
       currentPath = found.path
       current = found.children
     }
-    return currentPath
+    return { items: current, path: currentPath }
   }, [tree, workspacePath, navigationPath])
+  const currentFolder = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null
 
   const handleContextMenu = useCallback((e: MouseEvent, entry: WorkspaceTreeEntry | null) => {
     e.preventDefault()
