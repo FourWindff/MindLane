@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState, type MouseEvent } from 'react'
+import { TextPromptDialog } from '@/shared/components/TextPromptDialog'
 import { useWorkspaceStore } from '../store'
 import { FileContextMenu } from './FileContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { ConfirmDialog } from './ConfirmDialog'
-import { InputDialog } from './InputDialog'
 import { FileManagerToolbar } from './FileManagerToolbar'
 import { FileManagerBreadcrumb } from './FileManagerBreadcrumb'
 import { FileManagerGrid } from './FileManagerGrid'
@@ -226,7 +226,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
         {/* Dialogs */}
         {dialog.type === 'new-file' && (
-          <InputDialog
+          <TextPromptDialog
             label="新建文件"
             title="输入文件名"
             subtitle="创建后会立即保存到当前工作区。"
@@ -238,7 +238,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
         )}
 
         {dialog.type === 'new-folder' && (
-          <InputDialog
+          <TextPromptDialog
             label="新建文件夹"
             title="输入文件夹名称"
             placeholder="例如：学习笔记"

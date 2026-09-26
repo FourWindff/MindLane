@@ -214,18 +214,6 @@
   color: var(--ml-text-muted);
 }
 
-.workspace-home__modal-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ml-overlay-bg);
-  backdrop-filter: var(--ml-overlay-blur);
-  -webkit-backdrop-filter: var(--ml-overlay-blur);
-}
-
 .workspace-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -238,7 +226,12 @@
   -webkit-backdrop-filter: var(--ml-overlay-blur);
 }
 
-.workspace-home__modal,
+/* 工作区首页的弹窗限制在容器内（不盖住窗口栏）：必须排在上面那份之后才生效 */
+.workspace-home__modal-backdrop {
+  position: absolute;
+  z-index: 5;
+}
+
 .workspace-modal {
   width: min(420px, calc(100% - 2rem));
   padding: 1.5rem;
@@ -254,7 +247,6 @@
   gap: 0.85rem;
 }
 
-.workspace-home__modal-label,
 .workspace-modal__label {
   font-size: 0.72rem;
   font-weight: 500;
@@ -262,20 +254,17 @@
   color: var(--ml-text-faint);
 }
 
-.workspace-home__modal-title,
 .workspace-modal__title {
   margin: 0;
   font-size: 1.25rem;
 }
 
-.workspace-home__modal-subtitle,
 .workspace-modal__subtitle {
   margin: 0;
   color: var(--ml-text-muted);
   font-size: 0.92rem;
 }
 
-.workspace-home__modal-input,
 .workspace-modal__input {
   width: 100%;
   border: 1px solid var(--ml-border-strong);
@@ -290,13 +279,11 @@
     box-shadow 0.2s ease;
 }
 
-.workspace-home__modal-input:focus,
 .workspace-modal__input:focus {
   border-color: var(--ml-accent);
   box-shadow: 0 0 0 3px rgba(45, 42, 39, 0.06);
 }
 
-.workspace-home__modal-actions,
 .workspace-modal__actions {
   display: flex;
   justify-content: flex-end;

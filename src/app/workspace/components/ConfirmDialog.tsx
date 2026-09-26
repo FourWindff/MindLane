@@ -1,3 +1,6 @@
+import { useId } from 'react'
+import { Modal } from '@/shared/components/Modal'
+
 interface ConfirmDialogProps {
   title: string
   message: string
@@ -15,42 +18,27 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const titleId = useId()
+
   return (
-    <div
-      className="workspace-modal-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
-      <div
-        className="workspace-modal"
-        role="dialog"
-        aria-modal="true"
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onCancel()
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            onConfirm()
-          }
-        }}
-      >
-        <div className="workspace-modal__label">确认操作</div>
-        <h2 className="workspace-modal__title">{title}</h2>
-        <p className="workspace-modal__subtitle">{message}</p>
-        <div className="workspace-modal__actions">
-          <button type="button" className="workspace-home__action" onClick={onCancel}>
-            取消
-          </button>
-          <button
-            type="button"
-            className={`workspace-home__action ${danger ? 'workspace-home__action--danger' : 'workspace-home__action--primary'}`}
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+    <Modal labelledBy={titleId} onCancel={onCancel} onSubmit={onConfirm}>
+      <div className="workspace-modal__label">确认操作</div>
+      <h2 id={titleId} className="workspace-modal__title">
+        {title}
+      </h2>
+      <p className="workspace-modal__subtitle">{message}</p>
+      <div className="workspace-modal__actions">
+        <button type="button" className="workspace-home__action" onClick={onCancel}>
+          取消
+        </button>
+        <button
+          type="button"
+          className={`workspace-home__action ${danger ? 'workspace-home__action--danger' : 'workspace-home__action--primary'}`}
+          onClick={onConfirm}
+        >
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
