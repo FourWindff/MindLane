@@ -109,7 +109,7 @@ export interface WorkspaceTreeEntry {
   previewUrl?: string
 }
 
-export interface SelectedDocumentInfo {
+interface SelectedDocumentInfo {
   path: string
   name: string
   size: number
@@ -118,7 +118,7 @@ export interface SelectedDocumentInfo {
   type: DocumentRef['type']
 }
 
-export interface WorkspaceSession {
+interface WorkspaceSession {
   workspacePath: string | null
   workspaceUuid: string | null
   activeSessionIds: Record<string, string>
@@ -129,7 +129,7 @@ export interface WorkspaceSession {
   restoreLastWorkspaceOnLaunch: boolean
 }
 
-export interface ChatSessionMeta {
+interface ChatSessionMeta {
   id: string
   fileUuid: string
   title: string
@@ -138,7 +138,7 @@ export interface ChatSessionMeta {
   messageCount: number
 }
 
-export type ChatLoadSessionResult = {
+type ChatLoadSessionResult = {
   ok: true
   data: {
     sessionId: string
@@ -332,7 +332,7 @@ export type MindmapWriteResponse =
   | { requestId: string; ok: false; error: string }
 
 /** Steps the main process may emit as `step` events: mindmap subgraph + palace subgraph. */
-export const STREAM_STEPS = [
+const STREAM_STEPS = [
   'generating-map',
   'reading-doc',
   'extracting',
