@@ -14,6 +14,8 @@ interface ModalProps {
   /** 遮罩 className：工作区首页用容器内定位的那份，其余用铺满视口的默认值 */
   backdropClassName?: string
   panelClassName?: string
+  /** 面板 ref；需要查询面板内元素（如自动聚焦）的调用方使用 */
+  panelRef?: RefObject<HTMLDivElement>
   children: ReactNode
 }
 
@@ -25,6 +27,7 @@ export function Modal({
   selectInitial,
   backdropClassName = 'workspace-modal-backdrop',
   panelClassName = 'workspace-modal',
+  panelRef,
   children,
 }: ModalProps) {
   useEffect(() => {
@@ -46,6 +49,7 @@ export function Modal({
       }}
     >
       <div
+        ref={panelRef}
         className={panelClassName}
         role="dialog"
         aria-modal="true"

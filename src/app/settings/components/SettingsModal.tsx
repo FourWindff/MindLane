@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
+import { Modal } from '@/shared/components/Modal'
 import { SettingsPanel } from './SettingsPanel'
 import '../settings.css'
 
@@ -9,9 +10,9 @@ type Props = {
 }
 
 export function SettingsModal({ open, onClose }: Props) {
-  const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
+  // The panel needs its own ref: this focuses the first button, not an input.
   useEffect(() => {
     if (!open) return
     const timer = window.setTimeout(() => {
@@ -26,46 +27,33 @@ export function SettingsModal({ open, onClose }: Props) {
   if (!open) return null
 
   return (
-    <div
-      ref={backdropRef}
-      className="workspace-modal-backdrop settings-modal-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === backdropRef.current) onClose()
-      }}
+    <Modal
+      labelledBy="settings-modal-title"
+      onCancel={onClose}
+      panelRef={panelRef}
+      // The settings overlay stacks above the chat panel through the second
+      // class (settings.css), so both must stay on the backdrop.
+      backdropClassName="workspace-modal-backdrop settings-modal-backdrop"
+      panelClassName="settings-modal"
     >
-      <div
-        ref={panelRef}
-        className="settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.stopPropagation()
-            onClose()
-          }
-        }}
-      >
-        <div className="settings-modal__header">
-          <div className="settings-modal__header-brand">
-            <h2 id="settings-modal-title" className="settings-modal__title">
-              设置
-            </h2>
-          </div>
-          <button
-            type="button"
-            className="icon-btn icon-btn--sm settings-modal__close"
-            onClick={onClose}
-            aria-label="关闭"
-          >
-            <X size={18} strokeWidth={2} />
-          </button>
+      <div className="settings-modal__header">
+        <div className="settings-modal__header-brand">
+          <h2 id="settings-modal-title" className="settings-modal__title">
+            设置
+          </h2>
         </div>
-        <div className="settings-modal__body">
-          <SettingsPanel />
-        </div>
+        <button
+          type="button"
+          className="icon-btn icon-btn--sm settings-modal__close"
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          <X size={18} strokeWidth={2} />
+        </button>
       </div>
-    </div>
+      <div className="settings-modal__body">
+        <SettingsPanel />
+      </div>
+    </Modal>
   )
 }
