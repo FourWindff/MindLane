@@ -2,18 +2,23 @@
    StylePanel — mindmap appearance panel
    ══════════════════════════════════════════════════════ */
 
-.style-panel {
+/* Shared by .style-panel and .document-refs-panel; the per-panel width,
+   max-height and flex overrides live in document-refs-panel.css */
+:is(.style-panel, .document-refs-panel) {
   position: absolute;
   top: calc(100% + 8px);
   right: 5px;
   z-index: 40;
-  width: 220px;
   background: var(--ml-bg-elevated);
   border: 1px solid var(--ml-border-strong);
   border-radius: 12px;
   box-shadow: var(--ml-shadow-strong);
   overflow: hidden;
   animation: style-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.style-panel {
+  width: 220px;
 }
 
 @keyframes style-panel-in {
@@ -28,7 +33,7 @@
 }
 
 /* ── Header ── */
-.style-panel__header {
+:is(.style-panel__header, .document-refs-panel__header) {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -36,7 +41,7 @@
   border-bottom: 1px solid var(--ml-border);
 }
 
-.style-panel__title {
+:is(.style-panel__title, .document-refs-panel__title) {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--ml-text);

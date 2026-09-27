@@ -6,13 +6,11 @@
   gap: 0.35rem;
   padding: 5px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(16px) saturate(1.1);
-  -webkit-backdrop-filter: blur(16px) saturate(1.1);
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.04);
+  background: var(--ml-glass-bg);
+  backdrop-filter: var(--ml-glass-blur);
+  -webkit-backdrop-filter: var(--ml-glass-blur);
+  border: 1px solid var(--ml-glass-border);
+  box-shadow: var(--ml-glass-shadow);
   transition: width 0.25s ease;
   width: 100%;
   max-width: 100%;

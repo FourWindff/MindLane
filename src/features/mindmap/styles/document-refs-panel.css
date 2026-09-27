@@ -1,37 +1,12 @@
+/* Container rules shared with .style-panel live in style-panel.css */
 .document-refs-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 5px;
-  z-index: 40;
   width: 260px;
   max-height: 320px;
-  background: var(--ml-bg-elevated);
-  border: 1px solid var(--ml-border-strong);
-  border-radius: 12px;
-  box-shadow: var(--ml-shadow-strong);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: document-refs-panel-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes document-refs-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 
 .document-refs-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid var(--ml-border);
   flex-shrink: 0;
 }
 
@@ -39,10 +14,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--ml-text);
-  letter-spacing: 0.02em;
 }
 
 /* The panel's close button is an .icon-btn--xs (see index.css) */

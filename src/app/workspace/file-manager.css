@@ -14,16 +14,7 @@
   background: var(--ml-overlay-bg);
   backdrop-filter: var(--ml-overlay-blur);
   -webkit-backdrop-filter: var(--ml-overlay-blur);
-  animation: fm-fade-in 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes fm-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  animation: ml-fade-in 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* --- Panel --- */
@@ -185,12 +176,7 @@
   gap: 2px;
 }
 
-.file-manager__action-divider {
-  width: 1px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.08);
-  margin: 0 4px;
-}
+/* The base rule lives in index.css with the other toolbar dividers */
 
 /* Text button (primary actions): skeleton lives in .btn */
 .file-manager__btn {

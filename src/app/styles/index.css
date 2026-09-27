@@ -77,6 +77,27 @@ body {
   -webkit-user-select: text;
 }
 
+/* ── Shared keyframes ──
+   One plain fade used by both the file manager backdrop and the palace modal. */
+@keyframes ml-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Shared toolbar divider ──
+   The app toolbar, float toolbar and file manager toolbar draw the same 1px rule. */
+:is(.app-toolbar__divider, .float-toolbar__divider, .file-manager__action-divider) {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: rgba(0, 0, 0, 0.08);
+  align-self: center;
+}
+
 /* ── Action button skeleton ──
    Size, padding, border, colours and states stay on each component's own
    class: the three button systems differ in all of them. */
