@@ -168,17 +168,13 @@ function AppContent() {
         ) : (
           <div className="app-shell">
             <main className="app-shell__main">
-              {workspacePath && (
-                <>
-                  <AppToolbar
-                    onOpenFileManager={() => setFileManagerOpen(true)}
-                    fileManagerOpen={fileManagerOpen}
-                    filePath={filePath ?? undefined}
-                  />
-                  {/* Dev-only visual QA panel for agent write animations; tree-shaken out of production builds */}
-                  {hasDocumentOpen && import.meta.env.DEV && <AgentWriteSimulator />}
-                </>
-              )}
+              <AppToolbar
+                onOpenFileManager={() => setFileManagerOpen(true)}
+                fileManagerOpen={fileManagerOpen}
+                filePath={filePath ?? undefined}
+              />
+              {/* Dev-only visual QA panel for agent write animations; tree-shaken out of production builds */}
+              {hasDocumentOpen && import.meta.env.DEV && <AgentWriteSimulator />}
               {hasDocumentOpen ? (
                 <MindMapView
                   onSwitchWorkspace={() => void switchWorkspace()}

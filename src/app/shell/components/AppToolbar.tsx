@@ -1,4 +1,5 @@
 import { Menu } from 'lucide-react'
+import { displayFileName } from '@/shared/lib/displayFileName'
 import '../styles/window.css'
 
 type Props = {
@@ -7,16 +8,8 @@ type Props = {
   filePath?: string
 }
 
-function extractFileName(filePath: string | undefined): string | null {
-  if (!filePath) return null
-  return filePath
-    .split(/[/\\]/)
-    .pop()!
-    .replace(/\.mindlane$/, '')
-}
-
 export function AppToolbar({ onOpenFileManager, fileManagerOpen, filePath }: Props) {
-  const fileName = extractFileName(filePath)
+  const fileName = filePath ? displayFileName(filePath) : null
 
   return (
     <div className={`app-toolbar${fileName ? ' app-toolbar--with-filename' : ''}`}>

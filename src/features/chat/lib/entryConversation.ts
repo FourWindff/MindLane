@@ -1,5 +1,6 @@
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
 import { useWorkspaceStore } from '@/app/workspace/store'
+import { displayFileName } from '@/shared/lib/displayFileName'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
 
 /**
@@ -80,10 +81,6 @@ export function backfillEntryFileTitle(fileUuid: string, title: string): void {
 
   const name = entryFileTitle(title, null)
   instance.store.getState().setFileTitle(name)
-  const currentName = filePath
-    .split(/[\\/]/)
-    .pop()!
-    .replace(/\.mindlane$/, '')
-  if (currentName === name) return
+  if (displayFileName(filePath) === name) return
   void useWorkspaceStore.getState().renameItem(filePath, name)
 }

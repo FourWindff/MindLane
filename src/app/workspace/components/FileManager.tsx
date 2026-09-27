@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState, type MouseEvent } from 'react'
 import { TextPromptDialog } from '@/shared/components/TextPromptDialog'
+import { displayFileName } from '@/shared/lib/displayFileName'
 import { useWorkspaceStore } from '../store'
 import { FileContextMenu } from './FileContextMenu'
-import { RenameDialog } from './RenameDialog'
 import { ConfirmDialog } from './ConfirmDialog'
 import { FileManagerToolbar } from './FileManagerToolbar'
 import { FileManagerBreadcrumb } from './FileManagerBreadcrumb'
@@ -26,6 +26,11 @@ type ContextMenuState =
   | { scope: 'closed' }
   | { scope: 'empty'; x: number; y: number }
   | { scope: 'entry'; x: number; y: number; entry: WorkspaceTreeEntry }
+
+/** Renaming a file shows its name without the `.mindlane` extension; folders keep theirs. */
+function renameInitialValue(entry: WorkspaceTreeEntry): string {
+  return entry.type === 'file' ? displayFileName(entry.name) : entry.name
+}
 
 export function FileManager({ isOpen, onClose }: FileManagerProps) {
   const busy = useWorkspaceStore((s) => s.busy)
@@ -237,9 +242,13 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
         )}
 
         {dialog.type === 'rename' && (
-          <RenameDialog
-            currentName={dialog.entry.name}
-            isFile={dialog.entry.type === 'file'}
+          <TextPromptDialog
+            label="重命名"
+            title={dialog.entry.type === 'file' ? '重命名文件' : '重命名文件夹'}
+            initialValue={renameInitialValue(dialog.entry)}
+            selectInitial
+            placeholder={dialog.entry.type === 'file' ? '输入文件名' : '输入文件夹名'}
+            canSubmit={(value) => value !== renameInitialValue(dialog.entry)}
             onConfirm={(newName) => void handleRename(newName)}
             onCancel={closeDialog}
           />

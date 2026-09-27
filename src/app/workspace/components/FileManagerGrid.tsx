@@ -1,6 +1,7 @@
 import { Plus, ArrowRight, Folder, FileText, FolderOpen, HardDrive } from 'lucide-react'
 import { useCallback } from 'react'
 import type { MouseEvent } from 'react'
+import { displayFileName } from '@/shared/lib/displayFileName'
 import type { WorkspaceTreeEntry } from '../types'
 
 export function FileManagerGrid({
@@ -33,7 +34,7 @@ export function FileManagerGrid({
       <div className="file-manager__grid" onContextMenu={handleGridContextMenu}>
         {items.map((entry) => {
           const isFolder = entry.type === 'directory'
-          const displayName = isFolder ? entry.name : entry.name.replace(/\.mindlane$/, '')
+          const displayName = isFolder ? entry.name : displayFileName(entry.name)
           const childCount = isFolder ? (entry.children?.length ?? 0) : 0
           const dateLabel = isFolder ? `${childCount} 项内容` : formatDate(entry.lastModifiedAt)
 
