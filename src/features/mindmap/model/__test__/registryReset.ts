@@ -1,4 +1,4 @@
-import { mindmapRegistry } from '../mindmapRegistry'
+import { openFileRegistry } from '../openFileRegistry'
 
 /**
  * Test-only blank slate: dispose every instance held by the singleton registry
@@ -6,12 +6,12 @@ import { mindmapRegistry } from '../mindmapRegistry'
  * `release(key)`, so this lives outside the class instead of widening its API.
  */
 export function resetRegistry(): void {
-  const registry = mindmapRegistry as unknown as {
+  const registry = openFileRegistry as unknown as {
     instances: Map<string, { dispose: () => void }>
     activeKey: string | null
   }
   for (const instance of registry.instances.values()) instance.dispose()
   registry.instances.clear()
   registry.activeKey = null
-  mindmapRegistry.resetDefault()
+  openFileRegistry.resetDefault()
 }

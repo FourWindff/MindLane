@@ -1,34 +1,34 @@
-import { MindmapInstance } from './mindmapInstance'
+import { OpenFile } from './openFile'
 
 const DEFAULT_KEY = '__default__'
 
 type Listener = () => void
 
 /**
- * 管理工作区中所有打开文件的 MindmapInstance。
+ * 管理工作区中所有打开文件的 OpenFile。
  * - 同一文件多次打开返回同一实例。
  * - 切换活动文件不会释放之前的实例。
  * - 关闭文件或切换工作区时调用 release 释放实例。
  * - 没有任何文件打开时提供一个默认实例，保证 UI 始终有可用 store。
  */
-export class MindmapRegistry {
-  private instances = new Map<string, MindmapInstance>()
-  // Lazily created so module init never constructs a MindmapInstance; eager
+export class OpenFileRegistry {
+  private instances = new Map<string, OpenFile>()
+  // Lazily created so module init never constructs a OpenFile; eager
   // construction here closes an import cycle through aiStore -> buildChatContext.
-  private defaultInstance: MindmapInstance | null = null
+  private defaultInstance: OpenFile | null = null
   private activeKey: string | null = null
   private listeners = new Set<Listener>()
 
-  getOrCreate(key: string): MindmapInstance {
+  getOrCreate(key: string): OpenFile {
     let instance = this.instances.get(key)
     if (!instance) {
-      instance = new MindmapInstance(key)
+      instance = new OpenFile(key)
       this.instances.set(key, instance)
     }
     return instance
   }
 
-  get(key: string): MindmapInstance | undefined {
+  get(key: string): OpenFile | undefined {
     return this.instances.get(key)
   }
 
@@ -37,7 +37,7 @@ export class MindmapRegistry {
     this.emit()
   }
 
-  getActive(): MindmapInstance | null {
+  getActive(): OpenFile | null {
     if (!this.activeKey) return null
     return this.instances.get(this.activeKey) ?? null
   }
@@ -54,16 +54,16 @@ export class MindmapRegistry {
     }
   }
 
-  getByFileUuid(fileUuid: string): MindmapInstance | undefined {
+  getByFileUuid(fileUuid: string): OpenFile | undefined {
     for (const instance of this.instances.values()) {
       if (instance.store.getState().fileUuid === fileUuid) return instance
     }
     return undefined
   }
 
-  getDefault(): MindmapInstance {
+  getDefault(): OpenFile {
     if (!this.defaultInstance) {
-      this.defaultInstance = new MindmapInstance(DEFAULT_KEY)
+      this.defaultInstance = new OpenFile(DEFAULT_KEY)
     }
     return this.defaultInstance
   }
@@ -82,7 +82,7 @@ export class MindmapRegistry {
 
   resetDefault(): void {
     this.defaultInstance?.dispose()
-    this.defaultInstance = new MindmapInstance(DEFAULT_KEY)
+    this.defaultInstance = new OpenFile(DEFAULT_KEY)
     this.emit()
   }
 
@@ -110,4 +110,4 @@ export class MindmapRegistry {
   }
 }
 
-export const mindmapRegistry = new MindmapRegistry()
+export const openFileRegistry = new OpenFileRegistry()

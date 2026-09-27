@@ -1,7 +1,7 @@
 import type { ChatContext, ChatStreamEvent } from '../../../../electron/ipc'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { mindmapRegistry } from './mindmapRegistry'
+import { openFileRegistry } from './openFileRegistry'
 import type { MindmapEditor } from './mindmapEditor'
 
 /**
@@ -59,7 +59,7 @@ function runKey(fileUuid: string, nodeId: string): string {
 }
 
 function editorOf(run: ActiveRun): MindmapEditor | undefined {
-  return mindmapRegistry.getByFileUuid(run.fileUuid)?.editor
+  return openFileRegistry.getByFileUuid(run.fileUuid)?.editor
 }
 
 async function startRun(

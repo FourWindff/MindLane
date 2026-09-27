@@ -36,7 +36,7 @@ interface MindmapWriteResponderDependencies {
   subscribe: (listener: (request: MindmapWriteRequest) => void) => () => void
   /** fileUuid → 活编辑器；未打开返回 undefined。 */
   resolveEditor: (fileUuid: string) => MindmapEditor | undefined
-  /** 落盘成功后的持久化回调（fire-and-forget，如 saveMindmapInstance）。 */
+  /** 落盘成功后的持久化回调（fire-and-forget，如 saveOpenFile）。 */
   persistFile: (fileUuid: string) => void
   /** 渲染层 → 主进程落盘应答（未知 requestId 为 no-op）。 */
   respond: (payload: MindmapWriteResponse) => void | Promise<void>

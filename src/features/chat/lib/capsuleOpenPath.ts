@@ -1,4 +1,4 @@
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 
 /**
  * 点击胶囊时解析要打开的文件路径：优先当前已加载实例（改名/移动后最新），
@@ -9,7 +9,7 @@ export function resolveCapsuleOpenPath(
   fileUuidPaths: Record<string, string>,
 ): string | null {
   return (
-    mindmapRegistry.getByFileUuid(fileUuid)?.store.getState().filePath ??
+    openFileRegistry.getByFileUuid(fileUuid)?.store.getState().filePath ??
     fileUuidPaths[fileUuid] ??
     null
   )

@@ -1,4 +1,4 @@
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { VISUAL_VARIANTS } from './presets'
 
 /**

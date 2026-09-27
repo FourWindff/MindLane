@@ -1,21 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { StylePanel } from '../StylePanel'
-import { MindmapInstance } from '@/features/mindmap/model/mindmapInstance'
-import { MindmapInstanceContext } from '@/features/mindmap/hooks/useActiveMindmapInstance'
+import { OpenFile } from '@/features/mindmap/model/openFile'
+import { OpenFileContext } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
 import { COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 
 function renderStylePanel(): string {
-  const instance = new MindmapInstance('/test/path.mindlane')
+  const instance = new OpenFile('/test/path.mindlane')
   instance.newFile('测试')
   instance.store
     .getState()
     .setStyle({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })
   return renderToString(
-    <MindmapInstanceContext.Provider value={instance}>
+    <OpenFileContext.Provider value={instance}>
       <StylePanel initialTab="color" />
-    </MindmapInstanceContext.Provider>,
+    </OpenFileContext.Provider>,
   )
 }
 

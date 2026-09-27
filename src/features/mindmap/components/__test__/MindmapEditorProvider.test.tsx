@@ -2,15 +2,18 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { useEffect } from 'react'
 import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
-import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
-import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import {
+  useActiveOpenFile,
+  useActiveMindmapEditor,
+  useActiveMindmapStore,
+} from '@/features/mindmap/hooks/useActiveOpenFile'
+
 import { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 
 function ProbeComponent() {
-  const instance = useActiveMindmapInstance()
+  const instance = useActiveOpenFile()
   const editor = useActiveMindmapEditor()
   const nodeCount = useActiveMindmapStore((s) => s.nodes.length)
 
@@ -29,9 +32,9 @@ function ProbeComponent() {
 
 function prepareActiveInstance(key: string) {
   resetRegistry()
-  const instance = mindmapRegistry.getOrCreate(key)
+  const instance = openFileRegistry.getOrCreate(key)
   instance.newFile('测试')
-  mindmapRegistry.setActive(key)
+  openFileRegistry.setActive(key)
   return instance
 }
 
@@ -40,7 +43,7 @@ describe('MindmapEditorProvider', () => {
     resetRegistry()
   })
 
-  it('should provide the active MindmapInstance with editor and store', () => {
+  it('should provide the active OpenFile with editor and store', () => {
     prepareActiveInstance('/test.mindlane')
 
     const html = renderToString(

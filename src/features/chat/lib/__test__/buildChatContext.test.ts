@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
@@ -12,9 +12,9 @@ describe('buildChatContext workspace files', () => {
 
   it('derives workspaceFiles from the tree, nested files included', () => {
     const filePath = '/ws/root.mindlane'
-    const instance = mindmapRegistry.getOrCreate(filePath)
+    const instance = openFileRegistry.getOrCreate(filePath)
     instance.load(filePath, createEmptyFile('Root'), '/ws')
-    mindmapRegistry.setActive(filePath)
+    openFileRegistry.setActive(filePath)
     useWorkspaceStore.setState({
       workspacePath: '/ws',
       tree: [

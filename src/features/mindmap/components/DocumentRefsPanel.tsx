@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { FileText, Link, FileType, Paperclip } from 'lucide-react'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 
 function DocumentRefIcon({ type }: { type: DocumentRef['type'] }) {
   switch (type) {

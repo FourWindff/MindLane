@@ -19,9 +19,12 @@ import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { shortcutRows } from './shortcutRows'
-import { useActiveMindmapEditor } from './useActiveMindmapEditor'
-import { useActiveMindmapInstance } from './useActiveMindmapInstance'
-import { useActiveMindmapStore } from './useActiveMindmapStore'
+import {
+  useActiveMindmapEditor,
+  useActiveOpenFile,
+  useActiveMindmapStore,
+} from './useActiveOpenFile'
+
 import { useMindmapPersistence } from './useMindmapPersistence'
 import { usePalaceGeneration } from './usePalaceGeneration'
 import { nodeRegistry } from '@/features/mindmap/nodes/registry'
@@ -39,7 +42,7 @@ export function useMindmapOperationController() {
   const reactFlowStore = useStoreApi()
   const reactFlow = useReactFlow()
   const editor = useActiveMindmapEditor()
-  const activeInstance = useActiveMindmapInstance()
+  const activeInstance = useActiveOpenFile()
   const nodes = useActiveMindmapStore((state) => state.nodes)
   const edges = useActiveMindmapStore((state) => state.edges)
   const canUndo = useActiveMindmapStore((state) => state.canUndo)

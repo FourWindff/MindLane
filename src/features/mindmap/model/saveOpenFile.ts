@@ -1,6 +1,6 @@
-import type { MindmapInstance } from './mindmapInstance'
+import type { MindmapStore } from './mindmapStore'
 
-interface SaveMindmapInstanceOptions {
+interface SaveOpenFileOptions {
   syncAfterFileSaved: (filePath: string) => Promise<void>
   onError?: (message: string) => void
   afterSave?: (filePath: string) => void
@@ -19,12 +19,12 @@ function formatError(error: unknown): string {
  * dialog, silent workspace create) stay with the callers. Error routing is
  * injected via onError so this module has no chat-feature dependency.
  */
-export async function saveMindmapInstance(
-  instance: Pick<MindmapInstance, 'store'>,
-  options: SaveMindmapInstanceOptions,
+export async function saveOpenFile(
+  store: MindmapStore,
+  options: SaveOpenFileOptions,
 ): Promise<boolean> {
   const onError = options?.onError ?? ((message: string) => console.error(message))
-  const state = instance.store.getState()
+  const state = store.getState()
   if (!state.hasDocumentOpen || !state.dirty) return true
   if (!state.filePath) {
     onError('导图尚未关联文件，无法保存')
@@ -45,7 +45,7 @@ export async function saveMindmapInstance(
       onError(result?.error ?? '保存失败')
       return false
     }
-    const latest = instance.store.getState()
+    const latest = store.getState()
     latest.setFilePath(result.data.filePath)
     if (
       latest.nodes === savedNodes &&

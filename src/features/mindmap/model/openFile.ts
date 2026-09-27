@@ -7,7 +7,7 @@ import type { MindLaneFile } from '@/shared/lib/fileFormat'
  * 单个打开文件对应的导图实例，包含独立的 store、history 和 editor。
  * 实例在文件打开期间保持存活，切换活动文件不会销毁历史栈。
  */
-export class MindmapInstance {
+export class OpenFile {
   key: string
   readonly store: MindmapStore
   readonly history: MindmapHistory

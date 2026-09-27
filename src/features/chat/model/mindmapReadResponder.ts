@@ -1,4 +1,4 @@
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { serializeMindmapSection } from '@/shared/lib/mindmapXml'
 import type { MindmapReadQuery, MindmapReadRequest } from '../../../../electron/ipc'
 
@@ -25,7 +25,7 @@ async function respondMindmapRead(request: MindmapReadRequest): Promise<void> {
   const api = window.mindlane?.ai
   if (!api?.respondMindmapRead) return
 
-  const instance = mindmapRegistry.getByFileUuid(request.fileUuid)
+  const instance = openFileRegistry.getByFileUuid(request.fileUuid)
   if (!instance) {
     await api.respondMindmapRead({
       requestId: request.requestId,

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backfillEntryFileTitle, createEntryFile, entryFileTitle } from '../entryConversation'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
@@ -108,7 +108,7 @@ describe('entry conversation file lifecycle', () => {
     expect(createFile).toHaveBeenCalledWith(
       expect.objectContaining({ workspacePath: '/workspace', name: '帮我整理一份学习计划' }),
     )
-    const active = mindmapRegistry.getActiveFile()
+    const active = openFileRegistry.getActiveFile()
     expect(entry).toEqual({ fileUuid: active?.fileUuid, filePath: active?.filePath })
     expect(active?.filePath).toBe('/workspace/帮我整理一份学习计划.mindlane')
   })
@@ -130,7 +130,7 @@ describe('entry conversation file lifecycle', () => {
   it('backfills the generated map title onto the file created by the entry turn', async () => {
     const { renameItem } = installBridge()
     await createEntryFile('先起个占位标题', null)
-    const fileUuid = mindmapRegistry.getActiveFile()!.fileUuid
+    const fileUuid = openFileRegistry.getActiveFile()!.fileUuid
 
     backfillEntryFileTitle(fileUuid, 'Ruby 学习路线')
 
@@ -139,7 +139,7 @@ describe('entry conversation file lifecycle', () => {
       newName: 'Ruby 学习路线',
       workspacePath: '/workspace',
     })
-    expect(mindmapRegistry.getByFileUuid(fileUuid)!.store.getState().fileTitle).toBe(
+    expect(openFileRegistry.getByFileUuid(fileUuid)!.store.getState().fileTitle).toBe(
       'Ruby 学习路线',
     )
   })
@@ -147,13 +147,13 @@ describe('entry conversation file lifecycle', () => {
   it('keeps the backfill available while the entry file is not open', async () => {
     const { renameItem } = installBridge()
     await createEntryFile('先起个占位标题', null)
-    const closed = mindmapRegistry.getActiveFile()!
+    const closed = openFileRegistry.getActiveFile()!
     resetRegistry()
 
     backfillEntryFileTitle(closed.fileUuid, 'Ruby 学习路线')
     expect(renameItem).not.toHaveBeenCalled()
 
-    const reopened = mindmapRegistry.getOrCreate(closed.filePath)
+    const reopened = openFileRegistry.getOrCreate(closed.filePath)
     reopened.load(closed.filePath, createEmptyFile('先起个占位标题'), '/workspace')
     reopened.store.setState({ fileUuid: closed.fileUuid })
     backfillEntryFileTitle(closed.fileUuid, 'Ruby 学习路线')
@@ -163,7 +163,7 @@ describe('entry conversation file lifecycle', () => {
 
   it('never renames a file the entry turn did not create', async () => {
     const { renameItem } = installBridge()
-    const instance = mindmapRegistry.getOrCreate('/workspace/用户自己的文件.mindlane')
+    const instance = openFileRegistry.getOrCreate('/workspace/用户自己的文件.mindlane')
     instance.load(
       '/workspace/用户自己的文件.mindlane',
       {
@@ -176,12 +176,12 @@ describe('entry conversation file lifecycle', () => {
       },
       '/workspace',
     )
-    mindmapRegistry.setActive('/workspace/用户自己的文件.mindlane')
+    openFileRegistry.setActive('/workspace/用户自己的文件.mindlane')
 
     backfillEntryFileTitle('user-file-uuid', 'AI 起的名字')
 
     expect(renameItem).not.toHaveBeenCalled()
-    expect(mindmapRegistry.getByFileUuid('user-file-uuid')!.store.getState().fileTitle).toBe(
+    expect(openFileRegistry.getByFileUuid('user-file-uuid')!.store.getState().fileTitle).toBe(
       '用户自己的文件',
     )
   })

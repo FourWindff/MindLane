@@ -12,7 +12,7 @@ import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
 import { layoutReflow } from './mindmapLayout'
 
-export interface MindmapState {
+export interface OpenFileState {
   nodes: Node[]
   edges: Edge[]
   dirty: boolean
@@ -59,12 +59,12 @@ export interface MindmapState {
   addDocumentRef: (ref: DocumentRef) => void
 }
 
-export type MindmapStore = UseBoundStore<StoreApi<MindmapState>>
+export type MindmapStore = UseBoundStore<StoreApi<OpenFileState>>
 
 const initialFile = createEmptyFile()
 
 export function createMindmapStore(): MindmapStore {
-  return create<MindmapState>((set, get) => ({
+  return create<OpenFileState>((set, get) => ({
     nodes: initialFile.mindmap.nodes as Node[],
     edges: initialFile.mindmap.edges as Edge[],
     dirty: false,

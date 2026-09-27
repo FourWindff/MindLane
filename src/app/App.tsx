@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MindmapView } from '@/features/mindmap/components/MindmapView'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { SettingsModal } from '@/app/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { ChatInputBar } from '@/features/chat/components/ChatInputBar'
@@ -27,8 +27,8 @@ import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadRe
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { backfillEntryFileTitle } from '@/features/chat/lib/entryConversation'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
-import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
+import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
 import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
 import '@/app/workspace/workspace.css'
@@ -94,17 +94,17 @@ function AppContent() {
       // 覆盖启动早期 refreshCapsuleData 遇 not-ready 后重试耗尽的情况。
       if (ready) void useAiStore.getState().refreshCapsuleData()
     })
-    const disconnectAiStore = connectAiStore(mindmapRegistry)
+    const disconnectAiStore = connectAiStore(openFileRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
     // 落盘应答器：主进程转发写工具参数，这里按 fileUuid 串行化校验+落图并回 ack。
     const stopWriteResponder = createMindmapWriteResponder({
       subscribe: (listener) => window.mindlane?.ai.onMindmapWriteRequest(listener) ?? (() => {}),
-      resolveEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
+      resolveEditor: (fileUuid) => openFileRegistry.getByFileUuid(fileUuid)?.editor,
       persistFile: (fileUuid) => {
-        const instance = mindmapRegistry.getByFileUuid(fileUuid)
+        const instance = openFileRegistry.getByFileUuid(fileUuid)
         if (!instance) return
-        void saveMindmapInstance(instance, {
+        void saveOpenFile(instance.store, {
           syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
           // A write-tool persist failure is reported per file: errors have no
           // renderer UI anymore, they only enter the diagnostic log.
@@ -117,7 +117,7 @@ function AppContent() {
     const stopToolRouter = createMindmapEndEffects({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
-      getEditor: (fileUuid) => mindmapRegistry.getByFileUuid(fileUuid)?.editor,
+      getEditor: (fileUuid) => openFileRegistry.getByFileUuid(fileUuid)?.editor,
       // Entry-turn files start with a placeholder title; the generated map title
       // backfills it (only files the entry turn created are renamed).
       backfillTitle: backfillEntryFileTitle,

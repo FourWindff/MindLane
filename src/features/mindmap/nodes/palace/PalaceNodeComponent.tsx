@@ -1,8 +1,11 @@
 import { memo, useCallback, useRef, useState, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ChevronRight, Image, Landmark, Minimize2, X } from 'lucide-react'
-import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import {
+  useActiveMindmapEditor,
+  useActiveMindmapStore,
+} from '@/features/mindmap/hooks/useActiveOpenFile'
+
 import { resumePalaceRun, stopPalaceRun } from '@/features/mindmap/model/palaceRun'
 import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData } from './types'

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
-import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
-import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
+import { useActiveOpenFile } from '@/features/mindmap/hooks/useActiveOpenFile'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
+import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
@@ -337,7 +337,7 @@ export function SettingsPanel() {
   const providers = useSettingsStore((s) => s.providers)
   const activeChatProvider = useSettingsStore((s) => s.activeChatProvider)
   const setActiveChatProvider = useSettingsStore((s) => s.setActiveChatProvider)
-  const activeInstance = useActiveMindmapInstance()
+  const activeInstance = useActiveOpenFile()
   const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
   const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
     (s) => s.setRestoreLastWorkspaceOnLaunch,
@@ -452,9 +452,9 @@ export function SettingsPanel() {
                 onClick={async () => {
                   const result = await window.mindlane?.file.open()
                   if (result?.ok) {
-                    const instance = mindmapRegistry.getOrCreate(result.data.filePath)
+                    const instance = openFileRegistry.getOrCreate(result.data.filePath)
                     instance.load(result.data.filePath, result.data.data as MindLaneFile, null)
-                    mindmapRegistry.setActive(result.data.filePath)
+                    openFileRegistry.setActive(result.data.filePath)
                     await syncAfterFileSaved(result.data.filePath)
                   }
                 }}
@@ -465,7 +465,7 @@ export function SettingsPanel() {
                 type="button"
                 className="btn panel-btn"
                 onClick={() =>
-                  void saveMindmapInstance(activeInstance, {
+                  void saveOpenFile(activeInstance.store, {
                     syncAfterFileSaved,
                     onError: reportRendererError,
                   })
@@ -481,13 +481,13 @@ export function SettingsPanel() {
                   const data = state.toMindLaneFile()
                   const result = await window.mindlane?.file.saveAs({ data })
                   if (result?.ok) {
-                    const instance = mindmapRegistry.getOrCreate(result.data.filePath)
+                    const instance = openFileRegistry.getOrCreate(result.data.filePath)
                     instance.load(
                       result.data.filePath,
                       result.data.data as MindLaneFile,
                       workspacePath,
                     )
-                    mindmapRegistry.setActive(result.data.filePath)
+                    openFileRegistry.setActive(result.data.filePath)
                     await syncAfterFileSaved(result.data.filePath)
                   }
                 }}

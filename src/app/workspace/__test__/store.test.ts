@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
@@ -52,9 +52,9 @@ function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
 
 function activateLegacyFile(filePath = '/old.mindlane') {
   const data = createEmptyFile('Old')
-  const instance = mindmapRegistry.getOrCreate(filePath)
+  const instance = openFileRegistry.getOrCreate(filePath)
   instance.load(filePath, data, null)
-  mindmapRegistry.setActive(filePath)
+  openFileRegistry.setActive(filePath)
 }
 
 describe('workspace file switching', () => {
@@ -66,12 +66,12 @@ describe('workspace file switching', () => {
   it('preserves dirty background changes when the file is reopened before persistence finishes', async () => {
     const fileAData = createEmptyFile('A')
     const staleFileBData = createEmptyFile('B')
-    const fileA = mindmapRegistry.getOrCreate('/a.mindlane')
+    const fileA = openFileRegistry.getOrCreate('/a.mindlane')
     fileA.load('/a.mindlane', fileAData, '/ws')
-    const fileB = mindmapRegistry.getOrCreate('/b.mindlane')
+    const fileB = openFileRegistry.getOrCreate('/b.mindlane')
     fileB.load('/b.mindlane', staleFileBData, '/ws')
     fileB.editor.addChild('root', { label: '后台新增节点' })
-    mindmapRegistry.setActive('/a.mindlane')
+    openFileRegistry.setActive('/a.mindlane')
 
     vi.stubGlobal('window', {
       mindlane: {
@@ -86,7 +86,7 @@ describe('workspace file switching', () => {
 
     await useWorkspaceStore.getState().openWorkspaceFile('/b.mindlane')
 
-    expect(mindmapRegistry.getActive()).toBe(fileB)
+    expect(openFileRegistry.getActive()).toBe(fileB)
     expect(fileB.store.getState().nodes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -166,7 +166,7 @@ describe('workspace switch restore protocol', () => {
       ])
       expect(api.listFiles).not.toHaveBeenCalled()
       expect(api.listTree).toHaveBeenCalledWith({ workspacePath: '/ws' })
-      expect(mindmapRegistry.getActive()).toBeNull()
+      expect(openFileRegistry.getActive()).toBeNull()
     },
   )
 

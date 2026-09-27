@@ -1,9 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import {
+  useActiveMindmapEditor,
+  useActiveOpenFile,
+  useActiveMindmapStore,
+} from '@/features/mindmap/hooks/useActiveOpenFile'
+
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
@@ -22,7 +25,7 @@ function TextNodeInner({
 }: NodeProps) {
   const data = rawData as TextNodeData
   const editor = useActiveMindmapEditor()
-  const instance = useActiveMindmapInstance()
+  const instance = useActiveOpenFile()
   const edges = useActiveMindmapStore((state) => state.edges)
   const nodes = useActiveMindmapStore((state) => state.nodes)
   const [label, setLabel] = useState(data.label)

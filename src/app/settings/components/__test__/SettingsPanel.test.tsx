@@ -36,12 +36,12 @@ const workspaceState = {
   syncAfterFileSaved: vi.fn(),
 }
 
-vi.mock('@/features/mindmap/hooks/useActiveMindmapInstance', () => ({
-  useActiveMindmapInstance: () => ({ store: { getState: vi.fn() } }),
+vi.mock('@/features/mindmap/hooks/useActiveOpenFile', () => ({
+  useActiveOpenFile: () => ({ store: { getState: vi.fn() } }),
 }))
 
-vi.mock('@/features/mindmap/model/mindmapRegistry', () => ({
-  mindmapRegistry: { getOrCreate: vi.fn(), setActive: vi.fn() },
+vi.mock('@/features/mindmap/model/openFileRegistry', () => ({
+  openFileRegistry: { getOrCreate: vi.fn(), setActive: vi.fn() },
 }))
 
 vi.mock('@/app/workspace/store', () => ({

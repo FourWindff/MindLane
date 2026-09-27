@@ -10,7 +10,7 @@ import {
 } from '../aiStore'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import type { ChatContext } from '../../../../../electron/ipc'
@@ -107,11 +107,11 @@ function activateMindmap(fileUuid: string): void {
   // 源头不变量：发送必有活动文件。buildChatContext 不再兜底默认实例，
   // 测试在此建立不变量（注册活动导图实例，uuid/path/title 创建即存在）。
   const key = `test-${fileUuid}`
-  const instance = mindmapRegistry.getOrCreate(key)
+  const instance = openFileRegistry.getOrCreate(key)
   const file = createEmptyFile('Test 导图')
   file.metadata.fileUuid = fileUuid
   instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
-  mindmapRegistry.setActive(key)
+  openFileRegistry.setActive(key)
 }
 
 function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
@@ -315,7 +315,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       expect.objectContaining({ workspacePath: '/workspace', name: '帮我整理一份学习计划' }),
     )
     // Open: the file is in the registry (editor ready, write proxy resolvable) and is current.
-    const active = mindmapRegistry.getActiveFile()
+    const active = openFileRegistry.getActiveFile()
     expect(active?.filePath).toBe('/workspace/帮我整理一份学习计划.mindlane')
     expect(useAiStore.getState().currentFileUuid).toBe(active?.fileUuid)
 
@@ -362,7 +362,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
     expect(await useAiStore.getState().sendChatMessage('你好')).toBe(false)
 
     expect(chatStream).not.toHaveBeenCalled()
-    expect(mindmapRegistry.getActiveFile()).toBeNull()
+    expect(openFileRegistry.getActiveFile()).toBeNull()
     expect(useAiStore.getState().currentFileUuid).toBeNull()
   })
 

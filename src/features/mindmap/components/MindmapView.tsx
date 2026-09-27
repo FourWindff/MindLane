@@ -8,7 +8,7 @@ import { PalaceModal } from './PalaceModal'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
 import { DocumentRefsPanel } from './DocumentRefsPanel'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindmapOperationController'
 
 /** Props of both the public view and its inner workspace component. */

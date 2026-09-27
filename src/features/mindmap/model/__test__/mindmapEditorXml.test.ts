@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createMindmapStore, type MindmapState } from '../mindmapStore'
+import { createMindmapStore, type OpenFileState } from '../mindmapStore'
 import { MindmapHistory } from '../mindmapHistory'
 import { MindmapEditor } from '../mindmapEditor'
 import { serializeMindLaneFile } from '@/shared/lib/mindmapXml'
@@ -364,11 +364,11 @@ describe('MindmapEditor XML 集成', () => {
       return { aId: aId!, bId: bId!, cId: cId!, labels }
     }
 
-    function rootChildOrder(state: MindmapState) {
+    function rootChildOrder(state: OpenFileState) {
       return state.edges.filter((e) => e.source === 'root').map((e) => e.target)
     }
 
-    function yOrder(state: MindmapState) {
+    function yOrder(state: OpenFileState) {
       return rootChildOrder(state)
         .map((id) => ({ id, y: state.nodes.find((n) => n.id === id)!.position.y }))
         .sort((a, b) => a.y - b.y)

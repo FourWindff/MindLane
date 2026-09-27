@@ -1,4 +1,4 @@
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { displayFileName } from '@/shared/lib/displayFileName'
 import type { DocumentRef } from '@/shared/lib/fileFormat'
@@ -61,7 +61,7 @@ export async function createEntryFile(
   ) {
     return null
   }
-  const active = mindmapRegistry.getActiveFile()
+  const active = openFileRegistry.getActiveFile()
   if (!active) return null
   entryFileUuids.add(active.fileUuid)
   return { fileUuid: active.fileUuid, filePath: active.filePath }
@@ -74,7 +74,7 @@ export async function createEntryFile(
  */
 export function backfillEntryFileTitle(fileUuid: string, title: string): void {
   if (!entryFileUuids.has(fileUuid)) return
-  const instance = mindmapRegistry.getByFileUuid(fileUuid)
+  const instance = openFileRegistry.getByFileUuid(fileUuid)
   const filePath = instance?.store.getState().filePath
   if (!instance || !filePath) return
   entryFileUuids.delete(fileUuid)

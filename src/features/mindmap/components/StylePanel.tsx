@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Palette, Brush } from 'lucide-react'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
 import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
 import type { ColorSchemeId, StructureType, VisualVariant } from '@/features/mindmap/style/types'

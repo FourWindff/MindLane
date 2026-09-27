@@ -3,14 +3,14 @@ import { toPng } from 'html-to-image'
 import type { ReactFlowInstance } from '@xyflow/react'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { saveMindmapInstance } from '../model/saveMindmapInstance'
-import { useActiveMindmapInstance } from './useActiveMindmapInstance'
-import { useActiveMindmapStore } from './useActiveMindmapStore'
+import { saveOpenFile } from '../model/saveOpenFile'
+import { useActiveOpenFile, useActiveMindmapStore } from './useActiveOpenFile'
+
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 
 export function useMindmapPersistence() {
-  const activeInstance = useActiveMindmapInstance()
+  const activeInstance = useActiveOpenFile()
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)
   const dirty = useActiveMindmapStore((state) => state.dirty)
@@ -82,7 +82,7 @@ export function useMindmapPersistence() {
       }
       return
     }
-    await saveMindmapInstance(activeInstance, {
+    await saveOpenFile(activeInstance.store, {
       syncAfterFileSaved,
       onError: (message) => {
         console.error(`[MindLane] ${message}`)

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatStreamEvent, PalaceRunPayload } from '../../../../../electron/ipc'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 import { handlePalaceRunEvent, resumePalaceRun, startPalaceRun, stopPalaceRun } from '../palaceRun'
 
-vi.mock('@/features/mindmap/model/mindmapRegistry', () => ({
-  mindmapRegistry: { getByFileUuid: vi.fn() },
+vi.mock('@/features/mindmap/model/openFileRegistry', () => ({
+  openFileRegistry: { getByFileUuid: vi.fn() },
 }))
 
 const FILE_UUID = 'file-a'
@@ -75,7 +75,7 @@ function setup(
     configurable: true,
     value: { ai: { chatStream, stopStream } },
   })
-  vi.mocked(mindmapRegistry.getByFileUuid).mockReturnValue({
+  vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue({
     editor: editor as unknown as MindmapEditor,
   } as never)
 

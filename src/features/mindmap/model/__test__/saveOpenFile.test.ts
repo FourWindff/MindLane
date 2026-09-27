@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MindmapInstance } from '../mindmapInstance'
-import { saveMindmapInstance } from '../saveMindmapInstance'
+import { OpenFile } from '../openFile'
+import { saveOpenFile } from '../saveOpenFile'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 import { deserializeMindLaneFile } from '@/shared/lib/mindmapXml'
 
-function createDirtyInstance(filePath: string | null): MindmapInstance {
-  const instance = new MindmapInstance('test')
+function createDirtyInstance(filePath: string | null): OpenFile {
+  const instance = new OpenFile('test')
   if (filePath) {
     instance.load(filePath, createEmptyFile('B'), '/ws')
   } else {
@@ -15,7 +15,7 @@ function createDirtyInstance(filePath: string | null): MindmapInstance {
   return instance
 }
 
-describe('saveMindmapInstance', () => {
+describe('saveOpenFile', () => {
   let syncAfterFileSaved: ReturnType<typeof vi.fn<(filePath: string) => Promise<void>>>
 
   beforeEach(() => {
@@ -30,7 +30,7 @@ describe('saveMindmapInstance', () => {
     })
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    await expect(saveMindmapInstance(instance, { syncAfterFileSaved })).resolves.toBe(true)
+    await expect(saveOpenFile(instance.store, { syncAfterFileSaved })).resolves.toBe(true)
 
     expect(save).toHaveBeenCalledWith({
       filePath: '/b.mindlane',
@@ -56,7 +56,7 @@ describe('saveMindmapInstance', () => {
     })
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    await saveMindmapInstance(instance, { syncAfterFileSaved })
+    await saveOpenFile(instance.store, { syncAfterFileSaved })
 
     // 主进程序列化端产物必须是合法 XML，读回 roundtrip 一致
     const file = savedPayload!.data as Parameters<typeof serializeMindLaneFile>[0]
@@ -83,7 +83,7 @@ describe('saveMindmapInstance', () => {
     )
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    const saving = saveMindmapInstance(instance, { syncAfterFileSaved })
+    const saving = saveOpenFile(instance.store, { syncAfterFileSaved })
     instance.editor.addChild('root', { label: '保存期间的修改' })
     finishSave?.({ ok: true, data: { filePath: '/b.mindlane' } })
     await saving
@@ -92,12 +92,12 @@ describe('saveMindmapInstance', () => {
   })
 
   it('is a no-op for a clean instance', async () => {
-    const instance = new MindmapInstance('test')
+    const instance = new OpenFile('test')
     instance.load('/b.mindlane', createEmptyFile('B'), '/ws')
     const save = vi.fn()
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    await expect(saveMindmapInstance(instance, { syncAfterFileSaved })).resolves.toBe(true)
+    await expect(saveOpenFile(instance.store, { syncAfterFileSaved })).resolves.toBe(true)
 
     expect(save).not.toHaveBeenCalled()
     expect(syncAfterFileSaved).not.toHaveBeenCalled()
@@ -109,9 +109,7 @@ describe('saveMindmapInstance', () => {
     const onError = vi.fn()
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    await expect(saveMindmapInstance(instance, { syncAfterFileSaved, onError })).resolves.toBe(
-      false,
-    )
+    await expect(saveOpenFile(instance.store, { syncAfterFileSaved, onError })).resolves.toBe(false)
 
     expect(save).not.toHaveBeenCalled()
     expect(onError).toHaveBeenCalledOnce()
@@ -125,9 +123,7 @@ describe('saveMindmapInstance', () => {
     const onError = vi.fn()
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
-    await expect(saveMindmapInstance(instance, { syncAfterFileSaved, onError })).resolves.toBe(
-      false,
-    )
+    await expect(saveOpenFile(instance.store, { syncAfterFileSaved, onError })).resolves.toBe(false)
 
     expect(onError).toHaveBeenCalledWith('写入失败')
     expect(instance.store.getState().dirty).toBe(true)

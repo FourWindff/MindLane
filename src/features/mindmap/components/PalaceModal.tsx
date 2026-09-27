@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useState, useMemo } from 'react'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData, PalaceStation } from '@/shared/lib/fileFormat'
 

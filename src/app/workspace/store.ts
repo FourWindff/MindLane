@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
-import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
+import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import type { WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
@@ -89,20 +89,20 @@ async function listWorkspaceTree(workspacePath: string | null): Promise<Workspac
 }
 
 function loadMindLaneFile(filePath: string, data: unknown, workspacePath: string | null) {
-  const instance = mindmapRegistry.getOrCreate(filePath)
+  const instance = openFileRegistry.getOrCreate(filePath)
   if (!instance.store.getState().dirty) {
     instance.load(filePath, data as MindLaneFile, workspacePath)
   }
-  mindmapRegistry.setActive(filePath)
+  openFileRegistry.setActive(filePath)
 }
 
 function clearMindLaneFile() {
-  const active = mindmapRegistry.getActive()
+  const active = openFileRegistry.getActive()
   if (active) {
-    mindmapRegistry.release(active.key)
+    openFileRegistry.release(active.key)
   }
-  mindmapRegistry.setActive(null)
-  mindmapRegistry.resetDefault()
+  openFileRegistry.setActive(null)
+  openFileRegistry.resetDefault()
 }
 
 async function createUniqueWorkspaceFile(
@@ -131,15 +131,15 @@ async function createUniqueWorkspaceFile(
 
 export async function saveCurrentDocumentSilently(): Promise<boolean> {
   const workspaceState = useWorkspaceStore.getState()
-  const activeInstance = mindmapRegistry.getActive()
-  const mindmapState = activeInstance?.store.getState()
+  const activeInstance = openFileRegistry.getActive()
+  const openFileState = activeInstance?.store.getState()
 
-  if (!activeInstance || !mindmapState || !mindmapState.hasDocumentOpen || !mindmapState.dirty) {
+  if (!activeInstance || !openFileState || !openFileState.hasDocumentOpen || !openFileState.dirty) {
     return true
   }
 
-  if (mindmapState.filePath) {
-    return saveMindmapInstance(activeInstance, {
+  if (openFileState.filePath) {
+    return saveOpenFile(activeInstance.store, {
       syncAfterFileSaved: workspaceState.syncAfterFileSaved,
       onError: (message) => useWorkspaceStore.setState({ lastError: message }),
     })
@@ -153,8 +153,8 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
 
   const createResult = await createUniqueWorkspaceFile(
     workspacePath,
-    mindmapState.fileTitle,
-    mindmapState.toMindLaneFile(),
+    openFileState.fileTitle,
+    openFileState.toMindLaneFile(),
   )
   if (!createResult.ok) {
     useWorkspaceStore.setState({ lastError: createResult.error })
@@ -289,7 +289,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   },
 
   openWorkspaceFile: async (filePath: string) => {
-    const activeInstance = mindmapRegistry.getActive()
+    const activeInstance = openFileRegistry.getActive()
     const currentFilePath = activeInstance?.store.getState().filePath
     if (currentFilePath === filePath) return true
     if (!(await saveCurrentDocumentSilently())) {
@@ -461,7 +461,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return false
       }
 
-      const activeInstance = mindmapRegistry.getActive()
+      const activeInstance = openFileRegistry.getActive()
       const currentFilePath = activeInstance?.store.getState().filePath
       if (
         currentFilePath === targetPath ||
@@ -499,11 +499,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const renamedInstance = mindmapRegistry.get(oldPath)
+      const renamedInstance = openFileRegistry.get(oldPath)
       if (renamedInstance) {
         const fileUuid = renamedInstance.store.getState().fileUuid
         renamedInstance.store.getState().setFilePath(result.data.newPath)
-        mindmapRegistry.renameKey(oldPath, result.data.newPath)
+        openFileRegistry.renameKey(oldPath, result.data.newPath)
         useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
         // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次重命名。
         void window.mindlane?.workspace
@@ -538,11 +538,11 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         return null
       }
 
-      const movedInstance = mindmapRegistry.get(sourcePath)
+      const movedInstance = openFileRegistry.get(sourcePath)
       if (movedInstance) {
         const fileUuid = movedInstance.store.getState().fileUuid
         movedInstance.store.getState().setFilePath(result.data.newPath)
-        mindmapRegistry.renameKey(sourcePath, result.data.newPath)
+        openFileRegistry.renameKey(sourcePath, result.data.newPath)
         useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
         // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次移动。
         void window.mindlane?.workspace

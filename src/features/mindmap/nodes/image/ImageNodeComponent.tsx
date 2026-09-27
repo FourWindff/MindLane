@@ -1,7 +1,10 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import {
+  useActiveMindmapEditor,
+  useActiveMindmapStore,
+} from '@/features/mindmap/hooks/useActiveOpenFile'
+
 import type { ImageNodeData } from './types'
 
 function ImageNodeInner({ id, data: rawData, selected }: NodeProps) {

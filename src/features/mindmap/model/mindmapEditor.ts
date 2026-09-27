@@ -20,7 +20,7 @@ import {
 } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
-import type { MindmapState, MindmapStore } from './mindmapStore'
+import type { OpenFileState, MindmapStore } from './mindmapStore'
 import { MindmapHistory } from './mindmapHistory'
 import { layoutInitial, layoutReflow } from './mindmapLayout'
 import {
@@ -49,12 +49,12 @@ export class MindmapEditor {
     private history: MindmapHistory,
   ) {}
 
-  private get state(): MindmapState {
+  private get state(): OpenFileState {
     return this.store.getState()
   }
 
   /** 只读当前编辑器状态（校验场景用，如落盘应答器按活状态做存在性/纯树校验）。 */
-  getState(): MindmapState {
+  getState(): OpenFileState {
     return this.state
   }
 

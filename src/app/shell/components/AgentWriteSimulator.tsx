@@ -1,14 +1,17 @@
 import { useCallback } from 'react'
 import { Landmark, Move, PenLine, Plus, Trash2 } from 'lucide-react'
 import type { Edge, Node } from '@xyflow/react'
-import { useActiveMindmapEditor } from '@/features/mindmap/hooks/useActiveMindmapEditor'
-import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
+import {
+  useActiveMindmapEditor,
+  useActiveMindmapStore,
+} from '@/features/mindmap/hooks/useActiveOpenFile'
+
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { CHILD_OFFSET_X, findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
-import type { MindmapState } from '@/features/mindmap/model/mindmapStore'
+import type { OpenFileState } from '@/features/mindmap/model/mindmapStore'
 import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
 
 /**
@@ -174,7 +177,7 @@ interface PalaceSimInput {
   edges: Edge[]
   /** 当前选中节点，保持选中顺序 */
   selectedNodes: Array<{ id: string; label: string }>
-  addAsset: MindmapState['addAsset']
+  addAsset: OpenFileState['addAsset']
 }
 
 /**

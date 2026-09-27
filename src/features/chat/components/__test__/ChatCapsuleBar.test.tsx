@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatCapsuleBar } from '../ChatCapsuleBar'
 import { resolveCapsuleOpenPath } from '@/features/chat/lib/capsuleOpenPath'
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 
 interface MockFileChat {
   lastActivityAt: number
@@ -81,8 +81,8 @@ vi.mock('@/app/workspace/store', () => ({
   useWorkspaceStore: () => ({ openWorkspaceFile: vi.fn() }),
 }))
 
-vi.mock('@/features/mindmap/model/mindmapRegistry', () => ({
-  mindmapRegistry: {
+vi.mock('@/features/mindmap/model/openFileRegistry', () => ({
+  openFileRegistry: {
     getByFileUuid: vi.fn(() => undefined),
   },
 }))
@@ -188,7 +188,7 @@ describe('ChatCapsuleBar', () => {
   })
 
   it('resolves the open path from the persisted mapping when the file was not opened this launch', () => {
-    vi.mocked(mindmapRegistry.getByFileUuid).mockReturnValue(undefined)
+    vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue(undefined)
 
     expect(resolveCapsuleOpenPath('file-x', { 'file-x': '/workspace/x.mindlane' })).toBe(
       '/workspace/x.mindlane',
@@ -196,7 +196,7 @@ describe('ChatCapsuleBar', () => {
   })
 
   it('prefers the loaded mindmap instance path over the persisted mapping', () => {
-    vi.mocked(mindmapRegistry.getByFileUuid).mockReturnValue({
+    vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue({
       store: { getState: () => ({ filePath: '/workspace/renamed.mindlane' }) },
     } as never)
 
@@ -206,7 +206,7 @@ describe('ChatCapsuleBar', () => {
   })
 
   it('returns null when neither the registry nor the mapping knows the file', () => {
-    vi.mocked(mindmapRegistry.getByFileUuid).mockReturnValue(undefined)
+    vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue(undefined)
 
     expect(resolveCapsuleOpenPath('file-ghost', {})).toBeNull()
   })

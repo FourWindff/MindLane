@@ -1,4 +1,4 @@
-import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import type { WorkspaceTreeEntry } from '@/app/workspace/types'
 import { useAiStore } from '@/features/chat/model/aiStore'
@@ -25,26 +25,26 @@ function collectWorkspaceFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileInfo
  * 导图树摘要（mindmapSummary）已删除：模型需要结构时按需调用读工具。
  */
 export function buildChatContext(): ChatContext {
-  const instance = mindmapRegistry.getActive()
+  const instance = openFileRegistry.getActive()
   if (!instance) {
     throw new Error('没有打开的文件，无法发起对话')
   }
-  const mindmapState = instance.store.getState()
+  const openFileState = instance.store.getState()
   const wsState = useWorkspaceStore.getState()
-  const ctx: ChatContext = { fileUuid: mindmapState.fileUuid }
+  const ctx: ChatContext = { fileUuid: openFileState.fileUuid }
 
-  if (mindmapState.filePath) ctx.filePath = mindmapState.filePath
-  if (mindmapState.fileTitle) ctx.fileTitle = mindmapState.fileTitle
-  ctx.hasDocumentOpen = mindmapState.hasDocumentOpen
+  if (openFileState.filePath) ctx.filePath = openFileState.filePath
+  if (openFileState.fileTitle) ctx.fileTitle = openFileState.fileTitle
+  ctx.hasDocumentOpen = openFileState.hasDocumentOpen
 
-  if (mindmapState.documentRefs.length > 0) {
-    ctx.linkedDocuments = mindmapState.documentRefs.map((doc) => ({ ...doc }))
+  if (openFileState.documentRefs.length > 0) {
+    ctx.linkedDocuments = openFileState.documentRefs.map((doc) => ({ ...doc }))
   }
 
-  const selected = mindmapState.nodes.filter((n) => n.selected)
+  const selected = openFileState.nodes.filter((n) => n.selected)
   if (selected.length > 0) {
     ctx.selectedNodes = selected.map((n) =>
-      extractNodeInfoCompact(n, mindmapState.nodes, mindmapState.edges),
+      extractNodeInfoCompact(n, openFileState.nodes, openFileState.edges),
     )
   }
 
