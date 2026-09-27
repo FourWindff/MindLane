@@ -475,33 +475,10 @@
   color: var(--ml-text);
 }
 
+/* Layout lives in .icon-btn, size in .icon-btn--sm */
 .settings-modal__close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  padding: 0;
-  background: transparent;
-  color: var(--ml-text-muted);
   font: inherit;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    color 0.12s ease,
-    transform 0.1s ease;
   outline: none;
-}
-
-.settings-modal__close:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ml-text);
-}
-
-.settings-modal__close:active {
-  transform: scale(0.94);
 }
 
 .settings-modal__close:focus-visible {

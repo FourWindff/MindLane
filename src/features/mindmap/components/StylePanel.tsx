@@ -25,7 +25,11 @@ export function StylePanel({
       <div className="style-panel__header">
         <span className="style-panel__title">导图样式</span>
         {onClose && (
-          <button className="style-panel__close" onClick={onClose} aria-label="关闭样式面板">
+          <button
+            className="icon-btn icon-btn--xs style-panel__close"
+            onClick={onClose}
+            aria-label="关闭样式面板"
+          >
             ✕
           </button>
         )}

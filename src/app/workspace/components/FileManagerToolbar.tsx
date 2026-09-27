@@ -49,7 +49,7 @@ export function FileManagerToolbar({
       <div className="file-manager__action-group">
         <button
           type="button"
-          className="file-manager__icon-btn"
+          className="icon-btn icon-btn--md file-manager__icon-btn"
           onClick={onRefresh}
           disabled={busy || !workspacePath}
           title="刷新"
@@ -59,7 +59,7 @@ export function FileManagerToolbar({
         </button>
         <button
           type="button"
-          className="file-manager__icon-btn"
+          className="icon-btn icon-btn--md file-manager__icon-btn"
           onClick={onSwitchWorkspace}
           disabled={busy}
           title="切换仓库"
@@ -74,7 +74,7 @@ export function FileManagerToolbar({
       {/* Close */}
       <button
         type="button"
-        className="file-manager__close-btn"
+        className="icon-btn icon-btn--md file-manager__close-btn"
         onClick={onClose}
         title="关闭"
         aria-label="关闭"

@@ -76,3 +76,64 @@ body {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* ── Icon button primitive ──
+   Shared by the file manager, settings modal and mindmap side panels.
+   Size, radius and transition live on the size modifiers; focus ring and
+   disabled state stay on the owning component class (their offsets differ). */
+.icon-btn {
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--ml-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.icon-btn--md,
+.icon-btn--sm {
+  display: inline-flex;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease,
+    transform 0.1s ease;
+}
+
+.icon-btn--md {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+}
+
+.icon-btn--sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.icon-btn--xs {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ml-text);
+}
+
+/* Must follow the rule above: same specificity, so source order decides */
+.icon-btn--xs:hover:not(:disabled) {
+  background: var(--ml-fill-medium);
+  color: var(--ml-text);
+}
+
+.icon-btn--md:active:not(:disabled),
+.icon-btn--sm:active:not(:disabled) {
+  transform: scale(0.94);
+}

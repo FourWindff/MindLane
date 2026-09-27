@@ -55,7 +55,7 @@ export function SettingsModal({ open, onClose }: Props) {
           </div>
           <button
             type="button"
-            className="settings-modal__close"
+            className="icon-btn icon-btn--sm settings-modal__close"
             onClick={onClose}
             aria-label="关闭"
           >

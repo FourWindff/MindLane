@@ -45,27 +45,7 @@
   letter-spacing: 0.02em;
 }
 
-.document-refs-panel__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: transparent;
-  border-radius: 5px;
-  cursor: pointer;
-  color: var(--ml-text-muted);
-  padding: 0;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-
-.document-refs-panel__close:hover {
-  background: var(--ml-fill-medium);
-  color: var(--ml-text);
-}
+/* The panel's close button is an .icon-btn--xs (see index.css) */
 
 .document-refs-panel__list {
   list-style: none;

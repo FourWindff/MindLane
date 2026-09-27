@@ -43,7 +43,7 @@ export function DocumentRefsPanel({ onClose }: { onClose?: () => void }) {
         </span>
         {onClose && (
           <button
-            className="document-refs-panel__close"
+            className="icon-btn icon-btn--xs document-refs-panel__close"
             onClick={onClose}
             aria-label="关闭关联文件面板"
           >
