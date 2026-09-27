@@ -171,7 +171,8 @@
   background: var(--ml-accent);
 }
 
-.chat-input-bar__send:disabled {
+.chat-input-bar__send:disabled,
+.chat-input-bar__tool:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
@@ -246,7 +247,7 @@
   text-align: left;
 }
 
-.chat-input-bar__menu button:hover {
+:is(.chat-input-bar__menu button, .chat-input-bar__url-btn--ghost):hover {
   background: var(--ml-fill-soft);
 }
 
@@ -298,10 +299,6 @@
   background: transparent;
 }
 
-.chat-input-bar__url-btn--ghost:hover {
-  background: var(--ml-fill-soft);
-}
-
 .chat-input-bar__url-error {
   width: 100%;
   font-size: 0.68rem;
@@ -325,9 +322,4 @@
 .chat-input-bar__tool:hover {
   background: var(--ml-fill-soft);
   color: var(--ml-text);
-}
-
-.chat-input-bar__tool:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }

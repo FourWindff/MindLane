@@ -10,18 +10,14 @@
   background: var(--canvas-bg, var(--ml-bg));
   background-image: radial-gradient(
     circle,
-    var(--canvas-dot, rgba(0, 0, 0, 0.07)) 1px,
+    var(--canvas-dot, rgba(0, 0, 0, 0.06)) 1px,
     transparent 1px
   );
   background-size: 24px 24px;
   cursor: default;
 }
 
-.mindmap-canvas-wrap .react-flow__edge-path,
-.mindmap-canvas-wrap .react-flow__edge.selected .react-flow__edge-path,
-.mindmap-canvas-wrap .react-flow__edge.updating .react-flow__edge-path,
-.mindmap-canvas-wrap .react-flow__edge.selectable:focus .react-flow__edge-path,
-.mindmap-canvas-wrap .react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+.mindmap-canvas-wrap .react-flow__edge-path {
   stroke: var(--ml-edge-stroke);
   shape-rendering: crispEdges;
 }

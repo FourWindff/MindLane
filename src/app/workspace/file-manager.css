@@ -423,10 +423,6 @@
   background: rgba(255, 255, 255, 0.85);
 }
 
-.file-manager__card:active {
-  transform: translateY(0) scale(0.99);
-}
-
 .file-manager__card:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -455,14 +451,6 @@
 
 .file-manager__card--folder:hover .file-manager__card-visual {
   background: rgba(28, 25, 23, 0.07);
-}
-
-.file-manager__card--folder .file-manager__card-icon--folder {
-  color: rgba(28, 25, 23, 0.5);
-}
-
-.file-manager__card--folder .file-manager__card-name--folder {
-  color: var(--ml-text);
 }
 
 /* Folder left accent */
@@ -630,6 +618,7 @@
   transform: translateY(-2px);
 }
 
+.file-manager__card:active,
 .file-manager__new-card:active {
   transform: translateY(0) scale(0.99);
 }

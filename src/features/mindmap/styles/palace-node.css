@@ -113,7 +113,8 @@
     box-shadow 0.28s;
 }
 
-.palace-node-shell--collapsed {
+.palace-node-shell--collapsed,
+.palace-node-shell--collapsing {
   width: 72px;
   height: 72px;
   border: 2px solid var(--ml-info);
@@ -150,12 +151,6 @@
 }
 .palace-node-shell--expanded:hover {
   box-shadow: var(--ml-shadow-strong);
-}
-
-.palace-node-shell--collapsing {
-  width: 72px;
-  height: 72px;
-  border: 2px solid var(--ml-info);
 }
 
 .palace-node-expanded-inner {

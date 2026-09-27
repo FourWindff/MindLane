@@ -97,12 +97,6 @@
   max-width: 160px;
 }
 
-.chat-capsule--idle {
-  background:
-    linear-gradient(var(--ml-bg-elevated), var(--ml-bg-elevated)) padding-box,
-    linear-gradient(90deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.06)) border-box;
-}
-
 .chat-capsule--generating {
   background:
     linear-gradient(var(--ml-bg-elevated), var(--ml-bg-elevated)) padding-box,

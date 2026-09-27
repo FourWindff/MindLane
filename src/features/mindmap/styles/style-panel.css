@@ -140,11 +140,12 @@
     background 0.14s;
 }
 
-.style-panel__color-option:hover {
+/* Color option and style option share these two states */
+:is(.style-panel__color-option, .style-panel__style-option):hover {
   background: var(--ml-fill-soft);
 }
 
-.style-panel__color-option--active {
+:is(.style-panel__color-option--active, .style-panel__style-option--active) {
   border-color: var(--ml-accent);
   background: var(--ml-accent-soft);
 }
@@ -195,15 +196,6 @@
   transition:
     border-color 0.14s,
     background 0.14s;
-}
-
-.style-panel__style-option:hover {
-  background: var(--ml-fill-soft);
-}
-
-.style-panel__style-option--active {
-  border-color: var(--ml-accent);
-  background: var(--ml-accent-soft);
 }
 
 .style-panel__style-label {
