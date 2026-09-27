@@ -871,6 +871,16 @@ describe('deriveChatCapsuleEntries projection', () => {
     expect(useAiStore.getState().showSessionList).toBe(true)
   })
 
+  it('owns the chat panel and capsule flags the shell and header share', () => {
+    expect(useAiStore.getState().chatOpen).toBe(true)
+    useAiStore.getState().setChatOpen(false)
+    expect(useAiStore.getState().chatOpen).toBe(false)
+
+    expect(useAiStore.getState().capsuleExpanded).toBe(false)
+    useAiStore.getState().setCapsuleExpanded(true)
+    expect(useAiStore.getState().capsuleExpanded).toBe(true)
+  })
+
   it('stores a quick action prompt as the input draft', () => {
     useAiStore.setState({
       currentFileUuid: 'file-a',

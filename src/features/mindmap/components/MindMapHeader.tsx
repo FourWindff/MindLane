@@ -14,6 +14,7 @@ import {
   MessageCircleOff,
 } from 'lucide-react'
 import { useEffect } from 'react'
+import { useAiStore } from '@/features/chat/model/aiStore'
 
 type Props = {
   onAddChild: () => void
@@ -27,7 +28,6 @@ type Props = {
   onCenterRoot?: () => void
   onToggleStylePanel?: () => void
   onToggleDocumentRefsPanel?: () => void
-  onToggleChat?: () => void
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
@@ -36,8 +36,6 @@ type Props = {
   stylePanelOpen?: boolean
   documentRefsPanelOpen?: boolean
   hasDocumentRefs?: boolean
-  chatOpen?: boolean
-  capsuleExpanded?: boolean
   /** AI 服务就绪门控：不可用时聊天入口禁用并红色背景提示。 */
   aiReady?: boolean
   /** 样式面板内容，打开时渲染在工具栏下方。 */
@@ -102,7 +100,6 @@ export function MindMapHeader({
   onCenterRoot,
   onToggleStylePanel,
   onToggleDocumentRefsPanel,
-  onToggleChat,
   canAddChild,
   canAddSibling,
   canRemove,
@@ -111,12 +108,15 @@ export function MindMapHeader({
   stylePanelOpen,
   documentRefsPanelOpen,
   hasDocumentRefs,
-  chatOpen,
-  capsuleExpanded,
   aiReady = true,
   stylePanel,
   documentRefsPanel,
 }: Props) {
+  // Chat panel state lives in the ai store: the app shell shows/hides the panel
+  // and this toolbar only flips the flag.
+  const chatOpen = useAiStore((s) => s.chatOpen)
+  const capsuleExpanded = useAiStore((s) => s.capsuleExpanded)
+  const setChatOpen = useAiStore((s) => s.setChatOpen)
   useEffect(() => {
     if (
       (!stylePanelOpen && !documentRefsPanelOpen) ||
@@ -252,23 +252,21 @@ export function MindMapHeader({
                   icon={<Settings size={22} strokeWidth={1.5} />}
                 />
               )}
-              {onToggleChat && (
-                <ToolbarButton
-                  onClick={onToggleChat}
-                  disabled={!aiReady}
-                  unavailable={!aiReady}
-                  ariaLabel={chatOpen ? '隐藏聊天' : '显示聊天'}
-                  tooltip={aiReady ? (chatOpen ? '隐藏聊天' : '显示聊天') : '聊天服务不可用'}
-                  active={aiReady && !chatOpen}
-                  icon={
-                    chatOpen ? (
-                      <MessageCircle size={22} strokeWidth={1.5} />
-                    ) : (
-                      <MessageCircleOff size={22} strokeWidth={1.5} />
-                    )
-                  }
-                />
-              )}
+              <ToolbarButton
+                onClick={() => setChatOpen(!chatOpen)}
+                disabled={!aiReady}
+                unavailable={!aiReady}
+                ariaLabel={chatOpen ? '隐藏聊天' : '显示聊天'}
+                tooltip={aiReady ? (chatOpen ? '隐藏聊天' : '显示聊天') : '聊天服务不可用'}
+                active={aiReady && !chatOpen}
+                icon={
+                  chatOpen ? (
+                    <MessageCircle size={22} strokeWidth={1.5} />
+                  ) : (
+                    <MessageCircleOff size={22} strokeWidth={1.5} />
+                  )
+                }
+              />
             </div>
           </nav>
         </div>

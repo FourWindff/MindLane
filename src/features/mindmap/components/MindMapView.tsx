@@ -11,21 +11,14 @@ import { DocumentRefsPanel } from './DocumentRefsPanel'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindmapOperationController'
 
-function MindMapWorkspace({
-  onSwitchWorkspace,
-  onOpenSettings,
-  chatOpen,
-  capsuleExpanded,
-  onToggleChat,
-  aiReady,
-}: {
+/** Props of both the public view and its inner workspace component. */
+type MindmapViewProps = {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
-  chatOpen: boolean
-  capsuleExpanded: boolean
-  onToggleChat: () => void
   aiReady: boolean
-}) {
+}
+
+function MindMapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
   const view = useMindmapOperationController()
   const { visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)
 
@@ -38,9 +31,6 @@ function MindMapWorkspace({
         onUndo={view.actions.undo}
         onRedo={view.actions.redo}
         onOpenSettings={onOpenSettings}
-        chatOpen={chatOpen}
-        capsuleExpanded={capsuleExpanded}
-        onToggleChat={onToggleChat}
         onSwitchWorkspace={onSwitchWorkspace}
         onSave={view.actions.save}
         onCenterRoot={() => void view.actions.centerRoot()}
@@ -129,29 +119,12 @@ function MindMapWorkspace({
   )
 }
 
-export function MindMapView({
-  onSwitchWorkspace,
-  onOpenSettings,
-  chatOpen,
-  capsuleExpanded,
-  onToggleChat,
-  aiReady,
-}: {
-  onSwitchWorkspace?: () => void
-  onOpenSettings?: () => void
-  chatOpen: boolean
-  capsuleExpanded: boolean
-  onToggleChat: () => void
-  aiReady: boolean
-}) {
+export function MindMapView({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
   return (
     <ReactFlowProvider>
       <MindMapWorkspace
         onSwitchWorkspace={onSwitchWorkspace}
         onOpenSettings={onOpenSettings}
-        chatOpen={chatOpen}
-        capsuleExpanded={capsuleExpanded}
-        onToggleChat={onToggleChat}
         aiReady={aiReady}
       />
     </ReactFlowProvider>

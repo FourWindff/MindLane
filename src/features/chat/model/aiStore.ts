@@ -97,6 +97,10 @@ interface AiState {
   showSessionList: boolean
   attachedDocument: DocumentRef | null
   inputDraft: string
+  /** Chat panel visibility; the mindmap toolbar and the app shell both read it. */
+  chatOpen: boolean
+  /** Capsule bar expansion; the mindmap header compresses while it is open. */
+  capsuleExpanded: boolean
 
   setBusy: (busy: boolean) => void
   /**
@@ -107,6 +111,8 @@ interface AiState {
   reset: () => void
   addChatMessage: (message: ChatMessage) => void
   setShowSessionList: (show: boolean) => void
+  setChatOpen: (open: boolean) => void
+  setCapsuleExpanded: (expanded: boolean) => void
   loadSession: (sessionId: string) => Promise<void>
   deleteSession: (sessionId: string) => Promise<void>
   setAttachedDocument: (document: DocumentRef | null) => void
@@ -306,6 +312,8 @@ export const useAiStore = create<AiState>((set, get) => ({
   showSessionList: false,
   attachedDocument: null,
   inputDraft: '',
+  chatOpen: true,
+  capsuleExpanded: false,
 
   setBusy: (busy) =>
     set((state) => {
@@ -336,6 +344,8 @@ export const useAiStore = create<AiState>((set, get) => ({
       })
     }),
   setShowSessionList: (showSessionList) => set({ showSessionList }),
+  setChatOpen: (chatOpen) => set({ chatOpen }),
+  setCapsuleExpanded: (capsuleExpanded) => set({ capsuleExpanded }),
   setAttachedDocument: (attachedDocument) => set({ attachedDocument }),
   setInputDraft: (inputDraft) => set({ inputDraft }),
 

@@ -73,8 +73,9 @@ function WorkspaceEmptyState() {
 function AppContent() {
   const [fileManagerOpen, setFileManagerOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(true)
-  const [capsuleExpanded, setCapsuleExpanded] = useState(false)
+  const chatOpen = useAiStore((s) => s.chatOpen)
+  const capsuleExpanded = useAiStore((s) => s.capsuleExpanded)
+  const setCapsuleExpanded = useAiStore((s) => s.setCapsuleExpanded)
   // AI 服务就绪：启动时经桥读取一次，只读向下传递（不建状态机）。
   const [aiReady, setAiReady] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
@@ -179,9 +180,6 @@ function AppContent() {
                 <MindMapView
                   onSwitchWorkspace={() => void switchWorkspace()}
                   onOpenSettings={() => setSettingsOpen(true)}
-                  chatOpen={chatOpen}
-                  capsuleExpanded={capsuleExpanded}
-                  onToggleChat={() => setChatOpen((open) => !open)}
                   aiReady={aiReady}
                 />
               ) : (
@@ -194,7 +192,7 @@ function AppContent() {
             >
               <ChatCapsuleBar
                 expanded={capsuleExpanded}
-                onToggleExpand={() => setCapsuleExpanded((e) => !e)}
+                onToggleExpand={() => setCapsuleExpanded(!capsuleExpanded)}
               />
               {chatOpen && (
                 <>
