@@ -42,7 +42,7 @@ describe('top toolbar layout', () => {
 
   it('reveals the toolbar tooltip on hover (not clipped by the viewport)', () => {
     const tooltipCss = fs.readFileSync(
-      path.resolve('src/features/mindmap/styles/tooltip.css'),
+      path.resolve('src/features/mindmap/styles/toolbar.css'),
       'utf8',
     )
 

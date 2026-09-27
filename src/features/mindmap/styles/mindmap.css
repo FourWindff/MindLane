@@ -1,12 +1,9 @@
-@import './shell.css';
 @import './toolbar.css';
-@import './tooltip.css';
 @import './context-menu.css';
 @import './canvas.css';
 @import './text-node.css';
 @import './selection-bar.css';
 @import './palace-node.css';
-@import './palace-node-detail.css';
 @import './palace-modal.css';
 @import './palace-modal-stations.css';
 @import './map-style-variants.css';

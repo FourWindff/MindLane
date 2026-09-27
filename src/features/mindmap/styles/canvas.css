@@ -1,3 +1,13 @@
+.mindmap-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  background: var(--ml-bg-elevated);
+  color: var(--ml-text);
+}
+
 .mindmap-canvas-wrap {
   flex: 1;
   min-height: 0;
