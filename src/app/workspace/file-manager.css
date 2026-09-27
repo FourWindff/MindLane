@@ -192,10 +192,8 @@
   margin: 0 4px;
 }
 
-/* Text button (primary actions) */
+/* Text button (primary actions): skeleton lives in .btn */
 .file-manager__btn {
-  display: inline-flex;
-  align-items: center;
   gap: 0.4rem;
   height: 36px;
   padding: 0 0.8rem;
@@ -205,8 +203,6 @@
   color: var(--ml-text);
   font-family: inherit;
   font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
   transition:
     background 0.12s ease,
     transform 0.1s ease;

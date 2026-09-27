@@ -23,7 +23,7 @@ export function FileManagerToolbar({
       <div className="file-manager__action-group">
         <button
           type="button"
-          className="file-manager__btn file-manager__btn--primary"
+          className="btn file-manager__btn file-manager__btn--primary"
           onClick={onNewFile}
           disabled={busy || !workspacePath}
           title="新建文件"
@@ -33,7 +33,7 @@ export function FileManagerToolbar({
         </button>
         <button
           type="button"
-          className="file-manager__btn"
+          className="btn file-manager__btn"
           onClick={onNewFolder}
           disabled={busy || !workspacePath}
           title="新建文件夹"

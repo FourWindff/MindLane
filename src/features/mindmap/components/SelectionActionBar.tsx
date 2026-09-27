@@ -18,7 +18,7 @@ export function SelectionActionBar({
       <span className="selection-bar__count">已选 {selectedTopicCount} 个主题</span>
       <button
         type="button"
-        className="selection-bar__btn"
+        className="btn selection-bar__btn"
         onClick={onGeneratePalace}
         disabled={!palaceEnabled}
         title={palaceEnabled ? undefined : '需要配置对话模型'}

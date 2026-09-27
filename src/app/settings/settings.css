@@ -495,8 +495,6 @@
 
 /* ====== Panel Buttons ====== */
 .panel-btn {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
   gap: 0.4rem;
   padding: 0.45rem 0.85rem;
@@ -504,10 +502,8 @@
   border: 1px solid var(--ml-border);
   font: inherit;
   font-size: 0.8rem;
-  font-weight: 600;
   color: var(--ml-text);
   background: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
   transition:
     background 0.12s ease,
     transform 0.1s ease,

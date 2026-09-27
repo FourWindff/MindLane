@@ -241,7 +241,7 @@ function McpIntegrationsSection() {
               />
               <button
                 type="button"
-                className={`panel-btn${connected ? '' : ' panel-btn--primary'}`}
+                className={`btn panel-btn${connected ? '' : ' panel-btn--primary'}`}
                 disabled={busy}
                 onClick={() => {
                   if (busy) return
@@ -258,7 +258,7 @@ function McpIntegrationsSection() {
               {hasForm && (
                 <button
                   type="button"
-                  className="panel-btn"
+                  className="btn panel-btn"
                   disabled={busy}
                   aria-expanded={formOpen}
                   aria-label="配置"
@@ -293,7 +293,7 @@ function McpIntegrationsSection() {
                       {server.id === 'feishu' && field.id === 'uat' && (
                         <button
                           type="button"
-                          className="panel-btn"
+                          className="btn panel-btn"
                           disabled={busyUat}
                           onClick={() => void acquireUat(server)}
                         >
@@ -306,7 +306,7 @@ function McpIntegrationsSection() {
                 {formError && <div className="mcp-server__form-error">{formError}</div>}
                 <button
                   type="button"
-                  className="panel-btn panel-btn--primary"
+                  className="btn panel-btn panel-btn--primary"
                   disabled={busy || busyUat}
                   onClick={() => void submitForm(server)}
                 >
@@ -384,7 +384,7 @@ export function SettingsPanel() {
                 <div className="settings-card__value">0.0.0</div>
                 <div className="settings-card__hint">当前为桌面应用预览版本。</div>
               </div>
-              <button type="button" className="panel-btn panel-btn--primary">
+              <button type="button" className="btn panel-btn panel-btn--primary">
                 检查更新
               </button>
             </div>
@@ -406,7 +406,7 @@ export function SettingsPanel() {
               </div>
               <button
                 type="button"
-                className="panel-btn"
+                className="btn panel-btn"
                 onClick={() => void window.mindlane?.shell.openLogs()}
               >
                 打开日志目录
@@ -426,7 +426,7 @@ export function SettingsPanel() {
               </div>
               <button
                 type="button"
-                className="panel-btn panel-btn--primary"
+                className="btn panel-btn panel-btn--primary"
                 onClick={() => void openWorkspaceDirectory()}
               >
                 切换仓库
@@ -450,7 +450,7 @@ export function SettingsPanel() {
             <div className="settings-card__action-group">
               <button
                 type="button"
-                className="panel-btn"
+                className="btn panel-btn"
                 onClick={async () => {
                   const result = await window.mindlane?.file.open()
                   if (result?.ok) {
@@ -465,7 +465,7 @@ export function SettingsPanel() {
               </button>
               <button
                 type="button"
-                className="panel-btn"
+                className="btn panel-btn"
                 onClick={async () => {
                   const state = activeInstance.store.getState()
                   const data = state.toMindLaneFile()
@@ -484,7 +484,7 @@ export function SettingsPanel() {
               </button>
               <button
                 type="button"
-                className="panel-btn"
+                className="btn panel-btn"
                 onClick={async () => {
                   const state = activeInstance.store.getState()
                   const data = state.toMindLaneFile()

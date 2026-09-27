@@ -34,19 +34,16 @@
   white-space: nowrap;
 }
 
+/* Skeleton (display / align-items / font-weight / cursor) lives in .btn */
 .selection-bar__btn {
-  display: inline-flex;
-  align-items: center;
   gap: 0.35rem;
   padding: 0.4rem 0.8rem;
   border-radius: 8px;
   border: 1px solid var(--ml-accent);
   font: inherit;
   font-size: 0.78rem;
-  font-weight: 600;
   color: var(--ml-bg-elevated);
   background: var(--ml-accent);
-  cursor: pointer;
   white-space: nowrap;
   transition: background 0.12s;
 }

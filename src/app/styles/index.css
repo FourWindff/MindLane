@@ -77,6 +77,16 @@ body {
   -webkit-user-select: text;
 }
 
+/* ── Action button skeleton ──
+   Size, padding, border, colours and states stay on each component's own
+   class: the three button systems differ in all of them. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* ── Icon button primitive ──
    Shared by the file manager, settings modal and mindmap side panels.
    Size, radius and transition live on the size modifiers; focus ring and
