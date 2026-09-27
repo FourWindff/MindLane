@@ -1,6 +1,6 @@
-import { createMindmapStore, type MindmapStore } from './mindmapStore'
-import { MindmapHistory } from './mindmapHistory'
-import { MindmapEditor } from './mindmapEditor'
+import { createMindmapStore, type MindmapStore } from './store'
+import { MindmapHistory } from './history'
+import { MindmapEditor } from './editor'
 import type { MindLaneFile } from '@/shared/lib/fileFormat'
 
 /**

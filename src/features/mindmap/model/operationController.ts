@@ -1,12 +1,12 @@
 import type { Edge, EdgeChange, Node, NodeChange, Viewport } from '@xyflow/react'
-import type { MindmapEditor } from './mindmapEditor'
+import type { MindmapEditor } from './editor'
 import {
   collectSubtreeIds,
   findParentId,
   findRootNode,
   getChildIdsOrdered,
 } from '@/shared/lib/mindmapTree'
-import type { SiblingInsertMode } from './mindmapEditor'
+import type { SiblingInsertMode } from './editor'
 
 type OperationEditor = Pick<
   MindmapEditor,

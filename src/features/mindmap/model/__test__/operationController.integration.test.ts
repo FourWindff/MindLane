@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { MindmapEditor } from '../mindmapEditor'
-import { MindmapHistory } from '../mindmapHistory'
-import { createMindmapStore } from '../mindmapStore'
+import { MindmapEditor } from '../editor'
+import { MindmapHistory } from '../history'
+import { createMindmapStore } from '../store'
 import { createMindmapOperationController } from '../operationController'
 
 describe('MindmapOperationController integration', () => {

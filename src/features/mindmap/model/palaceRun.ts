@@ -2,7 +2,7 @@ import type { ChatContext, ChatStreamEvent } from '../../../../electron/ipc'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { openFileRegistry } from './openFileRegistry'
-import type { MindmapEditor } from './mindmapEditor'
+import type { MindmapEditor } from './editor'
 
 /**
  * Manual palace generation (CONTEXT.md「触发面」/「临时运行」): a plain ephemeral

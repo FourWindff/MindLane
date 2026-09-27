@@ -1,4 +1,4 @@
-import type { MindmapStore } from './mindmapStore'
+import type { MindmapStore } from './store'
 
 interface SaveOpenFileOptions {
   syncAfterFileSaved: (filePath: string) => Promise<void>

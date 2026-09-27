@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import { CHILD_OFFSET_X, findParentId, newId } from '@/shared/lib/mindmapTree'
 import {

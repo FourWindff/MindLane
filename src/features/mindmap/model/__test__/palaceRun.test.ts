@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatStreamEvent, PalaceRunPayload } from '../../../../../electron/ipc'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import { handlePalaceRunEvent, resumePalaceRun, startPalaceRun, stopPalaceRun } from '../palaceRun'
 
 vi.mock('@/features/mindmap/model/openFileRegistry', () => ({

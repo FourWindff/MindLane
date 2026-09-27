@@ -26,7 +26,7 @@ vi.mock('react', async (importOriginal) => {
   }
 })
 
-import { MindmapHeader } from '../MindmapHeader'
+import { MindmapHeader } from '../Header'
 
 class TestElement {
   constructor(private readonly selector: string | null = null) {}

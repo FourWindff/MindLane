@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
-import type { MindmapHistory } from '@/features/mindmap/model/mindmapHistory'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
-import type { MindmapStore, OpenFileState } from '@/features/mindmap/model/mindmapStore'
+import type { MindmapHistory } from '@/features/mindmap/model/history'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
+import type { MindmapStore, OpenFileState } from '@/features/mindmap/model/store'
 
 export interface ActiveOpenFile {
   key: string

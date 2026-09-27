@@ -10,7 +10,7 @@ import {
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 import { DEFAULT_STYLE } from '@/features/mindmap/theme/presets'
 import type { MindmapStyleState } from '@/features/mindmap/theme/types'
-import { layoutReflow } from './mindmapLayout'
+import { layoutReflow } from './layout'
 
 export interface OpenFileState {
   nodes: Node[]

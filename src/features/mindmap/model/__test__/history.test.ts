@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { MindmapHistory } from '../mindmapHistory'
+import { MindmapHistory } from '../history'
 import type { MindmapSnapshot, MindmapTransaction } from '../types'
 
 function makeSnapshot(label: string): MindmapSnapshot {

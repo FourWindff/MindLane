@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createMindmapStore, type OpenFileState } from '../mindmapStore'
-import { MindmapHistory } from '../mindmapHistory'
-import { MindmapEditor } from '../mindmapEditor'
+import { createMindmapStore, type OpenFileState } from '../store'
+import { MindmapHistory } from '../history'
+import { MindmapEditor } from '../editor'
 import { serializeMindLaneFile } from '@/shared/lib/mindmapXml'
 import { MindmapXmlError } from '@/shared/lib/mindmapXml'
 

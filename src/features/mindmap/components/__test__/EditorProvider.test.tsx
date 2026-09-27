@@ -1,14 +1,14 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { renderToString } from 'react-dom/server'
 import { useEffect } from 'react'
-import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
+import { MindmapEditorProvider } from '@/features/mindmap/components/EditorProvider'
 import {
   useActiveOpenFile,
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
 
-import { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import { MindmapEditor } from '@/features/mindmap/model/editor'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 

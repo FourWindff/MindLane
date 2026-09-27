@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMindmapEndEffects } from '../mindmapEndEffects'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 function stubEditor() {
   return {

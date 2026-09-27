@@ -33,7 +33,7 @@ import { isDefaultViewport } from '@/shared/lib/fileFormat'
 import { collectDescendantIds, collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/operationController'
-import type { ContextMenuState } from '@/features/mindmap/components/MindmapContextMenu'
+import type { ContextMenuState } from '@/features/mindmap/components/ContextMenu'
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 
 export function useMindmapView() {

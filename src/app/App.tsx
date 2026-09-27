@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MindmapView } from '@/features/mindmap/components/MindmapView'
+import { MindmapView } from '@/features/mindmap/components/View'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { SettingsModal } from '@/app/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/app/settings/model/settingsStore'
@@ -16,7 +16,7 @@ import {
 import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
 import { AppToolbar } from '@/app/shell/components/AppToolbar'
 import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
-import { MindmapEditorProvider } from '@/features/mindmap/components/MindmapEditorProvider'
+import { MindmapEditorProvider } from '@/features/mindmap/components/EditorProvider'
 import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
 import {
   connectAiStore,

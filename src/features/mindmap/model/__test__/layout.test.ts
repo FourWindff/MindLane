@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
-import { layoutInitial, layoutReflow } from '../mindmapLayout'
+import { layoutInitial, layoutReflow } from '../layout'
 
-describe('mindmapLayout', () => {
+describe('layout', () => {
   it('lays out imported nodes through the initial layout', () => {
     const nodes: Node[] = [
       { id: 'root', position: { x: 99, y: 99 }, data: {} },

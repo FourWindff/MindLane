@@ -11,8 +11,8 @@ import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { CHILD_OFFSET_X, findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
-import type { OpenFileState } from '@/features/mindmap/model/mindmapStore'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { OpenFileState } from '@/features/mindmap/model/store'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 /**
  * Agent 写操作的模拟面板（开发调试用）：四个写操作按钮分别走与 AI 写工具完全相同的

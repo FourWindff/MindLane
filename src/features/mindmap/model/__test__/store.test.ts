@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { createMindmapStore } from '../mindmapStore'
+import { createMindmapStore } from '../store'
 import { createEmptyFile, DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
 
-describe('mindmapStore.viewport', () => {
+describe('store.viewport', () => {
   let store: ReturnType<typeof createMindmapStore>
 
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe('mindmapStore.viewport', () => {
   })
 })
 
-describe('mindmapStore.style', () => {
+describe('store.style', () => {
   let store: ReturnType<typeof createMindmapStore>
 
   beforeEach(() => {
@@ -113,7 +113,7 @@ describe('mindmapStore.style', () => {
   })
 })
 
-describe('mindmapStore.workspacePath', () => {
+describe('store.workspacePath', () => {
   it('records workspacePath on loadFile and clears it on newFile/clearDocument', () => {
     const store = createMindmapStore()
     const file = createEmptyFile('WS')
@@ -132,7 +132,7 @@ describe('mindmapStore.workspacePath', () => {
   })
 })
 
-describe('mindmapStore.fileUuid', () => {
+describe('store.fileUuid', () => {
   it('preserves the loaded file UUID when serializing changes', () => {
     const store = createMindmapStore()
     const file = createEmptyFile('Identity')
@@ -152,7 +152,7 @@ describe('mindmapStore.fileUuid', () => {
   })
 })
 
-describe('mindmapStore.documentRefs', () => {
+describe('store.documentRefs', () => {
   let store: ReturnType<typeof createMindmapStore>
 
   beforeEach(() => {

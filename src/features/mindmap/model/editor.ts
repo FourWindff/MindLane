@@ -20,9 +20,9 @@ import {
 } from '@/shared/lib/mindmapTree'
 import { defaultNodeSize } from '@/shared/lib/nodeSize'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
-import type { OpenFileState, MindmapStore } from './mindmapStore'
-import { MindmapHistory } from './mindmapHistory'
-import { layoutInitial, layoutReflow } from './mindmapLayout'
+import type { OpenFileState, MindmapStore } from './store'
+import { MindmapHistory } from './history'
+import { layoutInitial, layoutReflow } from './layout'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   type MindmapCommand,

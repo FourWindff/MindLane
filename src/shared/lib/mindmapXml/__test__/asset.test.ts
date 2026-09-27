@@ -25,7 +25,7 @@ describe('asset helpers', () => {
   })
 
   it('dedups through the store: same content reuses the same asset id', async () => {
-    const { createMindmapStore } = await import('@/features/mindmap/model/mindmapStore')
+    const { createMindmapStore } = await import('@/features/mindmap/model/store')
     const store = createMindmapStore()
     const a = await assetFromDataUrl('data:image/png;base64,REVGRQ==')
     const b = await assetFromDataUrl('data:image/png;base64,REVGRQ==')

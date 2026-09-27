@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { createMindmapStore } from '../mindmapStore'
-import { MindmapHistory } from '../mindmapHistory'
-import { MindmapEditor } from '../mindmapEditor'
+import { createMindmapStore } from '../store'
+import { MindmapHistory } from '../history'
+import { MindmapEditor } from '../editor'
 import { getChildIdsOrdered } from '@/shared/lib/mindmapTree'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
 

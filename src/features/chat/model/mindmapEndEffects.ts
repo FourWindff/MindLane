@@ -1,6 +1,6 @@
 import type { ChatStreamEvent } from './aiStore'
 import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
-import type { MindmapEditor } from '@/features/mindmap/model/mindmapEditor'
+import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 /**
  * Remaining renderer-side duties for `end` events after live apply (ADR 0017

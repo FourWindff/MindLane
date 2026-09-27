@@ -18,7 +18,7 @@ vi.mock('@xyflow/react', async () => {
   }
 })
 
-import { MindmapCanvas } from '../MindmapCanvas'
+import { MindmapCanvas } from '../Canvas'
 
 describe('MindmapCanvas', () => {
   beforeEach(() => {
