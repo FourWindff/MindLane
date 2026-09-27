@@ -204,61 +204,72 @@ function TextNodeInner({
         (isMindmapRoot ? (
           <>
             {sideChildren && sideChildren.right > 0 && (
-              <button
-                type="button"
-                className={`text-node__collapse-btn${rightCollapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+              <CollapseButton
+                side="right"
+                collapsed={rightCollapsed}
                 onClick={(e) => toggleSideCollapsed('right', e)}
-                aria-label={rightCollapsed ? '展开右侧分支' : '收起右侧分支'}
-                title={rightCollapsed ? '展开右侧分支' : '收起右侧分支'}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                {rightCollapsed ? (
-                  <ChevronRight size={14} strokeWidth={2} />
-                ) : (
-                  <ChevronDown size={14} strokeWidth={2} />
-                )}
-              </button>
+              />
             )}
             {sideChildren && sideChildren.left > 0 && (
-              <button
-                type="button"
-                className={`text-node__collapse-btn text-node__collapse-btn--left${leftCollapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+              <CollapseButton
+                side="left"
+                mirrored
+                collapsed={leftCollapsed}
                 onClick={(e) => toggleSideCollapsed('left', e)}
-                aria-label={leftCollapsed ? '展开左侧分支' : '收起左侧分支'}
-                title={leftCollapsed ? '展开左侧分支' : '收起左侧分支'}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                {leftCollapsed ? (
-                  <ChevronLeft size={14} strokeWidth={2} />
-                ) : (
-                  <ChevronDown size={14} strokeWidth={2} />
-                )}
-              </button>
+              />
             )}
           </>
         ) : (
           hasChildren && (
-            <button
-              type="button"
-              className={`text-node__collapse-btn${collapsed ? ' text-node__collapse-btn--collapsed' : ''}${leftSide ? ' text-node__collapse-btn--left' : ''}`}
+            <CollapseButton
+              side="subtree"
+              mirrored={leftSide}
+              collapsed={collapsed}
               onClick={toggleCollapsed}
-              aria-label={collapsed ? '展开子树' : '折叠子树'}
-              title={collapsed ? '展开子树' : '折叠子树'}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {collapsed ? (
-                leftSide ? (
-                  <ChevronLeft size={14} strokeWidth={2} />
-                ) : (
-                  <ChevronRight size={14} strokeWidth={2} />
-                )
-              ) : (
-                <ChevronDown size={14} strokeWidth={2} />
-              )}
-            </button>
+            />
           )
         ))}
     </div>
+  )
+}
+
+/** Which branches the control folds; also picks the wording and the chevron side. */
+type CollapseSide = 'left' | 'right' | 'subtree'
+
+const COLLAPSE_LABELS: Record<CollapseSide, { collapsed: string; expanded: string }> = {
+  left: { collapsed: '展开左侧分支', expanded: '收起左侧分支' },
+  right: { collapsed: '展开右侧分支', expanded: '收起右侧分支' },
+  subtree: { collapsed: '展开子树', expanded: '折叠子树' },
+}
+
+/**
+ * Collapse toggle: one per side on a bilateral root, one on an ordinary node.
+ * The chevron mirrors on a left-hand button.
+ */
+function CollapseButton({
+  side,
+  mirrored,
+  collapsed,
+  onClick,
+}: {
+  side: CollapseSide
+  mirrored?: boolean
+  collapsed: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  const Chevron = collapsed ? (mirrored ? ChevronLeft : ChevronRight) : ChevronDown
+  const label = COLLAPSE_LABELS[side][collapsed ? 'collapsed' : 'expanded']
+  return (
+    <button
+      type="button"
+      className={`text-node__collapse-btn${mirrored ? ' text-node__collapse-btn--left' : ''}${collapsed ? ' text-node__collapse-btn--collapsed' : ''}`}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <Chevron size={14} strokeWidth={2} />
+    </button>
   )
 }
 

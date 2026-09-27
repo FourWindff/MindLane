@@ -63,15 +63,15 @@ export function StylePanel({
           <div className="style-panel__group-label">结构</div>
           <div className="style-panel__style-grid">
             {STRUCTURE_TYPES.map((s) => (
-              <button
+              <StyleOptionButton
                 key={s.id}
-                className={`style-panel__style-option ${structureType === s.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setStyle({ structureType: s.id as StructureType })}
+                active={structureType === s.id}
                 title={s.description}
+                onClick={() => setStyle({ structureType: s.id as StructureType })}
               >
                 <StructurePreview id={s.id as StructureType} active={structureType === s.id} />
                 <span className="style-panel__style-label">{s.label}</span>
-              </button>
+              </StyleOptionButton>
             ))}
           </div>
 
@@ -80,15 +80,15 @@ export function StylePanel({
           </div>
           <div className="style-panel__style-grid">
             {Object.values(VISUAL_VARIANTS).map((v) => (
-              <button
+              <StyleOptionButton
                 key={v.id}
-                className={`style-panel__style-option ${visualVariant === v.id ? 'style-panel__style-option--active' : ''}`}
-                onClick={() => setStyle({ visualVariant: v.id as VisualVariant })}
+                active={visualVariant === v.id}
                 title={v.description}
+                onClick={() => setStyle({ visualVariant: v.id as VisualVariant })}
               >
                 <VariantPreview variant={v.id as VisualVariant} active={visualVariant === v.id} />
                 <span className="style-panel__style-label">{v.label}</span>
-              </button>
+              </StyleOptionButton>
             ))}
           </div>
         </div>
@@ -112,6 +112,29 @@ export function StylePanel({
         </div>
       )}
     </div>
+  )
+}
+
+/** One option of the structure / visual grids; the preview is passed as children. */
+function StyleOptionButton({
+  active,
+  title,
+  onClick,
+  children,
+}: {
+  active: boolean
+  title: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      className={`style-panel__style-option ${active ? 'style-panel__style-option--active' : ''}`}
+      onClick={onClick}
+      title={title}
+    >
+      {children}
+    </button>
   )
 }
 
