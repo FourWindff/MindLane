@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
 import { useActiveMindmapInstance } from '@/features/mindmap/hooks/useActiveMindmapInstance'
 import { mindmapRegistry } from '@/features/mindmap/model/mindmapRegistry'
+import { saveMindmapInstance } from '@/features/mindmap/model/saveMindmapInstance'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
 import type { MindLaneFile } from '@/shared/lib/fileFormat'
 import { resolveArtworkStyle } from '@/shared/lib/palaceArtworkStyle'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 
 type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor' | 'integrations'
 
@@ -462,19 +464,12 @@ export function SettingsPanel() {
               <button
                 type="button"
                 className="btn panel-btn"
-                onClick={async () => {
-                  const state = activeInstance.store.getState()
-                  const data = state.toMindLaneFile()
-                  const result = await window.mindlane?.file.save({
-                    filePath: state.filePath,
-                    data,
+                onClick={() =>
+                  void saveMindmapInstance(activeInstance, {
+                    syncAfterFileSaved,
+                    onError: reportRendererError,
                   })
-                  if (result?.ok) {
-                    state.setFilePath(result.data.filePath)
-                    state.markClean()
-                    await syncAfterFileSaved(result.data.filePath)
-                  }
-                }}
+                }
               >
                 立即保存
               </button>
