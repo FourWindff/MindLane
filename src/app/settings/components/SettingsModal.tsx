@@ -28,7 +28,7 @@ export function SettingsModal({ open, onClose }: Props) {
   return (
     <div
       ref={backdropRef}
-      className="settings-modal-backdrop"
+      className="workspace-modal-backdrop settings-modal-backdrop"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === backdropRef.current) onClose()

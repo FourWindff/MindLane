@@ -422,17 +422,12 @@
 }
 
 /* ====== Settings Modal ====== */
-.settings-modal-backdrop {
-  position: fixed;
-  inset: 0;
+/* The overlay itself is the shared .workspace-modal-backdrop; only the stacking
+   order and inner padding differ (settings must sit above the chat surfaces).
+   Both classes are chained because workspace.css is bundled after this file. */
+.settings-modal-backdrop.workspace-modal-backdrop {
   z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 1.5rem;
-  background: var(--ml-overlay-bg);
-  backdrop-filter: var(--ml-overlay-blur);
-  -webkit-backdrop-filter: var(--ml-overlay-blur);
 }
 
 .settings-modal {
