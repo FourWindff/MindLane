@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Ban, Check, ChevronDown, ChevronRight, X } from 'lucide-react'
 import type { ChatToolCall, ChatToolCallStep } from '@/shared/lib/fileFormat'
 import { isSubgraphTool, toolDisplayName } from '@/features/chat/lib/chatUtils'
+import { cx } from '@/features/chat/lib/cx'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 
 type ToolCardStatus = NonNullable<ChatToolCall['status']>
@@ -18,10 +19,6 @@ export interface ToolCardItem {
   stages?: ChatToolCallStep[]
   /** Historical subgraph stage trace (persisted, ChatToolCall.steps). */
   steps?: ChatToolCallStep[]
-}
-
-function cx(...classes: (string | false | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
 }
 
 /**
@@ -70,6 +67,19 @@ function StatusGlyph({ status }: { status: ToolCardStatus }) {
   }
 }
 
+/** Card head shared by both card shapes: status glyph, name, canceled mark. */
+function CardHead({ card }: { card: ToolCardItem & { status: ToolCardStatus } }) {
+  return (
+    <>
+      <StatusGlyph status={card.status} />
+      <span className="chat-message-list__tool-card__name">{toolDisplayName(card.name)}</span>
+      {card.status === 'canceled' && (
+        <span className="chat-message-list__tool-card__mark">Canceled</span>
+      )}
+    </>
+  )
+}
+
 function CardClassName(status: ToolCardStatus, extra?: string): string {
   return cx('chat-message-list__tool-card', `chat-message-list__tool-card--${status}`, extra)
 }
@@ -77,11 +87,7 @@ function CardClassName(status: ToolCardStatus, extra?: string): string {
 function SingleLineCard({ card }: { card: ToolCardItem & { status: ToolCardStatus } }) {
   return (
     <span className={CardClassName(card.status)}>
-      <StatusGlyph status={card.status} />
-      <span className="chat-message-list__tool-card__name">{toolDisplayName(card.name)}</span>
-      {card.status === 'canceled' && (
-        <span className="chat-message-list__tool-card__mark">Canceled</span>
-      )}
+      <CardHead card={card} />
     </span>
   )
 }
@@ -106,11 +112,7 @@ function SubgraphCard({
         aria-expanded={showBody}
         aria-label={`${toolDisplayName(card.name)} ${showBody ? 'Collapse' : 'Expand'}`}
       >
-        <StatusGlyph status={card.status} />
-        <span className="chat-message-list__tool-card__name">{toolDisplayName(card.name)}</span>
-        {card.status === 'canceled' && (
-          <span className="chat-message-list__tool-card__mark">Canceled</span>
-        )}
+        <CardHead card={card} />
         {showBody ? (
           <ChevronDown
             size={11}

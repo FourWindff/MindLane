@@ -25,6 +25,13 @@ import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttach
 import '../styles/chat-input-bar.css'
 
 const MAX_ROWS = 4
+/** Row height in px; the CSS line box is 0.82rem × 1.45 ≈ 19px (drift is inert for ≤4 rows). */
+const LINE_HEIGHT = 20
+
+/** Rows the textarea currently needs, clamped to MAX_ROWS. */
+function rowsFor(textarea: HTMLTextAreaElement): number {
+  return Math.min(MAX_ROWS, Math.max(1, Math.round(textarea.scrollHeight / LINE_HEIGHT)))
+}
 
 interface ChatInputBarProps {
   onOpenSettings: () => void
@@ -72,9 +79,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     const textarea = inputRef.current
     if (textarea) {
       textarea.value = inputDraft
-      const lineHeight = 20
-      const rows = Math.min(MAX_ROWS, Math.max(1, Math.round(textarea.scrollHeight / lineHeight)))
-      setInputRows(rows)
+      setInputRows(rowsFor(textarea))
     }
     setInputDraft('')
   }, [inputDraft, setInputDraft])
@@ -201,10 +206,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const handleInputChange = useCallback(() => {
     const textarea = inputRef.current
     if (!textarea) return
-    const lineHeight = 20
-    const scrollHeight = textarea.scrollHeight
-    const rows = Math.min(MAX_ROWS, Math.max(1, Math.round(scrollHeight / lineHeight)))
-    setInputRows(rows)
+    setInputRows(rowsFor(textarea))
   }, [])
 
   return (

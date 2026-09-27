@@ -11,14 +11,11 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '@/features/chat/model/aiStore'
+import { cx } from '@/features/chat/lib/cx'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCardList } from './ToolCardList'
 
 import '../styles/chat-message-list.css'
-
-function cx(...classes: (string | false | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
-}
 
 const EMPTY_HINT = 'AI 助手可以生成思维导图、生成记忆宫殿'
 
@@ -148,55 +145,48 @@ export function ChatMessageList() {
       aria-live="polite"
     >
       {busy && (
-        <div className="chat-message-list__row chat-message-list__row--ai">
-          <div className="chat-message-list__ai">
-            {toolCards.length > 0 && <ToolCardList cards={toolCards} />}
-            <div className="chat-message-list__bubble chat-message-list__bubble--ai chat-message-list__bubble--streaming">
-              {streamingText ? (
-                <MarkdownContent content={streamingText} />
-              ) : (
-                <div className="chat-message-list__thinking">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              )}
-            </div>
+        <MessageRow>
+          {toolCards.length > 0 && <ToolCardList cards={toolCards} />}
+          <div className="chat-message-list__bubble chat-message-list__bubble--ai chat-message-list__bubble--streaming">
+            {streamingText ? (
+              <MarkdownContent content={streamingText} />
+            ) : (
+              <div className="chat-message-list__thinking">
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
           </div>
-        </div>
+        </MessageRow>
       )}
 
       {[...renderedMessages].reverse().map((msg, i) => {
         const isUser = msg.role === 'user'
         const toolCalls = msg.toolCalls && msg.toolCalls.length > 0 ? msg.toolCalls : undefined
         return (
-          <div
+          <MessageRow
             key={msg.timestamp || `${msg.role}-${messages.length - 1 - i}`}
-            className={cx(
-              'chat-message-list__row',
-              isUser ? 'chat-message-list__row--user' : 'chat-message-list__row--ai',
-            )}
+            isUser={isUser}
           >
-            <div className={cx('chat-message-list__ai', isUser && 'chat-message-list__ai--user')}>
-              {!isUser && toolCalls && <ToolCardList cards={toolCalls} />}
-              {isUser || msg.content?.trim() ? (
-                <div
-                  className={cx(
-                    'chat-message-list__bubble',
-                    isUser ? 'chat-message-list__bubble--user' : 'chat-message-list__bubble--ai',
-                  )}
-                >
-                  {isUser && msg.attachment && (
-                    <div className="chat-message-list__attachment">
-                      <FileText size={12} strokeWidth={2} />
-                      <span>{msg.attachment.name}</span>
-                    </div>
-                  )}
-                  <MarkdownContent content={msg.content} />
-                </div>
-              ) : null}
-            </div>
-          </div>
+            {!isUser && toolCalls && <ToolCardList cards={toolCalls} />}
+            {isUser || msg.content?.trim() ? (
+              <div
+                className={cx(
+                  'chat-message-list__bubble',
+                  isUser ? 'chat-message-list__bubble--user' : 'chat-message-list__bubble--ai',
+                )}
+              >
+                {isUser && msg.attachment && (
+                  <div className="chat-message-list__attachment">
+                    <FileText size={12} strokeWidth={2} />
+                    <span>{msg.attachment.name}</span>
+                  </div>
+                )}
+                <MarkdownContent content={msg.content} />
+              </div>
+            ) : null}
+          </MessageRow>
         )
       })}
 
@@ -222,6 +212,22 @@ export function ChatMessageList() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** One message row: the row shell plus the ai wrapper both sides share. */
+function MessageRow({ isUser, children }: { isUser?: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      className={cx(
+        'chat-message-list__row',
+        isUser ? 'chat-message-list__row--user' : 'chat-message-list__row--ai',
+      )}
+    >
+      <div className={cx('chat-message-list__ai', isUser && 'chat-message-list__ai--user')}>
+        {children}
+      </div>
     </div>
   )
 }
