@@ -1,80 +1,33 @@
 import type { ComponentProps } from 'react'
-import {
-  Controls,
-  ReactFlow,
-  SelectionMode,
-  useOnSelectionChange,
-  type Edge,
-  type Node,
-  type NodeTypes,
-} from '@xyflow/react'
+import { Controls, ReactFlow, SelectionMode, useOnSelectionChange, type Node } from '@xyflow/react'
 
 type ReactFlowProps = ComponentProps<typeof ReactFlow>
-type EdgeTypes = NonNullable<ReactFlowProps['edgeTypes']>
 
-interface MindmapCanvasProps {
-  nodes: Node[]
-  edges: Edge[]
-  nodeTypes: NodeTypes
-  edgeTypes: EdgeTypes
+/** ReactFlow's own props, except the selection callback this wrapper owns. */
+type MindmapCanvasProps = Omit<ReactFlowProps, 'onSelectionChange'> & {
   disabled: boolean
-  onNodesChange?: ReactFlowProps['onNodesChange']
-  onEdgesChange?: ReactFlowProps['onEdgesChange']
-  onConnect?: ReactFlowProps['onConnect']
-  onNodeClick?: ReactFlowProps['onNodeClick']
-  onNodeContextMenu?: ReactFlowProps['onNodeContextMenu']
-  onSelectionContextMenu?: ReactFlowProps['onSelectionContextMenu']
-  onEdgeContextMenu?: ReactFlowProps['onEdgeContextMenu']
-  onMoveEnd?: ReactFlowProps['onMoveEnd']
-  onInit?: ReactFlowProps['onInit']
   onSelectionChange: (nodes: Node[]) => void
 }
 
-export function MindmapCanvas({
-  nodes,
-  edges,
-  nodeTypes,
-  edgeTypes,
-  disabled,
-  onNodesChange,
-  onEdgesChange,
-  onConnect,
-  onNodeClick,
-  onNodeContextMenu,
-  onSelectionContextMenu,
-  onEdgeContextMenu,
-  onMoveEnd,
-  onInit,
-  onSelectionChange,
-}: MindmapCanvasProps) {
+export function MindmapCanvas({ disabled, onSelectionChange, ...rest }: MindmapCanvasProps) {
   useOnSelectionChange({ onChange: ({ nodes: selectedNodes }) => onSelectionChange(selectedNodes) })
 
   return (
     <ReactFlow
-      nodes={nodes}
-      edges={edges}
+      {...rest}
       // onNodesChange stays wired while disabled: dimension measurements must
       // still reach the editor during an AI stream, or edges connect at stale
       // default sizes until a later interaction forces a re-measure. The
       // controller filters out everything but dimensions while aiBusy.
-      onNodesChange={onNodesChange}
-      onEdgesChange={disabled ? undefined : onEdgesChange}
-      onConnect={disabled ? undefined : onConnect}
-      onNodeClick={onNodeClick}
+      onEdgesChange={disabled ? undefined : rest.onEdgesChange}
+      onConnect={disabled ? undefined : rest.onConnect}
       onPaneContextMenu={(event) => event.preventDefault()}
-      onNodeContextMenu={onNodeContextMenu}
-      onSelectionContextMenu={onSelectionContextMenu}
-      onEdgeContextMenu={onEdgeContextMenu}
       selectionOnDrag
       panOnDrag={[1]}
       selectionMode={SelectionMode.Partial}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
       nodesDraggable={false}
       nodesConnectable={false}
       elementsSelectable={!disabled}
-      onMoveEnd={onMoveEnd}
-      onInit={onInit}
       minZoom={0.2}
       maxZoom={1.5}
       proOptions={{ hideAttribution: true }}
