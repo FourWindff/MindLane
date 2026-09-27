@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MindMapView } from '@/features/mindmap/components/MindMapView'
+import { MindmapView } from '@/features/mindmap/components/MindmapView'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveMindmapStore'
 import { SettingsModal } from '@/app/settings/components/SettingsModal'
 import { loadSettingsFromBackend, useSettingsStore } from '@/app/settings/model/settingsStore'
@@ -37,7 +37,7 @@ import '@/features/mindmap/styles/mindmap.css'
 function WorkspaceEmptyState() {
   const busy = useWorkspaceStore((s) => s.busy)
   const openWorkspaceDirectory = useWorkspaceStore((s) => s.openWorkspaceDirectory)
-  const createMindlaneFile = useWorkspaceStore((s) => s.createMindlaneFile)
+  const createMindLaneFile = useWorkspaceStore((s) => s.createMindLaneFile)
 
   return (
     <div className="workspace-empty">
@@ -51,7 +51,7 @@ function WorkspaceEmptyState() {
           <button
             type="button"
             className="workspace-empty__action workspace-empty__action--primary"
-            onClick={() => void createMindlaneFile('未命名')}
+            onClick={() => void createMindLaneFile('未命名')}
             disabled={busy}
           >
             新建 .mindlane 文件
@@ -177,7 +177,7 @@ function AppContent() {
               {/* Dev-only visual QA panel for agent write animations; tree-shaken out of production builds */}
               {hasDocumentOpen && import.meta.env.DEV && <AgentWriteSimulator />}
               {hasDocumentOpen ? (
-                <MindMapView
+                <MindmapView
                   onSwitchWorkspace={() => void switchWorkspace()}
                   onOpenSettings={() => setSettingsOpen(true)}
                   aiReady={aiReady}

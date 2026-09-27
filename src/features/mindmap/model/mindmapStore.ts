@@ -4,7 +4,7 @@ import {
   createEmptyFile,
   type MindLaneFile,
   type DocumentRef,
-  type MindlaneAsset,
+  type MindLaneAsset,
   migrateDocumentRef,
 } from '@/shared/lib/fileFormat'
 import { nodeRegistry } from '@/features/mindmap/nodes/registry'
@@ -24,7 +24,7 @@ export interface MindmapState {
   workspacePath: string | null
   viewport: Viewport
   /** 内嵌图片资源（assets 节），sha256 内容去重 */
-  assets: MindlaneAsset[]
+  assets: MindLaneAsset[]
   documentRefs: DocumentRef[]
   style: MindmapStyleState
   canUndo: boolean
@@ -46,7 +46,7 @@ export interface MindmapState {
   setFileTitle: (title: string) => void
   setViewport: (viewport: Viewport) => void
   /** 添加内嵌图片资源；sha256 相同则复用已有 asset，返回实际使用的 asset id。 */
-  addAsset: (asset: MindlaneAsset) => string
+  addAsset: (asset: MindLaneAsset) => string
   /** 更新当前文档样式（合并），并标记文档为待保存。 */
   setStyle: (partial: Partial<MindmapStyleState>) => void
   /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */

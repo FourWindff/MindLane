@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import type { Node, Edge } from '@xyflow/react'
 import { createEmptyFile, type MindLaneFile } from '../../fileFormat'
 import {
-  serializeMindlaneFile,
+  serializeMindLaneFile,
   serializeTreeFragment,
   serializeMindmapSection,
 } from '../serializer'
-import { deserializeMindlaneFile, parseXmlFragment } from '../deserializer'
+import { deserializeMindLaneFile, parseXmlFragment } from '../deserializer'
 
 function makeNodes(...specs: Array<{ id: string; type: string; label?: string }>): Node[] {
   return specs.map((s) => ({
@@ -17,10 +17,10 @@ function makeNodes(...specs: Array<{ id: string; type: string; label?: string }>
   }))
 }
 
-describe('serializeMindlaneFile', () => {
+describe('serializeMindLaneFile', () => {
   it('produces a single-root document with all four sections', () => {
     const file = createEmptyFile('测试标题')
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
 
     expect(xml.startsWith('<mindlane version="1.0">')).toBe(true)
     expect(xml.endsWith('</mindlane>')).toBe(true)
@@ -40,7 +40,7 @@ describe('serializeMindlaneFile', () => {
     ;(file.mindmap.nodes[0]!.data as Record<string, unknown>).branchIndex = 3
     ;(file.mindmap.nodes[0]!.data as Record<string, unknown>).side = 'right'
     file.mindmap.edges = [{ id: 'e1', source: 'root', target: 'ghost', type: 'mindmap' }]
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
 
     expect(xml).not.toContain('position')
     expect(xml).not.toMatch(/x="42"|y="43"/)
@@ -54,7 +54,7 @@ describe('serializeMindlaneFile', () => {
     const file = createEmptyFile('标题 & "引号"')
     file.metadata.title = 'a < b > c & "d" \'e\''
     ;(file.mindmap.nodes[0]!.data as { label: string }).label = 'x < y & z "q"'
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
     expect(xml).toContain('a &lt; b &gt; c &amp; &quot;d&quot; &apos;e&apos;')
     expect(xml).toContain('x &lt; y &amp; z &quot;q&quot;')
   })
@@ -73,13 +73,13 @@ describe('serializeMindlaneFile', () => {
         sha256: 'abc',
       },
     ]
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
     expect(xml).toContain('<asset id="a1" mime="image/png" sha256="deadbeef">iVBORw0KGgo=</asset>')
     expect(xml).toContain('<document id="d1" type="pdf"')
     expect(xml).toContain('pageCount="3"')
   })
 
-  it('roundtrips through deserializeMindlaneFile byte-identically', async () => {
+  it('roundtrips through deserializeMindLaneFile byte-identically', async () => {
     const file = createEmptyFile('产品规划')
     const nodes = makeNodes(
       { id: 'root', type: 'text', label: '中心主题' },
@@ -115,8 +115,8 @@ describe('serializeMindlaneFile', () => {
       },
     ]
 
-    const xml1 = serializeMindlaneFile(file)
-    const parsed = await deserializeMindlaneFile(xml1)
+    const xml1 = serializeMindLaneFile(file)
+    const parsed = await deserializeMindLaneFile(xml1)
 
     expect(parsed.metadata).toEqual(file.metadata)
     expect(parsed.mindmap.viewport).toEqual(file.mindmap.viewport)
@@ -141,8 +141,8 @@ describe('serializeMindlaneFile', () => {
     expect(rootData.rightCollapsed).toBe(true)
 
     // 同一输入 → 同一输出（确定性）
-    const parsedBack = await deserializeMindlaneFile(xml1)
-    expect(serializeMindlaneFile(parsedBack)).toBe(xml1)
+    const parsedBack = await deserializeMindLaneFile(xml1)
+    expect(serializeMindLaneFile(parsedBack)).toBe(xml1)
   })
 
   it('serializes palace nodes with stations and asset reference', async () => {
@@ -177,7 +177,7 @@ describe('serializeMindlaneFile', () => {
       },
     ]
     file.mindmap.edges = [{ id: 'e-r-p1', source: 'root', target: 'p1', type: 'mindmap' }]
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
     expect(xml).toContain(
       '<node id="p1" type="palace" content="宫殿" asset="a1" sourceNodeIds="root">',
     )
@@ -199,7 +199,7 @@ describe('serializeMindlaneFile', () => {
       },
     ]
     file.mindmap.edges = [{ id: 'e-r-i1', source: 'root', target: 'i1', type: 'mindmap' }]
-    const xml = serializeMindlaneFile(file)
+    const xml = serializeMindLaneFile(file)
     expect(xml).toContain(
       '<node id="i1" type="image" asset="a1" alt="架构图" width="400" height="300" />',
     )
@@ -330,8 +330,8 @@ describe('visual sibling order (edge order may diverge)', () => {
     const file = createEmptyFile('测试')
     file.mindmap.nodes = nodes as unknown as MindLaneFile['mindmap']['nodes']
     file.mindmap.edges = edges as unknown as MindLaneFile['mindmap']['edges']
-    const xml = serializeMindlaneFile(file)
-    const reloaded = await deserializeMindlaneFile(xml)
+    const xml = serializeMindLaneFile(file)
+    const reloaded = await deserializeMindLaneFile(xml)
     // child order on disk follows visual order, so the reloaded edge order matches it
     const rootEdges = reloaded.mindmap.edges.filter((e) => e.source === 'root')
     expect(rootEdges.map((e) => e.target)).toEqual(['a', 'above', 'b'])

@@ -40,7 +40,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
   const clearError = useWorkspaceStore((s) => s.clearError)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const refreshWorkspaceFiles = useWorkspaceStore((s) => s.refreshWorkspaceFiles)
-  const createMindlaneFile = useWorkspaceStore((s) => s.createMindlaneFile)
+  const createMindLaneFile = useWorkspaceStore((s) => s.createMindLaneFile)
   const createSubfolder = useWorkspaceStore((s) => s.createSubfolder)
   const deleteItem = useWorkspaceStore((s) => s.deleteItem)
   const renameItem = useWorkspaceStore((s) => s.renameItem)
@@ -114,7 +114,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
   const handleNewFile = async (name: string) => {
     if (dialog.type !== 'new-file') return
-    const ok = await createMindlaneFile(name, dialog.parentPath)
+    const ok = await createMindLaneFile(name, dialog.parentPath)
     if (ok) closeDialog()
   }
 

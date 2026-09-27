@@ -7,17 +7,17 @@
  */
 
 export { MindmapXmlError, NODE_TAG } from './types.js'
-export type { MindlaneAsset } from './types.js'
+export type { MindLaneAsset } from './types.js'
 export { formatXmlError } from './errors.js'
 export { escapeXml } from './escape.js'
 export { normalizeSelfClosingTags } from './normalize.js'
 export { parseXmlTolerant, topLevelElements } from './parser.js'
 export { isValidSvgArtwork } from './svg.js'
 export {
-  serializeMindlaneFile,
+  serializeMindLaneFile,
   serializeTreeFragment,
   serializeMindmapSection,
   serializePalaceNodeXml,
 } from './serializer.js'
-export { parseXmlFragment, deserializeMindlaneFile } from './deserializer.js'
+export { parseXmlFragment, deserializeMindLaneFile } from './deserializer.js'
 export { validateFragmentForInsert, validateMove, buildValidationContext } from './validate.js'

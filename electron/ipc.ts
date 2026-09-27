@@ -470,7 +470,7 @@ export interface EphemeralRunRequest {
 // 渲染层访问主进程能力的唯一门户。preload 实现与渲染层类型引用同一份，
 // 编译器看守：实现不满足契约即编译失败。
 
-export interface MindlaneBridge {
+export interface MindLaneBridge {
   ai: {
     chatStream: (payload: {
       threadId: string

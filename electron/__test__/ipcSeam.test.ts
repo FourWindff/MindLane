@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC } from '../ipc.js'
-import type { MindlaneBridge, McpConnectPayload } from '../ipc.js'
+import type { MindLaneBridge, McpConnectPayload } from '../ipc.js'
 import type { McpCredentialField, McpServerStatusInfo } from '../mcp/types.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -167,9 +167,9 @@ describe('IPC seam contract', () => {
     expect(pushed.sort()).toEqual(listened.sort())
   })
 
-  it('declares Window.mindlane as the same type as MindlaneBridge', () => {
-    expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindlaneBridge>()
-    expectTypeOf<MindlaneBridge>().toMatchTypeOf<Window['mindlane']>()
+  it('declares Window.mindlane as the same type as MindLaneBridge', () => {
+    expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindLaneBridge>()
+    expectTypeOf<MindLaneBridge>().toMatchTypeOf<Window['mindlane']>()
   })
 
   it('McpConnect 契约：payload 支持携带凭据，状态信息携带表单字段元数据与失败指引', () => {

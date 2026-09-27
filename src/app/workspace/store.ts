@@ -23,7 +23,7 @@ interface WorkspaceStore {
   createWorkspaceDirectory: (name: string) => Promise<boolean>
   switchWorkspace: (workspacePath: string) => Promise<boolean>
   openWorkspaceFile: (filePath: string) => Promise<boolean>
-  createMindlaneFile: (
+  createMindLaneFile: (
     name: string,
     parentPath?: string,
     options?: { uniqueName?: boolean },
@@ -311,7 +311,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
-  createMindlaneFile: async (name, parentPath, options) => {
+  createMindLaneFile: async (name, parentPath, options) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
       set({ lastError: '请先打开工作区' })

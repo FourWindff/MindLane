@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore, type MindmapState } from '../mindmapStore'
 import { MindmapHistory } from '../mindmapHistory'
 import { MindmapEditor } from '../mindmapEditor'
-import { serializeMindlaneFile } from '@/shared/lib/mindmapXml'
+import { serializeMindLaneFile } from '@/shared/lib/mindmapXml'
 import { MindmapXmlError } from '@/shared/lib/mindmapXml'
 
 describe('MindmapEditor XML 集成', () => {
@@ -284,7 +284,7 @@ describe('MindmapEditor XML 集成', () => {
       editor.setNodeCollapsed(nodeId, true)
 
       const file = store.getState().toMindLaneFile()
-      const xml = serializeMindlaneFile(file)
+      const xml = serializeMindLaneFile(file)
       expect(xml).toContain(`collapsed="true"`)
 
       // 重新加载（打开文件 → 布局重算 → 保持折叠态）
@@ -326,10 +326,10 @@ describe('MindmapEditor XML 集成', () => {
       store.getState().setViewport({ x: 5, y: 6, zoom: 0.9 })
 
       const file = store.getState().toMindLaneFile()
-      const xml = serializeMindlaneFile(file)
+      const xml = serializeMindLaneFile(file)
 
-      const { deserializeMindlaneFile } = await import('@/shared/lib/mindmapXml')
-      const parsed = await deserializeMindlaneFile(xml)
+      const { deserializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+      const parsed = await deserializeMindLaneFile(xml)
       expect(parsed.metadata.title).toBe('测试')
       expect(parsed.mindmap.viewport).toEqual({ x: 5, y: 6, zoom: 0.9 })
       expect(parsed.mindmap.style).toEqual(file.mindmap.style)
@@ -419,9 +419,9 @@ describe('MindmapEditor XML 集成', () => {
       await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
 
       const file = store.getState().toMindLaneFile()
-      const xml = serializeMindlaneFile(file)
-      const { deserializeMindlaneFile } = await import('@/shared/lib/mindmapXml')
-      const parsed = await deserializeMindlaneFile(xml)
+      const xml = serializeMindLaneFile(file)
+      const { deserializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+      const parsed = await deserializeMindLaneFile(xml)
 
       const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
       editor2.loadFile('/tmp/order.mindlane', parsed, null)

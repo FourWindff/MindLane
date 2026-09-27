@@ -231,7 +231,7 @@ function serializeDocuments(file: MindLaneFile): string {
  * 把规范化文件模型序列化为完整 XML 文档（单根 <mindlane version="1.0">）。
  * 版本号只放根元素；position/edges/布局产物不落盘。
  */
-export function serializeMindlaneFile(file: MindLaneFile): string {
+export function serializeMindLaneFile(file: MindLaneFile): string {
   const nodesById = new Map(file.mindmap.nodes.map((n) => [n.id, n]))
   const childrenOf = buildChildrenMap(file.mindmap.nodes as Node[], file.mindmap.edges)
   const roots = findRootIds(file.mindmap.nodes as Node[], file.mindmap.edges)

@@ -8,7 +8,7 @@
 
 import type { Node } from '@xyflow/react'
 import { escapeXml } from './escape.js'
-import type { MindlaneAsset, XmlElementLike } from './types.js'
+import type { MindLaneAsset, XmlElementLike } from './types.js'
 
 interface XmlNodeReaderContext {
   /** XML 属性（键小写，实体已反转义） */
@@ -198,4 +198,4 @@ register({
 
 // ─── 通用工具 ────────────────────────────────────────────────────────────────
 
-export type { MindlaneAsset }
+export type { MindLaneAsset }

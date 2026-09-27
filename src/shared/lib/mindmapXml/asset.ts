@@ -1,9 +1,9 @@
 /**
- * asset 工具：data URL ↔ MindlaneAsset（sha256 去重键）。
+ * asset 工具：data URL ↔ MindLaneAsset（sha256 去重键）。
  * 图片在插入/生成时即转 base64 内嵌（PRD 4.1）；文件因此自包含。
  */
 
-import type { MindlaneAsset } from './types.js'
+import type { MindLaneAsset } from './types.js'
 
 /** 解析 data URL → { mime, data(base64) }；非 data URL 返回 null。 */
 export function parseDataUrl(dataUrl: string): { mime: string; data: string } | null {
@@ -33,7 +33,7 @@ async function sha256Hex(data: string): Promise<string> {
 }
 
 /** 从 data URL 构建 asset（id 由调用方决定/去重）。 */
-export async function assetFromDataUrl(dataUrl: string): Promise<MindlaneAsset | null> {
+export async function assetFromDataUrl(dataUrl: string): Promise<MindLaneAsset | null> {
   const parsed = parseDataUrl(dataUrl)
   if (!parsed) return null
   return {
@@ -45,6 +45,6 @@ export async function assetFromDataUrl(dataUrl: string): Promise<MindlaneAsset |
 }
 
 /** 渲染层 DataURL：把 asset 拼回 `<img src>` 可用形式。 */
-export function assetToDataUrl(asset: Pick<MindlaneAsset, 'mime' | 'data'>): string {
+export function assetToDataUrl(asset: Pick<MindLaneAsset, 'mime' | 'data'>): string {
   return `data:${asset.mime};base64,${asset.data}`
 }

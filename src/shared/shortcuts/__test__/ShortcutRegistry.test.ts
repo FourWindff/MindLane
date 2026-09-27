@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { MindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
-import { mindmapShortcutRows } from '@/features/mindmap/hooks/mindmapShortcutTable'
+import { shortcutRows } from '@/features/mindmap/hooks/shortcutRows'
 import { registerShortcutRows } from '../useRegisterShortcut'
 import { shortcutRegistry } from '../ShortcutRegistry'
 import type { ShortcutRegistration } from '../types'
@@ -200,7 +200,7 @@ describe('mindmap shortcut table', () => {
       redo: vi.fn(),
     }
     const save = vi.fn()
-    const rows = mindmapShortcutRows({
+    const rows = shortcutRows({
       controller: spies as unknown as MindmapOperationController,
       selectedId: 'n1',
       canAddSibling: true,

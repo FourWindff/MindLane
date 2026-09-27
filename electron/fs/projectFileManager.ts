@@ -3,7 +3,7 @@ import path from 'node:path'
 import { dialog, type BrowserWindow } from 'electron'
 import type { IpcResult } from './types.js'
 import type { MindLaneFile } from '../../src/shared/lib/fileFormat'
-import { deserializeMindlaneFile, serializeMindlaneFile } from '../../src/shared/lib/mindmapXml'
+import { deserializeMindLaneFile, serializeMindLaneFile } from '../../src/shared/lib/mindmapXml'
 import { atomicWrite } from './atomicWrite.js'
 import type { AppState } from './appState.js'
 
@@ -52,7 +52,7 @@ export class ProjectFileManager {
     try {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
       // 迁移后 app 只认 XML（无读时兜底、无双格式支持）；JSON v1.0 由一次性迁移脚本转换。
-      const data = await deserializeMindlaneFile(raw)
+      const data = await deserializeMindLaneFile(raw)
       if (!data.version || !data.mindmap) {
         return { ok: false, error: '文件格式不正确' }
       }
@@ -60,7 +60,7 @@ export class ProjectFileManager {
         const fileUuid = await this.appState.claimFileUuid(filePath, data.metadata.fileUuid)
         if (fileUuid !== data.metadata.fileUuid) {
           data.metadata.fileUuid = fileUuid
-          await atomicWrite(filePath, serializeMindlaneFile(data))
+          await atomicWrite(filePath, serializeMindLaneFile(data))
         }
       }
       return { ok: true, data: { filePath, data } }
@@ -99,7 +99,7 @@ export class ProjectFileManager {
       if (options?.createBackup !== false) {
         await this.createBackup(filePath)
       }
-      await atomicWrite(filePath, serializeMindlaneFile(savedData))
+      await atomicWrite(filePath, serializeMindLaneFile(savedData))
       return { ok: true, data: { filePath, data: savedData } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
@@ -151,7 +151,7 @@ export class ProjectFileManager {
           copiedData.metadata.fileUuid,
         )
       }
-      await atomicWrite(result.filePath, serializeMindlaneFile(copiedData))
+      await atomicWrite(result.filePath, serializeMindLaneFile(copiedData))
       return { ok: true, data: { filePath: result.filePath, data: copiedData } }
     } catch (e) {
       return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }

@@ -8,5 +8,5 @@ declare namespace NodeJS {
 }
 
 interface Window {
-  mindlane: import('./ipc.js').MindlaneBridge
+  mindlane: import('./ipc.js').MindLaneBridge
 }

@@ -1,5 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
-import { IPC, type MindlaneBridge } from './ipc.js'
+import { IPC, type MindLaneBridge } from './ipc.js'
 import type {
   ChatStreamEvent,
   MindmapReadRequest,
@@ -8,7 +8,7 @@ import type {
   MindmapWriteResponse,
 } from './ipc.js'
 
-const api: MindlaneBridge = {
+const api: MindLaneBridge = {
   ai: {
     chatStream: (payload) => ipcRenderer.invoke(IPC.AiChatStream, payload),
     stopStream: (streamId) => ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }),

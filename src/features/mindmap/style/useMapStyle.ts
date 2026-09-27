@@ -5,7 +5,7 @@ import { VISUAL_VARIANTS } from './presets'
  * Current mindmap style, read straight from the active store.
  *
  * The data-* attributes that drive the CSS variant rules are set by
- * `MindMapView`'s `.mindmap-shell` wrapper, so no React context is needed.
+ * `MindmapView`'s `.mindmap-shell` wrapper, so no React context is needed.
  */
 export function useMapStyle() {
   const { structureType, visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)

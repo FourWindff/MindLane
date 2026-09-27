@@ -9,7 +9,7 @@ import {
   isValidSvgArtwork,
   parseXmlFragment,
   serializeTreeFragment,
-  type MindlaneAsset,
+  type MindLaneAsset,
   validateMove,
 } from '@/shared/lib/mindmapXml'
 import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
@@ -125,9 +125,9 @@ async function materializePalaceArtwork(
   xml: string,
   editor: MindmapEditor,
   warn: (message: string) => void,
-): Promise<{ xml: string; nodeCount: number; rootId: string; assets: MindlaneAsset[] }> {
+): Promise<{ xml: string; nodeCount: number; rootId: string; assets: MindLaneAsset[] }> {
   const parsed = await parseXmlFragment(xml)
-  const assets: MindlaneAsset[] = []
+  const assets: MindLaneAsset[] = []
   let changed = false
 
   for (const node of parsed.nodes) {

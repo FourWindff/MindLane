@@ -88,7 +88,7 @@ function ToolbarButton({
   )
 }
 
-export function MindMapHeader({
+export function MindmapHeader({
   onAddChild,
   onAddSibling,
   onRemove,

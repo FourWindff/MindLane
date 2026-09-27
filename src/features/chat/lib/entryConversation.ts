@@ -55,7 +55,7 @@ export async function createEntryFile(
   const workspace = useWorkspaceStore.getState()
   if (!workspace.workspacePath) return null
   if (
-    !(await workspace.createMindlaneFile(entryFileTitle(text, document), undefined, {
+    !(await workspace.createMindLaneFile(entryFileTitle(text, document), undefined, {
       uniqueName: true,
     }))
   ) {

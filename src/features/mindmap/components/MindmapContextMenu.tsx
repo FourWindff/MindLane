@@ -33,7 +33,7 @@ type MenuItem = {
 /** The menu's content: plain items, separated by rules. */
 type MenuEntry = MenuItem | 'separator'
 
-export function MindMapContextMenu({
+export function MindmapContextMenu({
   menu,
   menuRef,
   onClose,

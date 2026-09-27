@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MindmapInstance } from '../mindmapInstance'
 import { saveMindmapInstance } from '../saveMindmapInstance'
 import { createEmptyFile } from '@/shared/lib/fileFormat'
-import { deserializeMindlaneFile } from '@/shared/lib/mindmapXml'
+import { deserializeMindLaneFile } from '@/shared/lib/mindmapXml'
 
 function createDirtyInstance(filePath: string | null): MindmapInstance {
   const instance = new MindmapInstance('test')
@@ -59,11 +59,11 @@ describe('saveMindmapInstance', () => {
     await saveMindmapInstance(instance, { syncAfterFileSaved })
 
     // 主进程序列化端产物必须是合法 XML，读回 roundtrip 一致
-    const file = savedPayload!.data as Parameters<typeof serializeMindlaneFile>[0]
-    const { serializeMindlaneFile } = await import('@/shared/lib/mindmapXml')
-    const xml = serializeMindlaneFile(file)
+    const file = savedPayload!.data as Parameters<typeof serializeMindLaneFile>[0]
+    const { serializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+    const xml = serializeMindLaneFile(file)
     expect(xml.startsWith('<mindlane version="1.0">')).toBe(true)
-    const parsed = await deserializeMindlaneFile(xml)
+    const parsed = await deserializeMindLaneFile(xml)
     expect(parsed.metadata.title).toBe('B')
     expect(parsed.mindmap.nodes).toHaveLength(3)
     const labels = parsed.mindmap.nodes.map((n) => (n.data as { label: string }).label)

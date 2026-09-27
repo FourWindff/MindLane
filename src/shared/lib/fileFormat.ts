@@ -4,8 +4,8 @@ import type { ImageNodeData } from '@/features/mindmap/nodes/image/types'
 import type { MindmapStyleState } from '@/features/mindmap/style/types'
 
 export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
-export type { MindlaneAsset } from './mindmapXml/types'
-import type { MindlaneAsset } from './mindmapXml/types'
+export type { MindLaneAsset } from './mindmapXml/types'
+import type { MindLaneAsset } from './mindmapXml/types'
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
@@ -31,7 +31,7 @@ export interface MindLaneFile {
     style?: MindmapStyleState
   }
   /** 内嵌图片资源（XML assets 节），节点经 asset 属性引用，sha256 去重 */
-  assets: MindlaneAsset[]
+  assets: MindLaneAsset[]
   documents: DocumentRef[]
 }
 

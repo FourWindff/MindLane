@@ -24,7 +24,7 @@ export const MINDLANE_ROOT_TAG = 'mindlane'
 export const NODE_TAG = 'node'
 
 /** 内嵌图片资源（base64 数据，无 data: 前缀）。 */
-export interface MindlaneAsset {
+export interface MindLaneAsset {
   id: string
   mime: string
   sha256: string

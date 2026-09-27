@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { createEmptyFile } from '../../../src/shared/lib/fileFormat'
-import { deserializeMindlaneFile, serializeMindlaneFile } from '../../../src/shared/lib/mindmapXml'
+import { deserializeMindLaneFile, serializeMindLaneFile } from '../../../src/shared/lib/mindmapXml'
 import { ProjectFileManager } from '../projectFileManager.js'
 import { AppState } from '../appState.js'
 
@@ -38,7 +38,7 @@ describe('ProjectFileManager file identity', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.data.data.metadata.fileUuid).not.toBe(source.metadata.fileUuid)
-    const written = await deserializeMindlaneFile(fs.readFileSync(targetPath, 'utf-8'))
+    const written = await deserializeMindLaneFile(fs.readFileSync(targetPath, 'utf-8'))
     expect(written.metadata.fileUuid).toBe(result.data.data.metadata.fileUuid)
   })
 
@@ -47,7 +47,7 @@ describe('ProjectFileManager file identity', () => {
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const movedPath = path.join(tmpDir, 'moved.mindlane')
     const source = createEmptyFile('Move')
-    fs.writeFileSync(originalPath, serializeMindlaneFile(source))
+    fs.writeFileSync(originalPath, serializeMindLaneFile(source))
 
     await indexed.loadFromPath(originalPath)
     fs.renameSync(originalPath, movedPath)
@@ -63,7 +63,7 @@ describe('ProjectFileManager file identity', () => {
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const copyPath = path.join(tmpDir, 'copy.mindlane')
     const source = createEmptyFile('Copy')
-    fs.writeFileSync(originalPath, serializeMindlaneFile(source))
+    fs.writeFileSync(originalPath, serializeMindLaneFile(source))
 
     await indexed.loadFromPath(originalPath)
     fs.copyFileSync(originalPath, copyPath)
@@ -78,14 +78,14 @@ describe('ProjectFileManager file identity', () => {
     const indexed = new ProjectFileManager(tmpDir, 5, new AppState(tmpDir))
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const source = createEmptyFile('Copy')
-    fs.writeFileSync(originalPath, serializeMindlaneFile(source))
+    fs.writeFileSync(originalPath, serializeMindLaneFile(source))
     await indexed.loadFromPath(originalPath)
 
     const copied = await indexed.createInDirectory(tmpDir, 'copy', source)
 
     expect(copied.ok).toBe(true)
     if (!copied.ok) return
-    const written = await deserializeMindlaneFile(fs.readFileSync(copied.data.filePath, 'utf-8'))
+    const written = await deserializeMindLaneFile(fs.readFileSync(copied.data.filePath, 'utf-8'))
     expect(copied.data.data.metadata.fileUuid).not.toBe(source.metadata.fileUuid)
     expect(copied.data.data.metadata.fileUuid).toBe(written.metadata.fileUuid)
   })

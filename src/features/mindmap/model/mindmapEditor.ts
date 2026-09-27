@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
-import { type MindLaneFile, type MindLaneNode, type MindlaneAsset } from '@/shared/lib/fileFormat'
+import { type MindLaneFile, type MindLaneNode, type MindLaneAsset } from '@/shared/lib/fileFormat'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -537,7 +537,7 @@ export class MindmapEditor {
    */ async insertFromXml(
     xml: string,
     options: { parentId?: string; position?: 'root' | 'child' | 'after' | 'before' } = {},
-    pendingAssets: MindlaneAsset[] = [],
+    pendingAssets: MindLaneAsset[] = [],
   ): Promise<void> {
     const parsed = await parseXmlFragment(xml)
     const { ctx } = buildValidationContext(this.state.nodes, this.state.edges, [
@@ -570,7 +570,7 @@ export class MindmapEditor {
    * 整体替换节点（含子树，updateMindmapNode 前端执行）：
    * 删除旧子树 → 用片段（同 id 根）重挂到旧父节点下，单条 batch 历史。
    */
-  async replaceNodeFromXml(xml: string, pendingAssets: MindlaneAsset[] = []): Promise<void> {
+  async replaceNodeFromXml(xml: string, pendingAssets: MindLaneAsset[] = []): Promise<void> {
     const parsed = await parseXmlFragment(xml)
     if (parsed.rootIds.length !== 1) {
       throw new MindmapXmlError(

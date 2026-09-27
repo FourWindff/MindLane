@@ -12,7 +12,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   lastOpenedFilePath: null,
 }
 
-function isMindlanePath(filePath: string): boolean {
+function isMindLanePath(filePath: string): boolean {
   return path.extname(filePath).toLowerCase() === '.mindlane'
 }
 
@@ -25,7 +25,7 @@ function coerceFileUuidPaths(value: unknown): Record<string, string> {
         entry[0] !== '' &&
         typeof entry[1] === 'string' &&
         entry[1] !== '' &&
-        isMindlanePath(entry[1]),
+        isMindLanePath(entry[1]),
     ),
   )
 }
@@ -260,6 +260,6 @@ export class Workspace {
   }
 
   private isSupportedFile(filePath: string): boolean {
-    return isMindlanePath(filePath)
+    return isMindLanePath(filePath)
   }
 }

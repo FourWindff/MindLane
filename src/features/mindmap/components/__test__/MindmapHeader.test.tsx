@@ -26,7 +26,7 @@ vi.mock('react', async (importOriginal) => {
   }
 })
 
-import { MindMapHeader } from '../MindMapHeader'
+import { MindmapHeader } from '../MindmapHeader'
 
 class TestElement {
   constructor(private readonly selector: string | null = null) {}
@@ -45,7 +45,7 @@ const defaultProps = {
   canRemove: true,
 }
 
-describe('MindMapHeader style panel dismissal', () => {
+describe('MindmapHeader style panel dismissal', () => {
   let pointerDown: ((event: { target: unknown }) => void) | undefined
   const addEventListener = vi.fn((type: string, listener: (event: { target: unknown }) => void) => {
     if (type === 'pointerdown') pointerDown = listener
@@ -68,7 +68,7 @@ describe('MindMapHeader style panel dismissal', () => {
   })
 
   function mount(open: boolean, onToggleStylePanel = vi.fn(), stylePanel?: ReactNode) {
-    MindMapHeader({
+    MindmapHeader({
       ...defaultProps,
       onToggleStylePanel,
       stylePanelOpen: open,
@@ -106,7 +106,7 @@ describe('MindMapHeader style panel dismissal', () => {
 
   it('owns the chat toggle and enters the capsule-compressed state', () => {
     chatState.capsuleExpanded = true
-    const html = ReactDOMServer.renderToString(<MindMapHeader {...defaultProps} />)
+    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} />)
 
     expect(html).toContain('mindmap-header--capsule-expanded')
     expect(html).toContain('aria-label="隐藏聊天"')
@@ -114,14 +114,14 @@ describe('MindMapHeader style panel dismissal', () => {
 
   it('restores the regular header state when capsules collapse', () => {
     chatState.chatOpen = false
-    const html = ReactDOMServer.renderToString(<MindMapHeader {...defaultProps} />)
+    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} />)
 
     expect(html).not.toContain('mindmap-header--capsule-expanded')
     expect(html).toContain('aria-label="显示聊天"')
   })
 
   it('disables the chat entry with a red unavailable state when AI is not ready', () => {
-    const html = ReactDOMServer.renderToString(<MindMapHeader {...defaultProps} aiReady={false} />)
+    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} aiReady={false} />)
 
     expect(html).toContain('float-toolbar__btn--unavailable')
     expect(html).toContain('disabled')
@@ -129,7 +129,7 @@ describe('MindMapHeader style panel dismissal', () => {
   })
 
   it('keeps the chat entry usable when AI is ready', () => {
-    const html = ReactDOMServer.renderToString(<MindMapHeader {...defaultProps} aiReady />)
+    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} aiReady />)
 
     expect(html).not.toContain('float-toolbar__btn--unavailable')
     expect(html).toContain('aria-label="隐藏聊天"')

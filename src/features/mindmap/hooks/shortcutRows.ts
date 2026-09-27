@@ -14,7 +14,7 @@ type MindmapShortcutContext = {
  * 导图快捷键表：一行 = combo → 一个动作。
  * 表本身每渲染重算，注册侧只靠元信息签名重挂，handler 始终取最新一版表。
  */
-export function mindmapShortcutRows({
+export function shortcutRows({
   controller,
   selectedId,
   canAddSibling,

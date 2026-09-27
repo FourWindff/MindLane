@@ -1,8 +1,8 @@
 import { ReactFlowProvider } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { MindMapHeader } from './MindMapHeader'
+import { MindmapHeader } from './MindmapHeader'
 import { MindmapCanvas } from './MindmapCanvas'
-import { MindMapContextMenu } from './MindMapContextMenu'
+import { MindmapContextMenu } from './MindmapContextMenu'
 import { SelectionActionBar } from './SelectionActionBar'
 import { PalaceModal } from './PalaceModal'
 import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
@@ -18,13 +18,13 @@ type MindmapViewProps = {
   aiReady: boolean
 }
 
-function MindMapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
+function MindmapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
   const view = useMindmapOperationController()
   const { visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)
 
   return (
     <div className="mindmap-shell" data-map-style={visualVariant} data-color-scheme={colorScheme}>
-      <MindMapHeader
+      <MindmapHeader
         onAddChild={view.actions.addChild}
         onAddSibling={view.actions.addSibling}
         onRemove={view.actions.removeSelected}
@@ -69,7 +69,7 @@ function MindMapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: Mindma
           aiBusy={view.aiBusy}
           palaceEnabled={view.palaceEnabled}
         />
-        <MindMapContextMenu
+        <MindmapContextMenu
           menu={view.contextMenu}
           menuRef={view.contextMenuRef}
           onClose={view.actions.closeContextMenu}
@@ -119,10 +119,10 @@ function MindMapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: Mindma
   )
 }
 
-export function MindMapView({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
+export function MindmapView({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
   return (
     <ReactFlowProvider>
-      <MindMapWorkspace
+      <MindmapWorkspace
         onSwitchWorkspace={onSwitchWorkspace}
         onOpenSettings={onOpenSettings}
         aiReady={aiReady}

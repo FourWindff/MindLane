@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseXmlFragment, deserializeMindlaneFile } from '../deserializer'
+import { parseXmlFragment, deserializeMindLaneFile } from '../deserializer'
 import { MindmapXmlError } from '../types'
 
 describe('parseXmlFragment', () => {
@@ -140,7 +140,7 @@ describe('parseXmlFragment', () => {
   })
 })
 
-describe('deserializeMindlaneFile', () => {
+describe('deserializeMindLaneFile', () => {
   const fullXml = `<mindlane version="1.0">
   <metadata>
     <fileUuid>bb29af86-1ae4-4e53-ac4a-9d23113b123e</fileUuid>
@@ -167,7 +167,7 @@ describe('deserializeMindlaneFile', () => {
 </mindlane>`
 
   it('parses all four sections', async () => {
-    const file = await deserializeMindlaneFile(fullXml)
+    const file = await deserializeMindLaneFile(fullXml)
 
     expect(file.version).toBe('1.0')
     expect(file.metadata).toMatchObject({
@@ -192,27 +192,27 @@ describe('deserializeMindlaneFile', () => {
   })
 
   it('positions are not persisted (all zero, layout recomputes)', async () => {
-    const file = await deserializeMindlaneFile(fullXml)
+    const file = await deserializeMindLaneFile(fullXml)
     for (const node of file.mindmap.nodes) {
       expect(node.position).toEqual({ x: 0, y: 0 })
     }
   })
 
   it('rejects non-mindlane root', async () => {
-    await expect(deserializeMindlaneFile('<foo />')).rejects.toMatchObject({
+    await expect(deserializeMindLaneFile('<foo />')).rejects.toMatchObject({
       code: 'xml_parse_error',
     })
   })
 
   it('rejects wrong version', async () => {
     await expect(
-      deserializeMindlaneFile('<mindlane version="2.0"><mindmap /></mindlane>'),
+      deserializeMindLaneFile('<mindlane version="2.0"><mindmap /></mindlane>'),
     ).rejects.toMatchObject({ code: 'xml_parse_error' })
   })
 
   it('rejects multi-root mindmap', async () => {
     await expect(
-      deserializeMindlaneFile(
+      deserializeMindLaneFile(
         `<mindlane version="1.0"><mindmap><node id="root" type="text" content="a" /><node id="b" type="text" content="c" /></mindmap></mindlane>`,
       ),
     ).rejects.toMatchObject({ code: 'tree_invalid' })
@@ -220,7 +220,7 @@ describe('deserializeMindlaneFile', () => {
 
   it('rejects non-root root id', async () => {
     await expect(
-      deserializeMindlaneFile(
+      deserializeMindLaneFile(
         `<mindlane version="1.0"><mindmap><node id="x" type="text" content="a" /></mindmap></mindlane>`,
       ),
     ).rejects.toMatchObject({ code: 'tree_invalid' })
@@ -228,7 +228,7 @@ describe('deserializeMindlaneFile', () => {
 
   it('maps malformed xml to xml_parse_error', async () => {
     await expect(
-      deserializeMindlaneFile('<mindlane version="1.0"><metadata></mindlane>'),
+      deserializeMindLaneFile('<mindlane version="1.0"><metadata></mindlane>'),
     ).rejects.toMatchObject({ code: 'xml_parse_error' })
   })
 

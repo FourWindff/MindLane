@@ -18,7 +18,7 @@ import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
-import { mindmapShortcutRows } from './mindmapShortcutTable'
+import { shortcutRows } from './shortcutRows'
 import { useActiveMindmapEditor } from './useActiveMindmapEditor'
 import { useActiveMindmapInstance } from './useActiveMindmapInstance'
 import { useActiveMindmapStore } from './useActiveMindmapStore'
@@ -30,7 +30,7 @@ import { isDefaultViewport } from '@/shared/lib/fileFormat'
 import { collectDescendantIds, collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
 import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
-import type { ContextMenuState } from '@/features/mindmap/components/MindMapContextMenu'
+import type { ContextMenuState } from '@/features/mindmap/components/MindmapContextMenu'
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 
 export function useMindmapOperationController() {
@@ -315,7 +315,7 @@ export function useMindmapOperationController() {
   const canRemove = Boolean(selectedId && selectedId !== 'root')
 
   useShortcuts(
-    mindmapShortcutRows({ controller, selectedId, canAddSibling, enabled: shortcutsEnabled, save }),
+    shortcutRows({ controller, selectedId, canAddSibling, enabled: shortcutsEnabled, save }),
     { group: 'mindmap', preventWhenTyping: true },
   )
 

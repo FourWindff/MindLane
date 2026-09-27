@@ -3,7 +3,7 @@
  *
  * - `parseXmlFragment`：AI 片段面，容错 HTML parser；多根片段返回多个 rootIds；
  *   畸形输入一律映射错误码（PRD 5.4），绝不裸抛。
- * - `deserializeMindlaneFile`：文件面，严格 XML parser。
+ * - `deserializeMindLaneFile`：文件面，严格 XML parser。
  */
 
 import type { Edge, Node } from '@xyflow/react'
@@ -346,7 +346,7 @@ interface MindLaneEdgeLike {
  * 反序列化完整 XML 文件（严格模式）。文件由编辑器生成，畸形输入映射错误码。
  * 位置信息不落盘 → 全部置 {0,0}，打开时由布局算法重算（调用方负责）。
  */
-export async function deserializeMindlaneFile(xml: string): Promise<MindLaneFile> {
+export async function deserializeMindLaneFile(xml: string): Promise<MindLaneFile> {
   const trimmed = xml.trim()
   if (!trimmed) {
     throw new MindmapXmlError('empty_xml', '文件内容为空')
