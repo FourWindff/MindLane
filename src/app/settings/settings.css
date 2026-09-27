@@ -199,7 +199,8 @@
   gap: 0.85rem;
 }
 
-.settings-card--hidden {
+/* `.settings-card` sets display: flex, so the attribute's UA rule loses on specificity. */
+.settings-card[hidden] {
   display: none;
 }
 

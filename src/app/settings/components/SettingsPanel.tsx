@@ -374,9 +374,7 @@ export function SettingsPanel() {
 
       <div className="settings-page__content">
         <div className="settings-page__sections">
-          <section
-            className={`settings-card${activeSection === 'about' ? '' : ' settings-card--hidden'}`}
-          >
+          <section className="settings-card" hidden={activeSection !== 'about'}>
             <div className="settings-card__title">关于应用</div>
             <div className="settings-card__row">
               <div>
@@ -414,9 +412,7 @@ export function SettingsPanel() {
             </div>
           </section>
 
-          <section
-            className={`settings-card${activeSection === 'workspace' ? '' : ' settings-card--hidden'}`}
-          >
+          <section className="settings-card" hidden={activeSection !== 'workspace'}>
             <div className="settings-card__title">文件与工作区</div>
             <div className="settings-card__row">
               <div>
@@ -506,9 +502,7 @@ export function SettingsPanel() {
             </div>
           </section>
 
-          <section
-            className={`settings-card${activeSection === 'ai' ? '' : ' settings-card--hidden'}`}
-          >
+          <section className="settings-card" hidden={activeSection !== 'ai'}>
             <div className="settings-card__title">AI 配置</div>
             {providers.length > 1 && (
               <div className="panel-field">
@@ -601,16 +595,12 @@ export function SettingsPanel() {
             )}
           </section>
 
-          <section
-            className={`settings-card${activeSection === 'integrations' ? '' : ' settings-card--hidden'}`}
-          >
+          <section className="settings-card" hidden={activeSection !== 'integrations'}>
             <div className="settings-card__title">集成</div>
             <McpIntegrationsSection />
           </section>
 
-          <section
-            className={`settings-card${activeSection === 'editor' ? '' : ' settings-card--hidden'}`}
-          >
+          <section className="settings-card" hidden={activeSection !== 'editor'}>
             <div className="settings-card__title">编辑器</div>
             <div className="settings-card__row">
               <div>
