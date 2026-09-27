@@ -5,7 +5,6 @@ import {
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { CHILD_OFFSET_X, findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'

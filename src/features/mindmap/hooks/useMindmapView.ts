@@ -24,7 +24,6 @@ import {
   useActiveOpenFile,
   useActiveMindmapStore,
 } from './useActiveOpenFile'
-
 import { useMindmapAutoSave } from './useMindmapAutoSave'
 import { usePalaceGeneration } from './usePalaceGeneration'
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'

@@ -5,7 +5,6 @@ import {
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-
 import { resumePalaceRun, stopPalaceRun } from '@/features/mindmap/model/palaceRun'
 import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
 import type { PalaceNodeData } from './types'

@@ -6,7 +6,6 @@ import {
   useActiveOpenFile,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/theme/colorPalettes'

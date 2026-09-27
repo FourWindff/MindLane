@@ -5,7 +5,6 @@ import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { saveOpenFile } from '../model/saveOpenFile'
 import { useActiveOpenFile, useActiveMindmapStore } from './useActiveOpenFile'
-
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 
