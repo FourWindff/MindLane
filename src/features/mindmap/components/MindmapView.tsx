@@ -9,7 +9,7 @@ import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
 import { DocumentRefsPanel } from './DocumentRefsPanel'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { useMindmapOperationController } from '@/features/mindmap/hooks/useMindmapOperationController'
+import { useMindmapView } from '@/features/mindmap/hooks/useMindmapView'
 
 /** Props of both the public view and its inner workspace component. */
 type MindmapViewProps = {
@@ -19,7 +19,7 @@ type MindmapViewProps = {
 }
 
 function MindmapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
-  const view = useMindmapOperationController()
+  const view = useMindmapView()
   const { visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)
 
   return (

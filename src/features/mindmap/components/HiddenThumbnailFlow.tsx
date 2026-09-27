@@ -7,13 +7,13 @@ import {
   type NodeTypes,
   type ReactFlowInstance,
 } from '@xyflow/react'
-import { nodeRegistry } from '@/features/mindmap/nodes/registry'
+import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 
 type EdgeTypes = NonNullable<React.ComponentProps<typeof ReactFlow>['edgeTypes']>
 
 function serializeNodes(nodes: Node[]): Node[] {
   return nodes.map((n) => {
-    const descriptor = nodeRegistry.get(n.type ?? '')
+    const descriptor = canvasNodeRegistry.get(n.type ?? '')
     return descriptor ? { ...n, data: descriptor.serialize(n.data) as Record<string, unknown> } : n
   })
 }

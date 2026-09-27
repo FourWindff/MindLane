@@ -3,8 +3,8 @@ import { useMemo, type CSSProperties } from 'react'
 import { computeSiblingCurvature } from './siblingOffset'
 import { buildTaperedPath } from './taperedEdge'
 import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
-import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
-import { getEdgeColor, getNodeColor } from '@/features/mindmap/style/colorPalettes'
+import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
+import { getEdgeColor, getNodeColor } from '@/features/mindmap/theme/colorPalettes'
 
 interface EdgeGradient {
   id: string

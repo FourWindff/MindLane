@@ -3,7 +3,7 @@ import type { Edge, Node } from '@xyflow/react'
 import {
   createMindmapOperationController,
   type MindmapOperationControllerDependencies,
-} from '../mindmapOperationController'
+} from '../operationController'
 
 describe('MindmapOperationController', () => {
   const nodes: Node[] = [

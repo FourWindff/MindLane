@@ -7,9 +7,9 @@ import {
   type MindLaneAsset,
   migrateDocumentRef,
 } from '@/shared/lib/fileFormat'
-import { nodeRegistry } from '@/features/mindmap/nodes/registry'
-import { DEFAULT_STYLE } from '@/features/mindmap/style/presets'
-import type { MindmapStyleState } from '@/features/mindmap/style/types'
+import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
+import { DEFAULT_STYLE } from '@/features/mindmap/theme/presets'
+import type { MindmapStyleState } from '@/features/mindmap/theme/types'
 import { layoutReflow } from './mindmapLayout'
 
 export interface OpenFileState {
@@ -231,7 +231,7 @@ export function createMindmapStore(): MindmapStore {
             id: n.id,
             type: n.type!,
             position: n.position,
-            data: nodeRegistry.get(n.type!)!.serialize(n.data),
+            data: canvasNodeRegistry.get(n.type!)!.serialize(n.data),
           })) as MindLaneFile['mindmap']['nodes'],
           edges: edges.map((e) => ({
             id: e.id,

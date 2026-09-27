@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MindmapEditor } from '../mindmapEditor'
 import { MindmapHistory } from '../mindmapHistory'
 import { createMindmapStore } from '../mindmapStore'
-import { createMindmapOperationController } from '../mindmapOperationController'
+import { createMindmapOperationController } from '../operationController'
 
 describe('MindmapOperationController integration', () => {
   it('keeps consecutive children attached to the selected parent', () => {

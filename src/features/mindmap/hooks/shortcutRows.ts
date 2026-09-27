@@ -1,4 +1,4 @@
-import type { MindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
+import type { MindmapOperationController } from '@/features/mindmap/model/operationController'
 import type { ShortcutRow } from '@/shared/shortcuts/useRegisterShortcut'
 
 type MindmapShortcutContext = {

@@ -8,12 +8,9 @@ import {
 } from '@/features/mindmap/hooks/useActiveOpenFile'
 
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
-import { useMapStyle } from '@/features/mindmap/style/useMapStyle'
-import { getNodeColor } from '@/features/mindmap/style/colorPalettes'
-import {
-  useNodeGlide,
-  usePrefersReducedMotion,
-} from '@/features/mindmap/components/animationFxHooks'
+import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
+import { getNodeColor } from '@/features/mindmap/theme/colorPalettes'
+import { useNodeGlide, usePrefersReducedMotion } from '@/features/mindmap/hooks/useNodeMotion'
 import type { TextNodeData } from './types'
 
 function TextNodeInner({

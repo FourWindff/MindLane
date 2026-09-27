@@ -3,8 +3,8 @@ import { renderToString } from 'react-dom/server'
 import { StylePanel } from '../StylePanel'
 import { OpenFile } from '@/features/mindmap/model/openFile'
 import { OpenFileContext } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
-import { COLOR_SCHEMES } from '@/features/mindmap/style/presets'
+import { SCHEME_PALETTES } from '@/features/mindmap/theme/colorPalettes'
+import { COLOR_SCHEMES } from '@/features/mindmap/theme/presets'
 
 function renderStylePanel(): string {
   const instance = new OpenFile('/test/path.mindlane')

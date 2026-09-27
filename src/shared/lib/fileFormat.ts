@@ -1,7 +1,7 @@
 import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
 import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
 import type { ImageNodeData } from '@/features/mindmap/nodes/image/types'
-import type { MindmapStyleState } from '@/features/mindmap/style/types'
+import type { MindmapStyleState } from '@/features/mindmap/theme/types'
 
 export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
 export type { MindLaneAsset } from './mindmapXml/types'

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MindmapOperationController } from '@/features/mindmap/model/mindmapOperationController'
+import type { MindmapOperationController } from '@/features/mindmap/model/operationController'
 import { shortcutRows } from '@/features/mindmap/hooks/shortcutRows'
 import { registerShortcutRows } from '../useRegisterShortcut'
 import { shortcutRegistry } from '../ShortcutRegistry'

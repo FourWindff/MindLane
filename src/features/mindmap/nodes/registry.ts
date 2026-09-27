@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import type { NodeProps } from '@xyflow/react'
 import { NODE_TYPE_DESCRIPTORS, type NodeTypeDescriptor } from './descriptors'
 
-class NodeRegistry {
+class CanvasNodeRegistry {
   private descriptors: Map<string, NodeTypeDescriptor>
 
   constructor(descriptors: NodeTypeDescriptor[]) {
@@ -23,4 +23,4 @@ class NodeRegistry {
   }
 }
 
-export const nodeRegistry = new NodeRegistry(NODE_TYPE_DESCRIPTORS)
+export const canvasNodeRegistry = new CanvasNodeRegistry(NODE_TYPE_DESCRIPTORS)

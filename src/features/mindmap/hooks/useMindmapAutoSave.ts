@@ -9,7 +9,7 @@ import { useActiveOpenFile, useActiveMindmapStore } from './useActiveOpenFile'
 import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 
-export function useMindmapPersistence() {
+export function useMindmapAutoSave() {
   const activeInstance = useActiveOpenFile()
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)

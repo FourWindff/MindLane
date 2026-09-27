@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Palette, Brush } from 'lucide-react'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '@/features/mindmap/style/presets'
-import { SCHEME_PALETTES } from '@/features/mindmap/style/colorPalettes'
-import type { ColorSchemeId, StructureType, VisualVariant } from '@/features/mindmap/style/types'
+import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from '@/features/mindmap/theme/presets'
+import { SCHEME_PALETTES } from '@/features/mindmap/theme/colorPalettes'
+import type { ColorSchemeId, StructureType, VisualVariant } from '@/features/mindmap/theme/types'
 
 type Tab = 'style' | 'color'
 
