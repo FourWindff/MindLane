@@ -8,7 +8,7 @@ import type { McpCredentialField, McpServerStatusInfo } from '../mcp/types.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** Walk every .ts/.tsx file under `dir`, skipping node_modules/dist/__test__. */
+/** Walk every .ts/.tsx file under `dir`, skipping node_modules/dist and test files. */
 function walkSourceFiles(dir: string): string[] {
   const out: string[] = []
   if (!fs.existsSync(dir)) return out
@@ -18,13 +18,53 @@ function walkSourceFiles(dir: string): string[] {
     }
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) {
+      // Main-process fixtures still live under `__test__`; the renderer has none.
       if (entry.name === '__test__') continue
       out.push(...walkSourceFiles(full))
-    } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
+    } else if (isSourceFile(entry.name)) {
       out.push(full)
     }
   }
   return out
+}
+
+/** Tests sit next to the module they cover; the boundary scans only see production code. */
+function isSourceFile(name: string): boolean {
+  if (!name.endsWith('.ts') && !name.endsWith('.tsx')) return false
+  return !(name.endsWith('.test.ts') || name.endsWith('.test.tsx') || name.endsWith('.testutil.ts'))
+}
+
+const IMPORT_SPECIFIER = /(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g
+
+function importsIn(source: string): string[] {
+  return [...source.matchAll(IMPORT_SPECIFIER)].map((match) => match[1]!)
+}
+
+/** Resolve an import specifier to a repo-relative path; bare packages return null. */
+function resolveImport(fromFile: string, specifier: string): string | null {
+  if (specifier === 'electron' || specifier.startsWith('electron/')) return specifier
+  if (specifier.startsWith('@contracts/'))
+    return `contracts/${specifier.slice('@contracts/'.length)}`
+  if (specifier.startsWith('@/')) return `src/${specifier.slice('@/'.length)}`
+  if (specifier.startsWith('.')) {
+    return path.posix.normalize(path.posix.join(path.posix.dirname(fromFile), specifier))
+  }
+  return null
+}
+
+const FEATURE_LAYERS = ['settings', 'mindmap', 'workspace', 'chat'] as const
+
+type ModuleLayer = 'app' | 'shared' | 'contracts' | 'electron' | `features/${string}`
+
+function moduleLayer(relativePath: string): ModuleLayer | null {
+  const scoped = relativePath.startsWith('src/') ? relativePath.slice('src/'.length) : relativePath
+  const [head, second] = scoped.split('/')
+  if (head === 'features' && second) return `features/${second}`
+  if (head === 'app') return 'app'
+  if (head === 'shared') return 'shared'
+  if (head === 'contracts') return 'contracts'
+  if (head === 'electron') return 'electron'
+  return null
 }
 
 const enumMembers = new Set<string>(Object.keys(IPC))
@@ -101,12 +141,18 @@ describe('IPC seam contract', () => {
     const offenders = rendererFiles
       .map((f) => {
         const source = fs.readFileSync(f, 'utf-8')
+        const relative = path.relative(repoRoot, f).split(path.sep).join('/')
         const hits = [
           ...(source.includes('ipcRenderer') ? ['ipcRenderer'] : []),
-          ...(/from ['"]electron['"]/.test(source) ? ['electron import'] : []),
           ...(/require\(['"]electron['"]\)/.test(source) ? ['electron require'] : []),
+          ...importsIn(source).flatMap((specifier) => {
+            const target = resolveImport(relative, specifier)
+            return target === 'electron' || target?.startsWith('electron/')
+              ? [`electron import (${specifier})`]
+              : []
+          }),
         ]
-        return hits.length > 0 ? { file: path.relative(repoRoot, f), hits } : null
+        return hits.length > 0 ? { file: relative, hits: [...new Set(hits)] } : null
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
     expect(offenders).toEqual([])
@@ -194,5 +240,89 @@ describe('IPC seam contract', () => {
       required?: boolean
       secret?: boolean
     }>()
+  })
+})
+
+// ---- 渲染层模块边界（ADR-0024 / ADR-0025） ----
+// 静态断言，不是行为测试：层级表是防复发的唯一守卫。
+
+describe('renderer module boundaries', () => {
+  const sourceFiles = [
+    ...walkSourceFiles(path.join(repoRoot, 'src')),
+    ...walkSourceFiles(path.join(repoRoot, 'contracts')),
+  ].map((f) => path.relative(repoRoot, f).split(path.sep).join('/'))
+
+  /** Imports of one source file, resolved to repo-relative module paths. */
+  function resolvedImports(file: string): Array<{ specifier: string; target: string }> {
+    const source = fs.readFileSync(path.join(repoRoot, file), 'utf-8')
+    const out: Array<{ specifier: string; target: string }> = []
+    for (const specifier of importsIn(source)) {
+      const target = resolveImport(file, specifier)
+      if (target) out.push({ specifier, target })
+    }
+    return out
+  }
+
+  it('keeps the feature set closed', () => {
+    const featureDirs = new Set(
+      sourceFiles
+        .map((file) => moduleLayer(file))
+        .filter((layer): layer is `features/${string}` => Boolean(layer?.startsWith('features/'))),
+    )
+    expect([...featureDirs].sort()).toEqual(
+      FEATURE_LAYERS.map((layer) => `features/${layer}`).sort(),
+    )
+  })
+
+  it('keeps feature imports one-way: settings < mindmap < workspace < chat < app', () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles) {
+      const from = moduleLayer(file)
+      if (!from || !from.startsWith('features/')) continue
+      for (const { specifier, target } of resolvedImports(file)) {
+        const to = moduleLayer(target)
+        if (!to) continue
+        if (to === from) continue
+        if (to === 'app') {
+          offenders.push(`${file}: ${from} must not import the composition root (${specifier})`)
+          continue
+        }
+        if (!to.startsWith('features/')) continue
+        const fromIndex = FEATURE_LAYERS.indexOf(from.slice('features/'.length) as never)
+        const toIndex = FEATURE_LAYERS.indexOf(to.slice('features/'.length) as never)
+        if (toIndex > fromIndex) {
+          offenders.push(`${file}: ${from} must not import upper layer ${to} (${specifier})`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('keeps shared free of app and feature knowledge', () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles) {
+      if (moduleLayer(file) !== 'shared') continue
+      for (const { specifier, target } of resolvedImports(file)) {
+        const to = moduleLayer(target)
+        if (to === 'app' || to?.startsWith('features/')) {
+          offenders.push(`${file}: shared must not import ${to} (${specifier})`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('keeps contracts a leaf: no src/ or electron/ imports', () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles) {
+      if (moduleLayer(file) !== 'contracts') continue
+      for (const { specifier, target } of resolvedImports(file)) {
+        const to = moduleLayer(target)
+        if (to && to !== 'contracts') {
+          offenders.push(`${file}: contracts must not import ${to} (${specifier})`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
   })
 })
