@@ -1,0 +1,260 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
+import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
+import { createEmptyFile } from '@contracts/fileFormat'
+import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
+import { connectChatWorkspaceSync } from '@/features/chat/model/workspaceSync'
+import { useWorkspaceStore } from './store'
+
+type WorkspaceApiOverrides = Partial<{
+  openDirectory: () => Promise<unknown>
+  createDirectory: (payload: { name: string }) => Promise<unknown>
+  switchDirectory: (payload: { workspacePath: string }) => Promise<unknown>
+  getSession: () => Promise<unknown>
+  listFiles: (payload: { workspacePath: string }) => Promise<unknown>
+  listTree: (payload: { workspacePath: string }) => Promise<unknown>
+  deleteItem: (payload: { targetPath: string; workspacePath: string }) => Promise<unknown>
+}>
+
+function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
+  const api = {
+    openDirectory: vi.fn(async () => ({ ok: true as const, data: { workspacePath: '/ws' } })),
+    createDirectory: vi.fn(async () => ({ ok: true as const, data: { workspacePath: '/ws' } })),
+    switchDirectory: vi.fn(async () => ({ ok: true as const, data: { workspacePath: '/ws' } })),
+    getSession: vi.fn(async () => ({
+      workspacePath: '/ws',
+      workspaceUuid: null,
+      activeSessionIds: {},
+      recentWorkspacePaths: ['/ws'],
+      lastOpenedFilePath: null,
+      restoreLastWorkspaceOnLaunch: true,
+    })),
+    listFiles: vi.fn(async () => ({
+      ok: true as const,
+      data: [{ filePath: '/ws/a.mindlane', name: 'a', lastModifiedAt: '2026-01-01T00:00:00.000Z' }],
+    })),
+    listTree: vi.fn(async () => ({
+      ok: true as const,
+      data: [
+        {
+          name: 'a',
+          path: '/ws/a.mindlane',
+          type: 'file' as const,
+          lastModifiedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    })),
+    deleteItem: vi.fn(async () => ({ ok: true as const })),
+    ...overrides,
+  }
+  vi.stubGlobal('window', { mindlane: { workspace: api } })
+  return api
+}
+
+function activateLegacyFile(filePath = '/old.mindlane') {
+  const data = createEmptyFile('Old')
+  const instance = openFileRegistry.getOrCreate(filePath)
+  instance.load(filePath, data, null)
+  openFileRegistry.setActive(filePath)
+}
+
+describe('workspace file switching', () => {
+  beforeEach(() => {
+    resetRegistry()
+    useWorkspaceStore.setState({ busy: false, lastError: null })
+  })
+
+  it('preserves dirty background changes when the file is reopened before persistence finishes', async () => {
+    const fileAData = createEmptyFile('A')
+    const staleFileBData = createEmptyFile('B')
+    const fileA = openFileRegistry.getOrCreate('/a.mindlane')
+    fileA.load('/a.mindlane', fileAData, '/ws')
+    const fileB = openFileRegistry.getOrCreate('/b.mindlane')
+    fileB.load('/b.mindlane', staleFileBData, '/ws')
+    fileB.editor.addChild('root', { label: '后台新增节点' })
+    openFileRegistry.setActive('/a.mindlane')
+
+    vi.stubGlobal('window', {
+      mindlane: {
+        workspace: {
+          openFilePath: vi.fn().mockResolvedValue({
+            ok: true,
+            data: { filePath: '/b.mindlane', data: staleFileBData },
+          }),
+        },
+      },
+    })
+
+    await useWorkspaceStore.getState().openWorkspaceFile('/b.mindlane')
+
+    expect(openFileRegistry.getActive()).toBe(fileB)
+    expect(fileB.store.getState().nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({ label: '后台新增节点' }),
+        }),
+      ]),
+    )
+  })
+})
+
+describe('workspace switch restore protocol', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals()
+    resetRegistry()
+    useWorkspaceStore.setState({
+      busy: false,
+      lastError: null,
+      workspacePath: null,
+      tree: [],
+    })
+  })
+
+  it('open/create treat cancel as silent and write lastError only when a message is available', async () => {
+    installWorkspaceApis({
+      openDirectory: vi.fn(async () => ({ ok: false as const, error: '已取消' })),
+    })
+    await expect(useWorkspaceStore.getState().openWorkspaceDirectory()).resolves.toBe(false)
+    expect(useWorkspaceStore.getState().lastError).toBeNull()
+
+    installWorkspaceApis({
+      createDirectory: vi.fn(async () => ({ ok: false as const, error: '创建目录失败' })),
+    })
+    await expect(useWorkspaceStore.getState().createWorkspaceDirectory('ws')).resolves.toBe(false)
+    expect(useWorkspaceStore.getState().lastError).toBe('创建目录失败')
+  })
+
+  it('switch falls back to the default error copy when the main process returns no message', async () => {
+    installWorkspaceApis({
+      switchDirectory: vi.fn(async () => ({ ok: false as const })),
+    })
+    await expect(useWorkspaceStore.getState().switchWorkspace('/ws')).resolves.toBe(false)
+    expect(useWorkspaceStore.getState().lastError).toBe('切换仓库失败')
+  })
+
+  it.each([
+    {
+      name: 'openWorkspaceDirectory',
+      run: () => useWorkspaceStore.getState().openWorkspaceDirectory(),
+    },
+    {
+      name: 'createWorkspaceDirectory',
+      run: () => useWorkspaceStore.getState().createWorkspaceDirectory('ws'),
+    },
+    {
+      name: 'switchWorkspace',
+      run: () => useWorkspaceStore.getState().switchWorkspace('/ws'),
+    },
+  ])(
+    '$name restores the scene from a freshly fetched tree and clears the active mindlane',
+    async ({ run }) => {
+      const api = installWorkspaceApis()
+      useWorkspaceStore.setState({ tree: [] })
+      activateLegacyFile('/old.mindlane')
+
+      const ok = await run()
+
+      expect(ok).toBe(true)
+      const state = useWorkspaceStore.getState()
+      expect(state.workspacePath).toBe('/ws')
+      expect(state.tree).toEqual([
+        {
+          name: 'a',
+          path: '/ws/a.mindlane',
+          type: 'file',
+          lastModifiedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ])
+      expect(api.listFiles).not.toHaveBeenCalled()
+      expect(api.listTree).toHaveBeenCalledWith({ workspacePath: '/ws' })
+      expect(openFileRegistry.getActive()).toBeNull()
+    },
+  )
+
+  it('no longer exposes the dead tree-expansion state', () => {
+    const state = useWorkspaceStore.getState() as unknown as Record<string, unknown>
+    expect(state.expandedFolders).toBeUndefined()
+    expect(state.toggleFolder).toBeUndefined()
+    expect(state.expandAllFolders).toBeUndefined()
+    expect(state.collapseAllFolders).toBeUndefined()
+  })
+})
+
+describe('file deletion capsule cleanup', () => {
+  let disconnectWorkspaceSync: () => void
+
+  beforeEach(() => {
+    resetRegistry()
+    useWorkspaceStore.setState({ busy: false, lastError: null })
+    useAiStore.setState({
+      fileUuidPaths: {},
+      filePaths: {},
+      fileChats: {},
+      allSessions: [],
+      currentFileUuid: null,
+      currentFilePath: null,
+    })
+    // The composition root registers the workspace → chat projection; without it
+    // the workspace store no longer pokes chat itself.
+    disconnectWorkspaceSync = connectChatWorkspaceSync()
+  })
+
+  afterEach(() => {
+    disconnectWorkspaceSync()
+  })
+
+  it('drops the deleted file from the capsule projection once the mapping is pruned', async () => {
+    const session = {
+      id: 'session-a',
+      fileUuid: 'file-a',
+      title: 'A',
+      createdAt: '2026-06-18T00:00:00.000Z',
+      updatedAt: '2026-06-18T00:01:00.000Z',
+      messageCount: 1,
+    }
+    const api = installWorkspaceApis({
+      // 主进程在删除成功后已 prune:getSession 返回的映射不再含已删路径。
+      getSession: vi.fn(async () => ({
+        workspacePath: '/ws',
+        workspaceUuid: null,
+        activeSessionIds: {},
+        fileUuidPaths: {},
+        recentWorkspacePaths: ['/ws'],
+        lastOpenedFilePath: null,
+        restoreLastWorkspaceOnLaunch: true,
+      })),
+    })
+    const chat = {
+      listSessions: vi.fn(async () => ({ ok: true as const, data: { sessions: [session] } })),
+    }
+    vi.stubGlobal('window', { mindlane: { workspace: api, chat } })
+    useWorkspaceStore.setState({ workspacePath: '/ws' })
+    // 删除前:会话仍在 + 映射仍在 → 胶囊可见。
+    useAiStore.setState({
+      fileUuidPaths: { 'file-a': '/ws/a.mindlane' },
+      allSessions: [session],
+    })
+    const derive = () =>
+      deriveChatCapsuleEntries(
+        useAiStore.getState().fileChats,
+        useAiStore.getState().filePaths,
+        useAiStore.getState().fileUuidPaths,
+        useAiStore.getState().allSessions,
+        useAiStore.getState().currentFileUuid,
+        useAiStore.getState().currentFilePath,
+      )
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeDefined()
+
+    const ok = await useWorkspaceStore.getState().deleteItem('/ws/a.mindlane')
+
+    expect(ok).toBe(true)
+    expect(api.deleteItem).toHaveBeenCalledWith({
+      targetPath: '/ws/a.mindlane',
+      workspacePath: '/ws',
+    })
+    await vi.waitFor(() => expect(useAiStore.getState().fileUuidPaths).toEqual({}))
+    // 删除后:映射已被 prune 刷新,会话保留但无映射 → 胶囊隐藏。
+    expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeUndefined()
+    expect(chat.listSessions).toHaveBeenCalledWith({ workspacePath: '/ws' })
+  })
+})

@@ -7,8 +7,8 @@ export default defineConfig({
     setupFiles: ['vitest.setup.ts'],
     // Test layout: a test lives next to the module it covers (`store.ts` + `store.test.ts`
     // in the same directory). Test-only helpers use the `.testutil.ts` suffix, integration
-    // tests keep `*.integration.test.ts`. The `__test__/` directories are the legacy layout --
-    // they still run, but new tests do not go there (shrink-only).
+    // tests keep `*.integration.test.ts`. The renderer has no `__test__/` directories left;
+    // the main process still does (out of scope, not scanned here).
     include: [
       'electron/**/*.test.ts',
       'src/**/*.test.ts',
