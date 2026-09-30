@@ -8,7 +8,7 @@ import type { DocumentRef } from '../../contracts/fileFormat.js'
 import { AGENT_LIMITS } from './config.js'
 import { extractTextContent } from './utils.js'
 import { logger } from '../shared/logger.js'
-import { runWithStreamId, shortStreamId } from '../shared/runContext.js'
+import { runWithRunContext, shortStreamId, type RunWorkspace } from '../shared/runContext.js'
 import { isSubgraphCall } from './subgraphRouter.js'
 import { deriveToolStatus } from './toolStatus.js'
 import type {
@@ -143,8 +143,19 @@ export class Runner {
 
   async run(): Promise<void> {
     const { sessionManager, request } = this.options
+    // The workspace identity enters the run context here (the only write point),
+    // and carries both halves the consumers need: tools read `path`, session and
+    // editlog stores key on `uuid`. Ephemeral runs have no workspace (§ below).
+    const workspacePath = request.context.workspacePath
+    const workspace: RunWorkspace | undefined =
+      workspacePath && request.workspaceUuid
+        ? { path: workspacePath, uuid: request.workspaceUuid }
+        : undefined
     const execute = () =>
-      runWithStreamId(this.options.streamId, request.sessionId, () => this.execute())
+      runWithRunContext(
+        { streamId: this.options.streamId, sessionId: request.sessionId, workspace },
+        () => this.execute(),
+      )
     // Contract: SessionManager is assembled at app startup; no isReady guard needed.
     // Ephemeral runs write no session record, so they skip the workspace switch —
     // a standalone file outside any workspace has no workspace to run in.

@@ -36,7 +36,6 @@ export interface SessionMeta {
  */
 export class SessionMessageStore {
   private baseDir = ''
-  private workspaceUuid = ''
   private readonly workspaceContext = new AsyncLocalStorage<string>()
   private readonly writeLocks = new Map<string, Promise<void>>()
 
@@ -49,12 +48,10 @@ export class SessionMessageStore {
   }
 
   /**
-   * 设置当前工作区哈希，所有会话操作均基于该目录。
+   * Enter the given workspace context; every session operation keys off its dir.
+   * The identity travels once per run (the ALS is the only source): no instance
+   * field is kept that a missing writer could silently blank out.
    */
-  setWorkspace(workspaceUuid: string): void {
-    this.workspaceUuid = workspaceUuid
-  }
-
   runInWorkspace<T>(workspaceUuid: string, action: () => T): T {
     return this.workspaceContext.run(workspaceUuid, action)
   }
@@ -204,15 +201,17 @@ export class SessionMessageStore {
   }
 
   resolveSessionPath(sessionId: string): string {
-    const workspaceUuid = this.workspaceContext.getStore() ?? this.workspaceUuid
-    if (!workspaceUuid) {
-      throw new Error('[SessionMessageStore] workspaceUuid 未设置，请先调用 setWorkspace()')
-    }
-    return path.join(this.baseDir, workspaceUuid, `${sessionId}.jsonl`)
+    return path.join(this.baseDir, this.getWorkspaceUuid(), `${sessionId}.jsonl`)
   }
 
   getWorkspaceUuid(): string {
-    return this.workspaceContext.getStore() ?? this.workspaceUuid
+    const workspaceUuid = this.workspaceContext.getStore()
+    if (!workspaceUuid) {
+      throw new Error(
+        '[SessionMessageStore] 缺少工作区上下文（workspaceUuid），请通过 runInWorkspace() 执行会话操作',
+      )
+    }
+    return workspaceUuid
   }
 
   private defaultMeta(sessionId: string, fileUuid: string): SessionMeta {

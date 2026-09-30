@@ -32,7 +32,15 @@ export class EditLogStore {
     return path.join(this.baseDir, workspaceUuid, `${fileUuid}.jsonl`)
   }
 
+  /** An empty uuid would silently share one bucket across workspaces. */
+  private assertWorkspaceUuid(workspaceUuid: string): void {
+    if (!workspaceUuid) {
+      throw new Error('[EditLogStore] 缺少工作区 UUID（workspaceUuid 为空）')
+    }
+  }
+
   async append(workspaceUuid: string, fileUuid: string, entry: EditLogEntry): Promise<void> {
+    this.assertWorkspaceUuid(workspaceUuid)
     const key = `${workspaceUuid}/${fileUuid}`
     const tail = this.appendTails.get(key) ?? Promise.resolve()
     const next = tail.then(() => this.appendNow(workspaceUuid, fileUuid, entry))
@@ -57,6 +65,7 @@ export class EditLogStore {
   }
 
   async read(workspaceUuid: string, fileUuid: string): Promise<EditLogEntry[]> {
+    this.assertWorkspaceUuid(workspaceUuid)
     let content: string
     try {
       content = await fs.promises.readFile(this.filePath(workspaceUuid, fileUuid), 'utf-8')
@@ -76,6 +85,7 @@ export class EditLogStore {
   }
 
   async delete(workspaceUuid: string, fileUuid: string): Promise<void> {
+    this.assertWorkspaceUuid(workspaceUuid)
     await fs.promises.rm(this.filePath(workspaceUuid, fileUuid), { force: true })
   }
 }

@@ -40,12 +40,12 @@ describe('Consolidator', () => {
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   let getToolDefinitions: () => []
   const fileUuid = 'file-uuid-1'
+  const workspaceUuid = 'workspace-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -54,226 +54,237 @@ describe('Consolidator', () => {
     getToolDefinitions = () => []
   })
 
+  /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
+  const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
+
   afterEach(() => {
     manager.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('消息数量未超阈值时跳过归档', async () => {
-    const sessionId = 'skip'
-    await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
+  it('消息数量未超阈值时跳过归档', async () =>
+    inWs(async () => {
+      const sessionId = 'skip'
+      await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
 
-    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 100,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 5,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 100,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 5,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(false)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(false)
 
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated).toBeUndefined()
-  })
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?.lastConsolidated).toBeUndefined()
+    }))
 
-  it('触发阈值低于容量时按阈值触发（策略与容量解耦）', async () => {
-    const sessionId = 'trigger'
-    await manager.saveMessages(sessionId, makeMessages(12), fileUuid)
+  it('触发阈值低于容量时按阈值触发（策略与容量解耦）', async () =>
+    inWs(async () => {
+      const sessionId = 'trigger'
+      await manager.saveMessages(sessionId, makeMessages(12), fileUuid)
 
-    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        // 容量远大于会话：只有策略阈值能触发归档。
-        inputBudgetTokens: 100_000,
-        consolidationTriggerTokens: 10,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 3,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          // 容量远大于会话：只有策略阈值能触发归档。
+          inputBudgetTokens: 100_000,
+          consolidationTriggerTokens: 10,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 3,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
 
-    expect(changed).toBe(true)
-    expect(manager.getSessionMeta(sessionId)?.lastConsolidated).toBeGreaterThan(0)
-  })
+      expect(changed).toBe(true)
+      expect(manager.getSessionMeta(sessionId)?.lastConsolidated).toBeGreaterThan(0)
+    }))
 
-  it('pickConsolidationBoundary 优先在 user 消息边界处结束', () => {
-    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 1000,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 120,
-        maxConsolidationRounds: 5,
-      },
-    )
+  it('pickConsolidationBoundary 优先在 user 消息边界处结束', () =>
+    inWs(async () => {
+      const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 1000,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 120,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const messages = [
-      new HumanMessage('a'),
-      new AIMessage('b'),
-      new HumanMessage('c'),
-      new AIMessage('d'),
-    ]
+      const messages = [
+        new HumanMessage('a'),
+        new AIMessage('b'),
+        new HumanMessage('c'),
+        new AIMessage('d'),
+      ]
 
-    const boundary = consolidator.pickConsolidationBoundary(messages, 3)
-    expect(boundary).toBe(2)
-  })
+      const boundary = consolidator.pickConsolidationBoundary(messages, 3)
+      expect(boundary).toBe(2)
+    }))
 
-  it('多轮压缩后推进 lastConsolidated 并写入滚动摘要', async () => {
-    const sessionId = 'archive'
-    const messages = makeMessages(20)
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('多轮压缩后推进 lastConsolidated 并写入滚动摘要', async () =>
+    inWs(async () => {
+      const sessionId = 'archive'
+      const messages = makeMessages(20)
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const provider = new FakeProvider(
-      new FakeListChatModel({ responses: ['summary one', 'summary two'] }),
-    )
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 30,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 3,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(
+        new FakeListChatModel({ responses: ['summary one', 'summary two'] }),
+      )
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 30,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 3,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
 
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
-    // 滚动摘要：最新一轮摘要写入 meta，不再写 history 文件
-    expect(meta?._lastSummary).toContain('summary one')
-  })
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
+      // 滚动摘要：最新一轮摘要写入 meta，不再写 history 文件
+      expect(meta?._lastSummary).toContain('summary one')
+    }))
 
-  it('LLM 失败时不推进游标（下轮 run 自愈）', async () => {
-    const sessionId = 'raw'
-    const messages = makeMessages(20)
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('LLM 失败时不推进游标（下轮 run 自愈）', async () =>
+    inWs(async () => {
+      const sessionId = 'raw'
+      const messages = makeMessages(20)
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const throwingModel = new FakeListChatModel({ responses: [] })
-    throwingModel.invoke = async () => {
-      throw new Error('model error')
-    }
-    const provider = new FakeProvider(throwingModel)
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 30,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 3,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const throwingModel = new FakeListChatModel({ responses: [] })
+      throwingModel.invoke = async () => {
+        throw new Error('model error')
+      }
+      const provider = new FakeProvider(throwingModel)
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 30,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 3,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(false)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(false)
 
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated).toBeUndefined()
-    expect(meta?._lastSummary).toBeUndefined()
-  })
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?.lastConsolidated).toBeUndefined()
+      expect(meta?._lastSummary).toBeUndefined()
+    }))
 
-  it('getMessagesForContext 限制条数与 token 预算', async () => {
-    const sessionId = 'context'
-    const messages = makeMessages(11)
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('getMessagesForContext 限制条数与 token 预算', async () =>
+    inWs(async () => {
+      const sessionId = 'context'
+      const messages = makeMessages(11)
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 20,
-        consolidationRatio: 0.5,
-        maxContextMessages: 4,
-        maxMessagesBeforeTokenCheck: 120,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 20,
+          consolidationRatio: 0.5,
+          maxContextMessages: 4,
+          maxMessagesBeforeTokenCheck: 120,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const contextMessages = await consolidator.getMessagesForContext(sessionId, {
-      maxMessages: 4,
-    })
+      const contextMessages = await consolidator.getMessagesForContext(sessionId, {
+        maxMessages: 4,
+      })
 
-    // 条数上限 4 条非系统消息 + 可能保留的系统消息
-    const nonSystem = contextMessages.filter((m) => m.getType() !== 'system')
-    expect(nonSystem.length).toBeLessThanOrEqual(4)
+      // 条数上限 4 条非系统消息 + 可能保留的系统消息
+      const nonSystem = contextMessages.filter((m) => m.getType() !== 'system')
+      expect(nonSystem.length).toBeLessThanOrEqual(4)
 
-    // 最后一条是当前用户消息
-    expect(contextMessages[contextMessages.length - 1].getType()).toBe('human')
-  })
+      // 最后一条是当前用户消息
+      expect(contextMessages[contextMessages.length - 1].getType()).toBe('human')
+    }))
 
-  it('getMessagesForContext 保留系统消息与当前用户消息', async () => {
-    const sessionId = 'retain'
-    const messages: BaseMessage[] = [
-      new SystemMessage('environment'),
-      new HumanMessage('old'),
-      new AIMessage('old reply'),
-      new HumanMessage('current'),
-    ]
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('getMessagesForContext 保留系统消息与当前用户消息', async () =>
+    inWs(async () => {
+      const sessionId = 'retain'
+      const messages: BaseMessage[] = [
+        new SystemMessage('environment'),
+        new HumanMessage('old'),
+        new AIMessage('old reply'),
+        new HumanMessage('current'),
+      ]
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 2,
-        consolidationRatio: 0.5,
-        maxContextMessages: 1,
-        maxMessagesBeforeTokenCheck: 120,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 2,
+          consolidationRatio: 0.5,
+          maxContextMessages: 1,
+          maxMessagesBeforeTokenCheck: 120,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    const contextMessages = await consolidator.getMessagesForContext(sessionId, {
-      maxMessages: 1,
-    })
+      const contextMessages = await consolidator.getMessagesForContext(sessionId, {
+        maxMessages: 1,
+      })
 
-    const types = contextMessages.map((m) => m.getType())
-    expect(types).toContain('system')
-    expect(types[types.length - 1]).toBe('human')
-    expect(contextMessages[contextMessages.length - 1].content).toBe('current')
-  })
+      const types = contextMessages.map((m) => m.getType())
+      expect(types).toContain('system')
+      expect(types[types.length - 1]).toBe('human')
+      expect(contextMessages[contextMessages.length - 1].content).toBe('current')
+    }))
 
-  it('并发调用同一会话串行执行', async () => {
-    const sessionId = 'concurrent'
-    const messages = makeMessages(30)
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('并发调用同一会话串行执行', async () =>
+    inWs(async () => {
+      const sessionId = 'concurrent'
+      const messages = makeMessages(30)
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const provider = new FakeProvider(new FakeListChatModel({ responses: ['one', 'two'] }))
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions },
-      {
-        inputBudgetTokens: 40,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 3,
-        maxConsolidationRounds: 5,
-      },
-    )
+      const provider = new FakeProvider(new FakeListChatModel({ responses: ['one', 'two'] }))
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions },
+        {
+          inputBudgetTokens: 40,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 3,
+          maxConsolidationRounds: 5,
+        },
+      )
 
-    await Promise.all([
-      consolidator.maybe_consolidate_by_tokens(sessionId),
-      consolidator.maybe_consolidate_by_tokens(sessionId),
-    ])
+      await Promise.all([
+        consolidator.maybe_consolidate_by_tokens(sessionId),
+        consolidator.maybe_consolidate_by_tokens(sessionId),
+      ])
 
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
-    expect(meta?._lastSummary).toBeDefined()
-  })
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
+      expect(meta?._lastSummary).toBeDefined()
+    }))
 })
 
 describe('Consolidator 轮次状态剥离', () => {
@@ -290,11 +301,15 @@ describe('Consolidator 轮次状态剥离', () => {
     maxConsolidationRounds: 5,
   }
 
+  const workspaceUuid = 'workspace-uuid-1'
+
+  /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
+  const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
+
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-strip-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -307,57 +322,59 @@ describe('Consolidator 轮次状态剥离', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('归档消息喂给滚动摘要前剥离末尾 EDITOR_STATE 块', async () => {
-    const sessionId = 'strip'
-    const turnStateSuffix =
-      '\n<EDITOR_STATE file_uuid="file-uuid-1" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
-    const messages = [
-      new HumanMessage(`第一轮问题${turnStateSuffix}`),
-      new AIMessage('第一轮回复'),
-      ...makeMessages(18),
-    ]
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('归档消息喂给滚动摘要前剥离末尾 EDITOR_STATE 块', async () =>
+    inWs(async () => {
+      const sessionId = 'strip'
+      const turnStateSuffix =
+        '\n<EDITOR_STATE file_uuid="file-uuid-1" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+      const messages = [
+        new HumanMessage(`第一轮问题${turnStateSuffix}`),
+        new AIMessage('第一轮回复'),
+        ...makeMessages(18),
+      ]
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const model = new FakeListChatModel({ responses: ['summary'] })
-    const invokeSpy = vi.spyOn(model, 'invoke')
-    const provider = new FakeProvider(model)
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
-      STRIP_LIMITS,
-    )
+      const model = new FakeListChatModel({ responses: ['summary'] })
+      const invokeSpy = vi.spyOn(model, 'invoke')
+      const provider = new FakeProvider(model)
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
+        STRIP_LIMITS,
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
 
-    const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
-    // 块被剥离：任何输入都不含 <EDITOR_STATE，且剥离后的问题文本在。
-    expect(summaryInputs.some((m) => String(m.content).includes('<EDITOR_STATE'))).toBe(false)
-    expect(summaryInputs.some((m) => m.content === '第一轮问题')).toBe(true)
-  })
+      const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
+      // 块被剥离：任何输入都不含 <EDITOR_STATE，且剥离后的问题文本在。
+      expect(summaryInputs.some((m) => String(m.content).includes('<EDITOR_STATE'))).toBe(false)
+      expect(summaryInputs.some((m) => m.content === '第一轮问题')).toBe(true)
+    }))
 
-  it('无块消息原样进入摘要输入（no-op）', async () => {
-    const sessionId = 'noop'
-    const messages = [
-      new HumanMessage('纯文本问题'),
-      new AIMessage('纯文本回复'),
-      ...makeMessages(18),
-    ]
-    await manager.saveMessages(sessionId, messages, fileUuid)
+  it('无块消息原样进入摘要输入（no-op）', async () =>
+    inWs(async () => {
+      const sessionId = 'noop'
+      const messages = [
+        new HumanMessage('纯文本问题'),
+        new AIMessage('纯文本回复'),
+        ...makeMessages(18),
+      ]
+      await manager.saveMessages(sessionId, messages, fileUuid)
 
-    const model = new FakeListChatModel({ responses: ['summary'] })
-    const invokeSpy = vi.spyOn(model, 'invoke')
-    const provider = new FakeProvider(model)
-    const consolidator = new Consolidator(
-      { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
-      STRIP_LIMITS,
-    )
+      const model = new FakeListChatModel({ responses: ['summary'] })
+      const invokeSpy = vi.spyOn(model, 'invoke')
+      const provider = new FakeProvider(model)
+      const consolidator = new Consolidator(
+        { sessionManager: manager, provider, buildMessages, getToolDefinitions: () => [] },
+        STRIP_LIMITS,
+      )
 
-    await consolidator.maybe_consolidate_by_tokens(sessionId)
+      await consolidator.maybe_consolidate_by_tokens(sessionId)
 
-    const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
-    expect(summaryInputs.some((m) => m.content === '纯文本问题')).toBe(true)
-    expect(summaryInputs.some((m) => m.content === '纯文本回复')).toBe(true)
-  })
+      const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
+      expect(summaryInputs.some((m) => m.content === '纯文本问题')).toBe(true)
+      expect(summaryInputs.some((m) => m.content === '纯文本回复')).toBe(true)
+    }))
 })
 
 describe('Consolidator 提取回调接缝', () => {
@@ -379,6 +396,9 @@ describe('Consolidator 提取回调接缝', () => {
     facts: ['用户偏好模块化设计', '用户偏好先跑 MVP'],
   })
 
+  /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
+  const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
+
   /** Summary calls return text; extraction calls (prompt contains the curator marker) return JSON. */
   function makeExtractionAwareModel(): BaseChatModel {
     const model = new FakeListChatModel({ responses: ['summary'] })
@@ -393,7 +413,6 @@ describe('Consolidator 提取回调接缝', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-seam-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test', workspaceUuid)
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -406,143 +425,150 @@ describe('Consolidator 提取回调接缝', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('归档后 onArchived 收到全部归档切片', async () => {
-    const sessionId = 'callback-slice'
-    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+  it('归档后 onArchived 收到全部归档切片', async () =>
+    inWs(async () => {
+      const sessionId = 'callback-slice'
+      await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
 
-    const onArchived = vi.fn()
-    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
-    const consolidator = new Consolidator(
-      {
-        sessionManager: manager,
-        provider,
-        buildMessages,
-        getToolDefinitions: () => [],
-        onArchived,
-      },
-      ARCHIVE_LIMITS,
-    )
-
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
-
-    await vi.waitFor(() => expect(onArchived).toHaveBeenCalledTimes(1))
-    const slice = onArchived.mock.calls[0]![0] as BaseMessage[]
-    expect(slice.length).toBeGreaterThan(0)
-    expect(slice.every((m) => typeof m.getType === 'function')).toBe(true)
-    // 回调切片与推进后的游标一致：同一批消息不会被重复提取
-    const meta = manager.getSessionMeta(sessionId)
-    expect(slice.length).toBe(meta?.lastConsolidated)
-  })
-
-  it('未发生归档时不触发 onArchived', async () => {
-    const sessionId = 'no-archive'
-    await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
-
-    const onArchived = vi.fn()
-    const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
-    const consolidator = new Consolidator(
-      {
-        sessionManager: manager,
-        provider,
-        buildMessages,
-        getToolDefinitions: () => [],
-        onArchived,
-      },
-      { ...ARCHIVE_LIMITS, inputBudgetTokens: 100, maxMessagesBeforeTokenCheck: 5 },
-    )
-
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(false)
-    expect(onArchived).not.toHaveBeenCalled()
-  })
-
-  it('提取成功后 editlog 被删除且记忆已写入', async () => {
-    const sessionId = 'extract-success'
-    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
-
-    const editLogStore = new EditLogStore(tmpDir)
-    await editLogStore.append(workspaceUuid, fileUuid, {
-      ts: 1,
-      nodeId: 'n1',
-      before: 'AI 写的',
-      after: '用户改的',
-    })
-
-    const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
-    const provider = new FakeProvider(makeExtractionAwareModel())
-    const consolidator = new Consolidator(
-      {
-        sessionManager: manager,
-        provider,
-        buildMessages,
-        getToolDefinitions: () => [],
-        onArchived: createExtractionCallback({
-          extractor,
-          editLogStore,
+      const onArchived = vi.fn()
+      const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+      const consolidator = new Consolidator(
+        {
+          sessionManager: manager,
           provider,
-          workspaceUuid,
-          fileUuid,
-        }),
-      },
-      ARCHIVE_LIMITS,
-    )
+          buildMessages,
+          getToolDefinitions: () => [],
+          onArchived,
+        },
+        ARCHIVE_LIMITS,
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
 
-    // 提取回调是 fire-and-forget：等它落地后断言产物
-    await vi.waitFor(async () => {
-      expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
-    })
-    const memoryContent = fs.readFileSync(path.join(tmpDir, 'mindlanememory', 'MEMORY.md'), 'utf-8')
-    expect(memoryContent).toContain('用户偏好模块化设计')
-  })
+      await vi.waitFor(() => expect(onArchived).toHaveBeenCalledTimes(1))
+      const slice = onArchived.mock.calls[0]![0] as BaseMessage[]
+      expect(slice.length).toBeGreaterThan(0)
+      expect(slice.every((m) => typeof m.getType === 'function')).toBe(true)
+      // 回调切片与推进后的游标一致：同一批消息不会被重复提取
+      const meta = manager.getSessionMeta(sessionId)
+      expect(slice.length).toBe(meta?.lastConsolidated)
+    }))
 
-  it('提取回调抛错时压缩不受影响且 editlog 保留', async () => {
-    const sessionId = 'extract-failure'
-    await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+  it('未发生归档时不触发 onArchived', async () =>
+    inWs(async () => {
+      const sessionId = 'no-archive'
+      await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
 
-    const editLogStore = new EditLogStore(tmpDir)
-    await editLogStore.append(workspaceUuid, fileUuid, {
-      ts: 1,
-      nodeId: 'n1',
-      before: 'AI 写的',
-      after: '用户改的',
-    })
-
-    const failingExtractor = {
-      extractAndPersist: vi.fn(async () => {
-        throw new Error('extraction boom')
-      }),
-    }
-    const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
-    const consolidator = new Consolidator(
-      {
-        sessionManager: manager,
-        provider,
-        buildMessages,
-        getToolDefinitions: () => [],
-        onArchived: createExtractionCallback({
-          extractor: failingExtractor as never,
-          editLogStore,
+      const onArchived = vi.fn()
+      const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
+      const consolidator = new Consolidator(
+        {
+          sessionManager: manager,
           provider,
-          workspaceUuid,
-          fileUuid,
+          buildMessages,
+          getToolDefinitions: () => [],
+          onArchived,
+        },
+        { ...ARCHIVE_LIMITS, inputBudgetTokens: 100, maxMessagesBeforeTokenCheck: 5 },
+      )
+
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(false)
+      expect(onArchived).not.toHaveBeenCalled()
+    }))
+
+  it('提取成功后 editlog 被删除且记忆已写入', async () =>
+    inWs(async () => {
+      const sessionId = 'extract-success'
+      await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+
+      const editLogStore = new EditLogStore(tmpDir)
+      await editLogStore.append(workspaceUuid, fileUuid, {
+        ts: 1,
+        nodeId: 'n1',
+        before: 'AI 写的',
+        after: '用户改的',
+      })
+
+      const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
+      const provider = new FakeProvider(makeExtractionAwareModel())
+      const consolidator = new Consolidator(
+        {
+          sessionManager: manager,
+          provider,
+          buildMessages,
+          getToolDefinitions: () => [],
+          onArchived: createExtractionCallback({
+            extractor,
+            editLogStore,
+            provider,
+            workspaceUuid,
+            fileUuid,
+          }),
+        },
+        ARCHIVE_LIMITS,
+      )
+
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
+
+      // 提取回调是 fire-and-forget：等它落地后断言产物
+      await vi.waitFor(async () => {
+        expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
+      })
+      const memoryContent = fs.readFileSync(
+        path.join(tmpDir, 'mindlanememory', 'MEMORY.md'),
+        'utf-8',
+      )
+      expect(memoryContent).toContain('用户偏好模块化设计')
+    }))
+
+  it('提取回调抛错时压缩不受影响且 editlog 保留', async () =>
+    inWs(async () => {
+      const sessionId = 'extract-failure'
+      await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
+
+      const editLogStore = new EditLogStore(tmpDir)
+      await editLogStore.append(workspaceUuid, fileUuid, {
+        ts: 1,
+        nodeId: 'n1',
+        before: 'AI 写的',
+        after: '用户改的',
+      })
+
+      const failingExtractor = {
+        extractAndPersist: vi.fn(async () => {
+          throw new Error('extraction boom')
         }),
-      },
-      ARCHIVE_LIMITS,
-    )
+      }
+      const provider = new FakeProvider(new FakeListChatModel({ responses: ['summary'] }))
+      const consolidator = new Consolidator(
+        {
+          sessionManager: manager,
+          provider,
+          buildMessages,
+          getToolDefinitions: () => [],
+          onArchived: createExtractionCallback({
+            extractor: failingExtractor as never,
+            editLogStore,
+            provider,
+            workspaceUuid,
+            fileUuid,
+          }),
+        },
+        ARCHIVE_LIMITS,
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
 
-    await vi.waitFor(() => expect(failingExtractor.extractAndPersist).toHaveBeenCalled())
+      await vi.waitFor(() => expect(failingExtractor.extractAndPersist).toHaveBeenCalled())
 
-    // 压缩主流程产物完好
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?._lastSummary).toBe('summary')
-    // 提取失败：editlog 证据保留
-    expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
-  })
+      // 压缩主流程产物完好
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?._lastSummary).toBe('summary')
+      // 提取失败：editlog 证据保留
+      expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
+    }))
 })

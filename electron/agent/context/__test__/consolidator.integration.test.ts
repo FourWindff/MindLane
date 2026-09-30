@@ -38,77 +38,81 @@ describe('Consolidator integration', () => {
   let tmpDir: string
   let manager: SessionManager
   const fileUuid = 'file-uuid-1'
+  const workspaceUuid = 'workspace-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-int-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
-    manager.setWorkspace('/workspace/test', 'workspace-uuid-1')
   })
+
+  /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
+  const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
 
   afterEach(() => {
     manager.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('200 条消息会话归档后进入 LLM 的消息数 ≤ 120 且摘要注入系统提示词', async () => {
-    const sessionId = 'long-session'
-    await manager.saveMessages(sessionId, makeMessages(200), fileUuid)
+  it('200 条消息会话归档后进入 LLM 的消息数 ≤ 120 且摘要注入系统提示词', async () =>
+    inWs(async () => {
+      const sessionId = 'long-session'
+      await manager.saveMessages(sessionId, makeMessages(200), fileUuid)
 
-    const buildMessages = async (
-      messages: BaseMessage[],
-      lastSummary?: string,
-    ): Promise<BaseMessage[]> => [
-      new SystemMessage(lastSummary ? `历史摘要：${lastSummary}` : 'system'),
-      ...messages,
-    ]
-    const getToolDefinitions = () => []
+      const buildMessages = async (
+        messages: BaseMessage[],
+        lastSummary?: string,
+      ): Promise<BaseMessage[]> => [
+        new SystemMessage(lastSummary ? `历史摘要：${lastSummary}` : 'system'),
+        ...messages,
+      ]
+      const getToolDefinitions = () => []
 
-    const provider = new FakeProvider(
-      new FakeListChatModel({
-        responses: ['用户讨论了 AI 助手项目的技术栈与实现方案'],
-      }),
-    )
+      const provider = new FakeProvider(
+        new FakeListChatModel({
+          responses: ['用户讨论了 AI 助手项目的技术栈与实现方案'],
+        }),
+      )
 
-    const consolidator = new Consolidator(
-      {
-        sessionManager: manager,
-        provider,
-        buildMessages,
-        getToolDefinitions,
-      },
-      {
-        inputBudgetTokens: 1_000,
-        consolidationRatio: 0.5,
-        maxContextMessages: 120,
-        maxMessagesBeforeTokenCheck: 120,
-        maxConsolidationRounds: 10,
-      },
-    )
+      const consolidator = new Consolidator(
+        {
+          sessionManager: manager,
+          provider,
+          buildMessages,
+          getToolDefinitions,
+        },
+        {
+          inputBudgetTokens: 1_000,
+          consolidationRatio: 0.5,
+          maxContextMessages: 120,
+          maxMessagesBeforeTokenCheck: 120,
+          maxConsolidationRounds: 10,
+        },
+      )
 
-    const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
-    expect(changed).toBe(true)
+      const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
+      expect(changed).toBe(true)
 
-    const meta = manager.getSessionMeta(sessionId)
-    expect(meta?.lastConsolidated).toBeGreaterThan(0)
-    expect(meta?._lastSummary).toContain('AI 助手项目')
+      const meta = manager.getSessionMeta(sessionId)
+      expect(meta?.lastConsolidated).toBeGreaterThan(0)
+      expect(meta?._lastSummary).toContain('AI 助手项目')
 
-    // 不再写 {sessionId}.history.jsonl：摘要只存在会话 meta 中
-    const sessionsDir = path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1')
-    expect(fs.readdirSync(sessionsDir).some((f) => f.endsWith('.history.jsonl'))).toBe(false)
+      // 不再写 {sessionId}.history.jsonl：摘要只存在会话 meta 中
+      const sessionsDir = path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1')
+      expect(fs.readdirSync(sessionsDir).some((f) => f.endsWith('.history.jsonl'))).toBe(false)
 
-    const contextMessages = await consolidator.getMessagesForContext(sessionId, {
-      maxMessages: 120,
-    })
-    expect(contextMessages.length).toBeLessThanOrEqual(120)
+      const contextMessages = await consolidator.getMessagesForContext(sessionId, {
+        maxMessages: 120,
+      })
+      expect(contextMessages.length).toBeLessThanOrEqual(120)
 
-    const systemMessages = contextMessages.filter((m) => m.getType() === 'system')
-    expect(systemMessages.length).toBe(0)
+      const systemMessages = contextMessages.filter((m) => m.getType() === 'system')
+      expect(systemMessages.length).toBe(0)
 
-    // 验证 buildMessages 回调能把 _lastSummary 注入系统提示词。
-    const fullMessages = await buildMessages(contextMessages, meta?._lastSummary)
-    const systemPrompt = fullMessages[0].content
-    expect(systemPrompt).toContain('历史摘要')
-    expect(systemPrompt).toContain('AI 助手项目')
-  })
+      // 验证 buildMessages 回调能把 _lastSummary 注入系统提示词。
+      const fullMessages = await buildMessages(contextMessages, meta?._lastSummary)
+      const systemPrompt = fullMessages[0].content
+      expect(systemPrompt).toContain('历史摘要')
+      expect(systemPrompt).toContain('AI 助手项目')
+    }))
 })

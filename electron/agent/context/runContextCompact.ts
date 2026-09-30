@@ -5,6 +5,7 @@ import { buildSystemPrompt, loadMemoryContext } from '../agenthub/mindlane/conte
 import { createExtractionCallback } from '../memory/memoryExtractor.js'
 import { AGENT_LIMITS } from '../config.js'
 import { logger } from '../../shared/logger.js'
+import { requireWorkspaceUuid } from '../../shared/runContext.js'
 import type { LLMProvider } from '../providers/index.js'
 import type { AgentServices } from '../service.js'
 import type { ToolRegistry } from '../tools/registry.js'
@@ -66,7 +67,7 @@ export async function runContextCompact(
         extractor: services.memoryExtractor,
         editLogStore: services.editLogStore,
         provider,
-        workspaceUuid: sessionManager.workspaceUuid,
+        workspaceUuid: requireWorkspaceUuid('记忆提取'),
         fileUuid,
       })
     : undefined

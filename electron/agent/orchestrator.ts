@@ -18,6 +18,7 @@ import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
+import { currentWorkspacePath } from '../shared/runContext.js'
 import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
@@ -121,10 +122,10 @@ export class AgentOrchestrator {
     this.toolRegistry.registerTool(actionTools.moveNodeTool)
     this.toolRegistry.registerTool(actionTools.deleteNodeTool)
 
-    // Read-only workspace file access for the mindlane chat agent.
-    this.toolRegistry.registerTool(
-      createReadFileTool(() => this.services.sessionManager.workspacePath),
-    )
+    // Read-only workspace file access for the mindlane chat agent. The workspace
+    // root comes from the run context (written by Runner.run), read per call so
+    // switching workspaces takes effect without rebuilding the registry.
+    this.toolRegistry.registerTool(createReadFileTool(() => currentWorkspacePath() ?? ''))
 
     // 按需读导图：模型需要整图结构（超出选中范围）时实时拉取。
     const mindmapReadProvider = this.options.mindmapReadProvider

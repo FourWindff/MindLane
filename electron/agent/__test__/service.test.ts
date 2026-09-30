@@ -41,7 +41,6 @@ describe('initAgentServices 装配', () => {
 
   it('sessionManager 可用：runInWorkspace 内读写往返', async () => {
     const sessionId = 'session-assembly'
-    services.sessionManager.setWorkspace('/workspace/test', 'workspace-uuid-assembly')
     await services.sessionManager.runInWorkspace('workspace-uuid-assembly', () =>
       services.sessionManager.saveMessage(sessionId, new HumanMessage('你好'), 'file-uuid-a'),
     )

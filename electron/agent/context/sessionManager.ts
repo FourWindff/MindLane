@@ -18,8 +18,6 @@ import type { ChatMessage } from '../../../contracts/fileFormat.js'
 export class SessionManager {
   private store: SessionMessageStore | null = null
   private checkpointer: CheckpointerManager | null = null
-  private _workspacePath: string = ''
-  private _workspaceUuid: string = ''
 
   /**
    * 初始化 JSONL 存储。
@@ -36,29 +34,6 @@ export class SessionManager {
    */
   setCheckpointer(cp: CheckpointerManager): void {
     this.checkpointer = cp
-  }
-
-  /**
-   * 当前工作区路径
-   */
-  get workspacePath(): string {
-    return this._workspacePath
-  }
-
-  /**
-   * 当前工作区 UUID
-   */
-  get workspaceUuid(): string {
-    return this._workspaceUuid
-  }
-
-  /**
-   * 设置工作区路径与稳定 UUID
-   */
-  setWorkspace(workspacePath: string, workspaceUuid: string): void {
-    this._workspacePath = workspacePath
-    this._workspaceUuid = workspaceUuid
-    this.store?.setWorkspace(this._workspaceUuid)
   }
 
   runInWorkspace<T>(workspaceUuid: string, action: () => T): T {

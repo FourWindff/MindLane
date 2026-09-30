@@ -6,7 +6,7 @@ import { AgentOrchestrator } from '../orchestrator.js'
 import type { AgentServices } from '../service.js'
 import { ProviderCapability, type LLMProvider } from '../providers/index.js'
 import { AGENT_LIMITS } from '../config.js'
-import { runWithStreamId } from '../../shared/runContext.js'
+import { runWithRunContext } from '../../shared/runContext.js'
 import { StreamManager } from '../streamManager.js'
 import type { SessionManager } from '../context/sessionManager.js'
 import type { ChatStreamEvent } from '../../ipc.js'
@@ -97,7 +97,6 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
   const persisted = new Map<string, BaseMessage[]>()
   const savedUserMessages: BaseMessage[] = []
   const sessionManager = {
-    workspaceUuid: 'workspace-a',
     isReady: () => true,
     runInWorkspace: (_workspaceUuid: string, action: () => unknown) => action(),
     getSessionMeta: () => undefined,
@@ -241,6 +240,7 @@ describe('手动宫殿：一次临时运行', () => {
     workspaceUuid: 'workspace-a',
     context: {
       fileUuid: 'file-a',
+      workspacePath: '/workspace/test',
       filePath: '/a.mindlane',
       fileTitle: '读书笔记',
       selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
@@ -312,6 +312,7 @@ describe('手动宫殿：一次临时运行', () => {
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
+        workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
         fileTitle: '读书笔记',
         selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
@@ -383,7 +384,7 @@ describe('手动宫殿：一次临时运行', () => {
     const { provider } = palaceRunProvider()
     const orchestrator = new AgentOrchestrator(provider, {
       checkpointer: { getAdapter: () => new MemorySaver() },
-      sessionManager: { workspaceUuid: 'workspace-a' },
+      sessionManager: {},
     } as unknown as AgentServices)
     const graph = orchestrator.getStreamRuntime().graph
 
@@ -463,7 +464,12 @@ describe('主图以节点形式挂载两个子图', () => {
       sessionId,
       message: '把这段内容做成导图',
       workspaceUuid: 'workspace-a',
-      context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '读书笔记' },
+      context: {
+        fileUuid: 'file-a',
+        workspacePath: '/workspace/test',
+        filePath: '/a.mindlane',
+        fileTitle: '读书笔记',
+      },
     }
 
     const streamId = harness.manager.startStream(request)
@@ -525,7 +531,12 @@ describe('主图以节点形式挂载两个子图', () => {
       sessionId,
       message: '把这段内容做成导图',
       workspaceUuid: 'workspace-a',
-      context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '读书笔记' },
+      context: {
+        fileUuid: 'file-a',
+        workspacePath: '/workspace/test',
+        filePath: '/a.mindlane',
+        fileTitle: '读书笔记',
+      },
     })
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
@@ -547,25 +558,37 @@ describe('主图以节点形式挂载两个子图', () => {
     const runOnce = (recursionLimit: number): Promise<ToolMessage | undefined> =>
       // The run context is what the subgraph keys its waves by: the direct-graph
       // test plays the Runner's part.
-      runWithStreamId('stream-test', 'session-long-doc', async () => {
-        const harness = createHarness(scriptedProvider(512), false)
-        const runtime = harness.orchestrator.getStreamRuntime()
-        const stream = await runtime.graph.stream(
-          {
-            messages: [new HumanMessage(manyBatchText(batches))],
-            context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '长文档' },
-            artworkStyle: 'vector',
-          },
-          { recursionLimit, streamMode: ['messages'] },
-        )
-        let toolMessage: ToolMessage | undefined
-        for await (const [mode, payload] of stream) {
-          if (mode !== 'messages') continue
-          const [message] = payload as [BaseMessage]
-          if (message.type === 'tool') toolMessage = message as ToolMessage
-        }
-        return toolMessage
-      })
+      runWithRunContext(
+        {
+          streamId: 'stream-test',
+          sessionId: 'session-long-doc',
+          workspace: { path: '/workspace/test', uuid: 'workspace-a' },
+        },
+        async () => {
+          const harness = createHarness(scriptedProvider(512), false)
+          const runtime = harness.orchestrator.getStreamRuntime()
+          const stream = await runtime.graph.stream(
+            {
+              messages: [new HumanMessage(manyBatchText(batches))],
+              context: {
+                fileUuid: 'file-a',
+                workspacePath: '/workspace/test',
+                filePath: '/a.mindlane',
+                fileTitle: '长文档',
+              },
+              artworkStyle: 'vector',
+            },
+            { recursionLimit, streamMode: ['messages'] },
+          )
+          let toolMessage: ToolMessage | undefined
+          for await (const [mode, payload] of stream) {
+            if (mode !== 'messages') continue
+            const [message] = payload as [BaseMessage]
+            if (message.type === 'tool') toolMessage = message as ToolMessage
+          }
+          return toolMessage
+        },
+      )
 
     // Subgraph super-steps count against the host graph's budget (S9a): the
     // pre-change 80 would die mid-wave, which is why AGENT_LIMITS was retuned.
@@ -592,6 +615,7 @@ describe('主图以节点形式挂载两个子图', () => {
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
+        workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
         fileTitle: '读书笔记',
         selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
@@ -672,7 +696,12 @@ describe('主图以节点形式挂载两个子图', () => {
       sessionId,
       message: '先读图定位，再按文档建图',
       workspaceUuid: 'workspace-a',
-      context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: '读书笔记' },
+      context: {
+        fileUuid: 'file-a',
+        workspacePath: '/workspace/test',
+        filePath: '/a.mindlane',
+        fileTitle: '读书笔记',
+      },
     })
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
