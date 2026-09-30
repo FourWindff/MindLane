@@ -2,11 +2,11 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
+  useActiveFileAiWriting,
   useActiveMindmapEditor,
   useActiveOpenFile,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/theme/colorPalettes'
 import { useNodeGlide, usePrefersReducedMotion } from '@/features/mindmap/hooks/useNodeMotion'
@@ -26,7 +26,7 @@ function TextNodeInner({
   const nodes = useActiveMindmapStore((state) => state.nodes)
   const [label, setLabel] = useState(data.label)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const aiBusy = useAiStore(selectCurrentChatBusy)
+  const aiBusy = useActiveFileAiWriting()
   const { visualVariant, colorScheme, structureType } = useMapStyle()
 
   const editing = !!data.editing

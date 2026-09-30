@@ -13,11 +13,39 @@ export class OpenFile {
   readonly history: MindmapHistory
   readonly editor: MindmapEditor
 
+  /**
+   * 「文件正在被 AI 写入」：打开的文件自己的瞬时状态，不进导图文档模型、
+   * 不落盘、不参与脏检查。chat 侧投影写入（见 aiWritingProjection），导图侧订阅读取。
+   */
+  private aiWriting = false
+  private aiWritingListeners = new Set<() => void>()
+
   constructor(key: string) {
     this.key = key
     this.store = createMindmapStore()
     this.history = new MindmapHistory()
     this.editor = new MindmapEditor(this.store, this.history)
+  }
+
+  isAiWriting(): boolean {
+    return this.aiWriting
+  }
+
+  /**
+   * 写这个标记只通知自己的订阅者，绝不触碰导图 store：否则自动保存会在
+   * AI 忙闲切换时被误触发。
+   */
+  setAiWriting(value: boolean): void {
+    if (this.aiWriting === value) return
+    this.aiWriting = value
+    for (const listener of this.aiWritingListeners) listener()
+  }
+
+  subscribeAiWriting(listener: () => void): () => void {
+    this.aiWritingListeners.add(listener)
+    return () => {
+      this.aiWritingListeners.delete(listener)
+    }
   }
 
   load(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
@@ -33,5 +61,7 @@ export class OpenFile {
   dispose(): void {
     this.editor.cancelPendingDeletes()
     this.history.clear()
+    this.aiWritingListeners.clear()
+    this.aiWriting = false
   }
 }

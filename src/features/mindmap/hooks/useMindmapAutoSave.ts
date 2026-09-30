@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { toPng } from 'html-to-image'
 import type { ReactFlowInstance } from '@xyflow/react'
-import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { saveOpenFile } from '../model/saveOpenFile'
-import { useActiveOpenFile, useActiveMindmapStore } from './useActiveOpenFile'
+import {
+  useActiveFileAiWriting,
+  useActiveOpenFile,
+  useActiveMindmapStore,
+} from './useActiveOpenFile'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 
 export function useMindmapAutoSave() {
   const activeInstance = useActiveOpenFile()
-  const aiBusy = useAiStore(selectCurrentChatBusy)
+  const aiBusy = useActiveFileAiWriting()
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)
   const dirty = useActiveMindmapStore((state) => state.dirty)
   const filePath = useActiveMindmapStore((state) => state.filePath)

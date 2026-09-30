@@ -32,6 +32,11 @@ export class OpenFileRegistry {
     return this.instances.get(key)
   }
 
+  /** Every non-default open file, in insertion order. */
+  list(): OpenFile[] {
+    return [...this.instances.values()]
+  }
+
   setActive(key: string | null): void {
     this.activeKey = key
     this.emit()

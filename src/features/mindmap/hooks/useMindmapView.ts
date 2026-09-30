@@ -15,11 +15,11 @@ import {
   type Viewport,
 } from '@xyflow/react'
 import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
-import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { shortcutRows } from './shortcutRows'
 import {
+  useActiveFileAiWriting,
   useActiveMindmapEditor,
   useActiveOpenFile,
   useActiveMindmapStore,
@@ -50,7 +50,7 @@ export function useMindmapView() {
   const edges = useActiveMindmapStore((state) => state.edges)
   const canUndo = useActiveMindmapStore((state) => state.canUndo)
   const canRedo = useActiveMindmapStore((state) => state.canRedo)
-  const aiBusy = useAiStore(selectCurrentChatBusy)
+  const aiBusy = useActiveFileAiWriting()
   const chatReady = useSettingsStore(selectChatReady)
   const palaceEnabled = chatReady
   const structureType = useActiveMindmapStore((state) => state.style.structureType)

@@ -24,6 +24,7 @@ import {
   subscribeToChatStreamEvents,
   useAiStore,
 } from '@/features/chat/model/aiStore'
+import { connectAiWritingProjection } from '@/features/chat/model/aiWritingProjection'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
@@ -149,6 +150,9 @@ function AppContent() {
       if (ready) void useAiStore.getState().refreshCapsuleData()
     })
     const disconnectAiStore = connectAiStore(openFileRegistry)
+    // 「文件正在被 AI 写入」是打开的文件自己的状态：chat 订阅自己的每文件忙闲，
+    // 单点投影进打开的文件；导图侧读文件，不读 chat。
+    const disconnectAiWriting = connectAiWritingProjection(openFileRegistry)
     // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
     // 落盘应答器：主进程转发写工具参数，这里按 fileUuid 串行化校验+落图并回 ack。
@@ -179,6 +183,7 @@ function AppContent() {
     return () => {
       stopToolRouter()
       stopWriteResponder()
+      disconnectAiWriting()
       disconnectAiStore()
       disconnectMindmapReadResponder()
     }
