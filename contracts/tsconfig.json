@@ -17,6 +17,6 @@
   },
   // The guard covers production code; the repo-wide tsconfig still typechecks
   // the contract tests (which may legitimately reach into a feature for setup).
-  "include": ["**/*.ts"],
+  "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/*.test.ts"]
 }

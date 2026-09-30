@@ -102,6 +102,21 @@ describe('chat workspace sync', () => {
     expect(capsule().find((entry) => entry.fileUuid === 'file-a')?.fileName).toBe('b.mindlane')
   })
 
+  it('re-applies live paths after a stale read-model pull', () => {
+    installApis()
+    openFile('/ws/a.mindlane')
+    disconnect = connectChatWorkspaceSync()
+    const instance = openFileRegistry.get('/ws/a.mindlane')!
+    instance.store.getState().setFilePath('/ws/b.mindlane')
+    openFileRegistry.renameKey('/ws/a.mindlane', '/ws/b.mindlane')
+
+    // connectAiStore's async session pull can land with the persisted (stale) mapping.
+    useAiStore.setState({ fileUuidPaths: { 'file-a': '/ws/a.mindlane' } })
+
+    expect(useAiStore.getState().fileUuidPaths['file-a']).toBe('/ws/b.mindlane')
+    expect(capsule().find((entry) => entry.fileUuid === 'file-a')?.fileName).toBe('b.mindlane')
+  })
+
   it('re-pulls the capsule inputs on a workspace tree change, hiding a pruned mapping', async () => {
     installApis()
     disconnect = connectChatWorkspaceSync()

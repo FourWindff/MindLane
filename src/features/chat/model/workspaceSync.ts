@@ -8,32 +8,28 @@ import { openFileRegistry, type OpenFileRegistry } from '@/features/mindmap/mode
  * longer pokes chat, so control flow matches the dependency direction
  * (chat observes workspace, never the other way around).
  *
- * Two triggers:
- * - workspace change (tree / path): re-pull the capsule inputs, then re-apply
- *   the live open-file paths so an in-flight persist cannot clobber a newer one;
+ * Triggers:
+ * - workspace change (tree / path): re-pull the capsule inputs;
  * - open-file registry change (rename / move / release): refresh the path index
  *   from the live instances and persist it, so the capsule shows the new path
- *   immediately and the next launch too.
+ *   immediately and the next launch too;
+ * - any write to the chat read model: re-apply the live paths, so a session
+ *   pull that lands with the stale persisted mapping cannot clobber a fresh one.
  */
 export function connectChatWorkspaceSync(
   registry: OpenFileRegistry = openFileRegistry,
 ): () => void {
-  const reprojectFromWorkspace = () => {
-    void useAiStore
-      .getState()
-      .refreshCapsuleData()
-      .then(() => reconcileOpenFilePaths(registry))
-  }
-
   const unsubscribeWorkspace = useWorkspaceStore.subscribe((state, previous) => {
     if (state.tree === previous.tree && state.workspacePath === previous.workspacePath) return
-    reprojectFromWorkspace()
+    void useAiStore.getState().refreshCapsuleData()
   })
   const unsubscribeRegistry = registry.subscribe(() => reconcileOpenFilePaths(registry))
+  const unsubscribeStore = useAiStore.subscribe(() => reconcileOpenFilePaths(registry))
   reconcileOpenFilePaths(registry)
   return () => {
     unsubscribeWorkspace()
     unsubscribeRegistry()
+    unsubscribeStore()
   }
 }
 

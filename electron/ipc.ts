@@ -1,4 +1,4 @@
-import type { ChatMessage, DocumentRef, MindLaneFile } from '../contracts/fileFormat'
+import type { ChatMessage, DocumentRef, MindLaneFile } from '../contracts/fileFormat.js'
 
 import type {
   ChatContext,

@@ -6,12 +6,7 @@ import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { insertPalacePlaceholder } from './mindmapWriteResponder'
 import { startPalaceRun } from '@/features/mindmap/model/palaceRun'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
-
-/** Selected topic node handed over by the mindmap UI; its label feeds the turn context. */
-export interface PalaceTopic {
-  id: string
-  label: string
-}
+import type { MindmapSelectedTopic } from '@/features/mindmap/hooks/useMindmapView'
 
 /**
  * Manual palace generation (CONTEXT.md「触发面」): the user's gesture starts one
@@ -19,16 +14,16 @@ export interface PalaceTopic {
  *
  * The orchestration — turn context, placeholder, run start — lives in chat; the
  * mindmap UI only emits the topic selection through a callback wired by the
- * composition root. The placeholder, its placement and the landing all live in
- * the write responder's `landPalace` action — the same landing the AI trigger
- * uses — so this hook only owns the gates, the context and the run start.
+ * composition root. Placeholder insertion (`insertPalacePlaceholder`) and the
+ * landing (`landPalace`) both stay in the write responder, shared with the AI
+ * trigger, so this hook only owns the gates, the context and the run start.
  */
-export function usePalaceGeneration(): (topics: PalaceTopic[]) => void {
+export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void {
   const aiBusy = useAiStore(selectCurrentChatBusy)
   const chatReady = useSettingsStore(selectChatReady)
 
   return useCallback(
-    async (topics: PalaceTopic[]) => {
+    async (topics: MindmapSelectedTopic[]) => {
       if (aiBusy) return
 
       const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined

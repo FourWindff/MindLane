@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore } from './store'
 import { createEmptyFile, DEFAULT_VIEWPORT } from '@contracts/fileFormat'
+import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 
 describe('store.viewport', () => {
   let store: ReturnType<typeof createMindmapStore>
@@ -221,5 +222,19 @@ describe('store.documentRefs', () => {
 
     expect(store.getState().documentRefs).toHaveLength(1)
     expect(store.getState().documentRefs[0]!.filename).toBe('new.pdf')
+  })
+})
+
+describe('store.assets', () => {
+  it('dedups by content: the same bytes reuse the same asset id', async () => {
+    const store = createMindmapStore()
+    const a = await assetFromDataUrl('data:image/png;base64,REVGRQ==')
+    const b = await assetFromDataUrl('data:image/png;base64,REVGRQ==')
+
+    const id1 = store.getState().addAsset(a!)
+    const id2 = store.getState().addAsset(b!)
+
+    expect(id1).toBe(id2)
+    expect(store.getState().assets).toHaveLength(1)
   })
 })

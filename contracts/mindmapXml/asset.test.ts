@@ -23,15 +23,4 @@ describe('asset helpers', () => {
   it('roundtrips asset back to data URL', () => {
     expect(assetToDataUrl({ mime: 'image/png', data: 'QUJD' })).toBe('data:image/png;base64,QUJD')
   })
-
-  it('dedups through the store: same content reuses the same asset id', async () => {
-    const { createMindmapStore } = await import('@/features/mindmap/model/store')
-    const store = createMindmapStore()
-    const a = await assetFromDataUrl('data:image/png;base64,REVGRQ==')
-    const b = await assetFromDataUrl('data:image/png;base64,REVGRQ==')
-    const id1 = store.getState().addAsset(a!)
-    const id2 = store.getState().addAsset(b!)
-    expect(id1).toBe(id2)
-    expect(store.getState().assets).toHaveLength(1)
-  })
 })

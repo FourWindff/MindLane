@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
+import { ShortcutsList } from './ShortcutsList'
 import { resolveArtworkStyle } from '@contracts/palaceArtworkStyle'
 
 /**

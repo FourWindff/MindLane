@@ -1,4 +1,4 @@
-import { isApplePlatform } from './platform'
+import { isApplePlatform } from '@/shared/shortcuts/platform'
 
 /** 将内部 combo 转为界面展示用文案，如 `Ctrl + /` 或 `⌘ /` */
 export function formatComboLabel(combo: string): string {

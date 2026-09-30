@@ -43,7 +43,7 @@ vi.mock('../model/settingsStore', () => ({
     selector(settingsState.current),
 }))
 
-vi.mock('@/shared/shortcuts/ShortcutsList', () => ({ ShortcutsList: () => null }))
+vi.mock('./ShortcutsList', () => ({ ShortcutsList: () => null }))
 
 function renderSettings() {
   const html = ReactDOMServer.renderToStaticMarkup(<SettingsPanel fileActions={fileActions} />)

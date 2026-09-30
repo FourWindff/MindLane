@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import { formatComboLabel } from './formatComboLabel'
-import { shortcutRegistry } from './ShortcutRegistry'
-import type { ShortcutRegistration } from './types'
+import { shortcutRegistry } from '@/shared/shortcuts/ShortcutRegistry'
+import type { ShortcutRegistration } from '@/shared/shortcuts/types'
 import './shortcuts.css'
 
 const GROUP_LABEL: Record<string, string> = {

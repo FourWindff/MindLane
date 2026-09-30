@@ -13,8 +13,8 @@ type Listener = () => void
  */
 export class OpenFileRegistry {
   private instances = new Map<string, OpenFile>()
-  // Lazily created so module init never constructs a OpenFile; eager
-  // construction here closes an import cycle through aiStore -> buildChatContext.
+  // Lazily created so module init never constructs an OpenFile (a store plus
+  // three collaborators) before the first file is opened.
   private defaultInstance: OpenFile | null = null
   private activeKey: string | null = null
   private listeners = new Set<Listener>()
