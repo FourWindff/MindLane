@@ -1,5 +1,5 @@
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
-import { useWorkspaceStore } from '@/app/workspace/store'
+import { useWorkspaceStore } from '@/features/workspace/store'
 import { displayFileName } from '@/shared/lib/displayFileName'
 import type { DocumentRef } from '@contracts/fileFormat'
 

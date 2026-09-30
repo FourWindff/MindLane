@@ -3,7 +3,7 @@ import { backfillEntryFileTitle, createEntryFile, entryFileTitle } from '../entr
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useAiStore } from '@/features/chat/model/aiStore'
-import { useWorkspaceStore } from '@/app/workspace/store'
+import { useWorkspaceStore } from '@/features/workspace/store'
 import { createEmptyFile, type DocumentRef } from '@contracts/fileFormat'
 
 function installBridge() {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TextPromptDialog } from '@/shared/components/TextPromptDialog'
+import { TextPromptDialog } from '@/features/workspace/components/TextPromptDialog'
 import { useWorkspaceStore } from '../store'
 
 function workspaceName(workspacePath: string): string {

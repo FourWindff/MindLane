@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { MindmapView } from '@/features/mindmap/components/View'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { SettingsModal } from '@/app/settings/components/SettingsModal'
-import { loadSettingsFromBackend, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { SettingsModal } from '@/features/settings/components/SettingsModal'
+import type { SettingsFileActions } from '@/features/settings/components/SettingsPanel'
+import { loadSettingsFromBackend, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ChatInputBar } from '@/features/chat/components/ChatInputBar'
 import { ChatMessageList } from '@/features/chat/components/ChatMessageList'
 import { ChatCapsuleBar } from '@/features/chat/components/ChatCapsuleBar'
-import { WorkspaceHome } from '@/app/workspace/components/WorkspaceHome'
-import { FileManager } from '@/app/workspace/components/FileManager'
+import { WorkspaceHome } from '@/features/workspace/components/WorkspaceHome'
+import { FileManager } from '@/features/workspace/components/FileManager'
 import {
   initializeWorkspaceSession,
   saveCurrentDocumentSilently,
   useWorkspaceStore,
-} from '@/app/workspace/store'
+} from '@/features/workspace/store'
 import { AppWindowBar } from '@/app/shell/components/AppWindowBar'
 import { AppToolbar } from '@/app/shell/components/AppToolbar'
 import { AgentWriteSimulator } from '@/app/shell/components/AgentWriteSimulator'
@@ -31,8 +32,47 @@ import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
 import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
-import '@/app/workspace/workspace.css'
+import '@/features/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
+
+type SyncAfterFileSaved = (filePath: string) => Promise<void>
+
+/** Settings panel "open file": dialog → load into the registry → sync the workspace tree. */
+async function openFileFromDialog(syncAfterFileSaved: SyncAfterFileSaved): Promise<void> {
+  const result = await window.mindlane?.file.open()
+  if (!result?.ok) return
+  const instance = openFileRegistry.getOrCreate(result.data.filePath)
+  instance.load(result.data.filePath, result.data.data, null)
+  openFileRegistry.setActive(result.data.filePath)
+  await syncAfterFileSaved(result.data.filePath)
+}
+
+/** Settings panel "save now": the shared save protocol (dirty check + error routing). */
+async function saveActiveFile(syncAfterFileSaved: SyncAfterFileSaved): Promise<void> {
+  const instance = openFileRegistry.getActive()
+  if (!instance) return
+  await saveOpenFile(instance.store, {
+    syncAfterFileSaved,
+    onError: reportRendererError,
+  })
+}
+
+/** Settings panel "save as": dialog → load the new path → sync the workspace tree. */
+async function saveActiveFileAs(
+  workspacePath: string | null,
+  syncAfterFileSaved: SyncAfterFileSaved,
+): Promise<void> {
+  const instance = openFileRegistry.getActive()
+  if (!instance) return
+  const result = await window.mindlane?.file.saveAs({
+    data: instance.store.getState().toMindLaneFile(),
+  })
+  if (!result?.ok) return
+  const next = openFileRegistry.getOrCreate(result.data.filePath)
+  next.load(result.data.filePath, result.data.data, workspacePath)
+  openFileRegistry.setActive(result.data.filePath)
+  await syncAfterFileSaved(result.data.filePath)
+}
 
 function WorkspaceEmptyState() {
   const busy = useWorkspaceStore((s) => s.busy)
@@ -83,6 +123,20 @@ function AppContent() {
   const workspaceInitializing = useWorkspaceStore((s) => s.initializing)
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
+  const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
+  const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
+  const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
+    (s) => s.setRestoreLastWorkspaceOnLaunch,
+  )
+  const settingsFileActions: SettingsFileActions = {
+    workspacePath,
+    restoreLastWorkspaceOnLaunch,
+    setRestoreLastWorkspaceOnLaunch: (enabled) => void setRestoreLastWorkspaceOnLaunch(enabled),
+    openWorkspaceDirectory: () => void switchWorkspace(),
+    openFile: () => void openFileFromDialog(syncAfterFileSaved),
+    saveActiveFile: () => void saveActiveFile(syncAfterFileSaved),
+    saveActiveFileAs: () => void saveActiveFileAs(workspacePath, syncAfterFileSaved),
+  }
   const hasDocumentOpen = useActiveMindmapStore((s) => s.hasDocumentOpen)
   const filePath = useActiveMindmapStore((s) => s.filePath)
 
@@ -202,7 +256,11 @@ function AppContent() {
                 </>
               )}
             </aside>
-            <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+            <SettingsModal
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              fileActions={settingsFileActions}
+            />
             <FileManager isOpen={fileManagerOpen} onClose={() => setFileManagerOpen(false)} />
           </div>
         )}

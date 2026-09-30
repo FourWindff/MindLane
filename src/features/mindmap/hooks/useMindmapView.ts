@@ -17,7 +17,7 @@ import {
 import { useShortcuts } from '@/shared/shortcuts/useRegisterShortcut'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { shortcutRows } from './shortcutRows'
 import {
   useActiveMindmapEditor,

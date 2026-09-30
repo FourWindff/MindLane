@@ -1,5 +1,5 @@
 import { useId, useRef, useState } from 'react'
-import { Modal } from './Modal'
+import { Modal } from '@/shared/components/Modal'
 
 interface TextPromptDialogProps {
   /** 面板顶部的小字说明 */

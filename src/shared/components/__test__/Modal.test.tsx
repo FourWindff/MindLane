@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { parseHTML } from 'linkedom'
 import { Modal } from '../Modal'
-import { TextPromptDialog } from '../TextPromptDialog'
+import { TextPromptDialog } from '@/features/workspace/components/TextPromptDialog'
 
 /** 测试环境没有 DOM：把服务端标记交给 linkedom 解析后断言。 */
 function render(element: ReactElement) {

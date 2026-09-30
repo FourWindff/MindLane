@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type MouseEvent } from 'react'
-import { TextPromptDialog } from '@/shared/components/TextPromptDialog'
+import { TextPromptDialog } from '@/features/workspace/components/TextPromptDialog'
 import { displayFileName } from '@/shared/lib/displayFileName'
 import { useWorkspaceStore } from '../store'
 import { FileContextMenu } from './FileContextMenu'

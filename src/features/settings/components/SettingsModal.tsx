@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { Modal } from '@/shared/components/Modal'
-import { SettingsPanel } from './SettingsPanel'
+import { SettingsPanel, type SettingsFileActions } from './SettingsPanel'
 import '../settings.css'
 
 type Props = {
   open: boolean
   onClose: () => void
+  fileActions: SettingsFileActions
 }
 
-export function SettingsModal({ open, onClose }: Props) {
+export function SettingsModal({ open, onClose, fileActions }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   // The panel needs its own ref: this focuses the first button, not an input.
@@ -52,7 +53,7 @@ export function SettingsModal({ open, onClose }: Props) {
         </button>
       </div>
       <div className="settings-modal__body">
-        <SettingsPanel />
+        <SettingsPanel fileActions={fileActions} />
       </div>
     </Modal>
   )

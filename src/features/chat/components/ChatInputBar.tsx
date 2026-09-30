@@ -19,8 +19,8 @@ import {
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
-import { useWorkspaceStore } from '@/app/workspace/store'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useWorkspaceStore } from '@/features/workspace/store'
 import type { DocumentRef } from '@contracts/fileFormat'
 import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
 import '../styles/chat-input-bar.css'

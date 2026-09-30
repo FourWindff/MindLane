@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { Node } from '@xyflow/react'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
-import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
+import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import { insertPalacePlaceholder } from '@/features/chat/model/mindmapWriteResponder'

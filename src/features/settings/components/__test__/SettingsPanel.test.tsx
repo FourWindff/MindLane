@@ -28,26 +28,15 @@ const settingsState = vi.hoisted(() => ({
   },
 }))
 
-const workspaceState = {
+const fileActions = {
+  workspacePath: null,
   restoreLastWorkspaceOnLaunch: true,
   setRestoreLastWorkspaceOnLaunch: vi.fn(),
   openWorkspaceDirectory: vi.fn(),
-  workspacePath: null,
-  syncAfterFileSaved: vi.fn(),
+  openFile: vi.fn(),
+  saveActiveFile: vi.fn(),
+  saveActiveFileAs: vi.fn(),
 }
-
-vi.mock('@/features/mindmap/hooks/useActiveOpenFile', () => ({
-  useActiveOpenFile: () => ({ store: { getState: vi.fn() } }),
-}))
-
-vi.mock('@/features/mindmap/model/openFileRegistry', () => ({
-  openFileRegistry: { getOrCreate: vi.fn(), setActive: vi.fn() },
-}))
-
-vi.mock('@/app/workspace/store', () => ({
-  useWorkspaceStore: (selector: (state: typeof workspaceState) => unknown) =>
-    selector(workspaceState),
-}))
 
 vi.mock('../../model/settingsStore', () => ({
   useSettingsStore: (selector: (state: typeof settingsState.current) => unknown) =>
@@ -57,7 +46,7 @@ vi.mock('../../model/settingsStore', () => ({
 vi.mock('@/shared/shortcuts/ShortcutsList', () => ({ ShortcutsList: () => null }))
 
 function renderSettings() {
-  const html = ReactDOMServer.renderToStaticMarkup(<SettingsPanel />)
+  const html = ReactDOMServer.renderToStaticMarkup(<SettingsPanel fileActions={fileActions} />)
   const { document } = parseHTML(html)
   return { document, text: html.replaceAll('<!-- -->', '') }
 }

@@ -8,8 +8,8 @@ import {
   type ChatStreamEvent,
   type FileChatState,
 } from '../aiStore'
-import { useSettingsStore } from '@/app/settings/model/settingsStore'
-import { useWorkspaceStore } from '@/app/workspace/store'
+import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { useWorkspaceStore } from '@/features/workspace/store'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@contracts/fileFormat'

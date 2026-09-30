@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
-import { useActiveOpenFile } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
-import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
-import { useWorkspaceStore } from '@/app/workspace/store'
-import { useSettingsStore } from '@/app/settings/model/settingsStore'
+import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ShortcutsList } from '@/shared/shortcuts/ShortcutsList'
-import type { MindLaneFile } from '@contracts/fileFormat'
 import { resolveArtworkStyle } from '@contracts/palaceArtworkStyle'
-import { reportRendererError } from '@/shared/lib/reportRendererError'
+
+/**
+ * File/workspace actions the panel exposes in its UI, injected by the
+ * composition root. The settings feature sits below mindmap and workspace, so
+ * it emits intents instead of reaching up into them.
+ */
+export interface SettingsFileActions {
+  workspacePath: string | null
+  restoreLastWorkspaceOnLaunch: boolean
+  setRestoreLastWorkspaceOnLaunch: (enabled: boolean) => void
+  openWorkspaceDirectory: () => void
+  openFile: () => void
+  saveActiveFile: () => void
+  saveActiveFileAs: () => void
+}
 
 type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor' | 'integrations'
 
@@ -323,7 +332,7 @@ function McpIntegrationsSection() {
   )
 }
 
-export function SettingsPanel() {
+export function SettingsPanel({ fileActions }: { fileActions: SettingsFileActions }) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('about')
   const apiKey = useSettingsStore((s) => s.apiKey)
   const setApiKey = useSettingsStore((s) => s.setApiKey)
@@ -337,14 +346,15 @@ export function SettingsPanel() {
   const providers = useSettingsStore((s) => s.providers)
   const activeChatProvider = useSettingsStore((s) => s.activeChatProvider)
   const setActiveChatProvider = useSettingsStore((s) => s.setActiveChatProvider)
-  const activeInstance = useActiveOpenFile()
-  const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
-  const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
-    (s) => s.setRestoreLastWorkspaceOnLaunch,
-  )
-  const openWorkspaceDirectory = useWorkspaceStore((s) => s.openWorkspaceDirectory)
-  const workspacePath = useWorkspaceStore((s) => s.workspacePath)
-  const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
+  const {
+    workspacePath,
+    restoreLastWorkspaceOnLaunch,
+    setRestoreLastWorkspaceOnLaunch,
+    openWorkspaceDirectory,
+    openFile,
+    saveActiveFile,
+    saveActiveFileAs,
+  } = fileActions
 
   const activeProvider = providers.find((p) => p.id === activeChatProvider) ?? providers[0]
   const models = activeProvider?.models ?? []
@@ -425,7 +435,7 @@ export function SettingsPanel() {
               <button
                 type="button"
                 className="btn panel-btn panel-btn--primary"
-                onClick={() => void openWorkspaceDirectory()}
+                onClick={openWorkspaceDirectory}
               >
                 切换仓库
               </button>
@@ -440,58 +450,19 @@ export function SettingsPanel() {
                 <input
                   type="checkbox"
                   checked={restoreLastWorkspaceOnLaunch}
-                  onChange={(e) => void setRestoreLastWorkspaceOnLaunch(e.target.checked)}
+                  onChange={(e) => setRestoreLastWorkspaceOnLaunch(e.target.checked)}
                 />
                 <span>{restoreLastWorkspaceOnLaunch ? '开启' : '关闭'}</span>
               </label>
             </div>
             <div className="settings-card__action-group">
-              <button
-                type="button"
-                className="btn panel-btn"
-                onClick={async () => {
-                  const result = await window.mindlane?.file.open()
-                  if (result?.ok) {
-                    const instance = openFileRegistry.getOrCreate(result.data.filePath)
-                    instance.load(result.data.filePath, result.data.data as MindLaneFile, null)
-                    openFileRegistry.setActive(result.data.filePath)
-                    await syncAfterFileSaved(result.data.filePath)
-                  }
-                }}
-              >
+              <button type="button" className="btn panel-btn" onClick={openFile}>
                 打开文件
               </button>
-              <button
-                type="button"
-                className="btn panel-btn"
-                onClick={() =>
-                  void saveOpenFile(activeInstance.store, {
-                    syncAfterFileSaved,
-                    onError: reportRendererError,
-                  })
-                }
-              >
+              <button type="button" className="btn panel-btn" onClick={saveActiveFile}>
                 立即保存
               </button>
-              <button
-                type="button"
-                className="btn panel-btn"
-                onClick={async () => {
-                  const state = activeInstance.store.getState()
-                  const data = state.toMindLaneFile()
-                  const result = await window.mindlane?.file.saveAs({ data })
-                  if (result?.ok) {
-                    const instance = openFileRegistry.getOrCreate(result.data.filePath)
-                    instance.load(
-                      result.data.filePath,
-                      result.data.data as MindLaneFile,
-                      workspacePath,
-                    )
-                    openFileRegistry.setActive(result.data.filePath)
-                    await syncAfterFileSaved(result.data.filePath)
-                  }
-                }}
-              >
+              <button type="button" className="btn panel-btn" onClick={saveActiveFileAs}>
                 另存为
               </button>
             </div>

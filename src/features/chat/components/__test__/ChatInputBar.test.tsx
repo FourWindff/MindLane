@@ -41,9 +41,9 @@ vi.mock('@/features/chat/model/aiStore', async () => {
   }
 })
 
-vi.mock('@/app/settings/model/settingsStore', async () => {
-  const actual = await vi.importActual<typeof import('@/app/settings/model/settingsStore')>(
-    '@/app/settings/model/settingsStore',
+vi.mock('@/features/settings/model/settingsStore', async () => {
+  const actual = await vi.importActual<typeof import('@/features/settings/model/settingsStore')>(
+    '@/features/settings/model/settingsStore',
   )
   return {
     ...actual,
@@ -52,9 +52,10 @@ vi.mock('@/app/settings/model/settingsStore', async () => {
   }
 })
 
-vi.mock('@/app/workspace/store', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/app/workspace/store')>('@/app/workspace/store')
+vi.mock('@/features/workspace/store', async () => {
+  const actual = await vi.importActual<typeof import('@/features/workspace/store')>(
+    '@/features/workspace/store',
+  )
   return {
     ...actual,
     useWorkspaceStore: (selector?: (state: unknown) => unknown) =>
