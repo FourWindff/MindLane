@@ -1,13 +1,16 @@
+import type { ChatMessage, DocumentRef, MindLaneFile } from '../contracts/fileFormat'
+
 import type {
-  ChatMessage,
-  ChatToolCall,
-  DocumentRef,
-  MindLaneEdge,
-  MindLaneFile,
-  MindLaneNode,
-} from '../src/shared/lib/fileFormat'
-import type { AppSettings, WorkspaceState } from './fs/types'
-import type { McpServerStatusInfo } from './mcp/types'
+  ChatContext,
+  ChatStreamEvent,
+  EphemeralRunRequest,
+  MindmapReadRequest,
+  MindmapReadResponse,
+  MindmapWriteRequest,
+  MindmapWriteResponse,
+} from '../contracts/ipc.js'
+import type { AppSettings, WorkspaceState } from './fs/types.js'
+import type { McpServerStatusInfo } from './mcp/types.js'
 
 export enum IPC {
   MainProcessMessage = 'main-process-message',
@@ -75,8 +78,6 @@ export enum IPC {
 // 跨进程边界的结果信封：可失败操作返回，必然成功的读取不包信封。
 
 export type IpcResult<T = void> = { ok: true; data: T } | { ok: false; error: string }
-
-export type { PalaceArtworkStyle } from '../src/shared/lib/palaceArtworkStyle'
 
 // ---- 边界 DTO（Boundary DTOs） ----
 
@@ -146,329 +147,14 @@ type ChatLoadSessionResult = {
   }
 }
 
-export interface ContextNodeInfo {
-  id: string
-  type: 'text' | 'palace'
-  label: string
-  /** 根节点链（root → … → 本节点，compact 轮次状态用） */
-  chain?: string[]
-  /** 直接子节点（compact 子树，深度 1） */
-  children?: ContextNodeInfo[]
-  extra?: Record<string, unknown>
-}
-
-export interface WorkspaceFileInfo {
-  name: string
-  filePath: string
-}
-
-export interface ChatContext {
-  fileUuid: string
-  selectedNodes?: ContextNodeInfo[]
-  filePath?: string
-  fileTitle?: string
-  hasDocumentOpen?: boolean
-  workspacePath?: string
-  workspaceFiles?: WorkspaceFileInfo[]
-  attachedDocument?: DocumentRef
-  linkedDocuments?: DocumentRef[]
-}
-
-// ---- 轮次状态（Turn State）契约 ----
-// 序列化与剥离的单一实现：主进程持久化、UI 展示、滚动摘要、记忆提取
-// 四个消费方共享同一份代码，避免各写一份导致漂移。
-
-/** 轮次状态 XML 块的根标签名。 */
-export const EDITOR_STATE_TAG = 'EDITOR_STATE'
-
-/** XML 属性值转义：`<` `>` `&` `"` 不破坏结构。 */
-export function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
-
-/**
- * 把 `ChatContext` 序列化为 `<EDITOR_STATE>` XML 块（轮次状态）。
- *
- * 结构约定：根标签携带文件身份属性（file_uuid / file_path / file_title）；
- * `<SELECTED_NODES count>` 恒发（空选 count="0" 且无子节点）；
- * `<ATTACHED_DOCUMENT>` / `<LINKED_DOCUMENTS>` 存在时才发。
- * 不含导图树摘要——模型需要完整结构时按需调用 `readMindmap` 读工具。
- */
-export function serializeTurnState(context: ChatContext): string {
-  let xml = `<${EDITOR_STATE_TAG} file_uuid="${xmlEscape(context.fileUuid)}" file_path="${xmlEscape(context.filePath ?? '')}" file_title="${xmlEscape(context.fileTitle ?? '')}">
-`
-
-  const selectedNodes = context.selectedNodes ?? []
-  xml += `<SELECTED_NODES count="${selectedNodes.length}">
-`
-  for (const node of selectedNodes) {
-    // 协议 XML 形状：id/type/content/collapsed；compact 模式带根节点链 + 直接子树
-    const collapsed =
-      (node as { collapsed?: boolean }).collapsed === true ? ' collapsed="true"' : ''
-    const chain =
-      node.chain && node.chain.length > 1 ? ` chain="${node.chain.map(xmlEscape).join(',')}"` : ''
-    const children =
-      (node as { children?: Array<{ id: string; type: string; label?: string }> }).children ?? []
-    if (children.length === 0) {
-      xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" content="${xmlEscape(node.label || '')}"${collapsed}${chain}/>
-`
-    } else {
-      xml += `  <node id="${xmlEscape(node.id)}" type="${xmlEscape(node.type)}" content="${xmlEscape(node.label || '')}"${collapsed}${chain}>
-`
-      for (const child of children) {
-        xml += `    <node id="${xmlEscape(child.id)}" type="${xmlEscape(child.type)}" content="${xmlEscape(child.label || '')}"/>
-`
-      }
-      xml += `  </node>
-`
-    }
-  }
-  xml += `</SELECTED_NODES>
-`
-
-  if (context.attachedDocument) {
-    const doc = context.attachedDocument
-    xml += `<ATTACHED_DOCUMENT type="${xmlEscape(doc.type)}" filename="${xmlEscape(doc.filename)}" path="${xmlEscape(doc.source)}">
-用户已附加文档「${xmlEscape(doc.filename)}」，请根据此文档内容生成思维导图。
-</ATTACHED_DOCUMENT>
-`
-  }
-
-  if (context.linkedDocuments && context.linkedDocuments.length > 0) {
-    xml += `<LINKED_DOCUMENTS count="${context.linkedDocuments.length}">
-`
-    for (const doc of context.linkedDocuments) {
-      xml += `  <document id="${xmlEscape(doc.id)}" type="${xmlEscape(doc.type)}" filename="${xmlEscape(doc.filename)}" text_cache_key="${xmlEscape(doc.id)}"/>
-`
-    }
-    xml += `</LINKED_DOCUMENTS>
-`
-  }
-
-  xml += `</${EDITOR_STATE_TAG}>`
-  return xml
-}
-
-/**
- * 从消息文本末尾剥离 `<EDITOR_STATE>` 块（展示、滚动摘要、记忆提取共用）。
- *
- * 末尾锚定：只剥**末尾**的完整块（含其前的换行分隔），
- * 无块时 no-op，中间内容永不触碰。旧会话消息无块 → 原样返回。
- */
-export function stripTurnState(text: string): string {
-  const closeTag = `</${EDITOR_STATE_TAG}>`
-  const closeIndex = text.lastIndexOf(closeTag)
-  if (closeIndex < 0) return text
-  // 块必须是文本末尾（允许尾随空白），否则视为普通内容。
-  if (text.slice(closeIndex + closeTag.length).trim() !== '') return text
-
-  const openTag = `<${EDITOR_STATE_TAG}`
-  const openIndex = text.lastIndexOf(openTag, closeIndex)
-  if (openIndex < 0) return text
-  // 防止误剥 `<EDITOR_STATE_EXTRA>` 之类的前缀同名标签。
-  const afterOpen = text[openIndex + openTag.length]
-  if (afterOpen !== ' ' && afterOpen !== '>' && afterOpen !== '\n') return text
-
-  // 剥掉开标签到末尾的整段，并去掉其前的换行分隔。
-  return text.slice(0, openIndex).replace(/\r?\n+$/, '')
-}
-
-/** 读导图查询参数（PRD 6.2：树查询，非行寻址）。 */
-export interface MindmapReadQuery {
-  scope?: 'whole' | 'subtree'
-  subtreeId?: string
-  type?: string
-  textContains?: string
-  maxDepth?: number
-}
-
-/** 主进程 → 渲染层：按需读导图请求（requestId 关联并发 runner）。 */
-export interface MindmapReadRequest {
-  requestId: string
-  fileUuid: string
-  query?: MindmapReadQuery
-}
-
-/** 渲染层 → 主进程：读导图应答。 */
-export type MindmapReadResponse =
-  { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
-
-/** 每个写动作的参数形状（IPC 边界仍为 Record<string,unknown>，渲染层按此解析）。 */
-export interface WriteActionArgs {
-  insertXmlFragment: {
-    xml: string
-    parentId?: string
-    position?: 'root' | 'child' | 'after' | 'before'
-  }
-  updateMindmapNode: { xml: string }
-  moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
-  deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
-  /**
-   * Palace landing (CONTEXT.md「确定性落图」): code serializes the subgraph
-   * payload to a palace XML fragment and both trigger surfaces land through
-   * this one action — the model never repeats the image data URL.
-   */
-  landPalace: { xml: string }
-}
-
-/** 写动作名 = 参数形状映射的键位（动作名单与参数形状收敛到同一处声明，不再手抄词表）。 */
-export type WriteAction = keyof WriteActionArgs
-
-/** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 通道模式）。 */
-export interface MindmapWriteRequest {
-  requestId: string
-  fileUuid: string
-  action: WriteAction
-  args: Record<string, unknown>
-}
-
-/** 渲染层 → 主进程：落盘应答（{ok, action, data} 或错误；未知 requestId 为 no-op）。 */
-export type MindmapWriteResponse =
-  | { requestId: string; ok: true; action: string; data: unknown }
-  | { requestId: string; ok: false; error: string }
-
-/** Steps the main process may emit as `step` events: mindmap subgraph + palace subgraph. */
-const STREAM_STEPS = [
-  'generating-map',
-  'reading-doc',
-  'extracting',
-  'merging',
-  'finalizing',
-  'planning-stations',
-  'generating-image',
-  'locating-stations',
-] as const
-export type StreamStep = (typeof STREAM_STEPS)[number]
-
-/**
- * Steps a subgraph node may emit: `generating-map` is triggered by tool events
- * (insertXmlFragment / generateMindmapFragment on_tool_start), never by a node.
- * Shared by the mindmap and palace subgraphs so both speak one stage vocabulary.
- */
-export type SubgraphProgressStep = Exclude<StreamStep, 'generating-map'>
-
-/**
- * Custom progress event a subgraph writes via `getWriter()`; streamManager
- * forwards it as a `step` stream event. One channel, shared by both subgraphs.
- */
-export const SUBGRAPH_PROGRESS_EVENT = 'subgraph-progress'
-
-export function isStreamStep(value: unknown): value is StreamStep {
-  return typeof value === 'string' && STREAM_STEPS.some((step) => step === value)
-}
-
-/**
- * 把"当前轮"切片语义收敛为跨进程共享的唯一实现。
- * 边界 = 最后一条 `type === 'human' || role === 'user'` 的消息；
- * `previous` 含边界消息，`current` 不含；无边界时 `previous` = 全部、`current` = 空。
- * 两种消息模型（`BaseMessage.type` 与 `ChatMessage.role`）共用同一份语义。
- */
-export function splitCurrentTurn<T extends { type?: string; role?: string }>(
-  messages: readonly T[],
-): { previous: T[]; current: T[] } {
-  const boundaryIndex = messages.findLastIndex(
-    (message) => message.type === 'human' || message.role === 'user',
-  )
-  if (boundaryIndex < 0) return { previous: [...messages], current: [] }
-  return {
-    previous: messages.slice(0, boundaryIndex + 1),
-    current: messages.slice(boundaryIndex + 1),
-  }
-}
-
-export interface StreamResponse {
-  content: string
-  messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
-  toolCalls?: ChatToolCall[]
-  mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[]; title: string }
-  /** Palace run outcome: a manual run's node settles on it (the landing itself happened already). */
-  palaceData?: PalaceRunPayload
-}
-
-/**
- * `step` event payload: the stage name, the id of the subgraph call that emitted
- * it (two subgraphs can run in parallel, so the card is attributed by this id),
- * and optional progress counts (streamManager must pass the counts through).
- */
-export interface StreamStepPayload {
-  step: StreamStep
-  callId?: string
-  completed?: number
-  total?: number
-}
-
-export type ChatStreamEvent =
-  | { streamId: string; sessionId: string; type: 'message-start'; payload: null }
-  | { streamId: string; sessionId: string; type: 'token'; payload: string }
-  | { streamId: string; sessionId: string; type: 'step'; payload: StreamStepPayload }
-  | {
-      streamId: string
-      sessionId: string
-      type: 'tool-start'
-      payload: { id: string; name: string; input: Record<string, unknown> }
-    }
-  | {
-      streamId: string
-      sessionId: string
-      type: 'tool-end'
-      payload: { id: string; name: string; status: 'success' | 'error'; output: string }
-    }
-  | { streamId: string; sessionId: string; type: 'end'; payload: StreamResponse }
-  | { streamId: string; sessionId: string; type: 'error'; payload: string }
-
-/**
- * Palace landing payload (CONTEXT.md「确定性落图」): the palace subgraph's output,
- * carried on the run's `end` event (a manual run's node settles on it) and —
- * minus the artwork — written into the close-out ToolMessage the model reads.
- * The landing itself is the code-serialized `landPalace` write request, so the
- * model never repeats the image data URL.
- */
-export interface PalaceStationPayload {
-  order: number
-  content: string
-  anchorVisual: string
-  association?: string
-  x: number
-  y: number
-  linkedNodeId: string
-}
-
-export type PalaceRunPayload =
-  | {
-      ok: true
-      label: string
-      stations: PalaceStationPayload[]
-      imageUrl: string
-      sourceNodeIds: string[]
-    }
-  | { ok: false; error: string }
-
-/**
- * Ephemeral run marker (CONTEXT.md「临时运行」): the manual palace generation.
- * The run lives on a private checkpoint thread, writes no session record and
- * still emits stream events; `runEntry` picks the graph's edge out of START.
- */
-export interface EphemeralRunRequest {
-  /** Resume by re-running with the same id and empty input; never a session id. */
-  privateThreadId: string
-  runEntry: 'palace'
-  /**
-   * Continue the private thread instead of starting it: when the thread still
-   * has a pending super-step (a stopped run), the graph is driven with no new
-   * input, so completed super-steps are not re-run. Without a pending task (a
-   * finished run, e.g. one that ended in an error payload) the run falls back
-   * to a normal start on the same thread.
-   */
-  resume?: boolean
-}
-
 // ---- 桥（Bridge）契约 ----
 // 渲染层访问主进程能力的唯一门户。preload 实现与渲染层类型引用同一份，
 // 编译器看守：实现不满足契约即编译失败。
+
+export * from '../contracts/ipc.js'
+export type { PalaceStationPayload, PalaceRunPayload } from '../contracts/palace.js'
+export * from '../contracts/turnState.js'
+export type { PalaceArtworkStyle } from '../contracts/palaceArtworkStyle.js'
 
 export interface MindLaneBridge {
   ai: {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseXmlFragment, deserializeMindLaneFile } from '../deserializer'
-import { MindmapXmlError } from '../types'
+import { parseXmlFragment, deserializeMindLaneFile } from './deserializer'
+import { MindmapXmlError } from './types'
 
 describe('parseXmlFragment', () => {
   it('parses nested nodes with minted ids and derived edges', async () => {

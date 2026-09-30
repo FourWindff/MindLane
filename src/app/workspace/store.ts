@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { createEmptyFile, type MindLaneFile } from '@/shared/lib/fileFormat'
+import { createEmptyFile, type MindLaneFile } from '@contracts/fileFormat'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
 import { useAiStore } from '@/features/chat/model/aiStore'

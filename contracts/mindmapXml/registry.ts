@@ -6,9 +6,8 @@
  * 描述经 `describeNodeTypes()` 注入系统提示稳定前缀（issue 06）。
  */
 
-import type { Node } from '@xyflow/react'
 import { escapeXml } from './escape.js'
-import type { MindLaneAsset, XmlElementLike } from './types.js'
+import type { MindLaneAsset, MindmapXmlNode, XmlElementLike } from './types.js'
 
 interface XmlNodeReaderContext {
   /** XML 属性（键小写，实体已反转义） */
@@ -31,10 +30,10 @@ interface XmlNodeTypeDescriptor {
   name: string
   /** 语义与用途描述（注入系统提示） */
   description: string
-  /** ReactFlow Node → XML 属性。不含 id/type/collapsed（通用层处理）。 */
-  write(node: Node): Record<string, string | undefined>
+  /** Node → XML 属性。不含 id/type/collapsed（通用层处理）。 */
+  write(node: MindmapXmlNode): Record<string, string | undefined>
   /** 类型专属子元素 XML（如 palace 的 <station>）。空字符串 = 无。 */
-  writeChildren?(node: Node): string
+  writeChildren?(node: MindmapXmlNode): string
   /** XML 属性 + 专属子元素 → ReactFlow NodeData。 */
   read(ctx: XmlNodeReaderContext): Record<string, unknown>
 }

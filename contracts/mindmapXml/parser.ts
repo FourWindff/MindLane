@@ -14,16 +14,12 @@
 
 import { MindmapXmlError } from './types.js'
 import { checkXmlWellFormed } from './normalize.js'
+import type { DomElementLike, DomNodeLike, ParsedDocumentLike } from './dom.js'
+
+export type { DomElementLike, DomNodeLike, ParsedDocumentLike } from './dom.js'
 
 type DomParserCtor = new () => {
   parseFromString(xml: string, contentType: string): ParsedDocumentLike
-}
-
-/** 解析器返回值的结构子集（浏览器 Document 与 linkedom 文档类型不同，取共同形状）。 */
-export interface ParsedDocumentLike {
-  documentElement: Element
-  body?: Element | null
-  querySelector?: (selectors: string) => Element | null
 }
 
 let injectedParser: DomParserCtor | undefined
@@ -95,24 +91,24 @@ export function parseXmlTolerant(xml: string): ParsedDocumentLike {
 }
 
 /** 解析结果中的顶层元素列表。 */
-export function topLevelElements(doc: ParsedDocumentLike): Element[] {
+export function topLevelElements(doc: ParsedDocumentLike): DomElementLike[] {
   const root = doc.documentElement
   if (!root) return []
   if (root.tagName.toLowerCase() === 'html') {
     const body = doc.body ?? root
-    const children: Element[] = []
+    const children: DomElementLike[] = []
     for (const child of Array.from(body.childNodes)) {
-      if (child.nodeType === 1) children.push(child as Element)
+      if (child.nodeType === 1) children.push(child as DomElementLike)
     }
     return children
   }
-  const result: Element[] = []
-  let el: Element | null = root
+  const result: DomElementLike[] = []
+  let el: DomElementLike | null = root
   while (el) {
     if (el.nodeType === 1) result.push(el)
-    let next: ChildNode | null = el.nextSibling
+    let next: DomNodeLike | null = el.nextSibling
     while (next && next.nodeType !== 1) next = next.nextSibling
-    el = next as Element | null
+    el = next as DomElementLike | null
   }
   return result
 }

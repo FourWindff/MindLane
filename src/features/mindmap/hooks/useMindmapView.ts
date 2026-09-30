@@ -28,12 +28,16 @@ import { useMindmapAutoSave } from './useMindmapAutoSave'
 import { usePalaceGeneration } from './usePalaceGeneration'
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
-import { isDefaultViewport } from '@/shared/lib/fileFormat'
-import { collectDescendantIds, collectSubtreeIds, findParentId } from '@/shared/lib/mindmapTree'
-import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
+import { isDefaultViewport } from '@contracts/fileFormat'
+import {
+  collectDescendantIds,
+  collectSubtreeIds,
+  findParentId,
+} from '@/features/mindmap/model/mindmapTree'
+import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 import { createMindmapOperationController } from '@/features/mindmap/model/operationController'
 import type { ContextMenuState } from '@/features/mindmap/components/ContextMenu'
-import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
+import type { PalaceNodeData } from '@contracts/nodeData'
 
 export function useMindmapView() {
   const nodeTypes = useMemo(() => canvasNodeRegistry.toReactFlowNodeTypes(), [])

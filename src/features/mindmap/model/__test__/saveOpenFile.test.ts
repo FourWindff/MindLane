@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpenFile } from '../openFile'
 import { saveOpenFile } from '../saveOpenFile'
-import { createEmptyFile } from '@/shared/lib/fileFormat'
-import { deserializeMindLaneFile } from '@/shared/lib/mindmapXml'
+import { createEmptyFile } from '@contracts/fileFormat'
+import { deserializeMindLaneFile } from '@contracts/mindmapXml'
 
 function createDirtyInstance(filePath: string | null): OpenFile {
   const instance = new OpenFile('test')
@@ -60,7 +60,7 @@ describe('saveOpenFile', () => {
 
     // 主进程序列化端产物必须是合法 XML，读回 roundtrip 一致
     const file = savedPayload!.data as Parameters<typeof serializeMindLaneFile>[0]
-    const { serializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+    const { serializeMindLaneFile } = await import('@contracts/mindmapXml')
     const xml = serializeMindLaneFile(file)
     expect(xml.startsWith('<mindlane version="1.0">')).toBe(true)
     const parsed = await deserializeMindLaneFile(xml)

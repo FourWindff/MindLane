@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@xyflow/react'
-import { getChildIdsOrdered } from '@/shared/lib/mindmapTree'
+import { getChildIdsOrdered } from '@/features/mindmap/model/mindmapTree'
 
 /**
  * Pure cascade-timing math for agent write fragments (model layer, unit-testable

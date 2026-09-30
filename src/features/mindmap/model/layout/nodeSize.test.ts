@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defaultNodeSize } from '../nodeSize'
+import { defaultNodeSize } from './nodeSize'
 
 describe('defaultNodeSize', () => {
   it('returns the regular node size for text and unknown types', () => {

@@ -3,7 +3,7 @@ import { ToolMessage } from '@langchain/core/messages'
 import { buildPalaceSubgraph } from '../palaceGraph.js'
 import { ProviderCapability, type LLMProvider } from '../../providers/index.js'
 import type { ChatContext } from '../../../ipc.js'
-import { resolveArtworkStyle } from '../../../../src/shared/lib/palaceArtworkStyle.js'
+import { resolveArtworkStyle } from '../../../../contracts/palaceArtworkStyle.js'
 import { GENERATE_PALACE_TOOL } from '../../tools/subgraphRoutingTools.js'
 
 // The subgraph nodes key their per-run bookkeeping by the Runner's run context

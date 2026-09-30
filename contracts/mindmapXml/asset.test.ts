@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { assetFromDataUrl, assetToDataUrl, parseDataUrl } from '../asset'
+import { assetFromDataUrl, assetToDataUrl, parseDataUrl } from './asset'
 
 describe('asset helpers', () => {
   it('parses data URLs into mime + base64', () => {

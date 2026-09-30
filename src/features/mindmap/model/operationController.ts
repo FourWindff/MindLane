@@ -5,7 +5,7 @@ import {
   findParentId,
   findRootNode,
   getChildIdsOrdered,
-} from '@/shared/lib/mindmapTree'
+} from '@/features/mindmap/model/mindmapTree'
 import type { SiblingInsertMode } from './editor'
 
 type OperationEditor = Pick<

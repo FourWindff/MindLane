@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, safeStorage, shell, dialog } from 'electron'
 import { DOMParser as LinkedomDOMParser } from 'linkedom'
-import { registerXmlDomParser } from '../src/shared/lib/mindmapXml/parser.js'
+import { registerXmlDomParser } from '../contracts/mindmapXml/parser.js'
 import { resolveChatProvider } from './agent/providers/index.js'
 import { FileSystemService } from './fs/index.js'
 import {

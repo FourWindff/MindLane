@@ -1,7 +1,7 @@
 import { ipcMain, shell } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { DocumentRef } from '../../../src/shared/lib/fileFormat.js'
+import type { DocumentRef } from '../../../contracts/fileFormat.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { resolveDocumentRef } from '../documentRef.js'

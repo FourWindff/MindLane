@@ -12,8 +12,8 @@ import { useSettingsStore } from '@/app/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
-import { createEmptyFile } from '@/shared/lib/fileFormat'
-import type { ChatContext } from '../../../../../electron/ipc'
+import { createEmptyFile } from '@contracts/fileFormat'
+import type { ChatContext } from '@contracts/ipc'
 
 type ChatStreamPayload = { threadId: string; message: string; context: ChatContext }
 

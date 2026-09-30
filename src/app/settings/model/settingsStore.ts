@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PalaceArtworkStyle } from '../../../../electron/ipc'
+import type { PalaceArtworkStyle } from '@contracts/palaceArtworkStyle'
 
 interface ProviderInfo {
   id: string

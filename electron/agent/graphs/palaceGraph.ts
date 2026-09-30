@@ -17,13 +17,13 @@ import {
   type PalaceRunPayload,
   type SubgraphProgressStep,
 } from '../../ipc.js'
-import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
-import { serializePalaceNodeXml } from '../../../src/shared/lib/mindmapXml/index.js'
+import type { ChatToolCallStep } from '../../../contracts/fileFormat.js'
+import { serializePalaceNodeXml } from '../../../contracts/mindmapXml/index.js'
 import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
 
 import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
-import { resolveArtworkStyle } from '../../../src/shared/lib/palaceArtworkStyle.js'
+import { resolveArtworkStyle } from '../../../contracts/palaceArtworkStyle.js'
 import { buildSubgraphToolMessage } from '../subgraphRouter.js'
 
 const log = logger.withContext('palace')

@@ -1,14 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import type { Node, Edge } from '@xyflow/react'
-import { createEmptyFile, type MindLaneFile } from '../../fileFormat'
-import {
-  serializeMindLaneFile,
-  serializeTreeFragment,
-  serializeMindmapSection,
-} from '../serializer'
-import { deserializeMindLaneFile, parseXmlFragment } from '../deserializer'
+import { createEmptyFile, type MindLaneFile } from '../fileFormat.js'
+import type { MindmapXmlEdge, MindmapXmlNode } from './types.js'
+import { serializeMindLaneFile, serializeTreeFragment, serializeMindmapSection } from './serializer'
+import { deserializeMindLaneFile, parseXmlFragment } from './deserializer'
 
-function makeNodes(...specs: Array<{ id: string; type: string; label?: string }>): Node[] {
+function makeNodes(
+  ...specs: Array<{ id: string; type: string; label?: string }>
+): MindmapXmlNode[] {
   return specs.map((s) => ({
     id: s.id,
     type: s.type,
@@ -87,7 +85,7 @@ describe('serializeMindLaneFile', () => {
       { id: 'a2', type: 'text', label: '子节点 & 特殊 <字符>' },
       { id: 'b1', type: 'text', label: '分支B' },
     )
-    const edges: Edge[] = [
+    const edges: MindmapXmlEdge[] = [
       { id: 'e-r-a1', source: 'root', target: 'a1', type: 'mindmap' },
       { id: 'e-a1-a2', source: 'a1', target: 'a2', type: 'mindmap' },
       { id: 'e-r-b1', source: 'root', target: 'b1', type: 'mindmap' },
@@ -215,7 +213,7 @@ describe('serializeTreeFragment', () => {
       { id: 'n2', type: 'text', label: 'b' },
       { id: 'n3', type: 'text', label: 'c' },
     )
-    const edges: Edge[] = [
+    const edges: MindmapXmlEdge[] = [
       { id: 'e1', source: 'n1', target: 'n2', type: 'mindmap' },
       { id: 'e2', source: 'n2', target: 'n3', type: 'mindmap' },
     ]
@@ -241,7 +239,7 @@ describe('serializeTreeFragment', () => {
       { id: 'n3', type: 'text', label: 'leaf' },
     )
     ;(nodes[1]!.data as Record<string, unknown>).collapsed = true
-    const edges: Edge[] = [
+    const edges: MindmapXmlEdge[] = [
       { id: 'e1', source: 'n1', target: 'n2', type: 'mindmap' },
       { id: 'e2', source: 'n2', target: 'n3', type: 'mindmap' },
     ]
@@ -261,7 +259,7 @@ describe('serializeMindmapSection', () => {
     { id: 'n2', type: 'text', label: '设计' },
     { id: 'n3', type: 'text', label: '前端框架' },
   )
-  const edges: Edge[] = [
+  const edges: MindmapXmlEdge[] = [
     { id: 'e1', source: 'root', target: 'n1', type: 'mindmap' },
     { id: 'e2', source: 'root', target: 'n2', type: 'mindmap' },
     { id: 'e3', source: 'n1', target: 'n3', type: 'mindmap' },
@@ -302,13 +300,13 @@ describe('serializeMindmapSection', () => {
 describe('visual sibling order (edge order may diverge)', () => {
   // edge array order: [root->a, root->b, root->above]; visual (y) order: a < above < b.
   // Simulates addSibling(b, 'above') where the new edge is appended last.
-  const nodes: Node[] = [
+  const nodes: MindmapXmlNode[] = [
     { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: '中心' } },
     { id: 'a', type: 'text', position: { x: 200, y: 0 }, data: { label: 'a' } },
     { id: 'above', type: 'text', position: { x: 200, y: 50 }, data: { label: 'above' } },
     { id: 'b', type: 'text', position: { x: 200, y: 100 }, data: { label: 'b' } },
   ]
-  const edges: Edge[] = [
+  const edges: MindmapXmlEdge[] = [
     { id: 'eA', source: 'root', target: 'a', type: 'mindmap' },
     { id: 'eB', source: 'root', target: 'b', type: 'mindmap' },
     { id: 'eAbove', source: 'root', target: 'above', type: 'mindmap' },

@@ -1,11 +1,9 @@
-import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
-import type { TextNodeData } from '@/features/mindmap/nodes/text/types'
-import type { ImageNodeData } from '@/features/mindmap/nodes/image/types'
-import type { MindmapStyleState } from '@/features/mindmap/theme/types'
+import type { PalaceNodeData, TextNodeData, ImageNodeData } from './nodeData.js'
+import type { MindmapStyleState } from './mindmapStyle.js'
 
-export type { PalaceNodeData, PalaceStation } from '@/features/mindmap/nodes/palace/types'
-export type { MindLaneAsset } from './mindmapXml/types'
-import type { MindLaneAsset } from './mindmapXml/types'
+export type { PalaceNodeData, PalaceStation } from './nodeData.js'
+export type { MindLaneAsset } from './mindmapXml/types.js'
+import type { MindLaneAsset } from './mindmapXml/types.js'
 
 export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 

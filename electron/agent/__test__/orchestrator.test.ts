@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatToolCallStep } from '../../../contracts/fileFormat.js'
 import type { AgentServices } from '../service.js'
 import { ProviderCapability, type LLMProvider } from '../providers/index.js'
 import { AgentOrchestrator } from '../orchestrator.js'

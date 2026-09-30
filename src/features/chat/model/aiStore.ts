@@ -4,15 +4,15 @@ import type {
   ChatToolCall,
   ChatToolCallStep,
   DocumentRef,
-} from '@/shared/lib/fileFormat'
+} from '@contracts/fileFormat'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import { createEntryFile } from '@/features/chat/lib/entryConversation'
 import { isSubgraphTool } from '@/features/chat/lib/chatUtils'
 import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
 import { selectChatReady, useSettingsStore } from '@/app/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { splitCurrentTurn, stripTurnState } from '../../../../electron/ipc'
-import type { ChatStreamEvent, StreamStep } from '../../../../electron/ipc'
+import { splitCurrentTurn, stripTurnState } from '@contracts/turnState'
+import type { ChatStreamEvent, StreamStep } from '@contracts/ipc'
 
 function generateSessionId(): string {
   return crypto.randomUUID()

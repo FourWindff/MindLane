@@ -5,7 +5,7 @@ import os from 'node:os'
 import type { BaseMessage } from '@langchain/core/messages'
 import { SessionManager } from '../sessionManager.js'
 import { uiMessageToBaseMessages } from '../sessionMessageStore.js'
-import type { ChatMessage } from '../../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage } from '../../../../contracts/fileFormat.js'
 
 describe('SessionManager', () => {
   let manager: SessionManager

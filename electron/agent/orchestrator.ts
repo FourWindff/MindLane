@@ -13,7 +13,7 @@ import type {
 import { MainGraphState } from './state.js'
 
 import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
-import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../src/shared/lib/fileFormat.js'
+import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../contracts/fileFormat.js'
 import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'

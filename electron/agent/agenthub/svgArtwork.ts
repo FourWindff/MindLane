@@ -1,6 +1,6 @@
 import type { PalaceSubgraphStateType, MemoryPalaceStation } from '../state.js'
 import type { StationDesign } from '../state.js'
-import { isValidSvgArtwork } from '../../../src/shared/lib/mindmapXml/svg.js'
+import { isValidSvgArtwork } from '../../../contracts/mindmapXml/svg.js'
 import { messageContentToString, formatAgentError } from '../utils.js'
 import { logger } from '../../shared/logger.js'
 import { applyCanonicalLayout, buildFallbackSummary, enforceMinDistance } from './palaceLayout.js'

@@ -7,8 +7,13 @@ import {
 } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
-import { CHILD_OFFSET_X, findParentId, getChildIdsOrdered, newId } from '@/shared/lib/mindmapTree'
-import { assetFromDataUrl } from '@/shared/lib/mindmapXml/asset'
+import {
+  CHILD_OFFSET_X,
+  findParentId,
+  getChildIdsOrdered,
+  newId,
+} from '@/features/mindmap/model/mindmapTree'
+import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
 import type { OpenFileState } from '@/features/mindmap/model/store'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'

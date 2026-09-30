@@ -1,6 +1,6 @@
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
-import { serializeMindmapSection } from '@/shared/lib/mindmapXml'
-import type { MindmapReadQuery, MindmapReadRequest } from '../../../../electron/ipc'
+import { serializeMindmapSection } from '@contracts/mindmapXml'
+import type { MindmapReadQuery, MindmapReadRequest } from '@contracts/ipc'
 
 /**
  * 渲染层读导图应答器：应用启动时注册一次。

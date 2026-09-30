@@ -1,12 +1,12 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
-import { type MindLaneFile, type MindLaneNode, type MindLaneAsset } from '@/shared/lib/fileFormat'
+import { type MindLaneFile, type MindLaneNode, type MindLaneAsset } from '@contracts/fileFormat'
 import {
   MindmapXmlError,
   parseXmlFragment,
   validateFragmentForInsert,
   buildValidationContext,
-} from '@/shared/lib/mindmapXml'
+} from '@contracts/mindmapXml'
 import {
   CHILD_GAP_Y,
   CHILD_OFFSET_X,
@@ -17,8 +17,8 @@ import {
   findRootNode,
   getChildIdsOrdered,
   newId,
-} from '@/shared/lib/mindmapTree'
-import { defaultNodeSize } from '@/shared/lib/nodeSize'
+} from '@/features/mindmap/model/mindmapTree'
+import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
 import type { OpenFileState, MindmapStore } from './store'
 import { MindmapHistory } from './history'
@@ -523,7 +523,7 @@ export class MindmapEditor {
     this.execute({ type: 'removeEdge', edgeId })
   }
 
-  addDocumentRef(ref: import('@/shared/lib/fileFormat').DocumentRef): void {
+  addDocumentRef(ref: import('@contracts/fileFormat').DocumentRef): void {
     this.state.addDocumentRef(ref)
   }
 

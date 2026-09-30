@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { escapeXml, unescapeXml } from '../escape'
-import { normalizeSelfClosingTags, findUnescapedInAttrValues } from '../normalize'
+import { escapeXml, unescapeXml } from './escape'
+import { normalizeSelfClosingTags, findUnescapedInAttrValues } from './normalize'
 
 describe('escapeXml', () => {
   it('escapes all 5 characters', () => {

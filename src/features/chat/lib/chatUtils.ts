@@ -1,6 +1,6 @@
 import type { Node } from '@xyflow/react'
-import { isTextNodeData, isPalaceNodeData } from '@/shared/lib/fileFormat'
-import type { ContextNodeInfo } from '../../../../electron/ipc'
+import { isTextNodeData, isPalaceNodeData } from '@contracts/fileFormat'
+import type { ContextNodeInfo } from '@contracts/ipc'
 
 function isKnownNodeType(type: string | undefined): type is 'text' | 'palace' {
   return type === 'text' || type === 'palace'

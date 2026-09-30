@@ -4,7 +4,7 @@ import type { BaseMessage } from '@langchain/core/messages'
 import { AIMessage, ToolMessage } from '@langchain/core/messages'
 import path from 'node:path'
 import fs from 'node:fs'
-import type { ChatMessage, ChatToolCallStep } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage, ChatToolCallStep } from '../../../contracts/fileFormat.js'
 import { extractTextContent } from '../utils.js'
 import { deriveToolStatus } from '../toolStatus.js'
 

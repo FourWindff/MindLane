@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { DocumentRef } from '../../src/shared/lib/fileFormat.js'
+import type { DocumentRef } from '../../contracts/fileFormat.js'
 
 type ResolvedDocumentRef =
   | { ok: true; displayText: string; target: string; external: boolean }

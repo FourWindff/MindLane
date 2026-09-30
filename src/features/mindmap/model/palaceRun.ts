@@ -1,4 +1,4 @@
-import type { ChatContext, ChatStreamEvent } from '../../../../electron/ipc'
+import type { ChatContext, ChatStreamEvent } from '@contracts/ipc'
 import { stageDisplayName } from '@/shared/lib/stageLabels'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { openFileRegistry } from './openFileRegistry'

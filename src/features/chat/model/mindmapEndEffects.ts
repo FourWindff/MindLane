@@ -1,5 +1,5 @@
 import type { ChatStreamEvent } from './aiStore'
-import type { ChatToolCall, DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatToolCall, DocumentRef } from '@contracts/fileFormat'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 /**

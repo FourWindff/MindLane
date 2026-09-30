@@ -4,7 +4,7 @@ import {
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-import type { ImageNodeData } from './types'
+import type { ImageNodeData } from '@contracts/nodeData'
 
 function ImageNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as ImageNodeData

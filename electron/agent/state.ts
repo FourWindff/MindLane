@@ -1,7 +1,7 @@
 import { Annotation, messagesStateReducer } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { Document } from '@langchain/core/documents'
-import type { ChatToolCallStep, DocumentRef } from '@/shared/lib/fileFormat'
+import type { ChatToolCallStep, DocumentRef } from '@contracts/fileFormat'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { DetectedAnchor } from './providers/index.js'
 import type { ChatContext, PalaceArtworkStyle } from '../ipc.js'

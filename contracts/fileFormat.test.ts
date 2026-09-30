@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createEmptyFile, migrateDocumentRef } from '../fileFormat'
+import { createEmptyFile, migrateDocumentRef } from './fileFormat'
 
 describe('MindLaneFile metadata', () => {
   it('createEmptyFile produces file with a stable UUID', () => {

@@ -1,3 +1,11 @@
+/**
+ * Persisted node data shapes: part of the `.mindlane` file format, not UI-only
+ * types, so both processes read the same definition. Transient UI markers may
+ * ride along (they are never serialized; see the node descriptors).
+ */
+
+import type { PalaceStationPayload } from './palace.js'
+
 export type TextNodeData = {
   label: string
   palaceId?: string
@@ -28,3 +36,37 @@ export type TextNodeData = {
   /** 思维导图布局中节点所在的一侧。由布局算法写入并持久化，保证重新布局时分侧稳定。 */
   side?: 'left' | 'right'
 }
+
+/** 图片节点数据：经 asset 引用内嵌图片（禁用外部 URL）。 */
+export type ImageNodeData = {
+  /** <assets> 节中的资源 id */
+  assetId: string
+  alt?: string
+  width?: number
+  height?: number
+  collapsed?: boolean
+  justAdded?: boolean
+  exiting?: boolean
+  /** 布局产物（不落盘，打开时重算） */
+  depth?: number
+  branchIndex?: number
+  side?: 'left' | 'right'
+}
+
+export type PalaceNodeData = {
+  label: string
+  /** 内嵌图片资源 id（<assets> 节）；迁移期下载失败的旧文件保留 imageUrl */
+  assetId?: string
+  imageUrl: string
+  stations: PalaceStation[]
+  sourceNodeIds: string[]
+  expanded?: boolean
+  generating?: boolean
+  /** Live manual-run stage label (transient, never persisted). */
+  runStage?: string
+  /** Manual run stopped or failed: the node keeps its placeholder and offers 继续. */
+  runStopped?: boolean
+}
+
+/** Palace stations are the landing payload's stations — the node stores that payload. */
+export type PalaceStation = PalaceStationPayload

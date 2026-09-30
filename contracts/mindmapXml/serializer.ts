@@ -3,18 +3,33 @@
  * 文件面与片段面共用同一 writer 实现（PRD 23：迁移转换与运行时序列化同一实现）。
  */
 
-import type { Edge, Node } from '@xyflow/react'
 import type { MindLaneFile } from '../fileFormat.js'
 import { escapeXml } from './escape.js'
 import { xmlNodeTypeRegistry } from './registry.js'
-import { MINDLANE_XML_VERSION, MINDLANE_ROOT_TAG, NODE_TAG } from './types.js'
-import { getChildIdsOrdered, newId } from '../mindmapTree'
+import {
+  MINDLANE_XML_VERSION,
+  MINDLANE_ROOT_TAG,
+  NODE_TAG,
+  type MindmapXmlEdge,
+  type MindmapXmlNode,
+} from './types.js'
+import { newId } from '../ids.js'
 
 /**
- * 子节点顺序：视觉顺序（position.y 升序，同 getChildIdsOrdered），保证序列化的
- * 同级顺序与界面一致，避免边数组顺序与视觉顺序漂移。
+ * 子节点顺序：视觉顺序（position.y 升序），保证序列化的同级顺序与界面一致，
+ * 避免边数组顺序与视觉顺序漂移。
  */
-function buildChildrenMap(nodes: Node[], edges: Edge[]): Map<string, string[]> {
+function getChildIdsOrdered(
+  nodes: MindmapXmlNode[],
+  edges: MindmapXmlEdge[],
+  parentId: string,
+): string[] {
+  const ids = edges.filter((edge) => edge.source === parentId).map((edge) => edge.target)
+  const y = new Map(nodes.map((n) => [n.id, n.position.y]))
+  return ids.sort((a, b) => (y.get(a) ?? 0) - (y.get(b) ?? 0))
+}
+
+function buildChildrenMap(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): Map<string, string[]> {
   const map = new Map<string, string[]>()
   for (const parentId of new Set(edges.map((edge) => edge.source))) {
     map.set(parentId, getChildIdsOrdered(nodes, edges, parentId))
@@ -22,13 +37,13 @@ function buildChildrenMap(nodes: Node[], edges: Edge[]): Map<string, string[]> {
   return map
 }
 
-function findRootIds(nodes: Node[], edges: Edge[]): string[] {
+function findRootIds(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string[] {
   const targets = new Set(edges.map((e) => e.target))
   return nodes.filter((n) => !targets.has(n.id)).map((n) => n.id)
 }
 
 /** 序列化单个 <node> 元素（含类型专属子元素与树子树）。 */
-function serializeNodeElement(node: Node, childrenXml: string, depth: number): string {
+function serializeNodeElement(node: MindmapXmlNode, childrenXml: string, depth: number): string {
   const indent = '  '.repeat(depth)
   const descriptor = xmlNodeTypeRegistry.get(node.type ?? '')
   const typeAttrs = descriptor ? descriptor.write(node) : { content: '' }
@@ -61,7 +76,7 @@ function serializeNodeElement(node: Node, childrenXml: string, depth: number): s
  */
 function serializeSubtree(
   nodeId: string,
-  nodesById: Map<string, Node>,
+  nodesById: Map<string, MindmapXmlNode>,
   childrenOf: Map<string, string[]>,
   depth: number,
   query?: MindmapSectionQuery,
@@ -83,7 +98,7 @@ function serializeSubtree(
  * 把节点/边序列化为 XML 片段（顶层多个 <node> = 多根）。
  * 位置、边、临时 UI 标记一律不落盘（PRD 2.2）。
  */
-export function serializeTreeFragment(nodes: Node[], edges: Edge[]): string {
+export function serializeTreeFragment(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string {
   return serializeMindmapSection(nodes, edges)
 }
 
@@ -115,7 +130,7 @@ export function serializePalaceNodeXml(input: PalaceNodePayload): string {
       stations: input.stations,
       sourceNodeIds: input.sourceNodeIds,
     },
-  } as unknown as Node
+  } as unknown as MindmapXmlNode
   return serializeNodeElement(node, '', 0)
 }
 
@@ -127,7 +142,7 @@ interface MindmapSectionQuery {
   maxDepth?: number
 }
 
-function matchesQuery(node: Node, query: MindmapSectionQuery | undefined): boolean {
+function matchesQuery(node: MindmapXmlNode, query: MindmapSectionQuery | undefined): boolean {
   if (!query) return true
   if (query.type && node.type !== query.type) return false
   if (query.textContains) {
@@ -144,8 +159,8 @@ function matchesQuery(node: Node, query: MindmapSectionQuery | undefined): boole
  * id/type/content/collapsed 的节点（metadata/assets/documents 不进上下文）。
  */
 export function serializeMindmapSection(
-  nodes: Node[],
-  edges: Edge[],
+  nodes: MindmapXmlNode[],
+  edges: MindmapXmlEdge[],
   query: MindmapSectionQuery = {},
 ): string {
   const nodesById = new Map(nodes.map((n) => [n.id, n]))
@@ -233,8 +248,8 @@ function serializeDocuments(file: MindLaneFile): string {
  */
 export function serializeMindLaneFile(file: MindLaneFile): string {
   const nodesById = new Map(file.mindmap.nodes.map((n) => [n.id, n]))
-  const childrenOf = buildChildrenMap(file.mindmap.nodes as Node[], file.mindmap.edges)
-  const roots = findRootIds(file.mindmap.nodes as Node[], file.mindmap.edges)
+  const childrenOf = buildChildrenMap(file.mindmap.nodes as MindmapXmlNode[], file.mindmap.edges)
+  const roots = findRootIds(file.mindmap.nodes as MindmapXmlNode[], file.mindmap.edges)
   const mindmapXml = roots.map((rid) => serializeSubtree(rid, nodesById, childrenOf, 2)).join('\n')
 
   const body = [

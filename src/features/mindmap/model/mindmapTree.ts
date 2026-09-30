@@ -1,4 +1,4 @@
-import { defaultNodeSize } from './nodeSize'
+import { defaultNodeSize } from './layout/nodeSize'
 import type { Edge, Node, Position as XyflowPosition } from '@xyflow/react'
 
 /**
@@ -18,20 +18,7 @@ export const Position = {
 export const CHILD_OFFSET_X = 200
 export const CHILD_GAP_Y = 12
 
-/**
- * nanoid(8) 风格短 id（PRD 6.4）：字母数字 + `-`/`_`，XML/JSON 安全。
- * 64⁸ 碰撞空间，单文件内唯一即可；旧文件中的 UUID id 不迁移、新旧共存；
- * 根节点固定锚点 `root`。
- */
-export function newId(): string {
-  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
-  const bytes = crypto.getRandomValues(new Uint8Array(8))
-  let id = ''
-  for (const byte of bytes) {
-    id += ALPHABET[byte % ALPHABET.length]
-  }
-  return id
-}
+export { newId } from '@contracts/ids'
 
 export function createInitialNodes(): Node[] {
   return [

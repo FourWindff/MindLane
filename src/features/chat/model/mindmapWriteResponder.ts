@@ -1,7 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
-import { CHILD_OFFSET_X, findParentId, newId } from '@/shared/lib/mindmapTree'
+import { CHILD_OFFSET_X, findParentId, newId } from '@/features/mindmap/model/mindmapTree'
 import {
   MindmapXmlError,
   buildValidationContext,
@@ -11,14 +11,14 @@ import {
   serializeTreeFragment,
   type MindLaneAsset,
   validateMove,
-} from '@/shared/lib/mindmapXml'
-import { assetFromDataUrl, parseDataUrl } from '@/shared/lib/mindmapXml/asset'
+} from '@contracts/mindmapXml'
+import { assetFromDataUrl, parseDataUrl } from '@contracts/mindmapXml/asset'
 import type {
   MindmapWriteRequest,
   MindmapWriteResponse,
   WriteAction,
   WriteActionArgs,
-} from '../../../../electron/ipc'
+} from '@contracts/ipc'
 
 /**
  * 渲染层落盘应答器（PRD：即时落盘 · 下半段）。

@@ -10,7 +10,8 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@contracts/*": ["./contracts/*"]
     },
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -23,6 +24,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "electron"],
+  "include": ["src", "electron", "contracts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

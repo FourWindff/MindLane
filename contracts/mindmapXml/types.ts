@@ -58,3 +58,23 @@ export interface XmlElementLike {
   /** 类型专属子元素（不含 <node> 树子节点） */
   elements: XmlElementLike[]
 }
+
+/**
+ * Minimal node shape the XML layer reads and writes. ReactFlow's `Node` is
+ * structurally assignable to it, so the renderer can hand its live nodes to the
+ * serializer without an adapter; the contracts layer stays UI-free.
+ */
+export interface MindmapXmlNode {
+  id: string
+  type?: string
+  position: { x: number; y: number }
+  data: Record<string, unknown>
+}
+
+/** Minimal edge shape the XML layer reads (ReactFlow's `Edge` assigns to it). */
+export interface MindmapXmlEdge {
+  id: string
+  source: string
+  target: string
+  type?: string
+}

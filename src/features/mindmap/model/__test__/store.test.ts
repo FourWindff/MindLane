@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore } from '../store'
-import { createEmptyFile, DEFAULT_VIEWPORT } from '@/shared/lib/fileFormat'
+import { createEmptyFile, DEFAULT_VIEWPORT } from '@contracts/fileFormat'
 
 describe('store.viewport', () => {
   let store: ReturnType<typeof createMindmapStore>

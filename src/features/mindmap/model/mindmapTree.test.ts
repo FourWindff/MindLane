@@ -8,7 +8,7 @@ import {
   createInitialNodes,
   newId,
   reflowChildren,
-} from '../mindmapTree'
+} from './mindmapTree'
 
 // registry 副作用注册 text 节点类型
 import '@/features/mindmap/nodes/registry'

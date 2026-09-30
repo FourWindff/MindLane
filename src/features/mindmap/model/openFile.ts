@@ -1,7 +1,7 @@
 import { createMindmapStore, type MindmapStore } from './store'
 import { MindmapHistory } from './history'
 import { MindmapEditor } from './editor'
-import type { MindLaneFile } from '@/shared/lib/fileFormat'
+import type { MindLaneFile } from '@contracts/fileFormat'
 
 /**
  * 单个打开文件对应的导图实例，包含独立的 store、history 和 editor。

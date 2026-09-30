@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
-import { createEmptyFile } from '@/shared/lib/fileFormat'
+import { createEmptyFile } from '@contracts/fileFormat'
 import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '../store'
 

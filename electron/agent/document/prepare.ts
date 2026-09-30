@@ -1,6 +1,6 @@
 import path from 'node:path'
 import type { Document } from '@langchain/core/documents'
-import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { DocumentRef } from '@contracts/fileFormat'
 import { loadDocument, type DocumentLoaderRegistry, type DocumentSource } from './loaders.js'
 import { splitDocuments } from './split.js'
 import { batchDocuments } from './batch.js'

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore, type OpenFileState } from '../store'
 import { MindmapHistory } from '../history'
 import { MindmapEditor } from '../editor'
-import { serializeMindLaneFile } from '@/shared/lib/mindmapXml'
-import { MindmapXmlError } from '@/shared/lib/mindmapXml'
+import { serializeMindLaneFile } from '@contracts/mindmapXml'
+import { MindmapXmlError } from '@contracts/mindmapXml'
 
 describe('MindmapEditor XML 集成', () => {
   let store: ReturnType<typeof createMindmapStore>
@@ -328,7 +328,7 @@ describe('MindmapEditor XML 集成', () => {
       const file = store.getState().toMindLaneFile()
       const xml = serializeMindLaneFile(file)
 
-      const { deserializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+      const { deserializeMindLaneFile } = await import('@contracts/mindmapXml')
       const parsed = await deserializeMindLaneFile(xml)
       expect(parsed.metadata.title).toBe('测试')
       expect(parsed.mindmap.viewport).toEqual({ x: 5, y: 6, zoom: 0.9 })
@@ -420,7 +420,7 @@ describe('MindmapEditor XML 集成', () => {
 
       const file = store.getState().toMindLaneFile()
       const xml = serializeMindLaneFile(file)
-      const { deserializeMindLaneFile } = await import('@/shared/lib/mindmapXml')
+      const { deserializeMindLaneFile } = await import('@contracts/mindmapXml')
       const parsed = await deserializeMindLaneFile(xml)
 
       const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())

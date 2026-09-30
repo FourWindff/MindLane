@@ -10,7 +10,7 @@ import {
   type ChatSession,
   type ChatStreamEvent,
 } from '../aiStore'
-import type { ChatMessage } from '@/shared/lib/fileFormat'
+import type { ChatMessage } from '@contracts/fileFormat'
 import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
 
 vi.mock('@/features/mindmap/model/palaceRun', () => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatXmlError, MindmapXmlError } from '../index.js'
+import { formatXmlError, MindmapXmlError } from './index.js'
 
 describe('formatXmlError', () => {
   it('formats MindmapXmlError as [code] message', () => {

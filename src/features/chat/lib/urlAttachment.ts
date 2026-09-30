@@ -1,4 +1,4 @@
-import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { DocumentRef } from '@contracts/fileFormat'
 
 const ALLOWED_PROTOCOLS = new Set(['http:', 'https:'])
 

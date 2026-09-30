@@ -13,7 +13,7 @@ import {
 } from '@langchain/core/messages'
 import { logger } from '../../shared/logger.js'
 import { atomicWrite } from '../../fs/atomicWrite.js'
-import type { ChatMessage, ChatToolCall } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage, ChatToolCall } from '../../../contracts/fileFormat.js'
 
 export interface SessionMeta {
   id: string

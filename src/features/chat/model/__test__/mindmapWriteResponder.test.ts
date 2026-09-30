@@ -4,10 +4,10 @@ import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import { MindmapEditor as RealMindmapEditor } from '@/features/mindmap/model/editor'
 import { MindmapHistory } from '@/features/mindmap/model/history'
 import { createMindmapStore } from '@/features/mindmap/model/store'
-import { MindmapXmlError, formatXmlError } from '@/shared/lib/mindmapXml'
-import type { MindmapWriteRequest } from '../../../../../electron/ipc'
+import { MindmapXmlError, formatXmlError } from '@contracts/mindmapXml'
+import type { MindmapWriteRequest } from '@contracts/ipc'
 import { createMindmapWriteResponder, insertPalacePlaceholder } from '../mindmapWriteResponder'
-import { serializePalaceNodeXml } from '@/shared/lib/mindmapXml'
+import { serializePalaceNodeXml } from '@contracts/mindmapXml'
 
 /** 可观察的假编辑器：记录方法调用，state 可注入，落图方法可挂起/放行。 */
 function createFakeEditor() {

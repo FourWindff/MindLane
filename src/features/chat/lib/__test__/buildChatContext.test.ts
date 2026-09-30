@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { useWorkspaceStore } from '@/app/workspace/store'
-import { createEmptyFile } from '@/shared/lib/fileFormat'
+import { createEmptyFile } from '@contracts/fileFormat'
 import { buildChatContext } from '../buildChatContext'
 
 describe('buildChatContext workspace files', () => {

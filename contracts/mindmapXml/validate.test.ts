@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import type { Edge, Node } from '@xyflow/react'
-import { parseXmlFragment } from '../deserializer'
-import { validateFragmentForInsert, validateMove, buildValidationContext } from '../validate'
+import { parseXmlFragment } from './deserializer.js'
+import type { MindmapXmlEdge, MindmapXmlNode } from './types.js'
+import { validateFragmentForInsert, validateMove, buildValidationContext } from './validate'
 
-function makeNode(id: string, label = id): Node {
+function makeNode(id: string, label = id): MindmapXmlNode {
   return { id, type: 'text', position: { x: 0, y: 0 }, data: { label } }
 }
 
@@ -55,7 +55,7 @@ describe('validateFragmentForInsert', () => {
 
 describe('validateMove', () => {
   const nodes = [makeNode('root'), makeNode('a'), makeNode('b'), makeNode('c')]
-  const edges: Edge[] = [
+  const edges: MindmapXmlEdge[] = [
     { id: 'e1', source: 'root', target: 'a', type: 'mindmap' },
     { id: 'e2', source: 'a', target: 'b', type: 'mindmap' },
   ]

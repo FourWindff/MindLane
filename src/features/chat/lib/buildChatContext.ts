@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '@/app/workspace/store'
 import type { WorkspaceTreeEntry } from '@/app/workspace/types'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { extractNodeInfoCompact } from '@/features/chat/lib/chatUtils'
-import type { ChatContext, WorkspaceFileInfo } from '../../../../electron/ipc'
+import type { ChatContext, WorkspaceFileInfo } from '@contracts/ipc'
 
 /** Flatten the workspace tree to the file list the model sees (nested files included). */
 function collectWorkspaceFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileInfo[] {

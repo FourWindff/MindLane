@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { extractSvgArtifact, svgToDataUrl } from '../svgArtwork.js'
-import { isValidSvgArtwork } from '../../../../src/shared/lib/mindmapXml/svg.js'
+import { isValidSvgArtwork } from '../../../../contracts/mindmapXml/svg.js'
 
 const svg = '<svg viewBox="0 0 1000 1000"><g data-station="1"/></svg>'
 

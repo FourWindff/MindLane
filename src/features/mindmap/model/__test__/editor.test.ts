@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMindmapStore } from '../store'
 import { MindmapHistory } from '../history'
 import { MindmapEditor } from '../editor'
-import { getChildIdsOrdered } from '@/shared/lib/mindmapTree'
-import { createEmptyFile } from '@/shared/lib/fileFormat'
+import { getChildIdsOrdered } from '@/features/mindmap/model/mindmapTree'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('MindmapEditor', () => {
   let store: ReturnType<typeof createMindmapStore>

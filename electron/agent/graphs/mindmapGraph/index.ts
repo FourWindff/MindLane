@@ -19,7 +19,7 @@ import { MindmapInputResolver } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId, requireStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
-import type { ChatToolCallStep } from '../../../../src/shared/lib/fileFormat.js'
+import type { ChatToolCallStep } from '../../../../contracts/fileFormat.js'
 import { SUBGRAPH_PROGRESS_EVENT, type SubgraphProgressStep } from '../../../ipc.js'
 import { buildSubgraphToolMessage } from '../../subgraphRouter.js'
 

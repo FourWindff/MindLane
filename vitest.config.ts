@@ -5,10 +5,15 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['vitest.setup.ts'],
+    // Test layout: a test lives next to the module it covers (`store.ts` + `store.test.ts`
+    // in the same directory). Test-only helpers use the `.testutil.ts` suffix, integration
+    // tests keep `*.integration.test.ts`. The `__test__/` directories are the legacy layout --
+    // they still run, but new tests do not go there (shrink-only).
     include: [
-      'electron/**/__test__/**/*.test.ts',
-      'src/**/__test__/**/*.test.ts',
-      'src/**/__test__/**/*.test.tsx',
+      'electron/**/*.test.ts',
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'contracts/**/*.test.ts',
     ],
     testTimeout: 120000,
     hookTimeout: 60000,
@@ -23,6 +28,7 @@ export default defineConfig({
     tsconfigPaths: true,
     alias: {
       '@': '/src',
+      '@contracts': '/contracts',
     },
   },
 })

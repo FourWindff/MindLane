@@ -1,6 +1,6 @@
 import type { ChatContext } from '../../../ipc.js'
 import { MemoryManager } from '../../memory/memoryManager.js'
-import { xmlNodeTypeRegistry } from '../../../../src/shared/lib/mindmapXml/registry.js'
+import { xmlNodeTypeRegistry } from '../../../../contracts/mindmapXml/registry.js'
 
 const MEMORY_TAG = 'MEMORY'
 

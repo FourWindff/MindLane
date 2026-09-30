@@ -6,8 +6,8 @@ import {
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { resumePalaceRun, stopPalaceRun } from '@/features/mindmap/model/palaceRun'
-import { assetToDataUrl } from '@/shared/lib/mindmapXml/asset'
-import type { PalaceNodeData } from './types'
+import { assetToDataUrl } from '@contracts/mindmapXml/asset'
+import type { PalaceNodeData } from '@contracts/nodeData'
 
 type TransitionPhase = 'collapsed' | 'expanding' | 'expanded' | 'collapsing'
 

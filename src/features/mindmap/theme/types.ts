@@ -4,12 +4,18 @@
  *   visualVariant（视觉）：card 卡片 | outline 线框 | minimal 极简 —— 只影响节点/边/间距
  *
  * 配色方案 colorScheme 与两者正交。
+ *
+ * 持久化形状（structureType/visualVariant/colorScheme）住在契约层，与文件格式
+ * 同一份定义；本模块只保留界面描述符。
  */
-export type StructureType = 'logic' | 'mindmap'
-export type VisualVariant = 'card' | 'outline' | 'minimal'
+import type { ColorSchemeId, StructureType, VisualVariant } from '@contracts/mindmapStyle'
 
-/** 配色方案 */
-export type ColorSchemeId = 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
+export type {
+  ColorSchemeId,
+  MindmapStyleState,
+  StructureType,
+  VisualVariant,
+} from '@contracts/mindmapStyle'
 
 /** 边路径算法 */
 type EdgePathKind = 'bezier' | 'smooth-step' | 'step'
@@ -44,10 +50,4 @@ export interface ColorSchemeDef {
   id: ColorSchemeId
   label: string
   /** 在选色器中显示的代表色 */
-}
-
-export interface MindmapStyleState {
-  structureType: StructureType
-  visualVariant: VisualVariant
-  colorScheme: ColorSchemeId
 }

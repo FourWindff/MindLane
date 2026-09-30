@@ -6,7 +6,6 @@
  * - `deserializeMindLaneFile`：文件面，严格 XML parser。
  */
 
-import type { Edge, Node } from '@xyflow/react'
 import type { MindLaneFile, MindLaneNode } from '../fileFormat.js'
 import { unescapeXml } from './escape.js'
 import { findUnescapedInAttrValues, normalizeSelfClosingTags } from './normalize.js'
@@ -22,20 +21,23 @@ import {
   MINDLANE_XML_VERSION,
   MindmapXmlError,
   NODE_TAG,
+  type MindmapXmlEdge,
+  type MindmapXmlNode,
   type XmlElementLike,
 } from './types.js'
-import { newId } from '../mindmapTree.js'
+import type { DomElementLike } from './dom.js'
+import { newId } from '../ids.js'
 
 /** 片段解析产物（insertFromXml 复用布局/聚合/历史）。 */
 export interface ParsedFragment {
-  nodes: Node[]
-  edges: Edge[]
+  nodes: MindmapXmlNode[]
+  edges: MindmapXmlEdge[]
   /** 子树根节点 ID 列表（单根 1 个，多根多个） */
   rootIds: string[]
 }
 
 /** 把 DOM 元素折叠为解析器无关的视图。 */
-function elementView(el: Element): XmlElementLike {
+function elementView(el: DomElementLike): XmlElementLike {
   const attrs: Record<string, string> = {}
   for (const attr of Array.from(el.attributes)) {
     // HTML parser 会把属性名小写化；保留原名 + 小写键双索引，读取时大小写不敏感
@@ -48,7 +50,7 @@ function elementView(el: Element): XmlElementLike {
   let text = ''
   for (const child of Array.from(el.childNodes)) {
     if (child.nodeType === 1) {
-      elements.push(elementView(child as Element))
+      elements.push(elementView(child as DomElementLike))
     } else if (child.nodeType === 3) {
       text += child.textContent ?? ''
     }
@@ -56,7 +58,7 @@ function elementView(el: Element): XmlElementLike {
   return { tag: el.tagName.toLowerCase(), attrs, text: text.trim(), elements }
 }
 
-function isNodeElement(el: Element): boolean {
+function isNodeElement(el: DomElementLike): boolean {
   return el.tagName.toLowerCase() === NODE_TAG
 }
 
@@ -75,13 +77,13 @@ function assertFragmentTreeValid(seenIds: Set<string>, id: string, allowRoot = f
   seenIds.add(id)
 }
 
-/** 从单个 <node> 元素递归构建 ReactFlow Node + 边。 */
+/** 从单个 <node> 元素递归构建节点 + 边。 */
 function nodeFromElement(
-  el: Element,
+  el: DomElementLike,
   seenIds: Set<string>,
   parentId: string | null,
   allowRoot = false,
-): { node: Node; edges: Edge[] } {
+): { node: MindmapXmlNode; edges: MindmapXmlEdge[] } {
   const view = elementView(el)
   const { attrs, elements } = view
 
@@ -113,14 +115,14 @@ function nodeFromElement(
     )
   }
 
-  const node: Node = {
+  const node: MindmapXmlNode = {
     id,
     type,
     position: { x: 0, y: 0 },
     data,
   }
 
-  const edges: Edge[] = []
+  const edges: MindmapXmlEdge[] = []
   if (parentId) {
     edges.push({ id: `e-${parentId}-${id}`, source: parentId, target: id, type: 'mindmap' })
   }
@@ -129,7 +131,7 @@ function nodeFromElement(
     if (!isNodeElement(childEl)) continue
     const sub = nodeFromElement(childEl, seenIds, id, allowRoot)
     edges.push(...sub.edges)
-    const data = node.data as Record<string, unknown> & { __children?: Node[] }
+    const data = node.data as Record<string, unknown> & { __children?: MindmapXmlNode[] }
     data.__children ??= []
     data.__children.push(sub.node)
   }
@@ -139,12 +141,12 @@ function nodeFromElement(
 
 /** 把一组候选元素中的 <node> 顶层元素解析为节点/边（片段面与文件面共用）。 */
 function collectNodes(
-  candidates: Iterable<Element>,
+  candidates: Iterable<DomElementLike>,
   allowRoot: boolean,
-): { nodes: Node[]; edges: Edge[]; rootIds: string[] } {
+): { nodes: MindmapXmlNode[]; edges: MindmapXmlEdge[]; rootIds: string[] } {
   const seenIds = new Set<string>()
-  const nodes: Node[] = []
-  const edges: Edge[] = []
+  const nodes: MindmapXmlNode[] = []
+  const edges: MindmapXmlEdge[] = []
   const rootIds: string[] = []
 
   for (const el of candidates) {
@@ -158,10 +160,10 @@ function collectNodes(
 }
 
 /** 展开 `__children` 中间态为平铺 nodes（父先于子）。 */
-function flattenChildren(nodes: Node[]): Node[] {
-  const flat: Node[] = []
-  const visit = (n: Node) => {
-    const children = ((n.data as Record<string, unknown>).__children ?? []) as Node[]
+function flattenChildren(nodes: MindmapXmlNode[]): MindmapXmlNode[] {
+  const flat: MindmapXmlNode[] = []
+  const visit = (n: MindmapXmlNode) => {
+    const children = ((n.data as Record<string, unknown>).__children ?? []) as MindmapXmlNode[]
     delete (n.data as Record<string, unknown>).__children
     flat.push(n)
     for (const child of children) visit(child)
@@ -200,11 +202,11 @@ export async function parseXmlFragment(xml: string): Promise<ParsedFragment> {
 
 // ─── 文件面 ──────────────────────────────────────────────────────────────────
 
-function sectionElement(doc: ParsedDocumentLike, tag: string): Element | undefined {
+function sectionElement(doc: ParsedDocumentLike, tag: string): DomElementLike | undefined {
   return Array.from(doc.documentElement.children).find((el) => el.tagName.toLowerCase() === tag)
 }
 
-function childElementText(el: Element, tag: string): string | undefined {
+function childElementText(el: DomElementLike, tag: string): string | undefined {
   const lowerTag = tag.toLowerCase()
   for (const child of Array.from(el.children)) {
     if (child.tagName.toLowerCase() === lowerTag) {
@@ -214,11 +216,11 @@ function childElementText(el: Element, tag: string): string | undefined {
   return undefined
 }
 
-function childElements(el: Element, tag: string): Element[] {
+function childElements(el: DomElementLike, tag: string): DomElementLike[] {
   return Array.from(el.children).filter((child) => child.tagName.toLowerCase() === tag)
 }
 
-function parseMetadata(el: Element | undefined, fileUuid: string): MindLaneFile['metadata'] {
+function parseMetadata(el: DomElementLike | undefined, fileUuid: string): MindLaneFile['metadata'] {
   const metadata: MindLaneFile['metadata'] = {
     fileUuid,
     title: '未命名',
@@ -233,7 +235,7 @@ function parseMetadata(el: Element | undefined, fileUuid: string): MindLaneFile[
   return metadata
 }
 
-function parseViewport(el: Element | undefined): { x: number; y: number; zoom: number } {
+function parseViewport(el: DomElementLike | undefined): { x: number; y: number; zoom: number } {
   const vp = { x: 0, y: 0, zoom: 1 }
   if (!el) return vp
   const x = Number(el.getAttribute('x'))
@@ -245,7 +247,7 @@ function parseViewport(el: Element | undefined): { x: number; y: number; zoom: n
   return vp
 }
 
-function parseStyle(el: Element | undefined): MindLaneFile['mindmap']['style'] {
+function parseStyle(el: DomElementLike | undefined): MindLaneFile['mindmap']['style'] {
   if (!el) return undefined
   const structureType = el.getAttribute('structureType')
   const visualVariant = el.getAttribute('visualVariant')
@@ -260,7 +262,7 @@ function parseStyle(el: Element | undefined): MindLaneFile['mindmap']['style'] {
   } as MindLaneFile['mindmap']['style']
 }
 
-function parseAsset(el: Element): NonNullable<MindLaneFile['assets']>[number] {
+function parseAsset(el: DomElementLike): NonNullable<MindLaneFile['assets']>[number] {
   return {
     id: el.getAttribute('id') ?? newId(),
     mime: el.getAttribute('mime') ?? 'image/png',
@@ -269,7 +271,7 @@ function parseAsset(el: Element): NonNullable<MindLaneFile['assets']>[number] {
   }
 }
 
-function parseDocument(el: Element): MindLaneFile['documents'][number] {
+function parseDocument(el: DomElementLike): MindLaneFile['documents'][number] {
   const doc: MindLaneFile['documents'][number] = {
     id: el.getAttribute('id') ?? '',
     type: (el.getAttribute('type') as MindLaneFile['documents'][number]['type']) ?? 'text',
@@ -290,9 +292,9 @@ function parseDocument(el: Element): MindLaneFile['documents'][number] {
 }
 
 /** 解析 mindmap 节（严格：恰好一棵树，根节点固定 id="root"）。 */
-function parseMindmapSection(el: Element | undefined): {
+function parseMindmapSection(el: DomElementLike | undefined): {
   nodes: MindLaneNode[]
-  edges: MindLaneEdgeLike[]
+  edges: MindmapXmlEdge[]
 } {
   if (!el) return { nodes: [], edges: [] }
   const { nodes, edges, rootIds } = collectNodes(Array.from(el.children), true)
@@ -333,13 +335,6 @@ function parseMindmapSection(el: Element | undefined): {
       type: e.type,
     })),
   }
-}
-
-interface MindLaneEdgeLike {
-  id: string
-  source: string
-  target: string
-  type?: string
 }
 
 /**

@@ -1,7 +1,7 @@
 import dagre from 'dagre'
 import type { Edge, Node } from '@xyflow/react'
-import { CHILD_GAP_Y, CHILD_OFFSET_X, reflowChildren } from '@/shared/lib/mindmapTree'
-import { defaultNodeSize } from '@/shared/lib/nodeSize'
+import { CHILD_GAP_Y, CHILD_OFFSET_X, reflowChildren } from '@/features/mindmap/model/mindmapTree'
+import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
 
 type MindmapStructureType = 'logic' | 'mindmap'
 

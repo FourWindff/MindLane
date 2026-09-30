@@ -8,6 +8,7 @@
 
 export { MindmapXmlError, NODE_TAG } from './types.js'
 export type { MindLaneAsset } from './types.js'
+export type { DomElementLike, DomNodeLike, ParsedDocumentLike } from './dom.js'
 export { formatXmlError } from './errors.js'
 export { escapeXml } from './escape.js'
 export { normalizeSelfClosingTags } from './normalize.js'

@@ -1,5 +1,5 @@
 import { ToolMessage } from '@langchain/core/messages'
-import type { ChatToolCallStep } from '../../src/shared/lib/fileFormat.js'
+import type { ChatToolCallStep } from '../../contracts/fileFormat.js'
 import {
   createGenerateMindmapFragmentTool,
   createGeneratePalaceTool,

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ChatStreamEvent, PalaceRunPayload } from '../../../../../electron/ipc'
+import type { ChatStreamEvent } from '@contracts/ipc'
+import type { PalaceRunPayload } from '@contracts/palace'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import { handlePalaceRunEvent, resumePalaceRun, startPalaceRun, stopPalaceRun } from '../palaceRun'

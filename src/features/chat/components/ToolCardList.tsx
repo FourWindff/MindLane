@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Ban, Check, ChevronDown, ChevronRight, X } from 'lucide-react'
-import type { ChatToolCall, ChatToolCallStep } from '@/shared/lib/fileFormat'
+import type { ChatToolCall, ChatToolCallStep } from '@contracts/fileFormat'
 import { isSubgraphTool, toolDisplayName } from '@/features/chat/lib/chatUtils'
 import { cx } from '@/features/chat/lib/cx'
 import { stageDisplayName } from '@/shared/lib/stageLabels'

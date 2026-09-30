@@ -3,7 +3,7 @@ import type { BaseMessage } from '@langchain/core/messages'
 import { SessionMessageStore, type SessionMeta } from './sessionMessageStore.js'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
 import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
-import type { ChatMessage } from '../../../src/shared/lib/fileFormat.js'
+import type { ChatMessage } from '../../../contracts/fileFormat.js'
 
 /**
  * 聊天历史管理器 - JSONL 版本

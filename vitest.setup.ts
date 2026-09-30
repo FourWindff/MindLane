@@ -1,5 +1,5 @@
 import { DOMParser as LinkedomDOMParser } from 'linkedom'
-import { registerXmlDomParser } from './src/shared/lib/mindmapXml/parser'
+import { registerXmlDomParser } from './contracts/mindmapXml/parser'
 
 /**
  * 测试环境（Electron-as-Node）没有全局 DOMParser：注入 linkedom，

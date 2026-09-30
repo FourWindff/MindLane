@@ -1,5 +1,5 @@
 import path from 'node:path'
-import type { DocumentRef } from '../../src/shared/lib/fileFormat.js'
+import type { DocumentRef } from '../../contracts/fileFormat.js'
 
 /** Extension (leading dot included) → document type. Also drives the open-dialog filter list. */
 export const documentTypeByExtension: Record<string, DocumentRef['type']> = {

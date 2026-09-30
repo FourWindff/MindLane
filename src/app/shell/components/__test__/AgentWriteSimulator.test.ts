@@ -3,7 +3,7 @@ import { MindmapEditor } from '@/features/mindmap/model/editor'
 import { MindmapHistory } from '@/features/mindmap/model/history'
 import { createMindmapStore } from '@/features/mindmap/model/store'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
-import type { PalaceNodeData } from '@/features/mindmap/nodes/palace/types'
+import type { PalaceNodeData } from '@contracts/nodeData'
 import { simulatePalaceInsert } from '../AgentWriteSimulator'
 
 describe('simulatePalaceInsert', () => {

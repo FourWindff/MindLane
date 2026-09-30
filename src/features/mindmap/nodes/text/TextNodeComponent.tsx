@@ -10,7 +10,7 @@ import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore
 import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
 import { getNodeColor } from '@/features/mindmap/theme/colorPalettes'
 import { useNodeGlide, usePrefersReducedMotion } from '@/features/mindmap/hooks/useNodeMotion'
-import type { TextNodeData } from './types'
+import type { TextNodeData } from '@contracts/nodeData'
 
 function TextNodeInner({
   id,

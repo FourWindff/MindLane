@@ -17,7 +17,8 @@ import {
   normalizeSelfClosingTags,
   parseXmlTolerant,
   topLevelElements,
-} from '../../../src/shared/lib/mindmapXml/index.js'
+  type DomElementLike,
+} from '../../../contracts/mindmapXml/index.js'
 
 /** 子图内部树类型（ADR-0016：降为 {label, children}，page_range/summary 已删）。 */
 export interface MindmapOutlineNode {
@@ -28,12 +29,12 @@ export interface MindmapOutlineNode {
 type MindmapOutlineParseResult =
   { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string }
 
-function isNodeElement(el: Element): boolean {
+function isNodeElement(el: DomElementLike): boolean {
   return el.tagName.toLowerCase() === NODE_TAG
 }
 
 /** 元素 label = 直接文本子节点拼接后 trim（嵌套 <node> 由 children 承载，不算 label）。 */
-function elementLabel(el: Element): string {
+function elementLabel(el: DomElementLike): string {
   let text = ''
   for (const child of Array.from(el.childNodes)) {
     if (child.nodeType === 3) text += child.textContent ?? ''
@@ -90,7 +91,7 @@ export function parseOutlineXml(text: string, fallbackTitle: string): MindmapOut
 
 /** 递归转换单个 <node> 元素；任一层级协议违例（属性/空 label）即整体失败。 */
 function nodeFromElement(
-  el: Element,
+  el: DomElementLike,
 ): { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string } {
   for (const attr of Array.from(el.attributes)) {
     return {
@@ -107,8 +108,8 @@ function nodeFromElement(
   const children: MindmapOutlineNode[] = []
   for (const child of Array.from(el.childNodes)) {
     if (child.nodeType !== 1) continue
-    if (!isNodeElement(child as Element)) continue
-    const sub = nodeFromElement(child as Element)
+    if (!isNodeElement(child as DomElementLike)) continue
+    const sub = nodeFromElement(child as DomElementLike)
     if (!sub.ok) return sub
     children.push(sub.tree)
   }

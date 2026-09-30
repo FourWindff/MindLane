@@ -1,7 +1,7 @@
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { useWorkspaceStore } from '@/app/workspace/store'
 import { displayFileName } from '@/shared/lib/displayFileName'
-import type { DocumentRef } from '@/shared/lib/fileFormat'
+import type { DocumentRef } from '@contracts/fileFormat'
 
 /**
  * Entry conversation (CONTEXT.md「入口对话」): with no file open the send box is

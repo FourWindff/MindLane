@@ -6,7 +6,7 @@ import {
   type DocumentRef,
   type MindLaneAsset,
   migrateDocumentRef,
-} from '@/shared/lib/fileFormat'
+} from '@contracts/fileFormat'
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 import { DEFAULT_STYLE } from '@/features/mindmap/theme/presets'
 import type { MindmapStyleState } from '@/features/mindmap/theme/types'

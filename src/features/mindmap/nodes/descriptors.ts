@@ -3,9 +3,7 @@ import type { NodeProps } from '@xyflow/react'
 import { TextNodeComponent } from './text/TextNodeComponent'
 import { ImageNodeComponent } from './image/ImageNodeComponent'
 import { PalaceNodeComponent } from './palace/PalaceNodeComponent'
-import type { TextNodeData } from './text/types'
-import type { ImageNodeData } from './image/types'
-import type { PalaceNodeData } from './palace/types'
+import type { TextNodeData, ImageNodeData, PalaceNodeData } from '@contracts/nodeData'
 
 /** 一个节点类型：React Flow 渲染组件 + 落盘序列化。 */
 export interface NodeTypeDescriptor<
