@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/__test__/registryReset'
 import { createEmptyFile } from '@contracts/fileFormat'
 import { deriveChatCapsuleEntries, useAiStore } from '@/features/chat/model/aiStore'
+import { connectChatWorkspaceSync } from '@/features/chat/model/workspaceSync'
 import { useWorkspaceStore } from '../store'
 
 type WorkspaceApiOverrides = Partial<{
@@ -180,6 +181,8 @@ describe('workspace switch restore protocol', () => {
 })
 
 describe('file deletion capsule cleanup', () => {
+  let disconnectWorkspaceSync: () => void
+
   beforeEach(() => {
     resetRegistry()
     useWorkspaceStore.setState({ busy: false, lastError: null })
@@ -191,6 +194,13 @@ describe('file deletion capsule cleanup', () => {
       currentFileUuid: null,
       currentFilePath: null,
     })
+    // The composition root registers the workspace → chat projection; without it
+    // the workspace store no longer pokes chat itself.
+    disconnectWorkspaceSync = connectChatWorkspaceSync()
+  })
+
+  afterEach(() => {
+    disconnectWorkspaceSync()
   })
 
   it('drops the deleted file from the capsule projection once the mapping is pruned', async () => {

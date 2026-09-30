@@ -474,7 +474,7 @@ export const useAiStore = create<AiState>((set, get) => ({
       filePaths: { ...state.filePaths, [fileUuid]: filePath },
     })),
 
-  /** Persisted mapping + in-memory path updated together (called via the bridge by the workspace store after rename/move). */
+  /** Persisted mapping + in-memory path updated together (called by workspaceSync after rename/move). */
   updateFileUuidPath: (fileUuid, filePath) =>
     set((state) => ({
       ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),

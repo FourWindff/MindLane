@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { createEmptyFile, type MindLaneFile } from '@contracts/fileFormat'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
-import { useAiStore } from '@/features/chat/model/aiStore'
 import type { WorkspaceTreeEntry, WorkspaceSessionState } from './types'
 
 type WorkspaceSwitchResult =
@@ -192,8 +191,6 @@ async function applyWorkspaceSession(
   const sessionData = session ?? makeFallbackSession(result.data.workspacePath, null)
   await syncWorkspaceState(sessionData)
   clearMindLaneFile()
-  // 切换 workspace：拉取新 workspace 的全量会话与 fileUuidPaths，刷新胶囊条。
-  void useAiStore.getState().refreshCapsuleData()
   return true
 }
 
@@ -232,8 +229,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       }
 
       set({ initialized: true, initializing: false })
-      // 启动恢复：拉取当前 workspace 的全量会话与 fileUuidPaths，刷新胶囊条。
-      void useAiStore.getState().refreshCapsuleData()
     } catch (error) {
       clearMindLaneFile()
       set({
@@ -472,8 +467,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       const tree = await listWorkspaceTree(workspacePath)
       set({ tree })
-      // 删除后重拉胶囊条输入（持久映射已被主进程 prune，会话仍在，重新投影即隐藏已删文件的胶囊）。
-      void useAiStore.getState().refreshCapsuleData()
       return true
     } finally {
       set({ busy: false })
@@ -501,14 +494,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       const renamedInstance = openFileRegistry.get(oldPath)
       if (renamedInstance) {
-        const fileUuid = renamedInstance.store.getState().fileUuid
         renamedInstance.store.getState().setFilePath(result.data.newPath)
         openFileRegistry.renameKey(oldPath, result.data.newPath)
-        useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
-        // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次重命名。
-        void window.mindlane?.workspace
-          .updateFileUuidPath({ workspacePath, fileUuid, filePath: result.data.newPath })
-          .catch(() => {})
       }
 
       const tree = await listWorkspaceTree(workspacePath)
@@ -540,14 +527,8 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       const movedInstance = openFileRegistry.get(sourcePath)
       if (movedInstance) {
-        const fileUuid = movedInstance.store.getState().fileUuid
         movedInstance.store.getState().setFilePath(result.data.newPath)
         openFileRegistry.renameKey(sourcePath, result.data.newPath)
-        useAiStore.getState().updateFileUuidPath(fileUuid, result.data.newPath)
-        // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次移动。
-        void window.mindlane?.workspace
-          .updateFileUuidPath({ workspacePath, fileUuid, filePath: result.data.newPath })
-          .catch(() => {})
       }
 
       const tree = await listWorkspaceTree(workspacePath)
