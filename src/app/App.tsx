@@ -25,6 +25,7 @@ import {
   useAiStore,
 } from '@/features/chat/model/aiStore'
 import { connectAiWritingProjection } from '@/features/chat/model/aiWritingProjection'
+import { usePalaceGeneration } from '@/features/chat/model/usePalaceGeneration'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
@@ -116,7 +117,10 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const chatOpen = useAiStore((s) => s.chatOpen)
   const capsuleExpanded = useAiStore((s) => s.capsuleExpanded)
+  const setChatOpen = useAiStore((s) => s.setChatOpen)
   const setCapsuleExpanded = useAiStore((s) => s.setCapsuleExpanded)
+  // Palace generation is chat orchestration; the mindmap only emits the intent.
+  const generatePalace = usePalaceGeneration()
   // AI 服务就绪：启动时经桥读取一次，只读向下传递（不建状态机）。
   const [aiReady, setAiReady] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
@@ -125,6 +129,7 @@ function AppContent() {
   const workspacePath = useWorkspaceStore((s) => s.workspacePath)
   const switchWorkspace = useWorkspaceStore((s) => s.openWorkspaceDirectory)
   const syncAfterFileSaved = useWorkspaceStore((s) => s.syncAfterFileSaved)
+  const updateFilePreviewUrl = useWorkspaceStore((s) => s.updateFilePreviewUrl)
   const restoreLastWorkspaceOnLaunch = useWorkspaceStore((s) => s.restoreLastWorkspaceOnLaunch)
   const setRestoreLastWorkspaceOnLaunch = useWorkspaceStore(
     (s) => s.setRestoreLastWorkspaceOnLaunch,
@@ -239,6 +244,12 @@ function AppContent() {
                 <MindmapView
                   onSwitchWorkspace={() => void switchWorkspace()}
                   onOpenSettings={() => setSettingsOpen(true)}
+                  onGeneratePalace={generatePalace}
+                  syncAfterFileSaved={syncAfterFileSaved}
+                  updateFilePreviewUrl={updateFilePreviewUrl}
+                  chatOpen={chatOpen}
+                  capsuleExpanded={capsuleExpanded}
+                  onToggleChatOpen={() => setChatOpen(!chatOpen)}
                   aiReady={aiReady}
                 />
               ) : (

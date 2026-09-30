@@ -4,18 +4,6 @@ import ReactDOMServer from 'react-dom/server'
 
 let runEffect: (() => void | (() => void)) | undefined
 
-// The header reads the chat panel flags from the ai store; the component is
-// called as a plain function here, so the store hook must not be a real hook.
-const chatState = vi.hoisted(() => ({
-  chatOpen: true,
-  capsuleExpanded: false,
-  setChatOpen: vi.fn(),
-}))
-
-vi.mock('@/features/chat/model/aiStore', () => ({
-  useAiStore: (selector: (state: typeof chatState) => unknown) => selector(chatState),
-}))
-
 vi.mock('react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react')>()
   return {
@@ -43,6 +31,9 @@ const defaultProps = {
   canAddChild: true,
   canAddSibling: true,
   canRemove: true,
+  chatOpen: true,
+  capsuleExpanded: false,
+  onToggleChatOpen: vi.fn(),
 }
 
 describe('MindmapHeader style panel dismissal', () => {
@@ -54,8 +45,6 @@ describe('MindmapHeader style panel dismissal', () => {
 
   beforeEach(() => {
     runEffect = undefined
-    chatState.chatOpen = true
-    chatState.capsuleExpanded = false
     pointerDown = undefined
     addEventListener.mockClear()
     removeEventListener.mockClear()
@@ -104,17 +93,17 @@ describe('MindmapHeader style panel dismissal', () => {
     expect(addEventListener).not.toHaveBeenCalled()
   })
 
-  it('owns the chat toggle and enters the capsule-compressed state', () => {
-    chatState.capsuleExpanded = true
-    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} />)
+  it('compresses the header while the capsule is expanded', () => {
+    const html = ReactDOMServer.renderToString(
+      <MindmapHeader {...defaultProps} capsuleExpanded={true} />,
+    )
 
     expect(html).toContain('mindmap-header--capsule-expanded')
     expect(html).toContain('aria-label="隐藏聊天"')
   })
 
-  it('restores the regular header state when capsules collapse', () => {
-    chatState.chatOpen = false
-    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} />)
+  it('restores the regular header state when the chat panel is collapsed', () => {
+    const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} chatOpen={false} />)
 
     expect(html).not.toContain('mindmap-header--capsule-expanded')
     expect(html).toContain('aria-label="显示聊天"')

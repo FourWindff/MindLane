@@ -9,17 +9,25 @@ import {
   useActiveMindmapStore,
 } from './useActiveOpenFile'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
-import { useWorkspaceStore } from '@/features/workspace/store'
 
-export function useMindmapAutoSave() {
+/**
+ * Save protocol and thumbnail refresh for the active document. The workspace
+ * observers are injected by the composition root: this feature sits below
+ * workspace and must not reach up into it.
+ */
+export function useMindmapAutoSave({
+  syncAfterFileSaved,
+  updateFilePreviewUrl,
+}: {
+  syncAfterFileSaved: (filePath: string) => Promise<void>
+  updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
+}) {
   const activeInstance = useActiveOpenFile()
   const aiBusy = useActiveFileAiWriting()
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)
   const dirty = useActiveMindmapStore((state) => state.dirty)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
-  const syncAfterFileSaved = useWorkspaceStore((state) => state.syncAfterFileSaved)
-  const updateFilePreviewUrl = useWorkspaceStore((state) => state.updateFilePreviewUrl)
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
   const hiddenRfInstanceRef = useRef<ReactFlowInstance | null>(null)
 

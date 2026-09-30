@@ -25,7 +25,6 @@ import {
   useActiveMindmapStore,
 } from './useActiveOpenFile'
 import { useMindmapAutoSave } from './useMindmapAutoSave'
-import { usePalaceGeneration } from './usePalaceGeneration'
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 import { MindmapEdge } from '@/features/mindmap/edges/MindmapEdge'
 import { isDefaultViewport } from '@contracts/fileFormat'
@@ -39,7 +38,21 @@ import { createMindmapOperationController } from '@/features/mindmap/model/opera
 import type { ContextMenuState } from '@/features/mindmap/components/ContextMenu'
 import type { PalaceNodeData } from '@contracts/nodeData'
 
-export function useMindmapView() {
+/** A selected topic node the view hands to the generate-palace intent. */
+export interface MindmapSelectedTopic {
+  id: string
+  label: string
+}
+
+export function useMindmapView({
+  onGeneratePalace,
+  syncAfterFileSaved,
+  updateFilePreviewUrl,
+}: {
+  onGeneratePalace: (topics: MindmapSelectedTopic[]) => void
+  syncAfterFileSaved: (filePath: string) => Promise<void>
+  updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
+}) {
   const nodeTypes = useMemo(() => canvasNodeRegistry.toReactFlowNodeTypes(), [])
   const edgeTypes = useMemo(() => ({ mindmap: MindmapEdge }), [])
   const reactFlowStore = useStoreApi()
@@ -151,8 +164,28 @@ export function useMindmapView() {
     [edges, hiddenNodeIds],
   )
 
-  const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapAutoSave()
-  const generatePalace = usePalaceGeneration({ nodes, selectedId, editor })
+  const { save, hiddenFlowRef, hiddenRfInstanceRef } = useMindmapAutoSave({
+    syncAfterFileSaved,
+    updateFilePreviewUrl,
+  })
+  // The view owns the selection, so it resolves the topic list and emits the
+  // generate intent; the chat orchestration itself is wired in by the root.
+  const generatePalace = useCallback(() => {
+    let selectedNodes = nodes
+      .filter((node) => node.selected && node.type === 'text')
+      .map((node) => ({ id: node.id, label: String(node.data?.label ?? '') }))
+    if (selectedNodes.length === 0 && selectedId) {
+      const target = nodes.find((node) => node.id === selectedId)
+      if (target?.type === 'text') {
+        selectedNodes = [{ id: target.id, label: String(target.data?.label ?? '') }]
+      }
+    }
+    if (selectedNodes.length === 0) {
+      reportRendererError('未选中任何主题节点')
+      return
+    }
+    onGeneratePalace(selectedNodes)
+  }, [nodes, selectedId, onGeneratePalace])
 
   useEffect(() => {
     if (!hasDocumentOpen || nodes.length === 0) return

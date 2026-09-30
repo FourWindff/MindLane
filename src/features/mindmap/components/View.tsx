@@ -9,17 +9,34 @@ import { HiddenThumbnailFlow } from './HiddenThumbnailFlow'
 import { StylePanel } from './StylePanel'
 import { DocumentRefsPanel } from './DocumentRefsPanel'
 import { useActiveMindmapStore } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { useMindmapView } from '@/features/mindmap/hooks/useMindmapView'
+import { useMindmapView, type MindmapSelectedTopic } from '@/features/mindmap/hooks/useMindmapView'
 
 /** Props of both the public view and its inner workspace component. */
 type MindmapViewProps = {
   onSwitchWorkspace?: () => void
   onOpenSettings?: () => void
+  /** Generate-palace intent; the orchestration lives in chat and is wired by the root. */
+  onGeneratePalace: (topics: MindmapSelectedTopic[]) => void
+  syncAfterFileSaved: (filePath: string) => Promise<void>
+  updateFilePreviewUrl: (filePath: string, previewUrl: string) => void
+  chatOpen: boolean
+  capsuleExpanded: boolean
+  onToggleChatOpen: () => void
   aiReady: boolean
 }
 
-function MindmapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
-  const view = useMindmapView()
+function MindmapWorkspace({
+  onSwitchWorkspace,
+  onOpenSettings,
+  onGeneratePalace,
+  syncAfterFileSaved,
+  updateFilePreviewUrl,
+  chatOpen,
+  capsuleExpanded,
+  onToggleChatOpen,
+  aiReady,
+}: MindmapViewProps) {
+  const view = useMindmapView({ onGeneratePalace, syncAfterFileSaved, updateFilePreviewUrl })
   const { visualVariant, colorScheme } = useActiveMindmapStore((s) => s.style)
 
   return (
@@ -32,6 +49,9 @@ function MindmapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: Mindma
         onRedo={view.actions.redo}
         onOpenSettings={onOpenSettings}
         onSwitchWorkspace={onSwitchWorkspace}
+        chatOpen={chatOpen}
+        capsuleExpanded={capsuleExpanded}
+        onToggleChatOpen={onToggleChatOpen}
         onSave={view.actions.save}
         onCenterRoot={() => void view.actions.centerRoot()}
         onToggleStylePanel={view.actions.toggleStylePanel}
@@ -119,14 +139,10 @@ function MindmapWorkspace({ onSwitchWorkspace, onOpenSettings, aiReady }: Mindma
   )
 }
 
-export function MindmapView({ onSwitchWorkspace, onOpenSettings, aiReady }: MindmapViewProps) {
+export function MindmapView(props: MindmapViewProps) {
   return (
     <ReactFlowProvider>
-      <MindmapWorkspace
-        onSwitchWorkspace={onSwitchWorkspace}
-        onOpenSettings={onOpenSettings}
-        aiReady={aiReady}
-      />
+      <MindmapWorkspace {...props} />
     </ReactFlowProvider>
   )
 }
