@@ -95,7 +95,11 @@ describe('AI writing projection', () => {
       activeStreamIds: {},
       workspacePath: '/workspace',
     })
-    useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+    useSettingsStore.setState({
+      loaded: true,
+      providerConfigs: { dashscope: { apiKey: 'test-key' } },
+      chatModel: 'test-model',
+    })
     // The stream events reach the store through the app's start-up wiring.
     installStreamApi()
     disconnectAiStore = connectAiStore(openFileRegistry)

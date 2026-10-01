@@ -18,7 +18,12 @@ const mockState = vi.hoisted(() => ({
     inputDraft: '',
     setInputDraft: vi.fn(),
   },
-  settings: { loaded: true, apiKey: 'test-key', chatModel: 'test-model' },
+  settings: {
+    loaded: true,
+    activeChatProvider: 'dashscope',
+    providerConfigs: { dashscope: { apiKey: 'test-key' } } as Record<string, { apiKey: string }>,
+    chatModel: 'test-model',
+  },
   workspace: { workspacePath: '/workspace' as string | null },
 }))
 
@@ -72,7 +77,12 @@ describe('ChatInputBar (entry conversation)', () => {
     mockState.ai.busy = false
     mockState.ai.hasFile = false
     mockState.ai.attachedDocument = null
-    mockState.settings = { loaded: true, apiKey: 'test-key', chatModel: 'test-model' }
+    mockState.settings = {
+      loaded: true,
+      activeChatProvider: 'dashscope',
+      providerConfigs: { dashscope: { apiKey: 'test-key' } },
+      chatModel: 'test-model',
+    }
     mockState.workspace.workspacePath = '/workspace'
   })
 
@@ -92,7 +102,12 @@ describe('ChatInputBar (entry conversation)', () => {
 
   it('is disabled while the provider settings are incomplete', () => {
     mockState.ai.hasFile = true
-    mockState.settings = { loaded: true, apiKey: '', chatModel: '' }
+    mockState.settings = {
+      loaded: true,
+      activeChatProvider: 'dashscope',
+      providerConfigs: {},
+      chatModel: '',
+    }
 
     const html = renderInputBar()
 

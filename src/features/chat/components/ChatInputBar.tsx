@@ -19,7 +19,11 @@ import {
   useActiveMindmapEditor,
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
-import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
+import {
+  selectActiveApiKey,
+  selectChatReady,
+  useSettingsStore,
+} from '@/features/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import type { DocumentRef } from '@contracts/fileFormat'
 import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
@@ -52,7 +56,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
 
   const chatReady = useSettingsStore(selectChatReady)
   const settingsLoaded = useSettingsStore((s) => s.loaded)
-  const hasApiKey = useSettingsStore((s) => s.apiKey.trim() !== '')
+  const hasApiKey = useSettingsStore((s) => selectActiveApiKey(s).trim() !== '')
   const hasChatModel = useSettingsStore((s) => s.chatModel.trim() !== '')
 
   // The resolved chat panel is the entry conversation box: with a workspace but

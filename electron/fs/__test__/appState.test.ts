@@ -111,12 +111,13 @@ describe('AppState', () => {
     })
   })
 
-  it('drops legacy workspace-scoped keys when saving', async () => {
+  it('drops legacy keys when saving', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),
       JSON.stringify({
-        apiKey: 'key',
+        apiKey: 'legacy-global-key',
         lastOpenedFilePath: '/old/file.mindlane',
+        providerConfigs: { dashscope: { apiKey: 'provider-key' } },
       }),
     )
 
@@ -128,6 +129,9 @@ describe('AppState', () => {
 
     expect(parsed.chatModel).toBe('new-model')
     expect(parsed.lastOpenedFilePath).toBeUndefined()
+    // The global apiKey is gone for good; per-provider keys stay.
+    expect(parsed.apiKey).toBeUndefined()
+    expect(parsed.providerConfigs.dashscope.apiKey).toBe('provider-key')
   })
 
   it('migrates legacy workspace-scoped keys once when lastWorkspacePath matches', async () => {
@@ -136,7 +140,6 @@ describe('AppState', () => {
     fs.writeFileSync(
       path.join(tmpDir, 'settings.json'),
       JSON.stringify({
-        apiKey: 'key',
         lastWorkspacePath: workspacePath,
         lastOpenedFilePath: '/old/file.mindlane',
       }),
@@ -154,7 +157,6 @@ describe('AppState', () => {
     const parsed = JSON.parse(raw)
     expect(parsed.lastOpenedFilePath).toBeUndefined()
     expect(parsed.lastWorkspacePath).toBe(workspacePath)
-    expect(parsed.apiKey).toBe('key')
   })
 
   it('does not migrate legacy keys when lastWorkspacePath does not match', async () => {

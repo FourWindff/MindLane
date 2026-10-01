@@ -54,7 +54,6 @@ function collectApiKeys(settings: AppSettings): string[] {
   const keys = Object.values(settings.providerConfigs ?? {})
     .map((config) => config?.apiKey)
     .filter((key): key is string => typeof key === 'string' && key.trim().length > 0)
-  if (settings.apiKey?.trim()) keys.push(settings.apiKey)
   return keys
 }
 

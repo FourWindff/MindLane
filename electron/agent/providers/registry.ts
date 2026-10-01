@@ -52,9 +52,9 @@ export function getProviderMeta(providerId: string): ProviderMeta | undefined {
 
 /**
  * Single owner of the chat-provider resolution recipe: pick the provider,
- * resolve the apiKey (per-provider config overrides the global key), and
- * validate the model against the provider's catalog. Pure function — throws
- * on missing key, empty model, or a model outside the catalog; no fallbacks.
+ * resolve the apiKey from that provider's own config, and validate the model
+ * against the provider's catalog. Pure function — throws on missing key, empty
+ * model, or a model outside the catalog; no fallbacks.
  */
 export function resolveChatProvider(settings: AppSettings): LLMProvider {
   const providerId = settings.activeProviders.chat || 'dashscope'
@@ -63,7 +63,7 @@ export function resolveChatProvider(settings: AppSettings): LLMProvider {
     throw new Error(`未知的 provider: ${providerId}`)
   }
   const providerConfig = settings.providerConfigs[providerId]
-  const apiKey = providerConfig?.apiKey?.trim() || settings.apiKey.trim()
+  const apiKey = providerConfig?.apiKey?.trim() ?? ''
   if (!apiKey) {
     throw new Error('未填写 API Key')
   }

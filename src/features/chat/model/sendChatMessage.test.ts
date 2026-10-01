@@ -145,7 +145,11 @@ describe('sendChatMessage handshake', () => {
       showSessionList: false,
       attachedDocument: null,
     })
-    useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+    useSettingsStore.setState({
+      loaded: true,
+      providerConfigs: { dashscope: { apiKey: 'test-key' } },
+      chatModel: 'test-model',
+    })
   })
 
   afterEach(() => {
@@ -159,10 +163,14 @@ describe('sendChatMessage handshake', () => {
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(false)
 
     activateFile('file-a')
-    useSettingsStore.setState({ loaded: false, apiKey: '', chatModel: '' })
+    useSettingsStore.setState({ loaded: false, providerConfigs: {}, chatModel: '' })
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(false)
 
-    useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+    useSettingsStore.setState({
+      loaded: true,
+      providerConfigs: { dashscope: { apiKey: 'test-key' } },
+      chatModel: 'test-model',
+    })
     expect(await useAiStore.getState().sendChatMessage('')).toBe(false)
 
     expect(chatStream).not.toHaveBeenCalled()
@@ -291,7 +299,11 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       showSessionList: false,
       attachedDocument: null,
     })
-    useSettingsStore.setState({ loaded: true, apiKey: 'test-key', chatModel: 'test-model' })
+    useSettingsStore.setState({
+      loaded: true,
+      providerConfigs: { dashscope: { apiKey: 'test-key' } },
+      chatModel: 'test-model',
+    })
     useWorkspaceStore.setState({
       busy: false,
       lastError: null,

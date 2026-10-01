@@ -15,7 +15,6 @@ function capabilitiesForProvider(providers: ProviderInfo[], providerId: string):
 interface SettingsState {
   loaded: boolean
   activeChatProvider: string
-  apiKey: string
   chatModel: string
   palaceArtworkStyle: PalaceArtworkStyle
   autoSaveIntervalMs: number
@@ -38,19 +37,27 @@ function persistToBackend(partial: Record<string, unknown>) {
 }
 
 /**
- * 对话就绪判定：settings 已加载、已填 API Key、已选模型。
+ * 当前 provider 的 API Key：providerConfigs 是密钥唯一来源，不再有全局兜底 key。
+ */
+export function selectActiveApiKey(
+  state: Pick<SettingsState, 'activeChatProvider' | 'providerConfigs'>,
+): string {
+  return state.providerConfigs[state.activeChatProvider]?.apiKey ?? ''
+}
+
+/**
+ * 对话就绪判定：settings 已加载、当前 provider 已填 API Key、已选模型。
  * ChatInputBar 门控与 palace 生成预检共用这一份判定。
  */
 export function selectChatReady(
-  state: Pick<SettingsState, 'loaded' | 'apiKey' | 'chatModel'>,
+  state: Pick<SettingsState, 'loaded' | 'activeChatProvider' | 'providerConfigs' | 'chatModel'>,
 ): boolean {
-  return state.loaded && state.apiKey.trim() !== '' && state.chatModel.trim() !== ''
+  return state.loaded && selectActiveApiKey(state).trim() !== '' && state.chatModel.trim() !== ''
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   loaded: false,
   activeChatProvider: 'dashscope',
-  apiKey: '',
   chatModel: '',
   palaceArtworkStyle: 'vector',
   autoSaveIntervalMs: 30_000,
@@ -63,11 +70,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setActiveChatProvider: (id) => {
     const state = get()
     const provider = state.providers.find((p) => p.id === id)
-    const providerKey = state.providerConfigs[id]?.apiKey ?? ''
     set({
       activeChatProvider: id,
       chatModel: '',
-      apiKey: providerKey,
       capabilities: provider?.capabilities ?? [],
     })
     persistToBackend({ activeProviders: { chat: id }, chatModel: '' })
@@ -76,14 +81,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setApiKey: (key) => {
     const providerId = get().activeChatProvider
     set((state) => ({
-      apiKey: key,
       providerConfigs: {
         ...state.providerConfigs,
         [providerId]: { ...state.providerConfigs[providerId], apiKey: key },
       },
     }))
     persistToBackend({
-      apiKey: key,
       providerConfigs: { [providerId]: { apiKey: key } },
     })
   },
@@ -115,7 +118,6 @@ export async function loadSettingsFromBackend(): Promise<void> {
   if (!settings) return
 
   const s = settings as {
-    apiKey?: string
     chatModel?: string
     palaceArtworkStyle?: PalaceArtworkStyle
     activeProviders?: { chat?: string }
@@ -125,11 +127,8 @@ export async function loadSettingsFromBackend(): Promise<void> {
 
   const providerId = s.activeProviders?.chat ?? 'dashscope'
   const configs = s.providerConfigs ?? {}
-  // 显示当前 provider 的 key，若无则回退到全局 apiKey
-  const displayKey = configs[providerId]?.apiKey || s.apiKey || ''
 
   useSettingsStore.getState().hydrate({
-    apiKey: displayKey,
     chatModel: s.chatModel ?? '',
     palaceArtworkStyle: s.palaceArtworkStyle ?? 'vector',
     autoSaveIntervalMs: s.editor?.autoSaveIntervalMs ?? 30_000,

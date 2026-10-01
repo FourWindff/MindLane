@@ -10,7 +10,6 @@ import type {
 export type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry }
 
 export interface AppSettings {
-  apiKey: string
   chatModel: string
   palaceArtworkStyle: PalaceArtworkStyle
   activeProviders: {
@@ -45,7 +44,6 @@ export interface ProviderConfig {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  apiKey: '',
   chatModel: '',
   palaceArtworkStyle: 'vector',
   activeProviders: { chat: 'dashscope' },

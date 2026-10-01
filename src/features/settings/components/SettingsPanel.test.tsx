@@ -7,7 +7,7 @@ const settingsState = vi.hoisted(() => ({
   current: {
     loaded: true,
     activeChatProvider: 'test-provider',
-    apiKey: 'key',
+    providerConfigs: { 'test-provider': { apiKey: 'key' } },
     chatModel: 'test-model',
     palaceArtworkStyle: 'raster' as 'vector' | 'raster',
     autoSaveIntervalMs: 30_000,
@@ -38,7 +38,8 @@ const fileActions = {
   saveActiveFileAs: vi.fn(),
 }
 
-vi.mock('../model/settingsStore', () => ({
+vi.mock('../model/settingsStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../model/settingsStore')>()),
   useSettingsStore: (selector: (state: typeof settingsState.current) => unknown) =>
     selector(settingsState.current),
 }))

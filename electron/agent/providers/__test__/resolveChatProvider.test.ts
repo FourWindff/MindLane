@@ -9,10 +9,9 @@ import { resolveChatProvider } from '../index.js'
 function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
     ...DEFAULT_SETTINGS,
-    apiKey: 'global-key',
     chatModel: 'qwen-plus',
     activeProviders: { chat: 'dashscope' },
-    providerConfigs: {},
+    providerConfigs: { dashscope: { apiKey: 'provider-key' } },
     ...overrides,
   }
 }
@@ -30,31 +29,33 @@ describe('resolveChatProvider', () => {
     expect(provider.model.lc_kwargs.configuration.baseURL).toBe('https://example.com')
   })
 
-  it('prefers the per-provider apiKey over the global key', () => {
-    const provider = resolveChatProvider(
-      makeSettings({ providerConfigs: { dashscope: { apiKey: 'provider-key' } } }),
-    )
+  it('resolves the apiKey from the active provider config', () => {
+    const provider = resolveChatProvider(makeSettings())
 
     expect(provider.model.lc_kwargs.apiKey).toBe('provider-key')
   })
 
-  it('falls back to the global apiKey when the provider config has none', () => {
-    const provider = resolveChatProvider(makeSettings())
-
-    expect(provider.model.lc_kwargs.apiKey).toBe('global-key')
-  })
-
-  it('ignores a whitespace-only provider key and falls back to the global key', () => {
-    const provider = resolveChatProvider(
-      makeSettings({ providerConfigs: { dashscope: { apiKey: '   ' } } }),
+  it('throws when the active provider has no apiKey configured', () => {
+    expect(() => resolveChatProvider(makeSettings({ providerConfigs: {} }))).toThrow(
+      '未填写 API Key',
     )
-
-    expect(provider.model.lc_kwargs.apiKey).toBe('global-key')
   })
 
-  it('throws when no apiKey is configured', () => {
-    expect(() => resolveChatProvider(makeSettings({ apiKey: '' }))).toThrow('未填写 API Key')
-    expect(() => resolveChatProvider(makeSettings({ apiKey: '  ' }))).toThrow('未填写 API Key')
+  it('treats a whitespace-only provider key as missing', () => {
+    expect(() =>
+      resolveChatProvider(makeSettings({ providerConfigs: { dashscope: { apiKey: '   ' } } })),
+    ).toThrow('未填写 API Key')
+  })
+
+  it('never reuses another provider key for the active provider', () => {
+    expect(() =>
+      resolveChatProvider(
+        makeSettings({
+          activeProviders: { chat: 'kimi-code' },
+          chatModel: KimiCodeProvider.defaultModels[0]!.id,
+        }),
+      ),
+    ).toThrow('未填写 API Key')
   })
 
   it('throws when chatModel is empty', () => {
@@ -80,6 +81,7 @@ describe('resolveChatProvider', () => {
       makeSettings({
         activeProviders: { chat: 'kimi-code' },
         chatModel: kimi.id,
+        providerConfigs: { 'kimi-code': { apiKey: 'kimi-key' } },
       }),
     )
 

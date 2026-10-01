@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
-import { useSettingsStore } from '@/features/settings/model/settingsStore'
+import { selectActiveApiKey, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { ShortcutsList } from './ShortcutsList'
 import { resolveArtworkStyle } from '@contracts/palaceArtworkStyle'
 
@@ -334,7 +334,7 @@ function McpIntegrationsSection() {
 
 export function SettingsPanel({ fileActions }: { fileActions: SettingsFileActions }) {
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('about')
-  const apiKey = useSettingsStore((s) => s.apiKey)
+  const apiKey = useSettingsStore(selectActiveApiKey)
   const setApiKey = useSettingsStore((s) => s.setApiKey)
   const chatModel = useSettingsStore((s) => s.chatModel)
   const setChatModel = useSettingsStore((s) => s.setChatModel)

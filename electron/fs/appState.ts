@@ -7,7 +7,8 @@ import { coerceLastOpenedFilePath } from './workspace.js'
 
 // Keys that lived in settings.json before the workspace-state migration.
 // Dropped on merge so they do not resurrect when any setting is updated.
-const LEGACY_SETTINGS_KEYS = ['expandedFolderPaths', 'lastOpenedFilePath'] as const
+// `apiKey` was the global fallback key; providerConfigs is now the only source.
+const LEGACY_SETTINGS_KEYS = ['expandedFolderPaths', 'lastOpenedFilePath', 'apiKey'] as const
 
 export class AppState {
   private filePath: string
@@ -254,7 +255,6 @@ export class AppState {
         ...DEFAULT_SETTINGS.editor,
         ...partial.editor,
       },
-      apiKey: partial.apiKey ?? DEFAULT_SETTINGS.apiKey,
       chatModel: partial.chatModel ?? DEFAULT_SETTINGS.chatModel,
       palaceArtworkStyle:
         partial.palaceArtworkStyle === 'raster' ? 'raster' : DEFAULT_SETTINGS.palaceArtworkStyle,
