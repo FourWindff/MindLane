@@ -13,21 +13,7 @@ import type { AppState } from './appState.js'
 type SavedProject = { filePath: string; data: MindLaneFile }
 
 export class ProjectFileManager {
-  private backupsDir: string
-  private maxBackups: number
-
-  constructor(
-    userDataPath: string,
-    private readonly appState?: AppState,
-    maxBackups = 5,
-  ) {
-    this.backupsDir = path.join(userDataPath, 'backups')
-    this.maxBackups = maxBackups
-  }
-
-  async initialize(): Promise<void> {
-    await fs.promises.mkdir(this.backupsDir, { recursive: true })
-  }
+  constructor(private readonly appState?: AppState) {}
 
   async open(
     win: BrowserWindow,
@@ -80,13 +66,13 @@ export class ProjectFileManager {
     if (!filePath) {
       return this.saveAs(data, win)
     }
-    return this.saveToPath(filePath, data, { createBackup: true })
+    return this.saveToPath(filePath, data)
   }
 
   async saveToPath(
     filePath: string,
     data: MindLaneFile,
-    options?: { createBackup?: boolean; overwrite?: boolean },
+    options?: { overwrite?: boolean },
   ): Promise<IpcResult<SavedProject>> {
     try {
       if (options?.overwrite === false && fs.existsSync(filePath)) {
@@ -99,9 +85,6 @@ export class ProjectFileManager {
         fileUuid === data.metadata.fileUuid
           ? data
           : { ...data, metadata: { ...data.metadata, fileUuid } }
-      if (options?.createBackup !== false) {
-        await this.createBackup(filePath)
-      }
       await atomicWrite(filePath, serializeMindLaneFile(savedData))
       return { ok: true, data: { filePath, data: savedData } }
     } catch (e) {
@@ -120,7 +103,7 @@ export class ProjectFileManager {
         ? trimmedName
         : `${trimmedName}${MINDLANE_EXTENSION}`
       const filePath = path.join(directoryPath, fileName)
-      return await this.saveToPath(filePath, data, { createBackup: false, overwrite: false })
+      return await this.saveToPath(filePath, data, { overwrite: false })
     } catch (e) {
       return fail(e)
     }
@@ -158,35 +141,6 @@ export class ProjectFileManager {
       return { ok: true, data: { filePath: result.filePath, data: copiedData } }
     } catch (e) {
       return fail(e, '保存失败')
-    }
-  }
-
-  private async createBackup(filePath: string): Promise<void> {
-    try {
-      if (!fs.existsSync(filePath)) return
-      const basename = path.basename(filePath, '.mindlane')
-      const backupName = `${basename}.${Date.now()}.mindlane.bak`
-      const backupPath = path.join(this.backupsDir, backupName)
-      await fs.promises.copyFile(filePath, backupPath)
-      await this.cleanOldBackups(basename)
-    } catch {
-      /* best-effort */
-    }
-  }
-
-  private async cleanOldBackups(basename: string): Promise<void> {
-    try {
-      const entries = await fs.promises.readdir(this.backupsDir)
-      const matching = entries
-        .filter((e) => e.startsWith(basename + '.') && e.endsWith('.mindlane.bak'))
-        .sort()
-        .reverse()
-      const toRemove = matching.slice(this.maxBackups)
-      for (const name of toRemove) {
-        await fs.promises.unlink(path.join(this.backupsDir, name)).catch(() => {})
-      }
-    } catch {
-      /* best-effort */
     }
   }
 }
