@@ -39,7 +39,6 @@ const STATE_FILE = 'state.json'
 const MINDLANE_DIR = '.mindlane'
 
 export class Workspace {
-  private cache = new Map<string, WorkspaceState>()
   private writeQueue = new Map<string, Promise<void>>()
 
   constructor(private readonly appState?: AppState) {}
@@ -164,7 +163,6 @@ export class Workspace {
         const statePath = this.statePath(workspacePath)
         await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
         await atomicWrite(statePath, JSON.stringify(next, null, 2))
-        this.cache.set(workspacePath, next)
       })
     this.writeQueue.set(workspacePath, operation)
     try {
@@ -204,7 +202,6 @@ export class Workspace {
           fileUuidPaths: coerceFileUuidPaths(parsed.fileUuidPaths),
           lastOpenedFilePath,
         }
-        this.cache.set(workspacePath, merged)
         if (corrected) {
           await atomicWrite(statePath, JSON.stringify(merged, null, 2))
         }
@@ -229,7 +226,6 @@ export class Workspace {
       const next = { ...state, workspaceUuid }
       await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
       await atomicWrite(statePath, JSON.stringify(next, null, 2))
-      this.cache.set(workspacePath, next)
       return { ok: true, data: next }
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
