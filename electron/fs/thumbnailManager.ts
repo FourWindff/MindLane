@@ -51,21 +51,4 @@ export class ThumbnailManager {
       // 静默忽略删除失败
     }
   }
-
-  /** 清理所有孤儿缩略图 */
-  async cleanup(validFilePaths: string[]): Promise<void> {
-    const validHashes = new Set(validFilePaths.map((p) => this.hashPath(p)))
-    try {
-      const entries = await fs.promises.readdir(this.thumbnailsDir)
-      for (const entry of entries) {
-        if (!entry.endsWith('.png')) continue
-        const hash = entry.slice(0, -4)
-        if (!validHashes.has(hash)) {
-          await fs.promises.unlink(path.join(this.thumbnailsDir, entry)).catch(() => {})
-        }
-      }
-    } catch {
-      // 静默忽略
-    }
-  }
 }

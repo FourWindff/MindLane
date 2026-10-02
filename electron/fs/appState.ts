@@ -63,16 +63,6 @@ export class AppState {
     }
   }
 
-  async reset(): Promise<IpcResult<void>> {
-    try {
-      this.cache = { ...DEFAULT_SETTINGS }
-      await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
-      return { ok: true, data: undefined }
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
-  }
-
   /**
    * Compute the workspace session the app should launch into.
    * Dedupes and prunes stale recent-workspace entries, clears an invalid
