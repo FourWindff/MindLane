@@ -3,19 +3,15 @@ import path from 'node:path'
 import { shell } from 'electron'
 import { isWithinWorkspace } from './paths.js'
 import { assertEntryName } from './entryName.js'
+import { isMindLaneFile, MINDLANE_EXTENSION } from './constants.js'
 import { guard } from './ipcResult.js'
 import type { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
-const SUPPORTED_EXTENSIONS = new Set(['.mindlane'])
 const IGNORED_NAMES = new Set(['node_modules', 'Thumbs.db'])
 
 export class WorkspaceTree {
   constructor(private readonly thumbnails: ThumbnailManager) {}
-
-  isSupportedFile(filePath: string): boolean {
-    return SUPPORTED_EXTENSIONS.has(path.extname(filePath).toLowerCase())
-  }
 
   async listFiles(workspacePath: string): Promise<IpcResult<WorkspaceFileEntry[]>> {
     return guard(async () => {
@@ -31,7 +27,7 @@ export class WorkspaceTree {
       const entries = await fs.promises.readdir(resolvedPath, { withFileTypes: true })
       const files = await Promise.all(
         entries
-          .filter((entry) => entry.isFile() && this.isSupportedFile(entry.name))
+          .filter((entry) => entry.isFile() && isMindLaneFile(entry.name))
           .map(async (entry) => {
             const filePath = path.join(resolvedPath, entry.name)
             const fileStats = await fs.promises.stat(filePath)
@@ -76,7 +72,7 @@ export class WorkspaceTree {
           lastModifiedAt: dirStats.mtime.toISOString(),
           children,
         })
-      } else if (entry.isFile() && this.isSupportedFile(entry.name)) {
+      } else if (entry.isFile() && isMindLaneFile(entry.name)) {
         const fileStats = await fs.promises.stat(fullPath)
         const previewUrl = await this.thumbnails.get(fullPath)
         files.push({
@@ -165,7 +161,7 @@ export class WorkspaceTree {
       const parentDir = path.dirname(resolvedOld)
       const stats = await fs.promises.stat(resolvedOld)
       const finalName =
-        stats.isFile() && this.isSupportedFile(resolvedOld) && !trimmedName.endsWith('.mindlane')
+        stats.isFile() && isMindLaneFile(resolvedOld) && !trimmedName.endsWith(MINDLANE_EXTENSION)
           ? `${trimmedName}.mindlane`
           : trimmedName
 

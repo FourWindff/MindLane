@@ -6,6 +6,7 @@ import type { MindLaneFile } from '../../contracts/fileFormat'
 import { deserializeMindLaneFile, serializeMindLaneFile } from '../../contracts/mindmapXml'
 import { atomicWrite } from './atomicWrite.js'
 import { assertEntryName } from './entryName.js'
+import { MINDLANE_EXTENSION } from './constants.js'
 import { fail } from './ipcResult.js'
 import type { AppState } from './appState.js'
 
@@ -115,7 +116,9 @@ export class ProjectFileManager {
   ): Promise<IpcResult<SavedProject>> {
     try {
       const trimmedName = assertEntryName(name, '文件名')
-      const fileName = trimmedName.endsWith('.mindlane') ? trimmedName : `${trimmedName}.mindlane`
+      const fileName = trimmedName.endsWith(MINDLANE_EXTENSION)
+        ? trimmedName
+        : `${trimmedName}${MINDLANE_EXTENSION}`
       const filePath = path.join(directoryPath, fileName)
       return await this.saveToPath(filePath, data, { createBackup: false, overwrite: false })
     } catch (e) {

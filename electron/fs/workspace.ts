@@ -3,6 +3,7 @@ import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
 import { isWithinWorkspace } from './paths.js'
 import { fail } from './ipcResult.js'
+import { isMindLaneFile } from './constants.js'
 import type { IpcResult, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
 
@@ -11,10 +12,6 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   activeSessionIds: {},
   fileUuidPaths: {},
   lastOpenedFilePath: null,
-}
-
-function isMindLanePath(filePath: string): boolean {
-  return path.extname(filePath).toLowerCase() === '.mindlane'
 }
 
 /** Coerce an untrusted value into a valid `fileUuidPaths` map. */
@@ -26,7 +23,7 @@ function coerceFileUuidPaths(value: unknown): Record<string, string> {
         entry[0] !== '' &&
         typeof entry[1] === 'string' &&
         entry[1] !== '' &&
-        isMindLanePath(entry[1]),
+        isMindLaneFile(entry[1]),
     ),
   )
 }
@@ -240,7 +237,7 @@ export class Workspace {
     if (
       candidate &&
       this.pathExists(candidate) &&
-      this.isSupportedFile(candidate) &&
+      isMindLaneFile(candidate) &&
       isWithinWorkspace(candidate, workspacePath)
     ) {
       return candidate
@@ -254,9 +251,5 @@ export class Workspace {
     } catch {
       return false
     }
-  }
-
-  private isSupportedFile(filePath: string): boolean {
-    return isMindLanePath(filePath)
   }
 }
