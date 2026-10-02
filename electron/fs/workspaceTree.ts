@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { shell } from 'electron'
 import { isWithinWorkspace } from './paths.js'
+import { assertEntryName } from './entryName.js'
 import { guard } from './ipcResult.js'
 import { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
@@ -100,18 +101,7 @@ export class WorkspaceTree {
 
   async createDirectory(parentPath: string, name: string): Promise<IpcResult<string>> {
     return guard(() => {
-      const trimmedName = name.trim()
-      if (!trimmedName) {
-        throw new Error('仓库名称不能为空')
-      }
-      if (
-        trimmedName === '.' ||
-        trimmedName === '..' ||
-        trimmedName.includes('/') ||
-        trimmedName.includes('\\')
-      ) {
-        throw new Error('仓库名称包含非法字符')
-      }
+      const trimmedName = assertEntryName(name, '仓库名称')
 
       const targetPath = path.resolve(parentPath, trimmedName)
       if (fs.existsSync(targetPath)) {
@@ -128,13 +118,7 @@ export class WorkspaceTree {
     workspacePath: string,
   ): Promise<IpcResult<string>> {
     return guard(() => {
-      const trimmedName = name.trim()
-      if (!trimmedName) {
-        throw new Error('文件夹名称不能为空')
-      }
-      if (trimmedName === '.' || trimmedName === '..' || /[\\/]/.test(trimmedName)) {
-        throw new Error('文件夹名称包含非法字符')
-      }
+      const trimmedName = assertEntryName(name, '文件夹名称')
 
       const resolvedParent = path.resolve(parentPath)
       const targetPath = path.join(resolvedParent, trimmedName)
@@ -172,13 +156,7 @@ export class WorkspaceTree {
     workspacePath: string,
   ): Promise<IpcResult<string>> {
     return guard(async () => {
-      const trimmedName = newName.trim()
-      if (!trimmedName) {
-        throw new Error('名称不能为空')
-      }
-      if (trimmedName === '.' || trimmedName === '..' || /[\\/]/.test(trimmedName)) {
-        throw new Error('名称包含非法字符')
-      }
+      const trimmedName = assertEntryName(newName, '名称')
 
       const resolvedOld = path.resolve(oldPath)
       if (!isWithinWorkspace(resolvedOld, workspacePath)) {

@@ -5,6 +5,7 @@ import type { IpcResult } from './types.js'
 import type { MindLaneFile } from '../../contracts/fileFormat'
 import { deserializeMindLaneFile, serializeMindLaneFile } from '../../contracts/mindmapXml'
 import { atomicWrite } from './atomicWrite.js'
+import { assertEntryName } from './entryName.js'
 import { fail } from './ipcResult.js'
 import type { AppState } from './appState.js'
 
@@ -112,16 +113,14 @@ export class ProjectFileManager {
     name: string,
     data: MindLaneFile,
   ): Promise<IpcResult<SavedProject>> {
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      return { ok: false, error: '文件名不能为空' }
+    try {
+      const trimmedName = assertEntryName(name, '文件名')
+      const fileName = trimmedName.endsWith('.mindlane') ? trimmedName : `${trimmedName}.mindlane`
+      const filePath = path.join(directoryPath, fileName)
+      return await this.saveToPath(filePath, data, { createBackup: false, overwrite: false })
+    } catch (e) {
+      return fail(e)
     }
-    if (trimmedName === '.' || trimmedName === '..' || /[\\/]/.test(trimmedName)) {
-      return { ok: false, error: '文件名包含非法字符' }
-    }
-    const fileName = trimmedName.endsWith('.mindlane') ? trimmedName : `${trimmedName}.mindlane`
-    const filePath = path.join(directoryPath, fileName)
-    return this.saveToPath(filePath, data, { createBackup: false, overwrite: false })
   }
 
   async saveAs(
