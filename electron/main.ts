@@ -242,7 +242,6 @@ app.whenReady().then(async () => {
 
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
-  fsService.workspaceTree.setThumbnailManager(fsService.thumbnails)
 
   // MCP：safeStorage 不可用时凭据仅驻留内存（McpCredentialStore 会记录警告）
   mcpManager = new McpManager({

@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { Workspace } from '../workspace.js'
 import { WorkspaceTree } from '../workspaceTree.js'
+import { ThumbnailManager } from '../thumbnailManager.js'
 
 // shell.trashItem falls back to rm so deletion works headless.
 vi.mock('electron', () => ({
@@ -18,7 +19,7 @@ describe('e2e: delete -> prune (handler sequence)', () => {
   it('prunes the deleted file mapping while keeping other mappings intact', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-e2e-'))
     const workspace = new Workspace()
-    const tree = new WorkspaceTree()
+    const tree = new WorkspaceTree(new ThumbnailManager(tmpDir))
     const wsPath = path.join(tmpDir, 'ws')
     fs.mkdirSync(wsPath, { recursive: true })
     const filePath = path.join(wsPath, 'a.mindlane')

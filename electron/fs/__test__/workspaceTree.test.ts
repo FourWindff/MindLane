@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { WorkspaceTree } from '../workspaceTree.js'
+import { ThumbnailManager } from '../thumbnailManager.js'
 
 vi.mock('electron', () => ({
   shell: {
@@ -21,7 +22,7 @@ describe('WorkspaceTree', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-workspacetree-'))
     workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
-    tree = new WorkspaceTree()
+    tree = new WorkspaceTree(new ThumbnailManager(tmpDir))
   })
 
   afterEach(() => {

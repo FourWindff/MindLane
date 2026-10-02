@@ -4,18 +4,14 @@ import { shell } from 'electron'
 import { isWithinWorkspace } from './paths.js'
 import { assertEntryName } from './entryName.js'
 import { guard } from './ipcResult.js'
-import { ThumbnailManager } from './thumbnailManager.js'
+import type { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
 const SUPPORTED_EXTENSIONS = new Set(['.mindlane'])
 const IGNORED_NAMES = new Set(['node_modules', 'Thumbs.db'])
 
 export class WorkspaceTree {
-  private thumbnails?: ThumbnailManager
-
-  setThumbnailManager(thumbnails: ThumbnailManager): void {
-    this.thumbnails = thumbnails
-  }
+  constructor(private readonly thumbnails: ThumbnailManager) {}
 
   isSupportedFile(filePath: string): boolean {
     return SUPPORTED_EXTENSIONS.has(path.extname(filePath).toLowerCase())
@@ -82,7 +78,7 @@ export class WorkspaceTree {
         })
       } else if (entry.isFile() && this.isSupportedFile(entry.name)) {
         const fileStats = await fs.promises.stat(fullPath)
-        const previewUrl = this.thumbnails ? await this.thumbnails.get(fullPath) : undefined
+        const previewUrl = await this.thumbnails.get(fullPath)
         files.push({
           name: entry.name,
           path: fullPath,

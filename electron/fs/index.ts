@@ -15,8 +15,8 @@ export class FileSystemService {
     this.appState = new AppState(userDataPath)
     this.project = new ProjectFileManager(userDataPath, this.appState)
     this.workspace = new Workspace(this.appState)
-    this.workspaceTree = new WorkspaceTree()
     this.thumbnails = new ThumbnailManager(userDataPath)
+    this.workspaceTree = new WorkspaceTree(this.thumbnails)
   }
 
   async initialize(): Promise<void> {
