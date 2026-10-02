@@ -43,7 +43,7 @@ describe('ProjectFileManager file identity', () => {
   })
 
   it('preserves a file UUID after an external move', async () => {
-    const indexed = new ProjectFileManager(tmpDir, 5, new AppState(tmpDir))
+    const indexed = new ProjectFileManager(tmpDir, new AppState(tmpDir))
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const movedPath = path.join(tmpDir, 'moved.mindlane')
     const source = createEmptyFile('Move')
@@ -59,7 +59,7 @@ describe('ProjectFileManager file identity', () => {
   })
 
   it('assigns a fresh file UUID to an external copy', async () => {
-    const indexed = new ProjectFileManager(tmpDir, 5, new AppState(tmpDir))
+    const indexed = new ProjectFileManager(tmpDir, new AppState(tmpDir))
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const copyPath = path.join(tmpDir, 'copy.mindlane')
     const source = createEmptyFile('Copy')
@@ -75,7 +75,7 @@ describe('ProjectFileManager file identity', () => {
   })
 
   it('returns the fresh UUID written when creating a copy in the workspace', async () => {
-    const indexed = new ProjectFileManager(tmpDir, 5, new AppState(tmpDir))
+    const indexed = new ProjectFileManager(tmpDir, new AppState(tmpDir))
     const originalPath = path.join(tmpDir, 'original.mindlane')
     const source = createEmptyFile('Copy')
     fs.writeFileSync(originalPath, serializeMindLaneFile(source))

@@ -15,8 +15,8 @@ export class ProjectFileManager {
 
   constructor(
     userDataPath: string,
-    maxBackups = 5,
     private readonly appState?: AppState,
+    maxBackups = 5,
   ) {
     this.backupsDir = path.join(userDataPath, 'backups')
     this.maxBackups = maxBackups

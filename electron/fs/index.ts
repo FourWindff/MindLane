@@ -13,7 +13,7 @@ export class FileSystemService {
 
   constructor(userDataPath: string) {
     this.appState = new AppState(userDataPath)
-    this.project = new ProjectFileManager(userDataPath, 5, this.appState)
+    this.project = new ProjectFileManager(userDataPath, this.appState)
     this.workspace = new Workspace(this.appState)
     this.workspaceTree = new WorkspaceTree()
     this.thumbnails = new ThumbnailManager(userDataPath)
