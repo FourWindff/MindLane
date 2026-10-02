@@ -1,4 +1,4 @@
-import type { McpServerUserState } from '../mcp/types.js'
+import type { McpServerUserState } from '../agent/mcp/types.js'
 import type {
   IpcResult,
   PalaceArtworkStyle,

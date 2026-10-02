@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { IPC } from '../ipc.js'
 import type { MindLaneBridge, McpConnectPayload } from '../ipc.js'
-import type { McpCredentialField, McpServerStatusInfo } from '../mcp/types.js'
+import type { McpCredentialField, McpServerStatusInfo } from '../agent/mcp/types.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 

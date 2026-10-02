@@ -10,7 +10,7 @@ import type {
   MindmapWriteResponse,
 } from '../contracts/ipc.js'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
-import type { McpServerStatusInfo } from './mcp/types.js'
+import type { McpServerStatusInfo } from './agent/mcp/types.js'
 
 export enum IPC {
   MainProcessMessage = 'main-process-message',

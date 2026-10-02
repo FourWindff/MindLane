@@ -1,7 +1,7 @@
 import path from 'node:path'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js'
-import { logger } from '../shared/logger.js'
+import { logger } from '../../shared/logger.js'
 import { McpCredentialStore, type McpCredentialCrypto } from './credentials.js'
 import {
   LoopbackOAuthProvider,

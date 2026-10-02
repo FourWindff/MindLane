@@ -4,7 +4,7 @@ import type {
   OAuthClientInformationMixed,
   OAuthTokens,
 } from '@modelcontextprotocol/sdk/shared/auth.js'
-import { logger } from '../shared/logger.js'
+import { logger } from '../../shared/logger.js'
 
 /** 凭据加解密接口；生产环境由 Electron safeStorage 实现，测试中可注入简易实现 */
 export interface McpCredentialCrypto {

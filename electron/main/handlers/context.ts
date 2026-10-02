@@ -5,7 +5,7 @@ import type { StreamManager } from '../../agent/streamManager.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { AppSettings } from '../../fs/types.js'
 import type { ChatStreamEvent } from '../../ipc.js'
-import type { McpManager } from '../../mcp/mcpManager.js'
+import type { McpManager } from '../../agent/mcp/mcpManager.js'
 import type {
   MindmapReadRequest,
   MindmapReadResponse,

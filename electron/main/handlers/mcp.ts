@@ -1,6 +1,6 @@
 import { ipcMain, shell } from 'electron'
-import type { McpServerStatus } from '../../mcp/types.js'
-import { acquireFeishuUat, exchangeFeishuUat } from '../../mcp/feishuUat.js'
+import type { McpServerStatus } from '../../agent/mcp/types.js'
+import { acquireFeishuUat, exchangeFeishuUat } from '../../agent/mcp/feishuUat.js'
 import { IPC, type McpConnectPayload, type McpAuthorizeUatPayload } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import type { FileSystemService } from '../../fs/index.js'
