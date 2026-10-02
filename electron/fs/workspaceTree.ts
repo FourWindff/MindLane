@@ -6,7 +6,7 @@ import { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
 const SUPPORTED_EXTENSIONS = new Set(['.mindlane'])
-const IGNORED_NAMES = new Set(['.git', '.DS_Store', 'node_modules', 'Thumbs.db'])
+const IGNORED_NAMES = new Set(['node_modules', 'Thumbs.db'])
 
 export class WorkspaceTree {
   private thumbnails?: ThumbnailManager
