@@ -5,6 +5,7 @@ import type { IpcResult } from './types.js'
 import type { MindLaneFile } from '../../contracts/fileFormat'
 import { deserializeMindLaneFile, serializeMindLaneFile } from '../../contracts/mindmapXml'
 import { atomicWrite } from './atomicWrite.js'
+import { fail } from './ipcResult.js'
 import type { AppState } from './appState.js'
 
 type SavedProject = { filePath: string; data: MindLaneFile }
@@ -65,7 +66,7 @@ export class ProjectFileManager {
       }
       return { ok: true, data: { filePath, data } }
     } catch (e) {
-      return { ok: false, error: `读取失败：${e instanceof Error ? e.message : String(e)}` }
+      return fail(e, '读取失败')
     }
   }
 
@@ -102,7 +103,7 @@ export class ProjectFileManager {
       await atomicWrite(filePath, serializeMindLaneFile(savedData))
       return { ok: true, data: { filePath, data: savedData } }
     } catch (e) {
-      return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
+      return fail(e, '保存失败')
     }
   }
 
@@ -154,7 +155,7 @@ export class ProjectFileManager {
       await atomicWrite(result.filePath, serializeMindLaneFile(copiedData))
       return { ok: true, data: { filePath: result.filePath, data: copiedData } }
     } catch (e) {
-      return { ok: false, error: `保存失败：${e instanceof Error ? e.message : String(e)}` }
+      return fail(e, '保存失败')
     }
   }
 

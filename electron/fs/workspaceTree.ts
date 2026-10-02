@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { shell } from 'electron'
 import { isWithinWorkspace } from './paths.js'
+import { guard } from './ipcResult.js'
 import { ThumbnailManager } from './thumbnailManager.js'
 import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
 
@@ -20,7 +21,7 @@ export class WorkspaceTree {
   }
 
   async listFiles(workspacePath: string): Promise<IpcResult<WorkspaceFileEntry[]>> {
-    return this.guard(async () => {
+    return guard(async () => {
       const resolvedPath = path.resolve(workspacePath)
       if (!fs.existsSync(resolvedPath)) {
         throw new Error('工作目录不存在')
@@ -50,7 +51,7 @@ export class WorkspaceTree {
   }
 
   async listTree(workspacePath: string): Promise<IpcResult<WorkspaceTreeEntry[]>> {
-    return this.guard(async () => {
+    return guard(async () => {
       const resolvedPath = path.resolve(workspacePath)
       return this.readDirectoryRecursive(resolvedPath)
     })
@@ -98,7 +99,7 @@ export class WorkspaceTree {
   }
 
   async createDirectory(parentPath: string, name: string): Promise<IpcResult<string>> {
-    return this.guard(() => {
+    return guard(() => {
       const trimmedName = name.trim()
       if (!trimmedName) {
         throw new Error('仓库名称不能为空')
@@ -126,7 +127,7 @@ export class WorkspaceTree {
     name: string,
     workspacePath: string,
   ): Promise<IpcResult<string>> {
-    return this.guard(() => {
+    return guard(() => {
       const trimmedName = name.trim()
       if (!trimmedName) {
         throw new Error('文件夹名称不能为空')
@@ -153,7 +154,7 @@ export class WorkspaceTree {
   }
 
   async deleteItem(targetPath: string, workspacePath: string): Promise<IpcResult<void>> {
-    return this.guard(async () => {
+    return guard(async () => {
       const resolved = path.resolve(targetPath)
       if (!isWithinWorkspace(resolved, workspacePath)) {
         throw new Error('目标路径不在工作区内')
@@ -170,7 +171,7 @@ export class WorkspaceTree {
     newName: string,
     workspacePath: string,
   ): Promise<IpcResult<string>> {
-    return this.guard(async () => {
+    return guard(async () => {
       const trimmedName = newName.trim()
       if (!trimmedName) {
         throw new Error('名称不能为空')
@@ -209,7 +210,7 @@ export class WorkspaceTree {
     targetDirPath: string,
     workspacePath: string,
   ): Promise<IpcResult<string>> {
-    return this.guard(async () => {
+    return guard(async () => {
       const resolvedSource = path.resolve(sourcePath)
       const resolvedTarget = path.resolve(targetDirPath)
 
@@ -253,14 +254,5 @@ export class WorkspaceTree {
       await fs.promises.rename(resolvedSource, newPath)
       return newPath
     })
-  }
-
-  private async guard<T>(action: () => Promise<T>): Promise<IpcResult<T>> {
-    try {
-      const data = await action()
-      return { ok: true, data }
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
-    }
   }
 }

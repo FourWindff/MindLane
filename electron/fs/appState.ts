@@ -3,6 +3,7 @@ import path from 'node:path'
 import type { AppSettings, IpcResult, WorkspaceState } from './types.js'
 import { DEFAULT_SETTINGS } from './types.js'
 import { atomicWrite } from './atomicWrite.js'
+import { fail } from './ipcResult.js'
 import { coerceLastOpenedFilePath } from './workspace.js'
 
 // Keys that lived in settings.json before the workspace-state migration.
@@ -59,7 +60,7 @@ export class AppState {
       await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
       return { ok: true, data: undefined }
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      return fail(e)
     }
   }
 
@@ -110,7 +111,7 @@ export class AppState {
         },
       }
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      return fail(e)
     }
   }
 
@@ -130,7 +131,7 @@ export class AppState {
         recentWorkspacePaths,
       })
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      return fail(e)
     }
   }
 
@@ -201,7 +202,7 @@ export class AppState {
       await atomicWrite(this.filePath, JSON.stringify(this.cache, null, 2))
       return { ok: true, data: migrated }
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      return fail(e)
     }
   }
 

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { atomicWrite } from './atomicWrite.js'
 import { isWithinWorkspace } from './paths.js'
+import { fail } from './ipcResult.js'
 import type { IpcResult, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
 
@@ -169,7 +170,7 @@ export class Workspace {
       await operation
       return { ok: true, data: undefined }
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+      return fail(e)
     } finally {
       if (this.writeQueue.get(workspacePath) === operation) {
         this.writeQueue.delete(workspacePath)
@@ -228,7 +229,7 @@ export class Workspace {
       await atomicWrite(statePath, JSON.stringify(next, null, 2))
       return { ok: true, data: next }
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+      return fail(error)
     }
   }
 
