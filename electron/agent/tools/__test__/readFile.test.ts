@@ -29,7 +29,7 @@ describe('createReadFileTool', () => {
     outside = fs.mkdtempSync(path.join(os.tmpdir(), 'readfile-out-'))
     readFile = createReadFileTool(() => workspace)
 
-    fs.writeFileSync(path.join(workspace, 'notes.md'), '第一行\n第二行\n第三行')
+    fs.writeFileSync(path.join(workspace, 'notes.md'), 'line one\nline two\nline three')
     fs.mkdirSync(path.join(workspace, 'docs'))
     fs.writeFileSync(path.join(workspace, 'docs', 'spec.md'), 'a\nb\nc\nd\ne')
     fs.writeFileSync(path.join(workspace, 'binary.bin'), Buffer.from([0x41, 0x00, 0x42]))
@@ -52,7 +52,7 @@ describe('createReadFileTool', () => {
       endLine: 3,
       truncated: false,
     })
-    expect(result.content).toBe('1→第一行\n2→第二行\n3→第三行')
+    expect(result.content).toBe('1→line one\n2→line two\n3→line three')
   })
 
   it('reads a start/end line range', async () => {
@@ -110,7 +110,7 @@ describe('createReadFileTool', () => {
     const result = await run({ path: 'docs' })
 
     expect(result.ok).toBe(false)
-    expect(result.error).toContain('目录')
+    expect(result.error).toContain('directory')
   })
 
   it('rejects end < start', async () => {
@@ -137,7 +137,7 @@ describe('createReadFileTool', () => {
     const result = await run({ path: 'binary.bin' })
 
     expect(result.ok).toBe(false)
-    expect(result.error).toContain('二进制')
+    expect(result.error).toContain('binary')
   })
 
   it('truncates files over 2000 lines and annotates totalLines', async () => {
@@ -166,7 +166,7 @@ describe('createReadFileTool', () => {
 
     expect(result.ok).toBe(true)
     expect(result.content).toContain('1→' + 'x'.repeat(2000))
-    expect(result.content).toContain('截断')
+    expect(result.content).toContain('truncated')
     expect(result.content).toContain('5000')
   })
 

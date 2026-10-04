@@ -8,7 +8,7 @@ describe('escapeXml', () => {
   })
 
   it('roundtrips through unescapeXml', () => {
-    const input = `标题 & 副标题 <tag> "quoted" 'apos'`
+    const input = `Title & Subtitle <tag> "quoted" 'apos'`
     expect(unescapeXml(escapeXml(input))).toBe(input)
   })
 
@@ -42,11 +42,11 @@ describe('normalizeSelfClosingTags', () => {
 
 describe('findUnescapedInAttrValues', () => {
   it('detects raw < inside attribute value (a<b trap)', () => {
-    expect(findUnescapedInAttrValues('<node content="a<b" />')).toContain('未转义')
+    expect(findUnescapedInAttrValues('<node content="a<b" />')).toContain('unescaped')
   })
 
   it('detects raw & inside attribute value', () => {
-    expect(findUnescapedInAttrValues('<node content="a & b" />')).toContain('未转义')
+    expect(findUnescapedInAttrValues('<node content="a & b" />')).toContain('unescaped')
   })
 
   it('accepts properly escaped values', () => {
@@ -54,6 +54,6 @@ describe('findUnescapedInAttrValues', () => {
   })
 
   it('accepts single-quoted attributes', () => {
-    expect(findUnescapedInAttrValues("<node content='a<b' />")).toContain('未转义')
+    expect(findUnescapedInAttrValues("<node content='a<b' />")).toContain('unescaped')
   })
 })

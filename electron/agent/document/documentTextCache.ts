@@ -6,23 +6,23 @@ const DOCUMENTS_DIR = 'documents'
 const SHORT_HASH_LENGTH = 8
 const PREVIEW_MAX_LENGTH = 20
 
-/** 计算文本的 sha256 */
+/** Compute the sha256 of a text */
 export function hashText(text: string): string {
   return crypto.createHash('sha256').update(text).digest('hex')
 }
 
-/** 计算文件的 sha256 */
+/** Compute the sha256 of a file */
 export async function hashFile(filePath: string): Promise<string> {
   const data = await fs.readFile(filePath)
   return crypto.createHash('sha256').update(data).digest('hex')
 }
 
-/** 生成短哈希，用于显示文件名 */
+/** Build a short hash, used in display file names */
 export function shortHash(hash: string): string {
   return hash.slice(0, SHORT_HASH_LENGTH)
 }
 
-/** 清洗文件名，去掉扩展名和非法字符 */
+/** Sanitize a file name: drop the extension and illegal characters */
 function sanitizeBaseFilename(filename: string): string {
   const withoutExt = path.basename(filename, path.extname(filename))
   return withoutExt
@@ -32,18 +32,18 @@ function sanitizeBaseFilename(filename: string): string {
     .slice(0, 80)
 }
 
-/** 构建缓存文件的相对路径 */
+/** Build the relative path of the cache file */
 function buildCacheRelativePath(baseFilename: string, hash: string): string {
-  const safeName = sanitizeBaseFilename(baseFilename) || '未命名'
+  const safeName = sanitizeBaseFilename(baseFilename) || 'Untitled'
   return path.join(DOCUMENTS_DIR, `${safeName}_${hash}.txt`)
 }
 
-/** 把相对路径转成 userData 下的绝对路径 */
+/** Turn a relative path into an absolute path under userData */
 function resolveCacheAbsolutePath(userDataPath: string, relativePath: string): string {
   return path.join(userDataPath, relativePath)
 }
 
-/** 保存文本缓存，成功返回相对路径，失败返回 undefined */
+/** Save the text cache: returns the relative path on success, undefined on failure */
 export async function saveDocumentTextCache(
   userDataPath: string,
   baseFilename: string,
@@ -58,13 +58,13 @@ export async function saveDocumentTextCache(
     await fs.writeFile(absolutePath, text, 'utf8')
     return relativePath
   } catch (error) {
-    // 缓存写入失败不应阻塞主流程
-    console.warn('[documentTextCache] 保存文本缓存失败:', error)
+    // A failed cache write must not block the main flow
+    console.warn('[documentTextCache] failed to save text cache:', error)
     return undefined
   }
 }
 
-/** 生成文本预览：前 20 字符 + 省略号 */
+/** Build a text preview: first 20 characters plus an ellipsis */
 export function buildTextPreview(text: string, maxLength = PREVIEW_MAX_LENGTH): string {
   const normalized = text.trim().replace(/\s+/g, ' ')
   if (normalized.length <= maxLength) {

@@ -31,45 +31,45 @@ export function buildAnalyzeAndPlanMessages(
   return [
     {
       role: 'system',
-      content: `你是记忆宫殿规划师。用户会给你一组知识点节点，你要围绕它们设计一个统一、连贯、可走访的记忆宫殿。
+      content: `You are a memory palace planner. The user gives you a set of knowledge-point nodes, and you design a unified, coherent, walkable memory palace around them.
 
-核心规则：
-1. 必须使用全部节点，每个节点恰好出现一次。linked_node_id 必须严格来自用户提供的节点 ID。
-2. content 必须与原节点语义保持一致，只允许极轻微压缩，不允许改写或替换为无关内容。
-3. theme 必须是一个具体的、有画面感的实体空间（如"海底珊瑚宫殿"、"蒸汽朋克钟表工坊"、"魔法森林树屋"），禁止使用"记忆宫殿"等抽象名称。
-4. scene_brief 用一句话描述该空间的具体样貌和氛围（如"一间布满铜管和齿轮的维多利亚风格工坊，蒸汽从天花板缝隙中弥漫"）。
-5. route_style 只能从 arc、s_curve、zigzag、loop、stairs 中选一个。
+Core rules:
+1. Use every node, each exactly once. linked_node_id must come strictly from the node IDs the user provides.
+2. content must keep the same meaning as the original node; only very light compression is allowed, never rewriting or replacing it with unrelated content.
+3. theme must be a concrete, vivid physical space (such as "undersea coral palace", "steampunk clockwork workshop", "magical forest treehouse"); abstract names like "memory palace" are forbidden.
+4. scene_brief describes the space's concrete appearance and atmosphere in one sentence (such as "a Victorian workshop packed with copper pipes and gears, steam drifting through cracks in the ceiling").
+5. route_style must be one of arc, s_curve, zigzag, loop, stairs.
 
-anchor_visual 要求（极其重要，直接决定生成图片质量）：
-- 必须是真实可见、有明确外形轮廓的大尺度物体或场景局部。
-- 好的例子："冒着蓝色火焰的巨型炼金炉"、"缠满藤蔓的石拱门"、"旋转的巨大水车"、"悬挂的巨型水晶球"。
-- 坏的例子："一个公式"、"E=mc²符号"、"一段文字"、"一个概念图"——这些无法被画出来。
-- 禁止使用文字、符号、公式、数字、箭头等无法被绘画直接表现的抽象元素。
-- 各锚点之间必须在物体类型、外形尺寸、主色调上有显著差异，避免同质化（如不能两个都是"书架"或两个都是"瓶子"）。
-- 锚点必须合理地存在于 theme 所描述的空间中。
+anchor_visual requirements (extremely important; they directly determine image quality):
+- Must be a real, visible, large-scale object or scene fragment with a clear silhouette.
+- Good examples: "a giant alchemist furnace blazing with blue fire", "a stone archway overgrown with vines", "a huge rotating waterwheel", "a giant hanging crystal ball".
+- Bad examples: "a formula", "the E=mc² symbol", "a paragraph of text", "a concept diagram" - none of these can be drawn.
+- Never use abstract elements that cannot be rendered directly by painting, such as text, symbols, formulas, numbers, or arrows.
+- Anchors must differ noticeably in object type, silhouette size, and dominant color; avoid sameness (for example, not two "bookshelves" or two "bottles").
+- Anchors must plausibly exist in the space described by theme.
 
-visual_bridge：一句话解释该具象锚点为什么能联想到节点内容（谐音、形状类似、功能隐喻、故事联想等）。
+visual_bridge: one sentence explaining why this concrete anchor evokes the node content (homophone, similar shape, functional metaphor, story association, etc.).
 
-请严格输出 JSON 对象，不要有任何额外文字：
+Output strictly a JSON object with no extra text:
 {
-  "theme": "具体空间场景名",
-  "scene_brief": "一句话描述空间的样貌和氛围",
+  "theme": "concrete scene name",
+  "scene_brief": "one sentence describing the space's appearance and atmosphere",
   "route_style": "arc",
   "stations": [
     {
       "order": 1,
       "linked_node_id": "node-id",
-      "content": "与原节点一致的内容",
-      "anchor_visual": "具体大尺度可见物体，如冒着蓝色火焰的巨型炼金炉",
-      "visual_bridge": "该物体与节点内容的联想桥梁",
-      "association": "锚点帮助记忆节点内容的简要说明"
+      "content": "content identical to the original node",
+      "anchor_visual": "concrete large-scale visible object, such as a giant alchemist furnace blazing with blue fire",
+      "visual_bridge": "the associative bridge between this object and the node content",
+      "association": "a brief note on how the anchor helps recall the node content"
     }
   ]
 }`,
     },
     {
       role: 'user',
-      content: `请为以下 ${selectedNodes.length} 个知识点设计记忆宫殿路线：\n${nodeList}`,
+      content: `Design a memory palace route for the following ${selectedNodes.length} knowledge points:\n${nodeList}`,
     },
   ]
 }
@@ -77,36 +77,50 @@ visual_bridge：一句话解释该具象锚点为什么能联想到节点内容�
 function describeRouteStyle(routeStyle: NodesPalaceRouteStyle): string {
   switch (routeStyle) {
     case 'arc':
-      return '弧线'
+      return 'arc'
     case 's_curve':
-      return 'S形曲线'
+      return 'S-shaped curve'
     case 'zigzag':
-      return '锯齿形折线'
+      return 'zigzag polyline'
     case 'loop':
-      return '环形'
+      return 'loop'
     case 'stairs':
-      return '阶梯式'
+      return 'staircase'
   }
 }
 
 function assignSpatialZones(count: number): string[] {
   if (count <= 0) return []
-  if (count === 1) return ['画面正中央']
-  if (count === 2) return ['画面左侧', '画面右侧']
-  if (count === 3) return ['画面左前方', '画面正中央', '画面右后方']
-  if (count === 4) return ['画面左前方', '画面右前方', '画面左后方', '画面右后方']
-  if (count === 5) return ['画面最左侧', '画面左前方', '画面正中', '画面右后方', '画面最右侧']
+  if (count === 1) return ['dead center of the frame']
+  if (count === 2) return ['left side of the frame', 'right side of the frame']
+  if (count === 3)
+    return ['front left of the frame', 'dead center of the frame', 'back right of the frame']
+  if (count === 4)
+    return [
+      'front left of the frame',
+      'front right of the frame',
+      'back left of the frame',
+      'back right of the frame',
+    ]
+  if (count === 5)
+    return [
+      'far left of the frame',
+      'front left of the frame',
+      'center of the frame',
+      'back right of the frame',
+      'far right of the frame',
+    ]
 
   const LARGE_ZONES = [
-    '画面左前近景',
-    '画面右前近景',
-    '画面左侧中景',
-    '画面正中央',
-    '画面右侧中景',
-    '画面左后远景',
-    '画面右后远景',
-    '画面远处正中',
-    '画面高处偏左',
+    'front-left foreground',
+    'front-right foreground',
+    'left midground',
+    'dead center',
+    'right midground',
+    'rear-left background',
+    'rear-right background',
+    'distant center',
+    'upper left',
   ]
   return Array.from({ length: count }, (_, i) => LARGE_ZONES[i % LARGE_ZONES.length])
 }
@@ -119,16 +133,16 @@ export function buildPalaceImagePrompt(input: PalaceImagePromptInput): string {
   const anchorDescs = input.stations.map((station, i) => {
     const zone = zones[i]
     if (compact) {
-      return `- ${zone}：${station.anchorVisual}`
+      return `- ${zone}: ${station.anchorVisual}`
     }
-    return `- ${zone}放置着${station.anchorVisual}`
+    return `- ${zone} holds ${station.anchorVisual}`
   })
 
   return [
-    `CG概念艺术风格，单张完整场景俯瞰图。${input.sceneBrief}。`,
-    `场景中沿${describeRouteStyle(input.routeStyle)}路线分布着 ${n} 个醒目且各不相同的标志物，彼此间距明显、互不重叠：`,
+    `CG concept-art style, one complete bird's-eye view of the scene. ${input.sceneBrief}.`,
+    `Along the ${describeRouteStyle(input.routeStyle)} route, ${n} striking and distinct landmarks are arranged with clear spacing and no overlap:`,
     ...anchorDescs,
-    `画面明亮清晰，色彩丰富，空间纵深感强。每个标志物在画面中占据独立区域，尺寸醒目便于辨认。`,
-    `绝对不要出现任何文字、标签、数字、箭头或说明框。`,
+    `Bright, clear image with rich color and a strong sense of depth. Each landmark occupies its own area of the frame at a conspicuous, recognizable size.`,
+    `Absolutely no text, labels, numbers, arrows, or callout boxes may appear.`,
   ].join('\n')
 }

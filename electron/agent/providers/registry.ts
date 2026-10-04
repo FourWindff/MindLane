@@ -9,8 +9,9 @@ type ProviderMeta = {
 }
 
 /**
- * Provider 类须自声明全部 meta（id/displayName/capabilities/defaultModels），
- * 注册处与实例 getter 共用同一份声明，不再双写目录。
+ * Provider classes must declare all of their meta themselves
+ * (id/displayName/capabilities/defaultModels); the registration site and the
+ * instance getters share that single declaration instead of duplicating the catalog.
  */
 type ProviderConstructor = (new (config: ProviderConfig & { chatModel: string }) => LLMProvider) & {
   id: string
@@ -40,7 +41,7 @@ export function createProvider(
 ): LLMProvider {
   const ctor = providers.get(providerId)
   if (!ctor) {
-    throw new Error(`未知的 provider: ${providerId}`)
+    throw new Error(`unknown provider: ${providerId}`)
   }
   return new ctor(config)
 }
@@ -60,19 +61,19 @@ export function resolveChatProvider(settings: AppSettings): LLMProvider {
   const providerId = settings.activeProviders.chat || 'dashscope'
   const meta = getProviderMeta(providerId)
   if (!meta) {
-    throw new Error(`未知的 provider: ${providerId}`)
+    throw new Error(`unknown provider: ${providerId}`)
   }
   const providerConfig = settings.providerConfigs[providerId]
   const apiKey = providerConfig?.apiKey?.trim() ?? ''
   if (!apiKey) {
-    throw new Error('未填写 API Key')
+    throw new Error('API Key is missing')
   }
   const chatModel = settings.chatModel.trim()
   if (!chatModel) {
-    throw new Error('请选择模型')
+    throw new Error('Please select a model')
   }
   if (!meta.defaultModels.some((model) => model.id === chatModel)) {
-    throw new Error(`模型 ${chatModel} 不属于当前 provider`)
+    throw new Error(`model ${chatModel} does not belong to the current provider`)
   }
   return createProvider(providerId, { apiKey, chatModel, baseUrl: providerConfig?.baseUrl })
 }

@@ -1,28 +1,30 @@
 /**
- * AbortSignal 工具集。
+ * AbortSignal toolkit.
  *
- * 信号合流与可中断睡眠直接用平台实现（`AbortSignal.any` / `AbortSignal.timeout` /
- * `node:timers/promises` 的 `setTimeout`）；本模块只保留平台没有的那一件：
- * `raceWithAbort` —— 给任意 Promise 包一层取消能力。
+ * Signal merging and interruptible sleeps use the platform directly
+ * (`AbortSignal.any` / `AbortSignal.timeout` / `setTimeout` from
+ * `node:timers/promises`); this module keeps only the one piece the platform
+ * lacks: `raceWithAbort` — wraps any Promise with cancellation.
  */
 
 export class TimeoutError extends Error {
-  constructor(message = '操作超时') {
+  constructor(message = 'Operation timed out') {
     super(message)
     this.name = 'TimeoutError'
   }
 }
 
 class AbortError extends Error {
-  constructor(message = '操作已取消') {
+  constructor(message = 'Operation canceled') {
     super(message)
     this.name = 'AbortError'
   }
 }
 
 /**
- * 让任意 Promise 可被取消。signal abort 后 reject AbortError。
- * 注意：这只是让等待方"放弃"等待，底层任务是否真的停下来取决于它本身是否监听 signal。
+ * Make any Promise cancellable. Rejects with AbortError once the signal aborts.
+ * Note: this only lets the waiter "give up"; whether the underlying task really
+ * stops depends on whether it listens to the signal itself.
  */
 export function raceWithAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) {

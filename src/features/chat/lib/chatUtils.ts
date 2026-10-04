@@ -40,8 +40,9 @@ function extractNodeInfo(node: Node): ContextNodeInfo {
 }
 
 /**
- * 组装 compact 轮次状态信息：根节点链 + 直接子树（深度 1）。
- * 模型因此知道选中节点在图中的位置，无需调用 readMindmap 就能做兄弟定位。
+ * Build the compact turn state: root node chain + direct subtree (depth 1).
+ * That tells the model where the selected node sits in the map, so it can
+ * locate siblings without calling readMindmap.
  */
 export function extractNodeInfoCompact(
   node: Node,
@@ -50,7 +51,7 @@ export function extractNodeInfoCompact(
 ): ContextNodeInfo {
   const info = extractNodeInfo(node)
 
-  // 根节点链：沿父边向上走到根
+  // Root node chain: walk parent edges up to the root
   const parents = new Map(edges.map((e) => [e.target, e.source]))
   const chain: string[] = [node.id]
   let current = parents.get(node.id)
@@ -63,7 +64,7 @@ export function extractNodeInfoCompact(
   }
   info.chain = chain
 
-  // 直接子节点（compact 子树，深度 1）
+  // Direct children (compact subtree, depth 1)
   const children = edges
     .filter((e) => e.source === node.id)
     .map((e) => nodes.find((n) => n.id === e.target))

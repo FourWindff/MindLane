@@ -1,8 +1,9 @@
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 
 /**
- * 点击胶囊时解析要打开的文件路径：优先当前已加载实例（改名/移动后最新），
- * 未在本启动打开过时回退持久映射 `fileUuidPaths`。
+ * Resolve the file path to open when a capsule is clicked: prefer the currently
+ * loaded instance (freshest after a rename or move), falling back to the
+ * persisted `fileUuidPaths` map when the file was not opened in this launch.
  */
 export function resolveCapsuleOpenPath(
   fileUuid: string,

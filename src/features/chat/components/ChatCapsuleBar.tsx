@@ -49,14 +49,14 @@ export function ChatCapsuleBar({ expanded, onToggleExpand }: ChatCapsuleBarProps
   return (
     <div
       className={`chat-capsule-bar ${expanded ? 'chat-capsule-bar--expanded' : ''}`}
-      aria-label="活跃会话"
+      aria-label="Active sessions"
     >
       <button
         type="button"
         className="chat-capsule-bar__toggle"
         onClick={onToggleExpand}
-        title={expanded ? '收起' : '展开'}
-        aria-label={expanded ? '收起胶囊条' : '展开胶囊条'}
+        title={expanded ? 'Collapse' : 'Expand'}
+        aria-label={expanded ? 'Collapse capsule bar' : 'Expand capsule bar'}
       >
         {expanded ? (
           <ChevronRight size={14} strokeWidth={2} />
@@ -102,8 +102,8 @@ function Capsule({
         <span
           className="chat-capsule__switch"
           role="button"
-          title="切换会话"
-          aria-label="切换会话"
+          title="Switch session"
+          aria-label="Switch session"
           onClick={(e) => {
             e.stopPropagation()
             onSwitchSession()

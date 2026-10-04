@@ -21,7 +21,7 @@ describe('createReadMindmapTool', () => {
       scope: 'subtree',
       subtreeId: 'n1',
       type: 'text',
-      textContains: '指南',
+      textContains: 'guide',
       maxDepth: 2,
     })
 
@@ -29,7 +29,7 @@ describe('createReadMindmapTool', () => {
       scope: 'subtree',
       subtreeId: 'n1',
       type: 'text',
-      textContains: '指南',
+      textContains: 'guide',
       maxDepth: 2,
     })
   })
@@ -45,27 +45,27 @@ describe('createReadMindmapTool', () => {
 
   it('surfaces a provider error as a clear tool error', async () => {
     const tool = createReadMindmapTool(async () => {
-      throw new Error('编辑器不可用（窗口已关闭），无法读取导图')
+      throw new Error('Editor is unavailable (the window is closed); cannot read mindmap')
     })
 
     const result = await tool.invoke({ fileUuid: 'file-a' })
 
     expect(result).toEqual({
       ok: false,
-      error: '编辑器不可用（窗口已关闭），无法读取导图',
+      error: 'Editor is unavailable (the window is closed); cannot read mindmap',
     })
   })
 
   it('surfaces a provider timeout rejection as a clear tool error', async () => {
     const tool = createReadMindmapTool(async () => {
-      throw new Error('读取导图超时（3s 内未收到渲染层响应）')
+      throw new Error('Read mindmap timed out (no response from the renderer within 3s)')
     })
 
     const result = await tool.invoke({ fileUuid: 'file-a' })
 
     expect(result).toEqual({
       ok: false,
-      error: '读取导图超时（3s 内未收到渲染层响应）',
+      error: 'Read mindmap timed out (no response from the renderer within 3s)',
     })
   })
 
@@ -82,9 +82,9 @@ describe('createReadMindmapTool', () => {
     const tool = createReadMindmapTool(async () => 'tree')
     const description = (tool as unknown as { description: string }).description
 
-    // 引导模型如何取 fileUuid，并注明「写工具执行即落盘」的语义。
+    // Guides the model on how to obtain fileUuid and states the "write tools land as soon as they execute" semantics.
     expect(description).toContain('file_uuid')
-    expect(description).toContain('执行即落盘')
-    expect(description).toContain('恢复策略')
+    expect(description).toContain('land as soon as they execute')
+    expect(description).toContain('recovery strategy')
   })
 })

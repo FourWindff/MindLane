@@ -73,7 +73,7 @@ describe('McpManager', () => {
     return { manager, onToolsChanged }
   }
 
-  it('启动时连接已授权 server，工具加 server 前缀后注入', async () => {
+  it('connects authorized servers at startup and injects tools with the server prefix', async () => {
     const { manager, onToolsChanged } = createManager({
       createClient: () => makeClient(['API-post-search', 'API-retrieve-page']),
     })
@@ -94,19 +94,19 @@ describe('McpManager', () => {
     ])
   })
 
-  it('启动时从持久化用户态水合 workspace 名', async () => {
+  it('hydrates the workspace name from persisted user state at startup', async () => {
     const { manager } = createManager()
 
-    await manager.start({ notion: { state: 'disconnected', workspaceName: '我的知识库' } })
+    await manager.start({ notion: { state: 'disconnected', workspaceName: 'My Knowledge Base' } })
 
-    // 未授权不重连，但展示信息已水合
+    // Not authorized so no reconnect, but the display info is hydrated
     expect(manager.getTools()).toEqual([])
     expect(manager.getStatuses()[0]).toEqual(
-      expect.objectContaining({ state: 'disconnected', workspaceName: '我的知识库' }),
+      expect.objectContaining({ state: 'disconnected', workspaceName: 'My Knowledge Base' }),
     )
   })
 
-  it('单个 server 连接失败被隔离：标记 failed，不影响其他 server，也不抛错', async () => {
+  it('isolates a single server failure: marks it failed without affecting other servers or throwing', async () => {
     const { manager } = createManager({
       servers: [makeDef('notion'), makeDef('other')],
       createClient: (def) =>
@@ -127,15 +127,15 @@ describe('McpManager', () => {
     expect(manager.getTools().map((t) => t.name)).toEqual(['other__ping'])
   })
 
-  it('未知的 server id 静默跳过，不抛错', async () => {
+  it('silently skips unknown server ids without throwing', async () => {
     const { manager } = createManager()
 
     await expect(manager.start({ ghost: { state: 'connected' } })).resolves.toBeUndefined()
     expect(manager.getTools()).toEqual([])
   })
 
-  it('断开后工具移除、OAuth 凭据删除、状态回到 disconnected', async () => {
-    // OAuth server：断开仍删除已存 token（与非 OAuth 表单配置保留的规则相反）
+  it('removes tools, deletes OAuth credentials and returns to disconnected after disconnect', async () => {
+    // OAuth server: disconnecting still deletes the stored token (the opposite of the keep rule for non-OAuth form config)
     const makeOAuthDef = (id: string) =>
       makeDef(id, {
         createAuthProvider: (() => ({
@@ -166,7 +166,7 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
   })
 
-  it('connect 走交互式路径并返回最终状态', async () => {
+  it('connect takes the interactive path and returns the final status', async () => {
     const { manager } = createManager()
 
     const status = await manager.connect('notion')
@@ -175,7 +175,7 @@ describe('McpManager', () => {
     expect(manager.getTools().map((t) => t.name)).toEqual(['notion__API-post-search'])
   })
 
-  it('连接中触发 disconnect 后，迟到的连接结果不会重新注入工具', async () => {
+  it('does not re-inject tools from a late connect result after disconnecting mid-connect', async () => {
     let releaseTools: (tools: DynamicStructuredTool[]) => void = () => {}
     const pendingClient: McpClientLike = {
       getTools: vi.fn(
@@ -197,7 +197,7 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
   })
 
-  // ---- 非 OAuth header 认证（Obsidian 类 server） ----
+  // ---- Non-OAuth header auth (Obsidian-style servers) ----
 
   const obsidianDef = (extra: Partial<McpServerDefinition> = {}) =>
     makeDef('obsidian', {
@@ -208,7 +208,7 @@ describe('McpManager', () => {
       ...extra,
     })
 
-  it('表单凭据经 createAuthHeaders 解析为认证头，注入 client 工厂', async () => {
+  it('resolves form credentials into auth headers via createAuthHeaders and injects them into the client factory', async () => {
     let receivedHeaders: Record<string, string> | undefined
     const { manager } = createManager({
       servers: [obsidianDef()],
@@ -224,7 +224,7 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'connected' }))
   })
 
-  it('启动静默重连时从持久化 secrets 解析认证头，无需重新填表', async () => {
+  it('resolves auth headers from persisted secrets on silent reconnect at startup, without refilling the form', async () => {
     let receivedHeaders: Record<string, string> | undefined
     const { manager } = createManager({
       credentialCrypto: testCrypto,
@@ -234,7 +234,7 @@ describe('McpManager', () => {
         return makeClient(['read_file'])
       },
     })
-    // 模拟上次连接写入的加密凭据文件
+    // Simulate the encrypted credential file written by the previous connection
     const credPath = path.join(userDataPath, 'mcp-credentials', 'obsidian.json')
     fs.mkdirSync(path.dirname(credPath), { recursive: true })
     fs.writeFileSync(
@@ -248,7 +248,7 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'connected' }))
   })
 
-  it('allowlist 裁剪先于注册：16 个工具注册为 13 个，破坏性工具被剔除', async () => {
+  it('trims the allowlist before registration: 16 tools register as 13, destructive tools removed', async () => {
     const { manager } = createManager({
       servers: [obsidianDef({ excludeTools: ['vault_delete', 'command_execute', 'open_file'] })],
       createClient: () =>
@@ -282,9 +282,9 @@ describe('McpManager', () => {
     }
   })
 
-  it('缺少必填表单字段时连接失败，错误信息含字段标签与指引文案', async () => {
+  it('fails the connection when required form fields are missing, with the field label and hint copy in the error', async () => {
     const { manager } = createManager({
-      servers: [obsidianDef({ failureHint: '请打开 Obsidian 并启用 Local REST API 插件' })],
+      servers: [obsidianDef({ failureHint: 'Open Obsidian and enable the Local REST API plugin' })],
       createClient: () => makeClient(['read_file']),
     })
 
@@ -292,23 +292,25 @@ describe('McpManager', () => {
 
     expect(status.state).toBe('failed')
     expect(status.error).toContain('API Key')
-    expect(status.error).toContain('请打开 Obsidian 并启用 Local REST API 插件')
+    expect(status.error).toContain('Open Obsidian and enable the Local REST API plugin')
     expect(manager.getTools()).toEqual([])
   })
 
-  it('连接失败时状态含指引文案', async () => {
+  it('includes the hint copy in the status when a connection fails', async () => {
     const { manager } = createManager({
-      servers: [obsidianDef({ failureHint: '请打开 Obsidian 并启用 Local REST API 插件' })],
-      createClient: () => makeFailingClient(new Error('连接被拒绝')),
+      servers: [obsidianDef({ failureHint: 'Open Obsidian and enable the Local REST API plugin' })],
+      createClient: () => makeFailingClient(new Error('Connection refused')),
     })
 
     await manager.connect('obsidian', { apiKey: 'k' })
 
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'failed' }))
-    expect(manager.getStatuses()[0].error).toContain('请打开 Obsidian 并启用 Local REST API 插件')
+    expect(manager.getStatuses()[0].error).toContain(
+      'Open Obsidian and enable the Local REST API plugin',
+    )
   })
 
-  it('断开后移除工具但保留 secrets 配置（表单配置可编辑复用）', async () => {
+  it('removes tools but keeps the secrets config after disconnect (editable form config is reusable)', async () => {
     const { manager } = createManager({
       credentialCrypto: testCrypto,
       servers: [obsidianDef()],
@@ -326,9 +328,9 @@ describe('McpManager', () => {
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
   })
 
-  it('状态信息携带表单字段元数据与失败指引', async () => {
+  it('status info carries the form field metadata and the failure hint', async () => {
     const { manager } = createManager({
-      servers: [obsidianDef({ failureHint: '请打开 Obsidian' })],
+      servers: [obsidianDef({ failureHint: 'Open Obsidian' })],
       createClient: () => makeClient(['read_file']),
     })
 
@@ -337,10 +339,10 @@ describe('McpManager', () => {
     expect(status.credentialFields).toEqual([
       { id: 'apiKey', label: 'API Key', required: true, secret: true },
     ])
-    expect(status.failureHint).toBe('请打开 Obsidian')
+    expect(status.failureHint).toBe('Open Obsidian')
   })
 
-  // ---- 飞书（开发者远程模式）UAT/TAT 头分支 ----
+  // ---- Feishu (developer remote mode) UAT/TAT header branches ----
 
   function makeFeishuManager(
     exchange?: (appId: string, appSecret: string) => Promise<string>,
@@ -359,7 +361,7 @@ describe('McpManager', () => {
     return { manager, receivedHeaders: () => receivedHeaders }
   }
 
-  it('有 UAT 时携带 X-Lark-MCP-UAT 头与 Allowed-Tools 头，不发起 TAT 换令牌', async () => {
+  it('sends the X-Lark-MCP-UAT and Allowed-Tools headers when a UAT is present, without exchanging for a TAT', async () => {
     const exchange = vi.fn(async () => 'app-token')
     const { manager, receivedHeaders } = makeFeishuManager(exchange)
 
@@ -373,7 +375,7 @@ describe('McpManager', () => {
     expect(receivedHeaders()?.['X-Lark-MCP-TAT']).toBeUndefined()
   })
 
-  it('无 UAT 时用 app 凭证现换 TAT 发 X-Lark-MCP-TAT 头', async () => {
+  it('exchanges app credentials for a TAT and sends the X-Lark-MCP-TAT header when no UAT is present', async () => {
     const exchange = vi.fn(async () => 'app-token')
     const { manager, receivedHeaders } = makeFeishuManager(exchange)
 
@@ -387,7 +389,7 @@ describe('McpManager', () => {
     expect(receivedHeaders()?.['X-Lark-MCP-UAT']).toBeUndefined()
   })
 
-  it('TAT 现换失败时降级为 failed，错误含检查 app 凭证指引', async () => {
+  it('degrades to failed when the TAT exchange fails, with a hint to check the app credentials in the error', async () => {
     const exchange = vi.fn(async () => {
       throw new Error('app_secret invalid')
     })
@@ -401,7 +403,7 @@ describe('McpManager', () => {
     expect(manager.getTools()).toEqual([])
   })
 
-  it('客户端 allowlist 再收敛：剔除写操作/通用工具，保留文档工具', async () => {
+  it('client allowlist trims further: removes write operations/generic tools, keeps document tools', async () => {
     const { manager } = makeFeishuManager(
       async () => 'app-token',
       [
@@ -424,7 +426,7 @@ describe('McpManager', () => {
     }
   })
 
-  it('断开后工具移除、配置保留，状态回到 disconnected（表单配置可编辑复用）', async () => {
+  it('removes tools but keeps the config after disconnect, back to disconnected (editable form config is reusable)', async () => {
     const { manager } = makeFeishuManager()
     await manager.connect('feishu', { appId: 'a', appSecret: 's', uat: 'u' })
     expect(manager.getTools().length).toBe(3)
@@ -434,7 +436,7 @@ describe('McpManager', () => {
 
     expect(manager.getTools()).toEqual([])
     expect(manager.getStatuses()[0]).toEqual(expect.objectContaining({ state: 'disconnected' }))
-    // 表单配置类 server 断开后保留凭据，方便修改后重连
+    // Form-configured servers keep credentials after disconnect, so they can be edited and reconnected
     expect(manager.getSecrets('feishu')).toEqual({ appId: 'a', appSecret: 's', uat: 'u' })
   })
 })

@@ -42,7 +42,8 @@ function reconcileOpenFilePaths(registry: OpenFileRegistry): void {
     if (fileUuidPaths[fileUuid] === filePath) continue
     useAiStore.getState().updateFileUuidPath(fileUuid, filePath)
     if (!workspacePath) continue
-    // 经桥落盘持久映射，供下次启动渲染胶囊条；失败不阻断本次投影。
+    // Persist the mapping through the bridge so the next launch can render the
+    // capsule bar; a failure here does not block the current projection.
     void window.mindlane?.workspace
       .updateFileUuidPath({ workspacePath, fileUuid, filePath })
       .catch(() => {})

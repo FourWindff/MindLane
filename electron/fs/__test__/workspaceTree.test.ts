@@ -46,7 +46,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('工作目录不存在')
+    expect(result.error).toContain('Workspace directory does not exist')
   })
 
   it('createDirectory creates a new directory and returns its path', async () => {
@@ -65,7 +65,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('已存在')
+    expect(result.error).toContain('already exists')
   })
 
   it('createSubdirectory returns an error when the target is outside the workspace', async () => {
@@ -76,7 +76,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('不在工作区内')
+    expect(result.error).toContain('is not inside the workspace')
   })
 
   it('createSubdirectory creates a folder inside the workspace', async () => {
@@ -95,7 +95,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('不在工作区内')
+    expect(result.error).toContain('is not inside the workspace')
   })
 
   it('deleteItem moves an in-workspace item to trash', async () => {
@@ -129,7 +129,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('已存在')
+    expect(result.error).toContain('already exists')
   })
 
   it('move returns an error when the source is outside the workspace', async () => {
@@ -140,7 +140,7 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('源路径不在工作区内')
+    expect(result.error).toContain('Source path is not inside the workspace')
   })
 
   it('move relocates an item inside the workspace', async () => {
@@ -167,6 +167,6 @@ describe('WorkspaceTree', () => {
 
     expect(result.ok).toBe(false)
     if (result.ok) return
-    expect(result.error).toContain('目标目录不在工作区内')
+    expect(result.error).toContain('Target directory is not inside the workspace')
   })
 })

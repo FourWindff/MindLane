@@ -39,11 +39,11 @@ type Props = {
   chatOpen: boolean
   capsuleExpanded: boolean
   onToggleChatOpen: () => void
-  /** AI 服务就绪门控：不可用时聊天入口禁用并红色背景提示。 */
+  /** AI readiness gate: when unavailable the chat entry is disabled with a red background hint. */
   aiReady?: boolean
-  /** 样式面板内容，打开时渲染在工具栏下方。 */
+  /** Style panel content; rendered below the toolbar when open. */
   stylePanel?: React.ReactNode
-  /** 关联文件面板内容，打开时渲染在工具栏下方。 */
+  /** Linked files panel content; rendered below the toolbar when open. */
   documentRefsPanel?: React.ReactNode
 }
 
@@ -64,7 +64,7 @@ function ToolbarButton({
   icon: React.ReactNode
   variant?: 'default' | 'danger'
   active?: boolean
-  /** 服务不可用：保持禁用且红色背景提示（区别于普通 disabled 的淡出）。 */
+  /** Service unavailable: stays disabled with a red background hint (unlike the plain disabled fade). */
   unavailable?: boolean
 }) {
   return (
@@ -130,9 +130,9 @@ export function MindmapHeader({
       if (
         target instanceof Element &&
         (target.closest('.style-panel') ||
-          target.closest('[aria-label="导图样式"]') ||
+          target.closest('[aria-label="Mindmap style"]') ||
           target.closest('.document-refs-panel') ||
-          target.closest('[aria-label="关联文件"]'))
+          target.closest('[aria-label="Linked files"]'))
       ) {
         return
       }
@@ -150,14 +150,14 @@ export function MindmapHeader({
     >
       <div className="mindmap-header__panel">
         <div className="mindmap-header__toolbar-viewport">
-          <nav className="float-toolbar" aria-label="导图操作">
+          <nav className="float-toolbar" aria-label="Mindmap actions">
             <div className="float-toolbar__group float-toolbar__group--edit">
               {onUndo && (
                 <ToolbarButton
                   onClick={onUndo}
                   disabled={!canUndo}
-                  ariaLabel="撤销"
-                  tooltip="撤销 (Ctrl+Z)"
+                  ariaLabel="Undo"
+                  tooltip="Undo (Ctrl+Z)"
                   icon={<Undo2 size={22} strokeWidth={1.5} />}
                 />
               )}
@@ -165,30 +165,32 @@ export function MindmapHeader({
                 <ToolbarButton
                   onClick={onRedo}
                   disabled={!canRedo}
-                  ariaLabel="重做"
-                  tooltip="重做 (Ctrl+Shift+Z)"
+                  ariaLabel="Redo"
+                  tooltip="Redo (Ctrl+Shift+Z)"
                   icon={<Redo2 size={22} strokeWidth={1.5} />}
                 />
               )}
               <ToolbarButton
                 onClick={onAddChild}
                 disabled={!canAddChild}
-                ariaLabel="添加子主题"
-                tooltip="添加子主题"
+                ariaLabel="Add child topic"
+                tooltip="Add child topic"
                 icon={<GitBranch size={22} strokeWidth={1.5} />}
               />
               <ToolbarButton
                 onClick={onAddSibling}
                 disabled={!canAddSibling}
-                ariaLabel="添加同级主题"
-                tooltip={!canAddSibling ? '根节点不能添加同级' : '添加同级主题'}
+                ariaLabel="Add sibling topic"
+                tooltip={
+                  !canAddSibling ? 'The root node cannot have siblings' : 'Add sibling topic'
+                }
                 icon={<BetweenHorizontalStart size={22} strokeWidth={1.5} />}
               />
               <ToolbarButton
                 onClick={onRemove}
                 disabled={!canRemove}
-                ariaLabel="删除"
-                tooltip="删除"
+                ariaLabel="Delete"
+                tooltip="Delete"
                 variant="danger"
                 icon={<Trash2 size={22} strokeWidth={1.5} />}
               />
@@ -200,24 +202,24 @@ export function MindmapHeader({
               {onCenterRoot && (
                 <ToolbarButton
                   onClick={onCenterRoot}
-                  ariaLabel="回到中心主题"
-                  tooltip="回到中心主题 (Ctrl+0)"
+                  ariaLabel="Back to central topic"
+                  tooltip="Back to central topic (Ctrl+0)"
                   icon={<Locate size={22} strokeWidth={1.5} />}
                 />
               )}
               {onSave && (
                 <ToolbarButton
                   onClick={onSave}
-                  ariaLabel="保存"
-                  tooltip="保存 (Ctrl+S)"
+                  ariaLabel="Save"
+                  tooltip="Save (Ctrl+S)"
                   icon={<Save size={22} strokeWidth={1.5} />}
                 />
               )}
               {onSwitchWorkspace && (
                 <ToolbarButton
                   onClick={onSwitchWorkspace}
-                  ariaLabel="切换仓库"
-                  tooltip="切换仓库"
+                  ariaLabel="Switch workspace"
+                  tooltip="Switch workspace"
                   icon={<FolderInput size={22} strokeWidth={1.5} />}
                 />
               )}
@@ -230,8 +232,8 @@ export function MindmapHeader({
                 <ToolbarButton
                   onClick={onToggleDocumentRefsPanel}
                   disabled={!hasDocumentRefs}
-                  ariaLabel="关联文件"
-                  tooltip={!hasDocumentRefs ? '当前没有关联文件' : '关联文件'}
+                  ariaLabel="Linked files"
+                  tooltip={!hasDocumentRefs ? 'No linked files' : 'Linked files'}
                   active={documentRefsPanelOpen}
                   icon={<Paperclip size={22} strokeWidth={1.5} />}
                 />
@@ -239,8 +241,8 @@ export function MindmapHeader({
               {onToggleStylePanel && (
                 <ToolbarButton
                   onClick={onToggleStylePanel}
-                  ariaLabel="导图样式"
-                  tooltip="导图样式"
+                  ariaLabel="Mindmap style"
+                  tooltip="Mindmap style"
                   active={stylePanelOpen}
                   icon={<Palette size={22} strokeWidth={1.5} />}
                 />
@@ -248,8 +250,8 @@ export function MindmapHeader({
               {onOpenSettings && (
                 <ToolbarButton
                   onClick={onOpenSettings}
-                  ariaLabel="打开设置"
-                  tooltip="打开设置"
+                  ariaLabel="Open settings"
+                  tooltip="Open settings"
                   icon={<Settings size={22} strokeWidth={1.5} />}
                 />
               )}
@@ -257,8 +259,10 @@ export function MindmapHeader({
                 onClick={onToggleChatOpen}
                 disabled={!aiReady}
                 unavailable={!aiReady}
-                ariaLabel={chatOpen ? '隐藏聊天' : '显示聊天'}
-                tooltip={aiReady ? (chatOpen ? '隐藏聊天' : '显示聊天') : '聊天服务不可用'}
+                ariaLabel={chatOpen ? 'Hide chat' : 'Show chat'}
+                tooltip={
+                  aiReady ? (chatOpen ? 'Hide chat' : 'Show chat') : 'Chat service unavailable'
+                }
                 active={aiReady && !chatOpen}
                 icon={
                   chatOpen ? (

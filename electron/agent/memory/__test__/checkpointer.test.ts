@@ -12,7 +12,7 @@ describe('CheckpointerManager', () => {
     try {
       await manager.initWithDbPath(':memory:')
     } catch {
-      // better-sqlite3 模块版本不匹配时跳过涉及数据库的测试
+      // Skip database-backed tests when the better-sqlite3 module version mismatches
     }
   })
 
@@ -154,19 +154,19 @@ describe('checkpointMessagesToSessionMessages', () => {
     const messages: BaseMessage[] = [
       new AIMessage({
         content: [
-          { type: 'text', text: '我将为您扩展思维导图。' },
+          { type: 'text', text: 'I will expand your mindmap.' },
           {
             type: 'tool_use',
             id: 'tool_abc',
             name: 'generateMindmapFragment',
-            input: { source: { type: 'text', content: '内容' } },
+            input: { source: { type: 'text', content: 'source text' } },
           },
         ],
         tool_calls: [
           {
             id: 'tool_abc',
             name: 'generateMindmapFragment',
-            args: { source: { type: 'text', content: '内容' } },
+            args: { source: { type: 'text', content: 'source text' } },
           },
         ],
       }),
@@ -175,11 +175,11 @@ describe('checkpointMessagesToSessionMessages', () => {
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({
       role: 'assistant',
-      content: '我将为您扩展思维导图。',
+      content: 'I will expand your mindmap.',
       toolCalls: [
         {
           name: 'generateMindmapFragment',
-          args: { source: { type: 'text', content: '内容' } },
+          args: { source: { type: 'text', content: 'source text' } },
           result: '',
         },
       ],
@@ -231,7 +231,7 @@ describe('checkpointMessagesToSessionMessages', () => {
         tool_calls: [{ id: 'sc1', name: 'updateMindmapNode', args: {} }],
       }),
       new ToolMessage({
-        content: '{"ok":false,"error":"[block_not_found] 节点不存在"}',
+        content: '{"ok":false,"error":"[block_not_found] Node not found"}',
         tool_call_id: 'sc1',
       }),
       new AIMessage('Done.'),

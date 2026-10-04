@@ -148,10 +148,10 @@ describe('ChatMessageList', () => {
   it('renders the empty-state quick actions with their prompts', () => {
     const html = renderMessageList({})
 
-    expect(html).toContain('生成思维导图')
-    expect(html).toContain('总结内容')
-    expect(html).toContain('头脑风暴')
-    expect(html).toContain('优化结构')
+    expect(html).toContain('Generate mindmap')
+    expect(html).toContain('Summarize content')
+    expect(html).toContain('Brainstorm')
+    expect(html).toContain('Optimize structure')
   })
 
   it('renders history tool cards above the AI bubble, one card per tool call', () => {
@@ -161,7 +161,7 @@ describe('ChatMessageList', () => {
           chatMessages: [
             {
               role: 'assistant',
-              content: '已插入',
+              content: 'Inserted',
               toolCalls: [
                 { name: 'insertXmlFragment', status: 'success' },
                 { name: 'readMindmap', status: 'error' },
@@ -174,8 +174,8 @@ describe('ChatMessageList', () => {
 
     const cards = html.match(/chat-message-list__tool-card__name/g)
     expect(cards).toHaveLength(2)
-    // 卡片区在气泡（正文）之前渲染，且每个卡片单独成行（tool-cards 为纵向布局）
-    expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('已插入'))
+    // Cards render before the bubble (body text), one card per line (tool-cards is a vertical layout)
+    expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('Inserted'))
     expect(html).toContain('chat-message-list__tool-card--success')
     expect(html).toContain('chat-message-list__tool-card--error')
     expect(html).toContain('Insert XML Fragment')
@@ -189,7 +189,7 @@ describe('ChatMessageList', () => {
           chatMessages: [
             {
               role: 'assistant',
-              content: '生成中',
+              content: 'Generating',
               toolCalls: [
                 { name: 'generateMindmapFragment', status: 'running' },
                 { name: 'generatePalace', status: 'canceled' },
@@ -215,7 +215,7 @@ describe('ChatMessageList', () => {
           chatMessages: [
             {
               role: 'assistant',
-              content: '旧会话',
+              content: 'Old session',
               toolCalls: [{ name: 'updateMindmapNode' }],
             },
           ],
@@ -240,7 +240,7 @@ describe('ChatMessageList', () => {
             },
             {
               role: 'assistant',
-              content: '已插入',
+              content: 'Inserted',
               toolCalls: [{ name: 'readMindmap', status: 'success' }],
             },
           ],
@@ -253,7 +253,7 @@ describe('ChatMessageList', () => {
     const cards = html.match(/chat-message-list__tool-card__name/g)
     expect(cards).toHaveLength(2)
     expect((html.match(/chat-message-list__bubble--ai/g) ?? []).length).toBe(1)
-    expect(html).toContain('已插入')
+    expect(html).toContain('Inserted')
   })
 
   it('keeps an isolated pure-tool message as a card-only row with no empty bubble', () => {
@@ -281,7 +281,7 @@ describe('ChatMessageList', () => {
       fileChats: {
         'file-a': fileChat({
           busy: true,
-          streamText: '正在生成',
+          streamText: 'Generating',
           toolCards: [
             { id: 'call-1', name: 'moveMindmapNode', status: 'running' },
             { id: 'call-2', name: 'deleteMindmapNode', status: 'success' },
@@ -295,12 +295,12 @@ describe('ChatMessageList', () => {
     expect(html).toContain('chat-message-list__spinner')
     expect(html).toContain('Move Node')
     expect(html).toContain('Delete Node')
-    // 流式卡片同样在正文之前
-    expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('正在生成'))
+    // Streaming cards render before the body text too
+    expect(html.indexOf('chat-message-list__tool-cards')).toBeLessThan(html.indexOf('Generating'))
   })
 
   it('anchors each streaming round cards above its own segment instead of below the newest message', () => {
-    // During a multi-round turn, a flushed segment ("读取完成") owns its cards
+    // During a multi-round turn, a flushed segment ("Read complete") owns its cards
     // already committed via message-start; the live row only holds the current
     // round (insertXmlFragment + its streaming text). No tool block floats below
     // the newest committed message.
@@ -308,12 +308,12 @@ describe('ChatMessageList', () => {
       fileChats: {
         'file-a': fileChat({
           busy: true,
-          streamText: '开始生成',
+          streamText: 'Starting generation',
           toolCards: [{ id: 'call-b', name: 'insertXmlFragment', status: 'success' }],
           chatMessages: [
             {
               role: 'assistant',
-              content: '读取完成',
+              content: 'Read complete',
               toolCalls: [{ name: 'readMindmap', status: 'success' }],
             },
           ],
@@ -324,9 +324,9 @@ describe('ChatMessageList', () => {
     // The streaming row renders first in DOM (column-reverse flips visual order):
     // within each block cards sit above their own text, and the committed
     // segment sits between the two card groups — no card floats below it.
-    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('读取完成'))
-    expect(html.indexOf('读取完成')).toBeGreaterThan(html.indexOf('Insert XML Fragment'))
-    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('开始生成'))
+    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('Read complete'))
+    expect(html.indexOf('Read complete')).toBeGreaterThan(html.indexOf('Insert XML Fragment'))
+    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('Starting generation'))
   })
 
   it('renders canceled cards for a stopped stream without spinners', () => {
@@ -352,12 +352,12 @@ describe('ChatMessageList', () => {
           chatMessages: [
             {
               role: 'assistant',
-              content: '第一轮',
+              content: 'Round one',
               toolCalls: [{ name: 'readMindmap', status: 'success' }],
             },
             {
               role: 'assistant',
-              content: '第二轮',
+              content: 'Round two',
               toolCalls: [{ name: 'insertXmlFragment', status: 'error' }],
             },
           ],
@@ -365,13 +365,14 @@ describe('ChatMessageList', () => {
       },
     })
 
-    // 消息倒序渲染：第二轮在前。各轮卡片紧跟各自的正文气泡（卡片先于正文）
+    // Messages render in reverse order: round two first. Each round's cards sit
+    // right before their own body bubble (cards above text)
     const firstCards = html.match(/Read Mindmap/g)
     const secondCards = html.match(/Insert XML Fragment/g)
     expect(firstCards).toHaveLength(1)
     expect(secondCards).toHaveLength(1)
-    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('第二轮'))
-    expect(html.indexOf('Read Mindmap')).toBeGreaterThan(html.indexOf('第二轮'))
-    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('第一轮'))
+    expect(html.indexOf('Insert XML Fragment')).toBeLessThan(html.indexOf('Round two'))
+    expect(html.indexOf('Read Mindmap')).toBeGreaterThan(html.indexOf('Round two'))
+    expect(html.indexOf('Read Mindmap')).toBeLessThan(html.indexOf('Round one'))
   })
 })

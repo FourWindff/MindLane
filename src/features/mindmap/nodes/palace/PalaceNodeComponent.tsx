@@ -18,7 +18,7 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   const editor = useActiveMindmapEditor()
   const assets = useActiveMindmapStore((state) => state.assets)
   const asset = data.assetId ? assets.find((a) => a.id === data.assetId) : undefined
-  // 图片一律经 asset 引用；迁移期下载失败的旧数据保留 imageUrl 兜底
+  // Images are always referenced through an asset; legacy data whose download failed keeps imageUrl as a fallback
   const imageSrc = asset ? assetToDataUrl(asset) : data.imageUrl || ''
 
   const prevExpanded = useRef(expanded)
@@ -47,7 +47,7 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
   )
 
   if (data.generating) {
-    // Manual run in flight: progress sits beside the node (CONTEXT.md「流事件路由」),
+    // Manual run in flight: progress sits beside the node (CONTEXT.md "stream event routing"),
     // not in the chat panel. A stopped/failed run keeps the placeholder so it can
     // resume on its own private thread, and that is what the button then offers.
     const stopped = data.runStopped === true
@@ -64,10 +64,10 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
             if (stopped) void resumePalaceRun(fileUuid, id)
             else stopPalaceRun(fileUuid, id)
           }}
-          aria-label={stopped ? '继续生成宫殿' : '中止生成宫殿'}
+          aria-label={stopped ? 'Resume palace generation' : 'Abort palace generation'}
         >
           {stopped ? <ChevronRight size={12} strokeWidth={2} /> : <X size={12} strokeWidth={2} />}
-          {stopped ? '继续' : '中止'}
+          {stopped ? 'Resume' : 'Abort'}
         </button>
         <Handle type="source" position={Position.Right} />
       </div>
@@ -90,12 +90,17 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
 
       {showExpanded && (
         <div className="palace-node-expanded-inner">
-          <button className="palace-node__collapse-btn" onClick={collapse} aria-label="收起">
+          <button className="palace-node__collapse-btn" onClick={collapse} aria-label="Collapse">
             <Minimize2 size={14} strokeWidth={2} />
           </button>
           <div className="palace-node__thumb">
             {imageSrc ? (
-              <img src={imageSrc} alt="记忆宫殿" className="palace-node__img" draggable={false} />
+              <img
+                src={imageSrc}
+                alt="Memory palace"
+                className="palace-node__img"
+                draggable={false}
+              />
             ) : (
               <div className="palace-node__placeholder">
                 <Landmark size={24} strokeWidth={1.5} />
@@ -103,8 +108,8 @@ function PalaceNodeInner({ id, data: rawData, selected }: NodeProps) {
             )}
           </div>
           <div className="palace-node__info">
-            <span className="palace-node__label">{data.label || '记忆宫殿'}</span>
-            <span className="palace-node__badge">{stations.length} 站</span>
+            <span className="palace-node__label">{data.label || 'Memory palace'}</span>
+            <span className="palace-node__badge">{stations.length} stations</span>
           </div>
         </div>
       )}

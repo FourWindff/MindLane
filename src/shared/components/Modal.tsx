@@ -1,20 +1,20 @@
 import { useEffect, type ReactNode, type RefObject } from 'react'
 
 interface ModalProps {
-  /** 标题元素 id，接 `aria-labelledby` */
+  /** Id of the title element, wired to `aria-labelledby` */
   labelledBy: string
-  /** Escape / 遮罩点击统一走这里 */
+  /** Escape and backdrop clicks both route here */
   onCancel: () => void
-  /** Enter 提交；缺省时 Enter 不拦截（如忙碌期间） */
+  /** Enter submits; without it Enter is not intercepted (e.g. while busy) */
   onSubmit?: () => void
-  /** 挂载后聚焦的元素；缺省不动焦点（确认框保持既有行为） */
+  /** Element to focus after mount; without it focus is left alone (confirm dialogs keep their behavior) */
   initialFocusRef?: RefObject<HTMLInputElement | null>
-  /** 聚焦时全选初值 */
+  /** Select the initial value on focus */
   selectInitial?: boolean
-  /** 遮罩 className：工作区首页用容器内定位的那份，其余用铺满视口的默认值 */
+  /** Backdrop className: the workspace home uses the container-positioned one, the rest use the viewport-filling default */
   backdropClassName?: string
   panelClassName?: string
-  /** 面板 ref；需要查询面板内元素（如自动聚焦）的调用方使用 */
+  /** Panel ref; for callers that need to query elements inside the panel (e.g. autofocus) */
   panelRef?: RefObject<HTMLDivElement>
   children: ReactNode
 }

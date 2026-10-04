@@ -104,11 +104,13 @@ function createRegistryHarness() {
 }
 
 function activateMindmap(fileUuid: string): void {
-  // 源头不变量：发送必有活动文件。buildChatContext 不再兜底默认实例，
-  // 测试在此建立不变量（注册活动导图实例，uuid/path/title 创建即存在）。
+  // Source invariant: a send always has an active file. buildChatContext no
+  // longer falls back to a default instance, so the test establishes the
+  // invariant here (register an active mindmap instance whose uuid/path/title
+  // exist from creation).
   const key = `test-${fileUuid}`
   const instance = openFileRegistry.getOrCreate(key)
-  const file = createEmptyFile('Test 导图')
+  const file = createEmptyFile('Test mindmap')
   file.metadata.fileUuid = fileUuid
   instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
   openFileRegistry.setActive(key)
@@ -260,8 +262,9 @@ describe('sendChatMessage handshake', () => {
     const context = chatStream.mock.calls[0]![0].context
     expect(context.fileUuid).toBe('file-a')
     expect(context.filePath).toBe('/file-a.mindlane')
-    expect(context.fileTitle).toBe('Test 导图')
-    // 导图树摘要不再随 ChatContext 发送（模型按需调用读工具）。
+    expect(context.fileTitle).toBe('Test mindmap')
+    // The mindmap tree summary is no longer sent with the ChatContext (the model
+    // calls the read tools on demand).
     expect(context).not.toHaveProperty('mindmapSummary')
   })
 
@@ -319,16 +322,16 @@ describe('sendChatMessage entry conversation (no file open)', () => {
   it('creates and opens a .mindlane file, then runs the turn inside that file', async () => {
     const { chatStream, createFile } = installApis()
 
-    expect(await useAiStore.getState().sendChatMessage('帮我整理一份学习计划')).toBe(true)
+    expect(await useAiStore.getState().sendChatMessage('Help me draft a study plan')).toBe(true)
 
     // Create: the file name comes from the first input line.
 
     expect(createFile).toHaveBeenCalledWith(
-      expect.objectContaining({ workspacePath: '/workspace', name: '帮我整理一份学习计划' }),
+      expect.objectContaining({ workspacePath: '/workspace', name: 'Help me draft a study plan' }),
     )
     // Open: the file is in the registry (editor ready, write proxy resolvable) and is current.
     const active = openFileRegistry.getActiveFile()
-    expect(active?.filePath).toBe('/workspace/帮我整理一份学习计划.mindlane')
+    expect(active?.filePath).toBe('/workspace/Help me draft a study plan.mindlane')
     expect(useAiStore.getState().currentFileUuid).toBe(active?.fileUuid)
 
     // Start stream: the context and the session both belong to the new file.
@@ -342,7 +345,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
     const chat = useAiStore.getState().fileChats[active!.fileUuid]
     expect(chatStream.mock.calls[0]![0].threadId).toBe(chat!.activeSessionId)
     expect(chat?.chatMessages).toEqual([
-      expect.objectContaining({ role: 'user', content: '帮我整理一份学习计划' }),
+      expect.objectContaining({ role: 'user', content: 'Help me draft a study plan' }),
     ])
     expect(chat?.busy).toBe(true)
     expect(useAiStore.getState().activeStreamIds[chat!.activeSessionId]).toBe('stream-1')
@@ -354,24 +357,24 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       attachedDocument: {
         id: 'doc-1',
         type: 'pdf',
-        source: '/报告.pdf',
-        filename: '报告.pdf',
+        source: '/report.pdf',
+        filename: 'report.pdf',
         importedAt: '2026-01-01T00:00:00.000Z',
       },
     })
 
     expect(await useAiStore.getState().sendChatMessage('')).toBe(true)
 
-    expect(createFile).toHaveBeenCalledWith(expect.objectContaining({ name: '报告' }))
+    expect(createFile).toHaveBeenCalledWith(expect.objectContaining({ name: 'report' }))
     const context = chatStream.mock.calls[0]![0].context
-    expect(context.attachedDocument?.filename).toBe('报告.pdf')
+    expect(context.attachedDocument?.filename).toBe('report.pdf')
   })
 
   it('starts no stream when the file cannot be created', async () => {
     const { chatStream, createFile } = installApis()
-    createFile.mockResolvedValueOnce({ ok: false as const, error: '创建文件失败' })
+    createFile.mockResolvedValueOnce({ ok: false as const, error: 'Failed to create the file' })
 
-    expect(await useAiStore.getState().sendChatMessage('你好')).toBe(false)
+    expect(await useAiStore.getState().sendChatMessage('Hello')).toBe(false)
 
     expect(chatStream).not.toHaveBeenCalled()
     expect(openFileRegistry.getActiveFile()).toBeNull()
@@ -388,12 +391,12 @@ describe('sendChatMessage entry conversation (no file open)', () => {
         }) as never,
     )
 
-    const first = useAiStore.getState().sendChatMessage('第一条')
-    const second = await useAiStore.getState().sendChatMessage('第二条')
+    const first = useAiStore.getState().sendChatMessage('First message')
+    const second = await useAiStore.getState().sendChatMessage('Second message')
     resolveCreate({
       ok: true,
       data: {
-        filePath: '/workspace/第一条.mindlane',
+        filePath: '/workspace/First message.mindlane',
         data: (createFile.mock.calls[0]![0] as { data: unknown }).data,
       },
     })
@@ -414,7 +417,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
         }) as never,
     )
 
-    const sending = useAiStore.getState().sendChatMessage('第一条')
+    const sending = useAiStore.getState().sendChatMessage('First message')
     await vi.waitFor(() => expect(resolveSessions).toBeTypeOf('function'))
     useAiStore.setState({ currentFileUuid: 'other-file' })
     resolveSessions({ ok: true, data: { sessions: [] } })

@@ -31,8 +31,9 @@ export function useActiveMindmapStore<T>(selector: (state: OpenFileState) => T):
 }
 
 /**
- * 「当前打开的文件正在被 AI 写入」。读的是打开的文件自己的标记（chat 投影写入），
- * 不订阅导图 store —— 忙闲切换不会惊动自动保存。
+ * "The currently open file is being written by AI". This reads the open file's own flag (written by
+ * the chat projection) and does not subscribe to the mindmap store -- toggling busy/idle never
+ * wakes auto-save.
  */
 export function useActiveFileAiWriting(): boolean {
   const instance = useActiveOpenFile()

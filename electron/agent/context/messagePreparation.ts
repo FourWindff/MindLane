@@ -15,23 +15,24 @@ import { logger } from '../../shared/logger.js'
 const log = logger.withContext('messagePreparation')
 
 /**
- * 消息准备配置
+ * Message preparation configuration
  *
- * 用于在 mindlaneAgent 调用 LLM 前对 state.messages 进行规范化与压缩。
+ * Used to normalize and compress state.messages before mindlaneAgent calls the LLM.
  */
 export interface MessagePreparationConfig {
-  /** 是否启用预处理管道 */
+  /** Whether the preparation pipeline is enabled */
   enabled: boolean
   /**
-   * 单次模型调用允许的**总输入** token 预算（含 system prompt 与当前用户消息）。
-   * 由模型上下文窗口推导：窗口 − 输出预留 − 估算误差缓冲。
+   * **Total input** token budget allowed for a single model call (including the system prompt
+   * and the current user message).
+   * Derived from the model context window: window − output reserve − estimation-error buffer.
    */
   inputBudgetTokens: number
-  /** 单条 tool_result 最大字节数，超过则转存磁盘 */
+  /** Max bytes for a single tool_result; larger results are offloaded to disk */
   toolResultMaxBytes: number
-  /** snip 时是否始终保留 system 消息 */
+  /** Whether snip always keeps system messages */
   snipPreserveSystem: boolean
-  /** snip 时是否始终保留最后一条 user 消息 */
+  /** Whether snip always keeps the last user message */
   snipPreserveLastUser: boolean
 }
 
@@ -43,10 +44,11 @@ const DEFAULT_MESSAGE_PREPARATION_CONFIG: Omit<MessagePreparationConfig, 'inputB
 }
 
 /**
- * 合并部分配置到默认配置。
+ * Merge a partial config into the default config.
  *
- * 未显式给出输入预算时，从模型上下文窗口现算：输出预留与估算缓冲都是固定
- * 扣减项（不随窗口缩放），扣减值住 AGENT_LIMITS。
+ * When no input budget is given explicitly, derive it from the model context
+ * window on the fly: the output reserve and the estimation buffer are fixed
+ * deductions (not scaled with the window), and the deduction values live in AGENT_LIMITS.
  */
 export function mergeMessagePreparationConfig(
   partial: Partial<MessagePreparationConfig> | undefined,
@@ -62,7 +64,8 @@ export function mergeMessagePreparationConfig(
 }
 
 /**
- * 预处理消息数组，按固定顺序组合 6 步调用（4 个实现，配对修复前后各跑一次）：
+ * Prepare the message array by composing 6 steps in a fixed order (4
+ * implementations, with the pairing repair run before and after):
  * 1. drop orphan tool_results (dropOrphanToolResults)
  * 2. backfill missing tool_results (backfillMissingToolResults)
  * 3. apply tool_result budget (applyToolResultBudget)
@@ -70,7 +73,7 @@ export function mergeMessagePreparationConfig(
  * 5. drop orphan tool_results (dropOrphanToolResults)
  * 6. backfill missing tool_results (backfillMissingToolResults)
  *
- * 返回处理后的新数组；不修改原始数组，也不写入 session。
+ * Returns a new processed array; the original array is not modified and nothing is written to the session.
  */
 export async function prepareMessagesForModel(
   messages: BaseMessage[],
@@ -126,7 +129,7 @@ export async function prepareMessagesForModel(
 }
 
 /**
- * 删除没有对应 tool_use 的孤儿 tool_result 消息
+ * Drop orphan tool_result messages that have no matching tool_use
  */
 export function dropOrphanToolResults(messages: BaseMessage[]): BaseMessage[] {
   const toolCallIds = new Set<string>()
@@ -151,7 +154,7 @@ export function dropOrphanToolResults(messages: BaseMessage[]): BaseMessage[] {
   const dropped = messages.length - kept.length
   if (dropped > 0) {
     // Orphan tool_result means upstream lost the matching tool_use — log as warn.
-    log.warn('pairing: 丢弃 %d 条孤儿 tool_result', dropped)
+    log.warn('pairing: dropped %d orphan tool_result messages', dropped)
   }
 
   return kept
@@ -160,8 +163,8 @@ export function dropOrphanToolResults(messages: BaseMessage[]): BaseMessage[] {
 const MISSING_TOOL_RESULT_PLACEHOLDER = '[Tool result unavailable — call was interrupted or lost]'
 
 /**
- * 为没有对应 tool_result 的 tool_use 插入占位结果。
- * 占位消息紧跟在对应的 AI tool_use 消息之后，保持原有顺序。
+ * Insert placeholder results for tool_use calls that have no matching tool_result.
+ * The placeholder message follows its AI tool_use message, preserving the original order.
  */
 export function backfillMissingToolResults(messages: BaseMessage[]): BaseMessage[] {
   const existingResultIds = new Set<string>()
@@ -195,7 +198,7 @@ export function backfillMissingToolResults(messages: BaseMessage[]): BaseMessage
 
   if (backfilled > 0) {
     // A missing tool_result means upstream dropped or interrupted a tool call — log as warn.
-    log.warn('pairing: 为 %d 个 tool_use 补占位 tool_result', backfilled)
+    log.warn('pairing: backfilled placeholder tool_result for %d tool_use calls', backfilled)
   }
 
   return result
@@ -206,7 +209,8 @@ function getToolName(msg: ToolMessage): string {
 }
 
 /**
- * 限制单条 tool_result 大小，超限内容写入 userData 临时文件，原消息用引用替换。
+ * Limit the size of a single tool_result: oversized content is written to a temp file under
+ * userData and the original message is replaced with a reference.
  */
 export async function applyToolResultBudget(
   messages: BaseMessage[],
@@ -283,9 +287,9 @@ async function createOffloadReference(
 }
 
 /**
- * 按 token 预算截断历史消息。
- * 优先保留 system 消息、最后一条 user 消息和最近对话。
- * 截断后重新校验并修复 tool_use / tool_result 配对。
+ * Truncate history messages by token budget.
+ * System messages, the last user message, and the most recent turns are kept preferentially.
+ * After truncation, tool_use / tool_result pairing is re-validated and repaired.
  */
 export function snipHistory(
   messages: BaseMessage[],
@@ -329,7 +333,7 @@ function trimHistoryToBudget(messages: BaseMessage[], budget: number): BaseMessa
   let total = estimateMessageTokens(messages)
   if (total <= budget) return messages
 
-  // 优先从头部丢弃较早消息，保留最近对话
+  // Drop older messages from the head first, keeping the most recent turns
   let start = 0
   while (start < messages.length && total > budget) {
     total -= estimateMessageTokens([messages[start]])
@@ -338,7 +342,12 @@ function trimHistoryToBudget(messages: BaseMessage[], budget: number): BaseMessa
 
   if (start > 0) {
     // Dropped history can hide upstream message-construction bugs — keep it visible.
-    log.warn('snip: 丢弃 %d/%d 条历史消息（budget %d tokens）', start, messages.length, budget)
+    log.warn(
+      'snip: dropped %d/%d history messages (budget %d tokens)',
+      start,
+      messages.length,
+      budget,
+    )
   }
 
   return messages.slice(start)

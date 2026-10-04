@@ -1,16 +1,17 @@
 /**
- * 单条快捷键定义。`group` 为任意字符串，帮助面板会按 group 分块展示（未知分组显示原文）。
+ * A single shortcut definition. `group` is any string; the help panel groups entries by it
+ * (unknown groups are shown verbatim).
  */
 export type ShortcutRegistration = {
   id: string
-  /** 规范串，如 `mod+slash`，与 `eventComboFromCode` 输出一致 */
+  /** Canonical combo, e.g. `mod+slash`, matching `eventComboFromCode` output */
   combo: string
   description: string
   group: string
-  /** 在输入框、textarea、select、contenteditable 内是否忽略 */
+  /** Whether to ignore it inside inputs, textareas, selects and contenteditables */
   preventWhenTyping: boolean
-  /** 返回 `false` 表示不拦截（不调用 preventDefault） */
+  /** Returning `false` means do not intercept (no preventDefault) */
   handler: (e: KeyboardEvent) => boolean | void
-  /** 为 false 时不触发 */
+  /** Does not fire when false */
   enabled?: () => boolean
 }

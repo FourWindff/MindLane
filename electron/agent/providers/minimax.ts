@@ -95,7 +95,7 @@ export class MiniMaxProvider extends LLMProvider {
 
   constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()
-    if (!key) throw new Error('未填写 API Key')
+    if (!key) throw new Error('API Key is missing')
 
     const baseURL = config.baseUrl?.trim() || MINIMAX_ANTHROPIC_BASE_URL
     const chatModelId = config.chatModel.trim()
@@ -122,7 +122,7 @@ export class MiniMaxProvider extends LLMProvider {
   }): Promise<{ urls: string[] }> {
     const prompt = input.prompt.trim()
     if (!prompt) {
-      throw new Error('请输入画面描述')
+      throw new Error('Please enter an image description')
     }
 
     const payload = await withRetry(() =>
@@ -145,7 +145,7 @@ export class MiniMaxProvider extends LLMProvider {
 
         const body = (await response.json().catch(() => null)) as MiniMaxImageResponse | null
         if (!response.ok) {
-          throw new Error(errMsg(body, `创建图片失败：HTTP ${response.status}`))
+          throw new Error(errMsg(body, `failed to create image: HTTP ${response.status}`))
         }
         return body
       }, HTTP_TIMEOUT_MS),
@@ -153,7 +153,7 @@ export class MiniMaxProvider extends LLMProvider {
 
     const urls = extractImageUrls(payload)
     if (urls.length === 0) {
-      throw new Error(errMsg(payload, '图片生成成功但未返回图片 URL'))
+      throw new Error(errMsg(payload, 'image generated but no image URL returned'))
     }
 
     return { urls }

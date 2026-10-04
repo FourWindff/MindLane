@@ -74,21 +74,23 @@ export enum IPC {
   WindowCloseConfirmed = 'window:close-confirmed',
 }
 
-// ---- 结果信封（Result Envelope） ----
-// 跨进程边界的结果信封：可失败操作返回，必然成功的读取不包信封。
+// ---- Result envelope ----
+// The result envelope used across the process boundary: returned by operations that can fail;
+// reads that cannot fail are not wrapped.
 
 export type IpcResult<T = void> = { ok: true; data: T } | { ok: false; error: string }
 
-// ---- 边界 DTO（Boundary DTOs） ----
+// ---- Boundary DTOs ----
 
-/** mcp:connect 载荷：OAuth server 只带 serverId，非 OAuth server 附带表单凭据 */
+/** mcp:connect payload: OAuth servers carry only serverId; non-OAuth servers attach form credentials */
+
 export interface McpConnectPayload {
   serverId: string
-  /** 非 OAuth server 的表单凭据（按定义的 credentialFields 校验），OAuth server 省略 */
+  /** Form credentials for non-OAuth servers (validated against the declared credentialFields); omitted for OAuth servers */
   credentials?: Record<string, string>
 }
 
-/** mcp:authorize-uat 载荷：飞书一键授权的 app 凭证（用于发起 OAuth 与换 token） */
+/** mcp:authorize-uat payload: app credentials for Feishu one-click authorization (used to start OAuth and exchange the token) */
 export interface McpAuthorizeUatPayload {
   serverId: string
   appId: string
@@ -123,7 +125,7 @@ interface WorkspaceSession {
   workspacePath: string | null
   workspaceUuid: string | null
   activeSessionIds: Record<string, string>
-  /** 会话文件索引：fileUuid -> filePath，跨启动渲染胶囊条用。 */
+  /** Session file index: fileUuid -> filePath, used by the renderer's capsule bar across launches. */
   fileUuidPaths: Record<string, string>
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
@@ -147,9 +149,10 @@ type ChatLoadSessionResult = {
   }
 }
 
-// ---- 桥（Bridge）契约 ----
-// 渲染层访问主进程能力的唯一门户。preload 实现与渲染层类型引用同一份，
-// 编译器看守：实现不满足契约即编译失败。
+// ---- Bridge contract ----
+// The only gateway through which the renderer reaches main-process capabilities. The preload
+// implementation and the renderer types reference the same declaration; the compiler guards
+// that an implementation not satisfying the contract fails to compile.
 
 export * from '../contracts/ipc.js'
 export type { PalaceStationPayload, PalaceRunPayload } from '../contracts/palace.js'
@@ -182,15 +185,15 @@ export interface MindLaneBridge {
     getCapabilities: () => Promise<
       { ok: true; capabilities: string[] } | { ok: false; error: string }
     >
-    /** 只读裸布尔：AI 服务就绪状态（装配成功与否），不包 IpcResult 信封。 */
+    /** Read-only bare boolean: AI service readiness (whether assembly succeeded), not wrapped in an IpcResult envelope. */
     isReady: () => Promise<boolean>
-    /** 主进程 → 渲染层：按需读导图请求（requestId 关联）。 */
+    /** Main process -> renderer: on-demand mindmap read request (correlated by requestId). */
     onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
-    /** 渲染层 → 主进程：读导图应答。 */
+    /** Renderer -> main process: mindmap read response. */
     respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
-    /** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 模式）。 */
+    /** Main process -> renderer: save-to-disk request (correlated by requestId, reusing the mindmap-read pattern). */
     onMindmapWriteRequest: (callback: (request: MindmapWriteRequest) => void) => () => void
-    /** 渲染层 → 主进程：落盘应答（未知 requestId 为 no-op）。 */
+    /** Renderer -> main process: save-to-disk response (unknown requestId is a no-op). */
     respondMindmapWrite: (payload: MindmapWriteResponse) => Promise<void>
   }
   file: {
@@ -227,7 +230,7 @@ export interface MindLaneBridge {
         activeSession?: { fileUuid: string; sessionId: string }
       } & Partial<WorkspaceState>,
     ) => Promise<{ ok: true } | { ok: false; error: string }>
-    /** 更新会话文件索引单条映射（改名/移动后修正路径用）。 */
+    /** Update one session file index mapping (used to fix the path after a rename/move). */
     updateFileUuidPath: (payload: {
       workspacePath: string
       fileUuid: string
@@ -260,7 +263,7 @@ export interface MindLaneBridge {
   chat: {
     listSessions: (payload: {
       workspacePath: string
-      /** 省略时返回当前 workspace 全量会话（保持按 updatedAt 降序、支持 limit/offset）。 */
+      /** When omitted, returns all sessions of the current workspace (still sorted by updatedAt descending, honoring limit/offset). */
       fileUuid?: string
       limit?: number
       offset?: number
@@ -285,7 +288,7 @@ export interface MindLaneBridge {
     mcpStatus: () => Promise<
       { ok: true; data: McpServerStatusInfo[] } | { ok: false; error: string }
     >
-    /** 一键获取飞书用户 UAT：拉起授权页，成功后把 uat 回填到连接表单 */
+    /** One-click Feishu user UAT: opens the authorization page and fills the uat back into the connection form */
     mcpAuthorizeUat: (payload: {
       serverId: string
       appId: string
@@ -293,7 +296,7 @@ export interface MindLaneBridge {
     }) => Promise<
       { ok: true; data: { uat: string; expiresIn: number } } | { ok: false; error: string }
     >
-    /** 读取表单配置类 server 已保存的凭据（非 OAuth 连接配置），用于“显示配置”回填 */
+    /** Read saved credentials for form-config servers (non-OAuth connection config), used to repopulate the "Show config" view */
     mcpGetCredentials: (
       serverId: string,
     ) => Promise<{ ok: true; data: Record<string, string> } | { ok: false; error: string }>
@@ -309,7 +312,7 @@ export interface MindLaneBridge {
   shell: {
     openDocumentRef: (doc: DocumentRef) => Promise<{ ok: true } | { ok: false; error: string }>
     openLogs: () => Promise<{ ok: true }>
-    /** 用系统默认浏览器打开外链（仅 http/https，防指令注入） */
+    /** Open an external link in the system default browser (http/https only, prevents command injection) */
     openExternal: (url: string) => Promise<{ ok: true } | { ok: false; error: string }>
     /**
      * Fire-and-forget renderer error report: the main process writes it to the

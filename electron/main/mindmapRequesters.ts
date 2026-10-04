@@ -28,8 +28,8 @@ export function createMindmapReadRequester(
     getWindow,
     (window, request) => window.webContents.send(IPC.AiMindmapReadRequest, request),
     REQUEST_TIMEOUT_MS,
-    '读取导图',
-    '响应',
+    'Read mindmap',
+    'response',
     (payload) => payload.summary,
   )
 }
@@ -41,8 +41,8 @@ export function createMindmapWriteRequester(
     getWindow,
     (window, request) => window.webContents.send(IPC.AiMindmapWriteRequest, request),
     REQUEST_TIMEOUT_MS,
-    '落盘',
-    '应答',
+    'Save to disk',
+    'ack',
     (payload) => ({ ok: true as const, action: payload.action, data: payload.data }),
   )
 }

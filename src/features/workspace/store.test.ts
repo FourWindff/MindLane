@@ -71,7 +71,7 @@ describe('workspace file switching', () => {
     fileA.load('/a.mindlane', fileAData, '/ws')
     const fileB = openFileRegistry.getOrCreate('/b.mindlane')
     fileB.load('/b.mindlane', staleFileBData, '/ws')
-    fileB.editor.addChild('root', { label: '后台新增节点' })
+    fileB.editor.addChild('root', { label: 'Node added in background' })
     openFileRegistry.setActive('/a.mindlane')
 
     vi.stubGlobal('window', {
@@ -91,7 +91,7 @@ describe('workspace file switching', () => {
     expect(fileB.store.getState().nodes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          data: expect.objectContaining({ label: '后台新增节点' }),
+          data: expect.objectContaining({ label: 'Node added in background' }),
         }),
       ]),
     )
@@ -112,16 +112,19 @@ describe('workspace switch restore protocol', () => {
 
   it('open/create treat cancel as silent and write lastError only when a message is available', async () => {
     installWorkspaceApis({
-      openDirectory: vi.fn(async () => ({ ok: false as const, error: '已取消' })),
+      openDirectory: vi.fn(async () => ({ ok: false as const, error: 'Canceled' })),
     })
     await expect(useWorkspaceStore.getState().openWorkspaceDirectory()).resolves.toBe(false)
     expect(useWorkspaceStore.getState().lastError).toBeNull()
 
     installWorkspaceApis({
-      createDirectory: vi.fn(async () => ({ ok: false as const, error: '创建目录失败' })),
+      createDirectory: vi.fn(async () => ({
+        ok: false as const,
+        error: 'Create directory failed',
+      })),
     })
     await expect(useWorkspaceStore.getState().createWorkspaceDirectory('ws')).resolves.toBe(false)
-    expect(useWorkspaceStore.getState().lastError).toBe('创建目录失败')
+    expect(useWorkspaceStore.getState().lastError).toBe('Create directory failed')
   })
 
   it('switch falls back to the default error copy when the main process returns no message', async () => {
@@ -129,7 +132,7 @@ describe('workspace switch restore protocol', () => {
       switchDirectory: vi.fn(async () => ({ ok: false as const })),
     })
     await expect(useWorkspaceStore.getState().switchWorkspace('/ws')).resolves.toBe(false)
-    expect(useWorkspaceStore.getState().lastError).toBe('切换仓库失败')
+    expect(useWorkspaceStore.getState().lastError).toBe('Switch failed')
   })
 
   it.each([
@@ -213,7 +216,8 @@ describe('file deletion capsule cleanup', () => {
       messageCount: 1,
     }
     const api = installWorkspaceApis({
-      // 主进程在删除成功后已 prune:getSession 返回的映射不再含已删路径。
+      // The main process prunes after a successful delete: the mapping returned by getSession no
+      // longer contains the deleted path.
       getSession: vi.fn(async () => ({
         workspacePath: '/ws',
         workspaceUuid: null,
@@ -229,7 +233,7 @@ describe('file deletion capsule cleanup', () => {
     }
     vi.stubGlobal('window', { mindlane: { workspace: api, chat } })
     useWorkspaceStore.setState({ workspacePath: '/ws' })
-    // 删除前:会话仍在 + 映射仍在 → 胶囊可见。
+    // Before deletion: the session and the mapping are still there → the capsule is visible.
     useAiStore.setState({
       fileUuidPaths: { 'file-a': '/ws/a.mindlane' },
       allSessions: [session],
@@ -253,7 +257,8 @@ describe('file deletion capsule cleanup', () => {
       workspacePath: '/ws',
     })
     await vi.waitFor(() => expect(useAiStore.getState().fileUuidPaths).toEqual({}))
-    // 删除后:映射已被 prune 刷新,会话保留但无映射 → 胶囊隐藏。
+    // After deletion: the mapping was pruned, the session stays but has no mapping → the capsule
+    // is hidden.
     expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeUndefined()
     expect(chat.listSessions).toHaveBeenCalledWith({ workspacePath: '/ws' })
   })

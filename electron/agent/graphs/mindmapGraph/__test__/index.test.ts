@@ -68,14 +68,14 @@ function baseInput(overrides: Record<string, unknown> = {}) {
   }
 }
 
-const VALID_TREE_XML = `<node>人工智能导论
-  <node>机器学习
-    <node>监督学习</node>
-    <node>无监督学习</node>
+const VALID_TREE_XML = `<node>Introduction to AI
+  <node>Machine Learning
+    <node>Supervised Learning</node>
+    <node>Unsupervised Learning</node>
   </node>
-  <node>深度学习
-    <node>神经网络</node>
-    <node>反向传播</node>
+  <node>Deep Learning
+    <node>Neural Networks</node>
+    <node>Backpropagation</node>
   </node>
 </node>`
 
@@ -89,7 +89,7 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(baseInput({ mindmapInputSource: null }))
 
-    expect(result.mindmapError).toContain('请提供要生成思维导图的文档或文本')
+    expect(result.mindmapError).toContain('Provide a document or text to generate a mindmap from')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -99,15 +99,18 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(
       baseInput({
-        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-        mindmapInputTitle: '人工智能导论',
+        mindmapInputSource: {
+          type: 'text',
+          content: 'This is a document about artificial intelligence.',
+        },
+        mindmapInputTitle: 'Introduction to AI',
       }),
     )
 
     expect(result.mindmapError).toBe('')
     expect(result.documentBatches).toHaveLength(1)
     expect(result.documentBatches[0]![0]).toBeInstanceOf(Document)
-    expect(result.documentBatches[0]![0]!.pageContent).toContain('人工智能')
+    expect(result.documentBatches[0]![0]!.pageContent).toContain('artificial intelligence')
   })
 
   it('sends a single-batch document straight to build_output without merging', async () => {
@@ -116,14 +119,17 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(
       baseInput({
-        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-        mindmapInputTitle: '人工智能导论',
+        mindmapInputSource: {
+          type: 'text',
+          content: 'This is a document about artificial intelligence.',
+        },
+        mindmapInputTitle: 'Introduction to AI',
       }),
     )
 
     expect(result.mindmapError).toBe('')
-    expect(String(closeOutPayload(result).xmlFragment)).toContain('人工智能导论')
-    expect(closeOutPayload(result).title).toBe('人工智能导论')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Introduction to AI')
+    expect(closeOutPayload(result).title).toBe('Introduction to AI')
     expect(result.leafResults).toHaveLength(1)
     expect(result.finalTree).toBeTruthy()
     expect(invokeMock(provider)).toHaveBeenCalledTimes(1)
@@ -316,7 +322,7 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'pdf', path: '/tmp/blank.pdf' } }),
     )
 
-    expect(result.mindmapError).toContain('文档未能提取出任何文本内容')
+    expect(result.mindmapError).toContain('No text content could be extracted from the document')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -330,7 +336,7 @@ describe('mindmapGraph', () => {
     )
 
     expect(result.mindmapError).toContain('fetch failed')
-    expect(result.mindmapResponse).toContain('加载文档失败')
+    expect(result.mindmapResponse).toContain('Failed to load the document')
     expect(invokeMock(provider)).not.toHaveBeenCalled()
   })
 
@@ -389,13 +395,16 @@ describe('mindmapGraph', () => {
 
     const result = await app.invoke(
       baseInput({
-        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-        mindmapInputTitle: '人工智能导论',
+        mindmapInputSource: {
+          type: 'text',
+          content: 'This is a document about artificial intelligence.',
+        },
+        mindmapInputTitle: 'Introduction to AI',
       }),
     )
 
     expect(result.mindmapError).toBe('')
-    expect(String(closeOutPayload(result).xmlFragment)).toContain('人工智能导论')
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('Introduction to AI')
     expect(invokeMock(provider)).toHaveBeenCalledTimes(2)
   })
 
@@ -407,8 +416,8 @@ describe('mindmapGraph', () => {
       baseInput({ mindmapInputSource: { type: 'text', content: 'some document text' } }),
     )
 
-    expect(result.mindmapError).toContain('XML 校验失败：[xml_parse_error]')
-    expect(result.mindmapError).toContain('标签 <node> 未闭合')
+    expect(result.mindmapError).toContain('XML validation failed: [xml_parse_error]')
+    expect(result.mindmapError).toContain('Tag <node> is not closed')
     expect(closeOutPayload(result)).toMatchObject({ ok: false })
     expect(invokeMock(provider)).toHaveBeenCalledTimes(3)
   })
@@ -449,7 +458,7 @@ describe('mindmapGraph', () => {
     const result = await app.invoke(
       baseInput({
         mindmapInputSource: { type: 'text', content: 'some document text' },
-        mindmapInputTitle: 'AI 导论',
+        mindmapInputTitle: 'Introduction to AI',
       }),
     )
 
@@ -457,14 +466,14 @@ describe('mindmapGraph', () => {
     expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Batch 1"')
     expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Part A"')
     expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Part B"')
-    // 合成根 label 与旧 YAML 行为一致：包合成根的 label 成为标题
+    // The synthetic root label matches the old YAML behavior: the wrapping root's label becomes the title
     expect(closeOutPayload(result).title).toBe('Batch 1')
   })
 
   it('keeps special characters complete and escaped in the output fragment', async () => {
     const provider = mockProvider(() => ({
       content:
-        '<node>R&amp;D &lt;fast&gt;\n  <node>a &gt; b &amp; c</node>\n  <node>价格 100%</node>\n</node>',
+        '<node>R&amp;D &lt;fast&gt;\n  <node>a &gt; b &amp; c</node>\n  <node>Price 100%</node>\n</node>',
     }))
     const app = buildMindmapSubgraph({ provider }).compile()
 
@@ -478,8 +487,8 @@ describe('mindmapGraph', () => {
     expect(result.mindmapError).toBe('')
     expect(String(closeOutPayload(result).xmlFragment)).toContain('content="R&amp;D &lt;fast&gt;"')
     expect(String(closeOutPayload(result).xmlFragment)).toContain('content="a &gt; b &amp; c"')
-    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="价格 100%"')
-    expect(String(closeOutPayload(result).xmlFragment)).not.toContain('<node>R&D') // 模型原串不外泄
+    expect(String(closeOutPayload(result).xmlFragment)).toContain('content="Price 100%"')
+    expect(String(closeOutPayload(result).xmlFragment)).not.toContain('<node>R&D') // the model's raw string never leaks
   })
 
   it('extracts all leaf batches before any merge starts', async () => {
@@ -525,8 +534,11 @@ describe('mindmapGraph close-out', () => {
 
     const result = await app.invoke(
       baseInput({
-        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-        mindmapInputTitle: '人工智能导论',
+        mindmapInputSource: {
+          type: 'text',
+          content: 'Intro to AI.',
+        },
+        mindmapInputTitle: 'Introduction to AI',
         mindmapToolCallId: 'call-mm',
         mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
       }),
@@ -539,10 +551,12 @@ describe('mindmapGraph close-out', () => {
     // documentRef rides back with the payload: the main graph reads it after the run.
     expect(JSON.parse(String(toolMessage.content))).toMatchObject({
       ok: true,
-      title: '人工智能导论',
-      documentRef: { type: 'text', source: '这是一篇关于人工智能的文档。' },
+      title: 'Introduction to AI',
+      documentRef: { type: 'text', source: 'Intro to AI.' },
     })
-    expect(String(JSON.parse(String(toolMessage.content)).xmlFragment)).toContain('人工智能导论')
+    expect(String(JSON.parse(String(toolMessage.content)).xmlFragment)).toContain(
+      'Introduction to AI',
+    )
     // The persisted trace is the run's own trace, not a stale one from state.
     expect(toolMessage.additional_kwargs.toolSteps).toEqual([
       { step: 'reading-doc' },
@@ -587,8 +601,11 @@ describe('mindmapGraph mounted as a node', () => {
     let result!: typeof MindmapSubgraphState.State
     const stream = await host.stream(
       baseInput({
-        mindmapInputSource: { type: 'text', content: '这是一篇关于人工智能的文档。' },
-        mindmapInputTitle: '人工智能导论',
+        mindmapInputSource: {
+          type: 'text',
+          content: 'This is a document about artificial intelligence.',
+        },
+        mindmapInputTitle: 'Introduction to AI',
         mindmapToolCallId: 'call-mm',
         mindmapToolName: GENERATE_MINDMAP_FRAGMENT_TOOL,
       }),

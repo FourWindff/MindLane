@@ -66,10 +66,10 @@ function assertHttpUrl(url: string): void {
   try {
     parsed = new URL(url)
   } catch {
-    throw new Error('无效的链接地址。')
+    throw new Error('Invalid link address.')
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('仅支持 http:// 与 https:// 链接。')
+    throw new Error('Only http:// and https:// links are supported.')
   }
 }
 
@@ -86,12 +86,12 @@ async function loadUrl(source: DocumentSource): Promise<Document[]> {
     const reason = error instanceof Error ? error.message : String(error)
     const message =
       error instanceof Error && error.name === 'TimeoutError'
-        ? `抓取链接超时(10秒)。`
-        : `抓取链接失败: ${reason}`
+        ? `Fetching the link timed out (10s).`
+        : `Failed to fetch the link: ${reason}`
     throw new Error(message, { cause: error })
   }
   if (!response.ok) {
-    throw new Error(`链接返回 HTTP ${response.status},无法读取。`)
+    throw new Error(`The link returned HTTP ${response.status} and cannot be read.`)
   }
 
   // Dispatch on Content-Type so binary payloads never pass through the HTML parser.
@@ -113,14 +113,14 @@ async function loadUrl(source: DocumentSource): Promise<Document[]> {
     return parsePdfBuffer(data, source.url)
   }
   throw new Error(
-    `暂不支持的链接类型: ${mime || '未知'}。仅支持网页(text/html)与 PDF(application/pdf)。`,
+    `Unsupported link type: ${mime || 'unknown'}. Only web pages (text/html) and PDFs (application/pdf) are supported.`,
   )
 }
 
 async function loadText(source: DocumentSource): Promise<Document[]> {
   const content = source.content ?? ''
   if (!content.trim()) {
-    throw new Error('文本输入内容为空。')
+    throw new Error('Text input is empty.')
   }
   return [new Document({ pageContent: content })]
 }
@@ -153,7 +153,7 @@ function officeChunkMetadata(chunk: OfficeChunk): Record<string, string | number
 
 async function loadOffice(source: DocumentSource): Promise<Document[]> {
   if (!isOfficeDocumentType(source.type)) {
-    throw new Error(`不支持的 Office 输入类型: ${source.type}`)
+    throw new Error(`Unsupported Office input type: ${source.type}`)
   }
   const type = source.type
   if (!source.path) {
@@ -170,7 +170,7 @@ async function loadOffice(source: DocumentSource): Promise<Document[]> {
         (signature[2] === 0x05 && signature[3] === 0x06) ||
         (signature[2] === 0x07 && signature[3] === 0x08))
     if (!isZip) {
-      throw new Error('文件不是有效的 OOXML 压缩包')
+      throw new Error('File is not a valid OOXML archive')
     }
 
     const result = await OfficeConverter.convert(file, 'chunks', {
@@ -206,15 +206,15 @@ async function loadOffice(source: DocumentSource): Promise<Document[]> {
     }
 
     if (documents.length === 0) {
-      throw new Error(`${type.toUpperCase()} 文档未包含可提取的文本内容。`)
+      throw new Error(`${type.toUpperCase()} document contains no extractable text content.`)
     }
     return documents
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (message === `${type.toUpperCase()} 文档未包含可提取的文本内容。`) {
+    if (message === `${type.toUpperCase()} document contains no extractable text content.`) {
       throw error
     }
-    throw new Error(`无法解析 ${type.toUpperCase()} 文档：${message}`, { cause: error })
+    throw new Error(`Failed to parse ${type.toUpperCase()} document: ${message}`, { cause: error })
   }
 }
 
@@ -224,7 +224,7 @@ async function loadMarkdown(source: DocumentSource): Promise<Document[]> {
   }
   const content = await readFile(source.path, 'utf8')
   if (!content.trim()) {
-    throw new Error('Markdown 文档未包含文本内容。')
+    throw new Error('Markdown document contains no text content.')
   }
   return [new Document({ pageContent: content })]
 }
@@ -248,7 +248,7 @@ export async function loadDocument(
 ): Promise<Document[]> {
   const loader = loaders[source.type]
   if (!loader) {
-    throw new Error(`不支持的输入类型: ${source.type}`)
+    throw new Error(`Unsupported input type: ${source.type}`)
   }
   return loader(source)
 }

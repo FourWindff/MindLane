@@ -104,7 +104,7 @@ describe('resolveDocumentRef', () => {
     expect(result).toEqual({
       ok: false,
       displayText: 'some preview text',
-      error: '缓存文件路径缺失',
+      error: 'Cached file path is missing',
     })
   })
 })

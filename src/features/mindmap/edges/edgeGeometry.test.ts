@@ -31,7 +31,7 @@ function node(
 }
 
 describe('resolveMindmapEdgeGeometry', () => {
-  it('右侧子节点：根节点从右缘出线，子节点从左缘进线', () => {
+  it('right-hand child: the root leaves from its right edge and the child enters from its left edge', () => {
     const root = node(0, 0, { depth: 0 })
     const child = node(300, -100)
 
@@ -39,13 +39,13 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g.sourcePosition).toBe(Position.Right)
     expect(g.targetPosition).toBe(Position.Left)
-    expect(g.sourceX).toBe(160) // 根节点右缘
-    expect(g.targetX).toBe(300) // 子节点左缘
+    expect(g.sourceX).toBe(160) // root right edge
+    expect(g.targetX).toBe(300) // child left edge
     expect(g.sourceY).toBe(20)
     expect(g.targetY).toBe(-80)
   })
 
-  it('左侧子节点：根节点从左缘出线，子节点从右缘进线（与右侧对称）', () => {
+  it('left-hand child: the root leaves from its left edge and the child enters from its right edge (mirror of the right-hand case)', () => {
     const root = node(0, 0, { depth: 0 })
     const child = node(-300, -100)
 
@@ -53,11 +53,11 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
-    expect(g.sourceX).toBe(0) // 根节点左缘
-    expect(g.targetX).toBe(-140) // 子节点右缘 (-300 + 160)
+    expect(g.sourceX).toBe(0) // root left edge
+    expect(g.targetX).toBe(-140) // child right edge (-300 + 160)
   })
 
-  it('非根节点沿用布局写入的 sourcePosition，目标进线方向按相对位置决定', () => {
+  it('a non-root node keeps the sourcePosition written by layout; the target entry direction follows the relative position', () => {
     const parent = node(-300, 0, { depth: 1, sourcePosition: Position.Left })
     const child = node(-600, 40)
 
@@ -69,17 +69,17 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
-    expect(g.sourceX).toBe(-300) // 父节点左缘
-    expect(g.targetX).toBe(-440) // 子节点右缘
+    expect(g.sourceX).toBe(-300) // parent left edge
+    expect(g.targetX).toBe(-440) // child right edge
   })
 
-  it('节点缺失时回退到 ReactFlow 提供的坐标与方向', () => {
+  it('falls back to the coordinates and directions ReactFlow provides when a node is missing', () => {
     const g = resolveEdgeGeometry({ fallback })
 
     expect(g).toEqual(fallback)
   })
 
-  it('bottom 连接：边从节点下边框水平引出，句柄为朝向子节点的侧边', () => {
+  it('bottom connection: the edge leaves the node bottom horizontally and the handle faces the child side', () => {
     const root = node(0, 0, { depth: 0, width: 160, height: 40 })
     const child = node(300, 100, { width: 160, height: 40 })
 
@@ -91,15 +91,15 @@ describe('resolveMindmapEdgeGeometry', () => {
       strokeWidth: 2,
     })
 
-    expect(g.sourcePosition).toBe(Position.Right) // 朝向右侧子节点
+    expect(g.sourcePosition).toBe(Position.Right) // faces the right-hand child
     expect(g.targetPosition).toBe(Position.Left)
-    expect(g.sourceX).toBe(160) // 根节点右缘
-    expect(g.sourceY).toBe(39) // 根节点底部 - 半线宽（与下边框对齐）
-    expect(g.targetX).toBe(300) // 子节点左缘
-    expect(g.targetY).toBe(139) // 子节点底部 - 半线宽
+    expect(g.sourceX).toBe(160) // root right edge
+    expect(g.sourceY).toBe(39) // root bottom - half the stroke width (aligned with the bottom border)
+    expect(g.targetX).toBe(300) // child left edge
+    expect(g.targetY).toBe(139) // child bottom - half the stroke width
   })
 
-  it('bottom 连接：子节点在左侧时从左侧引出，方向对称', () => {
+  it('bottom connection: leaves from the left when the child is on the left, mirrored', () => {
     const root = node(0, 0, { depth: 0, width: 160, height: 40 })
     const child = node(-300, 100, { width: 160, height: 40 })
 
@@ -113,14 +113,14 @@ describe('resolveMindmapEdgeGeometry', () => {
 
     expect(g.sourcePosition).toBe(Position.Left)
     expect(g.targetPosition).toBe(Position.Right)
-    expect(g.sourceX).toBe(0) // 根节点左缘
+    expect(g.sourceX).toBe(0) // root left edge
     expect(g.sourceY).toBe(39)
-    expect(g.targetX).toBe(-140) // 子节点右缘
+    expect(g.targetX).toBe(-140) // child right edge
     expect(g.targetY).toBe(139)
   })
 })
 
-describe('buildTaperedPath 树干渐变', () => {
+describe('buildTaperedPath trunk gradient', () => {
   const horizontal = {
     sourceX: 0,
     sourceY: 0,
@@ -130,7 +130,7 @@ describe('buildTaperedPath 树干渐变', () => {
     targetPosition: Position.Left,
   }
 
-  it('水平直线边：源端宽（半宽 3）、目标端窄（半宽 0.5），首尾闭合', () => {
+  it('horizontal straight edge: wide at the source (half width 3), narrow at the target (half width 0.5), closed at both ends', () => {
     const d = buildTaperedPath(horizontal, 0.25, 6, 1)
 
     expect(d.startsWith('M0,3 ')).toBe(true)
@@ -139,7 +139,7 @@ describe('buildTaperedPath 树干渐变', () => {
     expect(d.endsWith(' Z')).toBe(true)
   })
 
-  it('细化后曲线采样点足够多（>16），避免尖角', () => {
+  it('the refined curve has enough sample points (>16) to avoid sharp corners', () => {
     const d = buildTaperedPath(horizontal, 0.25, 6, 1, 24)
     expect(d.split('L').length).toBeGreaterThan(40)
   })

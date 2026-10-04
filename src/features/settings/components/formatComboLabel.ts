@@ -1,6 +1,6 @@
 import { isApplePlatform } from '@/shared/shortcuts/platform'
 
-/** 将内部 combo 转为界面展示用文案，如 `Ctrl + /` 或 `⌘ /` */
+/** Convert an internal combo into display copy, e.g. `Ctrl + /` or `⌘ /` */
 export function formatComboLabel(combo: string): string {
   const isMac = isApplePlatform()
   const parts = combo.split('+')

@@ -3,7 +3,7 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import { estimateTokenCount } from '../lib/tokenCounter.js'
 
 /**
- * 检测错误是否为 prompt-too-long / 上下文超限类错误
+ * Detect whether an error is a prompt-too-long / context-overflow error.
  */
 export function isPromptTooLongError(error: unknown): boolean {
   const message = String(error).toLowerCase()
@@ -18,7 +18,7 @@ export function isPromptTooLongError(error: unknown): boolean {
 }
 
 /**
- * 估算工具 schema 的 token 数
+ * Estimate the token count of the tools' schemas.
  */
 export function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): number {
   let total = 0
@@ -34,11 +34,11 @@ export function estimateToolsSchemaTokens(tools: StructuredToolInterface[]): num
 }
 
 /**
- * 裁剪到最近消息窗口，保留 system 消息和当前用户消息。
+ * Trim to the most recent message window, keeping system messages and the current user message.
  *
- * 用于两处：
- * 1. 调用前压缩的超预算兜底（保留最近窗口）；
- * 2. supervisor 的非 LLM 裁剪重试（prompt-too-long 时裁掉旧消息重试一次）。
+ * Used in two places:
+ * 1. Over-budget fallback before pre-call compaction (keep the recent window);
+ * 2. Supervisor's non-LLM trim retry (drop old messages and retry once on prompt-too-long).
  */
 export function trimToRecentWindow(messages: BaseMessage[], recentCount: number): BaseMessage[] {
   const systemMsgs = messages.filter((m) => m.type === 'system')

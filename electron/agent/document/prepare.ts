@@ -70,26 +70,26 @@ export async function prepareDocument(input: PrepareDocumentInput): Promise<Prep
     case 'text': {
       type = 'text'
       hash = hashText(text)
-      baseFilename = '用户输入'
+      baseFilename = 'User input'
       persistedSource = buildTextPreview(text)
-      filename = `用户输入_${shortHash(hash)}.txt`
+      filename = `User input_${shortHash(hash)}.txt`
       break
     }
     case 'url': {
       type = 'url'
       hash = hashText(text)
-      baseFilename = existingRef?.filename || 'URL来源'
+      baseFilename = existingRef?.filename || 'URL source'
       persistedSource = source.url!
-      filename = existingRef?.filename || `URL来源_${shortHash(hash)}.txt`
+      filename = existingRef?.filename || `URL source_${shortHash(hash)}.txt`
       break
     }
     default: {
       // Exhaustive fallback
       type = source.type as DocumentRef['type']
       hash = hashText(text)
-      baseFilename = existingRef?.filename || '未命名'
+      baseFilename = existingRef?.filename || 'Untitled'
       persistedSource = String(source.path ?? source.url ?? source.content ?? '')
-      filename = existingRef?.filename || `未命名_${shortHash(hash)}.txt`
+      filename = existingRef?.filename || `Untitled_${shortHash(hash)}.txt`
     }
   }
 

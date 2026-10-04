@@ -7,15 +7,16 @@ import { isSubgraphCall } from '../subgraphRouter.js'
 const DEFAULT_OFFLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * 将工具结果统一规范化为适合进入 LLM 上下文的字符串。
+ * Normalize tool results uniformly into a string fit for the LLM context.
  *
- * 处理流程：
- * 1. 将非字符串 content 通过 messageContentToString 转为字符串。
- * 2. 对空/空白/null/undefined 结果返回中文兜底提示。
- * 3. 豁免工具（generateMindmapFragment / generatePalace）跳过 offload 与截断。
- * 4. 超过 toolResultOffloadChars 时，将完整内容写入 userData/tool-results/，
- *    返回前 toolResultSummaryChars 字符摘要 + 文件路径引用。
- * 5. 转存失败且超过 toolResultMaxChars 时，保留头部并附加截断标记。
+ * Pipeline:
+ * 1. Convert non-string content to a string via messageContentToString.
+ * 2. Return a fallback notice for empty/blank/null/undefined results.
+ * 3. Exempt tools (generateMindmapFragment / generatePalace) skip offload and truncation.
+ * 4. Above toolResultOffloadChars, write the full content to userData/tool-results/ and
+ *    return the first toolResultSummaryChars characters plus a file path reference.
+ * 5. When offload fails and the content exceeds toolResultMaxChars, keep the head and
+ *    append a truncation marker.
  */
 export async function _normalize_tool_result(
   toolName: string,
@@ -83,7 +84,7 @@ export async function cleanupToolResultOffloads(
 }
 
 function fallbackEmpty(toolName: string): string {
-  return `该工具（${toolName}）未返回任何内容。如果你期望看到结果，请尝试重新描述需求或检查相关资源是否可用。`
+  return `Tool ${toolName} returned no content. If you expected a result, try restating the request or checking whether the relevant resources are available.`
 }
 
 async function offload(
@@ -117,12 +118,12 @@ function buildOffloadSummary(content: string, offloadPath: string): string {
   const summary = content.slice(0, summaryLength)
   const totalLength = content.length
 
-  return `[工具结果较长，已转存到本地文件]\n以下前 ${summaryLength} 字符为摘要，完整内容共 ${totalLength} 字符。\n\n${summary}\n\n完整结果路径：${offloadPath}`
+  return `[Tool result too long; offloaded to a local file]\nThe first ${summaryLength} chars below are a summary; the full content is ${totalLength} chars.\n\n${summary}\n\nFull result path: ${offloadPath}`
 }
 
 function truncate(content: string): string {
   const maxLength = AGENT_LIMITS.toolResultMaxChars
-  const marker = `\n\n[内容已超出 ${maxLength} 字符上限，已截断。]`
+  const marker = `\n\n[Content exceeded the ${maxLength} char limit and was truncated.]`
   const headLength = Math.max(0, maxLength - marker.length)
   return content.slice(0, headLength) + marker
 }

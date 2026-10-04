@@ -65,8 +65,10 @@ describe('SettingsPanel palace artwork setting', () => {
 
     expect(raster.hasAttribute('checked')).toBe(true)
     expect(vector.closest('fieldset')?.hasAttribute('disabled')).toBe(true)
-    expect(text).toContain('当前 provider 无文生图能力，将使用矢量图')
-    expect(text).toContain('记忆宫殿：SVG 矢量图')
+    expect(text).toContain(
+      'The current provider has no text-to-image capability; vector artwork will be used',
+    )
+    expect(text).toContain('Memory palace: SVG vector artwork')
   })
 
   it('enables raster and describes the effective concept-image carrier', () => {
@@ -76,7 +78,7 @@ describe('SettingsPanel palace artwork setting', () => {
     const raster = document.querySelector('input[value="raster"]') as HTMLInputElement
 
     expect(raster.closest('fieldset')?.hasAttribute('disabled')).toBe(false)
-    expect(text).toContain('记忆宫殿：概念图（文生图）')
-    expect(text).not.toContain('当前 provider 无文生图能力')
+    expect(text).toContain('Memory palace: Concept image (text-to-image)')
+    expect(text).not.toContain('The current provider has no text-to-image capability')
   })
 })

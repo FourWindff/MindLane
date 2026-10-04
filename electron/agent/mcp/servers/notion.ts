@@ -2,13 +2,13 @@ import type { McpServerDefinition } from '../types.js'
 import { LoopbackOAuthProvider } from '../oauth.js'
 
 /**
- * Notion 官方托管 MCP（streamable HTTP + OAuth 2.0/PKCE，支持 DCR）。
- * 详见 docs/adr/0003-notion-hosted-mcp-oauth.md。
+ * Notion's official hosted MCP (streamable HTTP + OAuth 2.0/PKCE, supports DCR).
+ * See docs/adr/0003-notion-hosted-mcp-oauth.md.
  */
 export const notionServer: McpServerDefinition = {
   id: 'notion',
   displayName: 'Notion',
-  description: '连接后 AI 可以搜索和读取你的 Notion 内容。',
+  description: 'Once connected, the AI can search and read your Notion content.',
   transport: 'http',
   connection: { url: 'https://mcp.notion.com/mcp' },
   createAuthProvider: (ctx) =>
@@ -19,7 +19,7 @@ export const notionServer: McpServerDefinition = {
       interactive: ctx.interactive,
       openBrowser: ctx.openBrowser,
     }),
-  // 通过 server 自带的 get-self 工具取 workspace 名（OAuthTokens 不保留 token 响应里的 workspace_name）
+  // Get the workspace name through the server's own get-self tool (OAuthTokens does not keep workspace_name from the token response)
   fetchWorkspaceName: async (tools) => {
     const selfTool = tools.find((t) => /(^|__)((API|notion)[-_])?get-self$/i.test(t.name))
     if (!selfTool) return undefined

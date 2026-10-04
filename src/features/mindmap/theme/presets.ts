@@ -6,55 +6,55 @@ import type {
   VisualVariantDef,
 } from './types'
 
-/** 新建文件 / 无 style 字段旧文件的默认样式 */
+/** Default style for a new file / an old file with no style field */
 export const DEFAULT_STYLE: MindmapStyleState = {
   structureType: 'logic',
   visualVariant: 'card',
   colorScheme: 'default',
 }
 
-/** 结构轴：只决定布局算法 */
+/** Structure axis: picks the layout algorithm only */
 export const STRUCTURE_TYPES: StructureTypeDef[] = [
   {
     id: 'logic',
-    label: '逻辑图',
-    description: '所有节点从根向右单向展开',
+    label: 'Logic chart',
+    description: 'All nodes expand one way, to the right of the root',
   },
   {
     id: 'mindmap',
-    label: '思维导图',
-    description: '根节点居中，子节点向左右两侧交替展开',
+    label: 'Mindmap',
+    description: 'The root sits in the center; children expand to the left and right in turn',
   },
 ]
 
-/** 视觉轴：决定节点样式、边样式与连接方式 */
+/** Visual axis: picks node style, edge style and connection mode */
 export const VISUAL_VARIANTS: Record<VisualVariant, VisualVariantDef> = {
   card: {
     id: 'card',
-    label: '卡片式',
-    description: '圆角卡片节点，贝塞尔树干渐变边',
+    label: 'Card',
+    description: 'Rounded card nodes with tapered bezier edges',
     edge: { path: 'bezier', stroke: 'trunk', connect: 'side', strokeWidth: 1.5 },
   },
   outline: {
     id: 'outline',
-    label: '线框式',
-    description: '轻量边框节点，平滑折线',
+    label: 'Outline',
+    description: 'Lightweight bordered nodes with smooth polylines',
     edge: { path: 'smooth-step', stroke: 'line', connect: 'side', strokeWidth: 1.5 },
   },
   minimal: {
     id: 'minimal',
-    label: '极简式',
-    description: '纯文字下划线，直角分支线连接节点下边框',
+    label: 'Minimal',
+    description: 'Plain underlined text; right-angle branch lines join the node bottom',
     edge: { path: 'step', stroke: 'line', connect: 'bottom', strokeWidth: 2 },
   },
 }
 
 export const COLOR_SCHEMES: ColorSchemeDef[] = [
-  { id: 'default', label: '默认' },
-  { id: 'rainbow', label: '彩虹' },
-  { id: 'warm', label: '暖石' },
-  { id: 'ocean', label: '海蓝' },
-  { id: 'forest', label: '森绿' },
-  { id: 'sunset', label: '暮橙' },
-  { id: 'night', label: '暗夜' },
+  { id: 'default', label: 'Default' },
+  { id: 'rainbow', label: 'Rainbow' },
+  { id: 'warm', label: 'Warm Stone' },
+  { id: 'ocean', label: 'Ocean' },
+  { id: 'forest', label: 'Forest' },
+  { id: 'sunset', label: 'Sunset' },
+  { id: 'night', label: 'Night' },
 ]

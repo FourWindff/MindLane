@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { STRUCTURE_TYPES, VISUAL_VARIANTS, COLOR_SCHEMES } from './presets'
 import { SCHEME_PALETTES } from './colorPalettes'
 
-describe('导图样式模块配置', () => {
-  it('结构轴包含 逻辑图 + 思维导图', () => {
+describe('mindmap style module configuration', () => {
+  it('the structure axis has logic + mindmap', () => {
     expect(STRUCTURE_TYPES.map((s) => s.id)).toEqual(['logic', 'mindmap'])
   })
 
-  it('视觉轴包含 卡片/线框/极简，且每套配置齐全', () => {
+  it('the visual axis has card/outline/minimal, each with a complete config', () => {
     const ids = Object.values(VISUAL_VARIANTS).map((v) => v.id)
     expect(ids).toEqual(['card', 'outline', 'minimal'])
 
@@ -19,15 +19,15 @@ describe('导图样式模块配置', () => {
     }
   })
 
-  it('仅极简式连接节点下边框，卡片式使用树干渐变边', () => {
+  it('only minimal connects to the node bottom; card uses a tapered trunk edge', () => {
     expect(VISUAL_VARIANTS.minimal.edge.connect).toBe('bottom')
     expect(VISUAL_VARIANTS.card.edge.stroke).toBe('trunk')
     expect(VISUAL_VARIANTS.outline.edge.connect).toBe('side')
   })
 })
 
-describe('配色方案', () => {
-  it('包含 默认（灰）与 彩虹，且每套调色板齐全', () => {
+describe('color schemes', () => {
+  it('includes default (gray) and rainbow, each with a complete palette', () => {
     const ids = COLOR_SCHEMES.map((c) => c.id)
     expect(ids).toContain('default')
     expect(ids).toContain('rainbow')
@@ -39,7 +39,7 @@ describe('配色方案', () => {
     }
   })
 
-  it('默认配色全分支同灰（单分支），彩虹配色 6 种分支色', () => {
+  it('default is gray on every branch (single branch); rainbow has 6 branch colors', () => {
     expect(SCHEME_PALETTES.default.branches).toHaveLength(1)
     expect(SCHEME_PALETTES.rainbow.branches).toHaveLength(6)
   })

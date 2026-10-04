@@ -1,7 +1,8 @@
 /**
- * nanoid(8) 风格短 id（PRD 6.4）：字母数字 + `-`/`_`，XML/JSON 安全。
- * 64⁸ 碰撞空间，单文件内唯一即可；旧文件中的 UUID id 不迁移、新旧共存；
- * 根节点固定锚点 `root`。
+ * Short nanoid(8)-style id (PRD 6.4): alphanumeric + `-`/`_`, safe in XML/JSON.
+ * A 64^8 collision space; unique within a single file is enough. UUID ids in
+ * old files are not migrated — old and new coexist; the root node is the fixed
+ * anchor `root`.
  *
  * Lives in the contracts layer because the XML reader/writer mints ids for
  * fragments that arrive without one.

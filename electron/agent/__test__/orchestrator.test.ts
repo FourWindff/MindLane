@@ -6,7 +6,7 @@ import { AgentOrchestrator } from '../orchestrator.js'
 import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages'
 import type { BaseMessage } from '@langchain/core/messages'
 
-// ─── Mock 工厂 ───────────────────────────────────────────────
+// ─── Mock factory ────────────────────────────────────────────
 
 function createMockProvider(
   capabilities: Set<ProviderCapability> = new Set([ProviderCapability.Chat]),
@@ -25,7 +25,7 @@ function createMockProvider(
   } as unknown as LLMProvider
 }
 
-// 边界 cast（唯一谎言点）：graph 结构测试从不运行提取回调等真实服务路径。
+// Boundary cast (the only lie): graph-structure tests never run real service paths such as the extraction callback.
 function createMockServices(checkpointer?: unknown): AgentServices {
   return {
     checkpointer: {
@@ -34,9 +34,9 @@ function createMockServices(checkpointer?: unknown): AgentServices {
   } as unknown as AgentServices
 }
 
-// ─── 测试 ────────────────────────────────────────────────────
+// ─── Tests ───────────────────────────────────────────────────
 
-describe('AgentOrchestrator 编译缓存', () => {
+describe('AgentOrchestrator compiled cache', () => {
   let provider: LLMProvider
   let services: AgentServices
   let orchestrator: AgentOrchestrator
@@ -47,14 +47,14 @@ describe('AgentOrchestrator 编译缓存', () => {
     orchestrator = new AgentOrchestrator(provider, services)
   })
 
-  it('getCompiledMindmapSubgraph() 多次调用返回同一实例', () => {
+  it('getCompiledMindmapSubgraph() returns the same instance across calls', () => {
     const getCompiledMindmapSubgraph = (orchestrator as unknown as Record<string, () => unknown>)[
       'getCompiledMindmapSubgraph'
     ].bind(orchestrator)
     expect(getCompiledMindmapSubgraph()).toBe(getCompiledMindmapSubgraph())
   })
 
-  it('getCompiledPalaceSubgraph() 多次调用返回同一实例', () => {
+  it('getCompiledPalaceSubgraph() returns the same instance across calls', () => {
     provider = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
     )
@@ -66,7 +66,7 @@ describe('AgentOrchestrator 编译缓存', () => {
   })
 })
 
-describe('AgentOrchestrator buildGraph 结构', () => {
+describe('AgentOrchestrator buildGraph structure', () => {
   /** Conditional-edge targets of a node, read straight off the un-compiled graph. */
   function branchEnds(graph: unknown, node: string): Record<string, string> {
     const branches = (
@@ -75,7 +75,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     return branches[node]?.condition.ends ?? {}
   }
 
-  it('无论 provider 能力如何，graph 节点结构完全一致', () => {
+  it('the graph node structure is identical regardless of provider capabilities', () => {
     const providerWithPalace = createMockProvider(
       new Set([ProviderCapability.Chat, ProviderCapability.ImageGen, ProviderCapability.Vision]),
     )
@@ -101,7 +101,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     expect(Object.keys(graphWith.nodes)).toEqual(Object.keys(graphWithout.nodes))
   })
 
-  it('两个子图以编译后的图作为节点挂载（不是节点函数里嵌套 invoke）', () => {
+  it('mounts both subgraphs as compiled graphs (not nested invoke inside a node function)', () => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
 
     const graph = (
@@ -114,7 +114,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     }
   })
 
-  it('START 按入口标记分派：聊天走压缩，手动宫殿直达宫殿子图', () => {
+  it('START dispatches on the entry marker: chat goes through compaction, a manual palace run goes straight to the palace subgraph', () => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
 
     const graph = (orchestrator as unknown as Record<string, () => unknown>)['buildGraph'].bind(
@@ -127,7 +127,7 @@ describe('AgentOrchestrator buildGraph 结构', () => {
     })
   })
 
-  it('每个子图节点直接回到 supervisor：没有收口节点', () => {
+  it('every subgraph node goes straight back to the supervisor: there is no collector node', () => {
     const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
 
     const graph = (
@@ -192,44 +192,44 @@ describe('AgentOrchestrator extractToolCalls', () => {
     ].bind(orchestrator)
   })
 
-  it('只提取当前轮次（最后一条 human 消息之后）的 ToolMessage', () => {
+  it('extracts only ToolMessages from the current turn (after the last human message)', () => {
     const messages: BaseMessage[] = [
-      new HumanMessage('第一轮'),
-      new AIMessage('回复1'),
-      new ToolMessage({ content: '旧工具结果', tool_call_id: 'call-1', name: 'oldTool' }),
-      new HumanMessage('第二轮'),
-      new AIMessage('回复2'),
-      new ToolMessage({ content: '新工具结果', tool_call_id: 'call-2', name: 'newTool' }),
+      new HumanMessage('first turn'),
+      new AIMessage('reply 1'),
+      new ToolMessage({ content: 'old tool result', tool_call_id: 'call-1', name: 'oldTool' }),
+      new HumanMessage('second turn'),
+      new AIMessage('reply 2'),
+      new ToolMessage({ content: 'new tool result', tool_call_id: 'call-2', name: 'newTool' }),
     ]
 
     const result = extractToolCalls(messages)
     expect(result).toHaveLength(1)
-    expect(result![0]).toMatchObject({ name: 'newTool', result: '新工具结果' })
+    expect(result![0]).toMatchObject({ name: 'newTool', result: 'new tool result' })
   })
 
-  it('没有 human 消息时提取所有 ToolMessage', () => {
+  it('extracts every ToolMessage when there is no human message', () => {
     const messages: BaseMessage[] = [
-      new ToolMessage({ content: '工具结果', tool_call_id: 'call-1', name: 'singleTool' }),
+      new ToolMessage({ content: 'tool result', tool_call_id: 'call-1', name: 'singleTool' }),
     ]
 
     const result = extractToolCalls(messages)
     expect(result).toHaveLength(1)
-    expect(result![0]).toMatchObject({ name: 'singleTool', result: '工具结果' })
+    expect(result![0]).toMatchObject({ name: 'singleTool', result: 'tool result' })
   })
 
-  it('当前轮次无 ToolMessage 时返回 undefined', () => {
+  it('returns undefined when the current turn has no ToolMessage', () => {
     const messages: BaseMessage[] = [
-      new HumanMessage('第一轮'),
-      new ToolMessage({ content: '旧工具', tool_call_id: 'call-1', name: 'oldTool' }),
-      new HumanMessage('第二轮'),
-      new AIMessage('纯文本回复'),
+      new HumanMessage('first turn'),
+      new ToolMessage({ content: 'old tool', tool_call_id: 'call-1', name: 'oldTool' }),
+      new HumanMessage('second turn'),
+      new AIMessage('plain text reply'),
     ]
 
     const result = extractToolCalls(messages)
     expect(result).toBeUndefined()
   })
 
-  it('读取 additional_kwargs.toolSteps 为 ChatToolCall.steps', () => {
+  it('reads additional_kwargs.toolSteps as ChatToolCall.steps', () => {
     const messages: BaseMessage[] = [
       new ToolMessage({
         content: '{"ok":true}',
@@ -253,7 +253,7 @@ describe('AgentOrchestrator extractToolCalls', () => {
     ])
   })
 
-  it('无轨迹（旧会话）ToolMessage 不产生 steps', () => {
+  it('a ToolMessage with no trace (older session) produces no steps', () => {
     const messages: BaseMessage[] = [
       new ToolMessage({
         content: 'ok',
@@ -278,7 +278,7 @@ describe('AgentOrchestrator extractToolCalls', () => {
 
     const failed = extractToolCalls([
       new ToolMessage({
-        content: JSON.stringify({ ok: false, error: '[block_not_found] 节点不存在' }),
+        content: JSON.stringify({ ok: false, error: '[block_not_found] Node not found' }),
         tool_call_id: 'call-fail',
         name: 'updateMindmapNode',
       }),
@@ -286,7 +286,11 @@ describe('AgentOrchestrator extractToolCalls', () => {
     expect(failed![0].status).toBe('error')
 
     const freeText = extractToolCalls([
-      new ToolMessage({ content: '导图已生成', tool_call_id: 'call-txt', name: 'readMindmap' }),
+      new ToolMessage({
+        content: 'mindmap generated',
+        tool_call_id: 'call-txt',
+        name: 'readMindmap',
+      }),
     ])
     expect(freeText![0].status).toBe('success')
   })

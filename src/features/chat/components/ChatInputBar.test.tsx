@@ -91,7 +91,7 @@ describe('ChatInputBar (entry conversation)', () => {
 
     expect(html).toContain('chat-input-bar__textarea')
     expect(html).not.toContain('disabled')
-    expect(html).not.toContain('请先打开一个 .mindlane 文件')
+    expect(html).not.toContain('Open a .mindlane file first')
   })
 
   it('is disabled without a workspace (nothing to create the file in)', () => {
@@ -112,6 +112,6 @@ describe('ChatInputBar (entry conversation)', () => {
     const html = renderInputBar()
 
     expect(html).toContain('disabled')
-    expect(html).toContain('请先在设置中配置 API Key 并选择模型')
+    expect(html).toContain('Configure an API Key and model in settings first')
   })
 })

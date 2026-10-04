@@ -56,9 +56,9 @@ interface ChatResponse {
 interface AgentOrchestratorOptions {
   userDataPath?: string
   messagePipeline?: MessagePreparationConfig
-  /** 按需读导图快照提供者：主进程装配时注入（经反向 IPC 向渲染层拉取）。 */
+  /** On-demand mindmap snapshot provider: injected by main-process assembly (pulled from the renderer over reverse IPC). */
   mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
-  /** 写工具渲染层代理：转发参数、返回渲染层落盘应答（原样）。 */
+  /** Write-tool renderer proxy: forwards args and returns the renderer's write ack (as-is). */
   mindmapWriteProxy?: MindmapWriteProxy
 }
 
@@ -112,7 +112,7 @@ export class AgentOrchestrator {
 
   /**
    * Register MindLane's default tools into the toolRegistry.
-   * XML 写工具（固定 4 个）先注册，随后是路由工具。
+   * The XML write tools (fixed set of 4) go first, then the routing tools.
    */
   private registerDefaultTools(): void {
     const actionTools = createMindmapActionTools(this.getWriteProxy())
@@ -127,7 +127,8 @@ export class AgentOrchestrator {
     // switching workspaces takes effect without rebuilding the registry.
     this.toolRegistry.registerTool(createReadFileTool(() => currentWorkspacePath() ?? ''))
 
-    // 按需读导图：模型需要整图结构（超出选中范围）时实时拉取。
+    // On-demand mindmap read: pulled live when the model needs the whole tree
+    // (beyond the current selection).
     const mindmapReadProvider = this.options.mindmapReadProvider
     if (mindmapReadProvider) {
       this.toolRegistry.registerTool(createReadMindmapTool(mindmapReadProvider))
@@ -149,9 +150,10 @@ export class AgentOrchestrator {
     const toolRegistry = this.toolRegistry.snapshot()
     const graph = this.buildGraph(toolRegistry)
     const checkpointer = this.services.checkpointer.getAdapter()
-    // LangGraph 的泛型 stream<TStreamMode> 返回类型无法与 StreamGraph 的
-    // 只读元组签名完全结构匹配（实测 TS2322），故在此局部强转并注释原因，
-    // 避免调用侧继续以 as unknown as 向编译器撒谎。
+    // LangGraph's generic stream<TStreamMode> return type cannot fully match
+    // StreamGraph's readonly-tuple signature structurally (observed as TS2322),
+    // so the cast stays local and documented, sparing callers from lying to the
+    // compiler with another `as unknown as`.
     return {
       graph: graph.compile(
         checkpointer ? { checkpointer } : undefined,
@@ -177,19 +179,22 @@ export class AgentOrchestrator {
       this.compiledPalaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
         // The palace subgraph lands its own payload through the same write
-        // responder the model's write tools use (CONTEXT.md「确定性落图」).
+        // responder the model's write tools use (CONTEXT.md "Deterministic
+        // Landing").
         writeProxy: this.getWriteProxy(),
       }).compile()
     }
     return this.compiledPalaceSubgraph
   }
 
-  /** 写工具渲染层代理：参数转发给渲染层落盘应答器；未装配代理时调用即报错。 */
+  /** Write-tool renderer proxy: forwards args to the renderer's write responder; calling it with no proxy wired in throws. */
   private getWriteProxy(): MindmapWriteProxy {
     return (fileUuid, action, args) => {
       const proxy = this.options.mindmapWriteProxy
       if (!proxy) {
-        return Promise.reject(new Error('落盘通道不可用，无法执行写操作'))
+        return Promise.reject(
+          new Error('Write channel unavailable, cannot execute write operations'),
+        )
       }
       return proxy(fileUuid, action, args)
     }
@@ -261,7 +266,7 @@ export class AgentOrchestrator {
 
     // Proactive compaction: compress to persistence (rolling summary), then read
     // unarchived messages by budget. The running summary flows to the supervisor
-    // via state.summary (injected as `## 历史摘要`). Assembly lives in
+    // via state.summary (injected as `## History Summary`). Assembly lives in
     // runContextCompact; this node is a one-line delegator so the call graph
     // attributes Consolidator's caller to a named module symbol.
     const runAssemblyDeps: RunContextAssemblyDeps = {
@@ -325,7 +330,7 @@ export class AgentOrchestrator {
   buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
     // The palace entry has no supervisor reply to fall back to: its run carries
     // the palace payload, not prose.
-    const fallback = result.runEntry === 'palace' ? '' : '抱歉，我无法生成回复。'
+    const fallback = result.runEntry === 'palace' ? '' : 'Sorry, I could not generate a reply.'
     const rawContent = streamingContent || result.response || fallback
     const assistantMessages = checkpointMessagesToSessionMessages(
       splitCurrentTurn(result.messages).current,

@@ -187,7 +187,7 @@ class Logger {
     }
   }
 
-  /** `模块名:streamId短前缀` — streamId auto-attached from the active run context. */
+  /** `module:shortStreamId` — streamId auto-attached from the active run context. */
   private effectiveContext(): string {
     const streamId = currentStreamId()
     const short = streamId ? shortStreamId(streamId) : ''

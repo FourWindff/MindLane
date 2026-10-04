@@ -1,18 +1,18 @@
 import crypto from 'node:crypto'
 import { startLoopbackCallbackServer } from './oauth.js'
 
-/** 飞书 UAT 授权回调的固定端口——回调地址 `http://127.0.0.1:44664/callback`
- *  需在飞书开放平台后台（安全设置 → 重定向 URL）一次性登记，之后每次走同一地址。 */
+/** Fixed port for the Feishu UAT authorization callback - the callback URL `http://127.0.0.1:44664/callback`
+ *  must be registered once in the Feishu Open Platform console (Security Settings -> Redirect URL), after which every run uses the same address. */
 const FEISHU_UAT_CALLBACK_PORT = 44664
 
-/** 授权成功拿到的用户身份凭证（UAT），供设置面板回填进连接表单 */
+/** User identity credential (UAT) obtained after successful authorization, filled back into the connection form by the settings panel */
 interface FeishuUatResult {
   uat: string
   refreshToken: string
   expiresIn: number
 }
 
-/** 解析飞书 token 类接口响应：code!==0 或非 JSON 时抛出带原始信息的错误 */
+/** Parses a Feishu token endpoint response: throws an error carrying the raw info when code!==0 or the body is not JSON */
 async function readFeishuTokenBody(
   res: Response,
   what: string,
@@ -26,25 +26,25 @@ async function readFeishuTokenBody(
     body = (await res.json()) as typeof body
   } catch {
     const raw = await res.text().catch(() => '')
-    throw new Error(`${what}响应异常：${res.status} ${raw.slice(0, 200)}`)
+    throw new Error(`${what} response error: ${res.status} ${raw.slice(0, 200)}`)
   }
   if (!res.ok || body.code !== 0 || !body.data?.access_token) {
-    throw new Error(`${what}失败：${body.code ?? res.status} ${body.msg ?? ''}`)
+    throw new Error(`${what} failed: ${body.code ?? res.status} ${body.msg ?? ''}`)
   }
   return body.data
 }
 
-/** token 交换器抽象，测试可注入 mock */
+/** Token exchanger abstraction; tests can inject a mock */
 type FeishuUatExchanger = (
   appId: string,
   appSecret: string,
   code: string,
 ) => Promise<FeishuUatResult>
 
-/** 生产实现：调用飞书开放平台接口，用授权码换用户身份 token
- *  注意：文档预告 v3（user_access_token/internal，body 用 client_id/client_secret），
- *  但线上实测 v3 返回 404；现行 v1/access_token 的 body 字段名是 app_id/app_secret（
- *  实测用 client_id 会报 20025 missing app id or app secret）。平台切换 v3 时只需改这里。 */
+/** Production implementation: calls the Feishu Open Platform API to exchange an authorization code for a user identity token
+ *  Note: the docs announce v3 (user_access_token/internal, with client_id/client_secret in the body),
+ *  but v3 returns 404 in live testing; the current v1/access_token body fields are app_id/app_secret (
+ *  using client_id reports 20025 missing app id or app secret). When the platform switches to v3, only this spot needs changing. */
 export async function exchangeFeishuUat(
   appId: string,
   appSecret: string,
@@ -59,11 +59,11 @@ export async function exchangeFeishuUat(
       app_id: appId,
       app_secret: appSecret,
     }),
-    // 默认 fetch 无超时，这里 20s 兜底——宁可失败提示也不要“获取中”卡死
+    // fetch has no default timeout, so 20s is the backstop - better a failure message than a stuck "fetching" state
     signal: AbortSignal.timeout(20_000),
   })
-  const data = await readFeishuTokenBody(res, '授权码换取 user_access_token')
-  // 仅返回 uat 等非敏感展示信息；refresh_token 由 app 侧持有，不落盘。
+  const data = await readFeishuTokenBody(res, 'exchanging authorization code for user_access_token')
+  // Only returns non-sensitive display info such as the uat; the refresh_token stays on the app side and is not persisted.
   return {
     uat: data.access_token ?? '',
     refreshToken: data.refresh_token ?? '',
@@ -71,7 +71,7 @@ export async function exchangeFeishuUat(
   }
 }
 
-/** 用 refresh_token 换新 UAT（约 30 天内可反复续期）；返回新的 uat 与新的 refresh_token */
+/** Exchanges a refresh_token for a new UAT (renewable repeatedly within about 30 days); returns the new uat and a new refresh_token */
 export async function refreshFeishuUat(
   appId: string,
   appSecret: string,
@@ -86,10 +86,10 @@ export async function refreshFeishuUat(
       app_id: appId,
       app_secret: appSecret,
     }),
-    // 默认 fetch 无超时，20s 兜底——失败提示好过连接卡住
+    // fetch has no default timeout, so 20s is the backstop - a failure message beats a stuck connection
     signal: AbortSignal.timeout(20_000),
   })
-  const data = await readFeishuTokenBody(res, '刷新 user_access_token')
+  const data = await readFeishuTokenBody(res, 'refreshing user_access_token')
   return {
     uat: data.access_token ?? '',
     refreshToken: data.refresh_token ?? '',
@@ -98,16 +98,16 @@ export async function refreshFeishuUat(
 }
 
 /**
- * 一键获取飞书 UAT：拉起授权页 → 用户在浏览器登录授权 → loopback 回调拿 code →
- * 用 app 凭证换 user_access_token。
- * openBrowser 会在授权页拉起前被调用；超时或用户拒绝则 reject。
+ * One-click Feishu UAT acquisition: open the authorization page -> the user signs in and authorizes in the browser -> the loopback callback receives the code ->
+ * exchange it for a user_access_token using the app credentials.
+ * openBrowser is called before the authorization page opens; it rejects on timeout or if the user declines.
  */
 export async function acquireFeishuUat(opts: {
   appId: string
   appSecret: string
   openBrowser: (url: string) => void
   timeoutMs?: number
-  // 测试可传 0 用随机端口，避免固定端口冲突；生产默认预设端口
+  // Tests can pass 0 for a random port to avoid fixed-port conflicts; production defaults to the preset port
   port?: number
   exchange?: FeishuUatExchanger
 }): Promise<FeishuUatResult> {

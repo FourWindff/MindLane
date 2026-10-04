@@ -1,9 +1,10 @@
 /**
- * XML 转义/反转义：序列化端对文本与属性值全量转义 5 字符（`& < > " '`）。
- * base64 字符集本身 XML 安全，无需额外处理。
+ * XML escaping/unescaping: the serializer escapes all 5 characters
+ * (`& < > " '`) in text and attribute values. The base64 alphabet is itself
+ * XML-safe and needs no extra handling.
  */
 
-/** 转义 5 字符：`& < > " '` → 实体。 */
+/** Escape the 5 characters: `& < > " '` → entities. */
 export function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -15,7 +16,7 @@ export function escapeXml(value: string): string {
 
 const ENTITY_RE = /&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g
 
-/** 反转义 XML 实体（含数字实体）。未知实体原样保留。 */
+/** Unescape XML entities (including numeric ones). Unknown entities are kept as-is. */
 export function unescapeXml(value: string): string {
   return value.replace(ENTITY_RE, (_match, entity: string) => {
     switch (entity) {

@@ -5,7 +5,7 @@ import { openFileRegistry } from './openFileRegistry'
 import type { MindmapEditor } from './editor'
 
 /**
- * Manual palace generation (CONTEXT.md「触发面」/「临时运行」): a plain ephemeral
+ * Manual palace generation (CONTEXT.md "Trigger Surface" / "Ephemeral Run"): a plain ephemeral
  * graph run, not a direct subgraph call.
  *
  * One run = one `chatStream` carrying an entry marker; the main process mounts
@@ -82,7 +82,7 @@ async function sendRun(
   const api = window.mindlane?.ai
   if (!api) {
     forgetRun(run)
-    return { ok: false, error: 'IPC 通道不可用，请确认 Electron 环境' }
+    return { ok: false, error: 'IPC channel unavailable; make sure you are running in Electron' }
   }
 
   const result = await api.chatStream({
@@ -141,7 +141,7 @@ export async function resumePalaceRun(fileUuid: string, nodeId: string): Promise
   editor?.clearNodeFlag(nodeId, 'runStopped')
   const result = await startRun(run, { resume: true })
   if (!result.ok) {
-    reportRendererError(`继续生成失败：${result.error}`)
+    reportRendererError(`Failed to resume palace generation: ${result.error}`)
     editor?.setNodeFlag(nodeId, 'runStopped', true)
   }
 }
@@ -214,7 +214,7 @@ function forgetRun(run: ActiveRun): void {
 
 /** Keep the placeholder and offer a resume: the private thread stays resumable. */
 function settleStopped(run: ActiveRun, error?: string): void {
-  if (error) reportRendererError(`宫殿生成失败：${error}`)
+  if (error) reportRendererError(`Palace generation failed: ${error}`)
   const editor = editorOf(run)
   editor?.clearNodeFlag(run.nodeId, 'runStage')
   editor?.setNodeFlag(run.nodeId, 'runStopped', true)

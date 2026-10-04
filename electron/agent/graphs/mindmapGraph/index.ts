@@ -43,7 +43,7 @@ const runStarts = new Map<string, number>()
 
 /** Run key for the per-stream bookkeeping maps (see `requireStreamId`). */
 function runKey(): string {
-  return requireStreamId('导图子图')
+  return requireStreamId('mindmap subgraph')
 }
 
 /** Read and clear the run start (build_output always runs, so this never leaks). */
@@ -181,7 +181,7 @@ async function generateValidMindmapXml(
   fallbackTitle: string,
 ): Promise<{ tree: MindmapOutlineNode; attempts: number }> {
   let messages = initialMessages
-  let lastReason = 'XML 校验失败'
+  let lastReason = 'XML validation failed'
 
   for (let attempt = 1; attempt <= XML_GENERATION_ATTEMPTS; attempt += 1) {
     const response = await provider.model.invoke(messages)
@@ -194,7 +194,7 @@ async function generateValidMindmapXml(
 
     lastReason = validation.reason
     log.warn(
-      'XML 校验失败（attempt %d/%d，%s）：%s',
+      'XML validation failed (attempt %d/%d, %s): %s',
       attempt,
       XML_GENERATION_ATTEMPTS,
       fallbackTitle,
@@ -203,8 +203,13 @@ async function generateValidMindmapXml(
     messages = buildXmlRepairPrompt(initialMessages, content, lastReason)
   }
 
-  log.error('XML 校验连续 %d 次失败（%s）：%s', XML_GENERATION_ATTEMPTS, fallbackTitle, lastReason)
-  throw new Error(`XML 校验失败：${lastReason}`)
+  log.error(
+    'XML validation failed %d times in a row (%s): %s',
+    XML_GENERATION_ATTEMPTS,
+    fallbackTitle,
+    lastReason,
+  )
+  throw new Error(`XML validation failed: ${lastReason}`)
 }
 
 function buildXmlRepairPrompt(
@@ -220,12 +225,12 @@ function buildXmlRepairPrompt(
     },
     {
       role: 'user',
-      content: `上一次输出的 XML 无效，原因：${reason}
+      content: `The previous XML output was invalid. Reason: ${reason}
 
-请根据原始任务重新生成完整的 outline XML。
-只输出 XML，不要 JSON，不要 YAML，不要 Markdown 解释，不要额外前后缀。
-使用 <node> 嵌套表达层级：<node>节点内容</node>，子节点嵌套在父节点内部。
-所有 <node> 标签必须配对闭合；文本中的 & < > 需转义为 &amp; &lt; &gt;；标签上不要写任何属性。`,
+Regenerate the full outline XML for the original task.
+Output only XML: no JSON, no YAML, no Markdown explanation, no extra prefix or suffix.
+Express hierarchy with nested <node> elements: <node>node content</node>, with child nodes nested inside their parent.
+Every <node> tag must be closed; escape & < > in text as &amp; &lt; &gt;; write no attributes on any tag.`,
     },
   ]
 }
@@ -241,8 +246,8 @@ async function resolveInputNode(
   if (!resolution) {
     return {
       ...reset,
-      mindmapError: '请提供要生成思维导图的文档或文本。',
-      mindmapResponse: '请提供要生成思维导图的文档或文本。',
+      mindmapError: 'Provide a document or text to generate a mindmap from.',
+      mindmapResponse: 'Provide a document or text to generate a mindmap from.',
     }
   }
 
@@ -251,7 +256,7 @@ async function resolveInputNode(
   // A new run starts: clear the previous leftover trace (build_output already
   // consumed it; this is a leak safety net).
   stepTraces.delete(runKey())
-  log.info('入口： source=%s, title=%s', resolution.source.type, resolution.title)
+  log.info('input: source=%s, title=%s', resolution.source.type, resolution.title)
   return {
     ...reset,
     mindmapInputSource: resolution.source,
@@ -270,8 +275,8 @@ async function loadDocumentNode(
   if (!source) {
     return {
       ...reset,
-      mindmapError: '请提供输入来源。',
-      mindmapResponse: '请提供输入来源。',
+      mindmapError: 'Provide an input source.',
+      mindmapResponse: 'Provide an input source.',
     }
   }
 
@@ -289,13 +294,13 @@ async function loadDocumentNode(
     if (batches.length === 0) {
       return {
         ...reset,
-        mindmapError: '文档未能提取出任何文本内容。',
-        mindmapResponse: '文档未能提取出任何文本内容。',
+        mindmapError: 'No text content could be extracted from the document.',
+        mindmapResponse: 'No text content could be extracted from the document.',
       }
     }
 
     log.info(
-      '文档管线： source=%s, batches=%d, budget=%d 字符',
+      'document pipeline: source=%s, batches=%d, budget=%d chars',
       source.type,
       batches.length,
       budgetChars,
@@ -311,11 +316,11 @@ async function loadDocumentNode(
     }
   } catch (error) {
     const formatted = formatAgentError(error)
-    log.error('加载文档失败： %s', formatted.split('\n')[0])
+    log.error('loading the document failed: %s', formatted.split('\n')[0])
     return {
       ...reset,
       mindmapError: formatted,
-      mindmapResponse: `加载文档失败：${formatted.split('\n')[0]}`,
+      mindmapResponse: `Failed to load the document: ${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -349,7 +354,7 @@ async function leafExtractNode(
     const completed = takeItemProgress(state.mindmapToolCallId, 'extracting', total)
     const branches = (tree as { children?: unknown[] }).children?.length ?? 0
     log.info(
-      'batch-%d 完成，第 %d/%d 个, 提取 %d 分支, %ss, 重试 %d 次',
+      'batch-%d finished, %d/%d, %d branches extracted, %ss, %d retries',
       batchIndex + 1,
       completed,
       total,
@@ -369,10 +374,10 @@ async function leafExtractNode(
     }
   } catch (error) {
     const formatted = formatAgentError(error)
-    log.error('batch-%d 提取失败： %s', batchIndex + 1, formatted.split('\n')[0])
+    log.error('batch-%d extraction failed: %s', batchIndex + 1, formatted.split('\n')[0])
     return {
       mindmapError: formatted,
-      mindmapResponse: `提取结构失败：${formatted.split('\n')[0]}`,
+      mindmapResponse: `Failed to extract the structure: ${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -438,7 +443,7 @@ async function mergeTreesNode(
 
     const completed = takeItemProgress(state.mindmapToolCallId, 'merging', totalGroups)
     log.info(
-      'merge group-%d 完成，第 %d/%d 个, 合并 %d 棵树, %ss, 重试 %d 次',
+      'merge group-%d finished, %d/%d, %d trees merged, %ss, %d retries',
       group.groupIndex + 1,
       completed,
       totalGroups,
@@ -452,10 +457,10 @@ async function mergeTreesNode(
     }
   } catch (error) {
     const formatted = formatAgentError(error)
-    log.error('merge group-%d 合并失败： %s', group.groupIndex + 1, formatted.split('\n')[0])
+    log.error('merge group-%d failed: %s', group.groupIndex + 1, formatted.split('\n')[0])
     return {
       mindmapError: formatted,
-      mindmapResponse: `合并结构失败：${formatted.split('\n')[0]}`,
+      mindmapResponse: `Failed to merge the structure: ${formatted.split('\n')[0]}`,
     }
   }
 }
@@ -503,12 +508,12 @@ async function buildOutputNode(
   }
 
   const tree = state.finalTree
-  const title = state.mindmapInputTitle || '思维导图'
+  const title = state.mindmapInputTitle || 'Mindmap'
 
   if (!tree) {
-    const response = '生成思维导图失败：未能生成有效的结构'
+    const response = 'Mindmap generation failed: no valid structure was generated'
     return {
-      mindmapError: '未能生成有效的思维导图结构',
+      mindmapError: 'Failed to generate a valid mindmap structure',
       mindmapResponse: response,
       messages: [closeOut({ ok: false, error: response })],
     }
@@ -517,16 +522,16 @@ async function buildOutputNode(
   const finalTitle = tree.label.trim() || title
 
   if (tree.children.length === 0) {
-    const response = '生成思维导图失败：未提取到任何要点'
+    const response = 'Mindmap generation failed: no key points were extracted'
     return {
-      mindmapError: '未提取到任何要点',
+      mindmapError: 'No key points were extracted',
       mindmapResponse: response,
       messages: [closeOut({ ok: false, error: response })],
     }
   }
 
   log.info(
-    '完成： 总耗时 %ss, 产出 %d 节点, 模型调用 %d 次, title=%s',
+    'done: %ss total, %d nodes produced, %d model calls, title=%s',
     runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
     countTreeNodes(tree),
     takeModelCallCount(currentStreamId() ?? ''),
@@ -535,7 +540,7 @@ async function buildOutputNode(
 
   const mindmapXml = serializeStorageFragment(tree)
   return {
-    mindmapResponse: `已生成思维导图「${finalTitle}」。`,
+    mindmapResponse: `Generated the mindmap "${finalTitle}".`,
     messages: [
       closeOut({
         ok: true,

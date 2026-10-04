@@ -1,6 +1,7 @@
 /**
- * 序列化端（writer）：MindmapNode 树 → XML 字符串。
- * 文件面与片段面共用同一 writer 实现（PRD 23：迁移转换与运行时序列化同一实现）。
+ * Serializer side (writer): MindmapNode tree → XML string.
+ * The file surface and fragment surface share one writer implementation (PRD 23:
+ * migration conversion and runtime serialization use the same implementation).
  */
 
 import type { MindLaneFile } from '../fileFormat.js'
@@ -16,8 +17,8 @@ import {
 import { newId } from '../ids.js'
 
 /**
- * 子节点顺序：视觉顺序（position.y 升序），保证序列化的同级顺序与界面一致，
- * 避免边数组顺序与视觉顺序漂移。
+ * Child order: visual order (position.y ascending), so the serialized sibling
+ * order matches the UI and the edge-array order cannot drift from the visual one.
  */
 function getChildIdsOrdered(
   nodes: MindmapXmlNode[],
@@ -42,7 +43,7 @@ function findRootIds(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string[]
   return nodes.filter((n) => !targets.has(n.id)).map((n) => n.id)
 }
 
-/** 序列化单个 <node> 元素（含类型专属子元素与树子树）。 */
+/** Serialize a single <node> element (including type-specific children and the tree subtree). */
 function serializeNodeElement(node: MindmapXmlNode, childrenXml: string, depth: number): string {
   const indent = '  '.repeat(depth)
   const descriptor = xmlNodeTypeRegistry.get(node.type ?? '')
@@ -69,10 +70,11 @@ function serializeNodeElement(node: MindmapXmlNode, childrenXml: string, depth: 
 }
 
 /**
- * 序列化一棵子树（递归）。`query` 存在时按查询过滤（`serializeMindmapSection`）：
- * 被过滤掉的中间节点用子树内容提升，`maxDepth` 截断。
- * @param nodesById 全部节点（按 id 索引）
- * @param childrenOf 父 → 有序子节点 id
+ * Serialize one subtree (recursive). When `query` is present, filter by it
+ * (`serializeMindmapSection`): filtered-out intermediate nodes are replaced by
+ * their subtree content, and `maxDepth` truncates.
+ * @param nodesById All nodes (indexed by id)
+ * @param childrenOf Parent → ordered child node ids
  */
 function serializeSubtree(
   nodeId: string,
@@ -95,15 +97,15 @@ function serializeSubtree(
 }
 
 /**
- * 把节点/边序列化为 XML 片段（顶层多个 <node> = 多根）。
- * 位置、边、临时 UI 标记一律不落盘（PRD 2.2）。
+ * Serialize nodes/edges into an XML fragment (multiple top-level <node> = multiple roots).
+ * Positions, edges and transient UI markers are never persisted (PRD 2.2).
  */
 export function serializeTreeFragment(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string {
   return serializeMindmapSection(nodes, edges)
 }
 
 /**
- * Palace landing input: the subgraph payload (CONTEXT.md「子图输出」) minus the
+ * Palace landing input: the subgraph payload (CONTEXT.md "subgraph output") minus the
  * kind/error envelope.
  */
 interface PalaceNodePayload {
@@ -114,10 +116,12 @@ interface PalaceNodePayload {
 }
 
 /**
- * 宫殿 payload → XML 片段（确定性落图：由**代码**序列化，模型不复述图片 data URL）。
+ * Palace payload → XML fragment (deterministic landing: serialized by **code**;
+ * the model never repeats the image data URL).
  *
- * id 在序列化时铸出：解析器对缺 id 的片段会自行铸一个，落图方需要的是同一个 id；
- * 节点形状复用 palace 注册表 writer，避免出现第二份 XML 契约。
+ * The id is minted during serialization: the parser mints its own id for a
+ * fragment that lacks one, and the landing side needs the same id; the node shape
+ * reuses the palace registry writer, avoiding a second XML contract.
  */
 export function serializePalaceNodeXml(input: PalaceNodePayload): string {
   const node = {
@@ -134,7 +138,7 @@ export function serializePalaceNodeXml(input: PalaceNodePayload): string {
   return serializeNodeElement(node, '', 0)
 }
 
-/** 序列化 mindmap 节的子树（readMindmap 输出 / 轮次状态）。 */
+/** Serialize a mindmap section subtree (readMindmap output / turn state). */
 interface MindmapSectionQuery {
   subtreeId?: string
   type?: string
@@ -154,9 +158,10 @@ function matchesQuery(node: MindmapXmlNode, query: MindmapSectionQuery | undefin
 }
 
 /**
- * 序列化 mindmap 节为 XML 片段（树查询过滤后）。
- * 过滤语义：子树截断 + 类型/内容过滤 + 深度截断；只输出携带
- * id/type/content/collapsed 的节点（metadata/assets/documents 不进上下文）。
+ * Serialize the mindmap section into an XML fragment (after tree-query filtering).
+ * Filter semantics: subtree selection + type/content filtering + depth
+ * truncation; only nodes carrying id/type/content/collapsed are emitted
+ * (metadata/assets/documents never enter the context).
  */
 export function serializeMindmapSection(
   nodes: MindmapXmlNode[],
@@ -168,7 +173,7 @@ export function serializeMindmapSection(
   const roots = query.subtreeId ? [query.subtreeId] : findRootIds(nodes, edges)
 
   if (isFiltered(query) && !query.subtreeId && roots.length === 1) {
-    // 过滤查询：保留根链，被过滤的中间节点用子树内容提升
+    // Filter query: keep the root chain; filtered-out intermediate nodes are replaced by their subtree content
     return serializeSubtree(roots[0]!, nodesById, childrenOf, 0, query)
   }
   return roots
@@ -187,7 +192,7 @@ function textOf(value: string | undefined): string {
   return escapeXml(value ?? '')
 }
 
-/** 序列化 metadata 节。 */
+/** Serialize the metadata section. */
 function serializeMetadata(file: MindLaneFile): string {
   const { metadata, mindmap } = file
   const style = mindmap.style
@@ -206,7 +211,7 @@ function serializeMetadata(file: MindLaneFile): string {
   ].join('\n')
 }
 
-/** 序列化 assets 节。 */
+/** Serialize the assets section. */
 function serializeAssets(file: MindLaneFile): string {
   const assets = file.assets ?? []
   if (assets.length === 0) return `  <assets />`
@@ -217,7 +222,7 @@ function serializeAssets(file: MindLaneFile): string {
   return [`  <assets>`, ...lines, `  </assets>`].join('\n')
 }
 
-/** 序列化 documents 节。 */
+/** Serialize the documents section. */
 function serializeDocuments(file: MindLaneFile): string {
   const docs = file.documents ?? []
   if (docs.length === 0) return `  <documents />`
@@ -243,8 +248,9 @@ function serializeDocuments(file: MindLaneFile): string {
 }
 
 /**
- * 把规范化文件模型序列化为完整 XML 文档（单根 <mindlane version="1.0">）。
- * 版本号只放根元素；position/edges/布局产物不落盘。
+ * Serialize the normalized file model into a complete XML document (single root
+ * <mindlane version="1.0">). The version sits only on the root element;
+ * position/edges/layout products are never persisted.
  */
 export function serializeMindLaneFile(file: MindLaneFile): string {
   const nodesById = new Map(file.mindmap.nodes.map((n) => [n.id, n]))

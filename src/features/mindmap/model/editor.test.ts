@@ -14,7 +14,7 @@ describe('MindmapEditor', () => {
     store = createMindmapStore()
     history = new MindmapHistory()
     editor = new MindmapEditor(store, history)
-    editor.newFile('测试')
+    editor.newFile('Test')
   })
 
   function rootId(): string {
@@ -117,7 +117,7 @@ describe('MindmapEditor', () => {
       expect(edges.find((e) => e.target === parent)?.source).toBe(rootId())
       expect(edges.find((e) => e.target === b)?.source).toBe(parent)
       expect(childOrder(rootId())).toEqual([a, parent])
-      expect(nodes.find((n) => n.id === parent)?.data.label).toBe('新主题')
+      expect(nodes.find((n) => n.id === parent)?.data.label).toBe('Untitled')
     })
 
     it('returns null for root and supports undo/redo', () => {
@@ -156,15 +156,15 @@ describe('MindmapEditor', () => {
 
   describe('updateNode', () => {
     it('should update node label and allow undo/redo', () => {
-      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: '已更新' } }))
+      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: 'Updated' } }))
 
-      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('已更新')
+      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Updated')
 
       editor.undo()
-      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('中心主题')
+      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Central Topic')
 
       editor.redo()
-      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('已更新')
+      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Updated')
     })
   })
 
@@ -297,12 +297,13 @@ describe('MindmapEditor', () => {
       const { nodeId: a } = editor.addChild(rootId())
       const edgeId = `e_${a}_${a}`
 
-      // 纯树约束（ADR-0015）：任意连线入口已移除，边只能由加子/加兄弟产生。
+      // Pure-tree constraint (ADR-0015): every connect entry point was removed, so edges can
+      // only come from add-child/add-sibling.
       const edgesBefore = store.getState().edges.length
       editor.applyNativeEdgeChanges([{ id: edgeId, type: 'remove' }])
       expect(store.getState().edges.length).toBe(edgesBefore)
 
-      // 通过 addChild 产生的边可以被原生 remove 移除
+      // An edge created by addChild can be removed by a native remove
       const childEdge = store.getState().edges.find((e) => e.target === a)!
       editor.applyNativeEdgeChanges([{ id: childEdge.id, type: 'remove' }])
       expect(store.getState().edges.some((e) => e.id === childEdge.id)).toBe(false)
@@ -377,18 +378,18 @@ describe('MindmapEditor', () => {
     })
 
     it('should commit label change as a recorded update and leave escape transient', () => {
-      // 模拟 Escape：仅清除 editing 标记，不创建事务
+      // Simulate Escape: clear the editing flag only, record no transaction
       editor.setNodeEditing(rootId(), true)
       editor.setNodeEditing(rootId(), false)
       expect(store.getState().canUndo).toBe(false)
 
-      // 模拟提交：调用 updateNode 创建事务
-      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: '已提交' } }))
+      // Simulate commit: updateNode records a transaction
+      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: 'Committed' } }))
       expect(store.getState().canUndo).toBe(true)
-      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('已提交')
+      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Committed')
 
       editor.undo()
-      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('中心主题')
+      expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Central Topic')
     })
 
     it('should clear node flag without recording history', () => {
@@ -460,7 +461,7 @@ describe('MindmapEditor', () => {
 
   describe('loadFile', () => {
     it('should initialize structureType from the loaded file style', () => {
-      const file = createEmptyFile('导图')
+      const file = createEmptyFile('Mindmap')
       file.mindmap.style = {
         structureType: 'mindmap',
         visualVariant: 'minimal',
@@ -474,7 +475,7 @@ describe('MindmapEditor', () => {
     })
 
     it('should fall back to default style when file has no style field', () => {
-      const file = createEmptyFile('旧文件')
+      const file = createEmptyFile('Legacy file')
 
       editor.loadFile('/test/legacy.mindlane', file, null)
 

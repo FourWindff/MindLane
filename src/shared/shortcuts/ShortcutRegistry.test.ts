@@ -5,8 +5,8 @@ import { registerShortcutRows } from './useRegisterShortcut'
 import { shortcutRegistry } from './ShortcutRegistry'
 import type { ShortcutRegistration } from './types'
 
-// 测试环境（Electron-as-Node）没有 DOM：`isTypingTarget` 只用到
-// `instanceof HTMLElement` 与 `tagName` / `isContentEditable`。
+// The test environment (Electron-as-Node) has no DOM: `isTypingTarget` only uses
+// `instanceof HTMLElement` and `tagName` / `isContentEditable`.
 class FakeElement {
   isContentEditable = false
   constructor(readonly tagName: string = 'DIV') {}

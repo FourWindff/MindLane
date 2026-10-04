@@ -40,7 +40,8 @@ describe('AnchorAgent error logging', () => {
     expect(consoleLogSpy).toHaveBeenCalled()
     const warnCall = consoleLogSpy.mock.calls.find((call: unknown[]) =>
       call.some(
-        (arg: unknown) => String(arg).includes('locateAnchors') || String(arg).includes('降级'),
+        (arg: unknown) =>
+          String(arg).includes('locateAnchors') || String(arg).includes('falling back'),
       ),
     )
     expect(warnCall).toBeDefined()

@@ -12,11 +12,11 @@ export { GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL }
 export type SubgraphName = 'mindmap' | 'palace'
 
 interface SubgraphCall {
-  /** 目标子图名称 */
+  /** Target subgraph name */
   subgraph: SubgraphName
-  /** 原始 tool_call id */
+  /** Original tool_call id */
   toolCallId: string
-  /** 原始工具名 */
+  /** Original tool name */
   toolName: string
 }
 
@@ -26,16 +26,17 @@ export interface ToolCallLike {
 }
 
 /**
- * 返回模型可见的虚拟子图路由工具列表（mindmap 与 palace）。
+ * Return the model-visible virtual subgraph routing tools (mindmap and palace).
  *
- * 记忆宫殿默认可用；画面载体在子图内按偏好与 provider 能力解析。
+ * The memory palace is available by default; the artwork carrier is resolved
+ * inside the subgraph from the preference and the provider's capabilities.
  */
 export function getToolSchemas() {
   return [createGenerateMindmapFragmentTool(), createGeneratePalaceTool()]
 }
 
 /**
- * 判断一个工具名是否代表虚拟子图调用。
+ * Tell whether a tool name stands for a virtual subgraph call.
  */
 export function isSubgraphCall(name: string): boolean {
   return name === GENERATE_MINDMAP_FRAGMENT_TOOL || name === GENERATE_PALACE_TOOL

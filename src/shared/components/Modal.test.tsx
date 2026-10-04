@@ -5,7 +5,7 @@ import { parseHTML } from 'linkedom'
 import { Modal } from './Modal'
 import { TextPromptDialog } from '@/features/workspace/components/TextPromptDialog'
 
-/** 测试环境没有 DOM：把服务端标记交给 linkedom 解析后断言。 */
+/** The test environment has no DOM: hand the server markup to linkedom for parsing before asserting. */
 function render(element: ReactElement) {
   const { document } = parseHTML(
     `<html><body>${ReactDOMServer.renderToStaticMarkup(element)}</body></html>`,
@@ -19,7 +19,7 @@ describe('Modal', () => {
   it('renders a labelled dialog inside a presentation backdrop', () => {
     const doc = render(
       <Modal labelledBy="head" onCancel={noop} onSubmit={noop}>
-        <h2 id="head">标题</h2>
+        <h2 id="head">Title</h2>
       </Modal>,
     )
 
@@ -40,7 +40,7 @@ describe('Modal', () => {
         backdropClassName="workspace-modal-backdrop workspace-home__modal-backdrop"
         panelClassName="workspace-home__panel"
       >
-        <h2 id="head">标题</h2>
+        <h2 id="head">Title</h2>
       </Modal>,
     )
 
@@ -55,8 +55,8 @@ describe('TextPromptDialog', () => {
   function renderPrompt(props: Partial<Parameters<typeof TextPromptDialog>[0]> = {}) {
     const doc = render(
       <TextPromptDialog
-        label="新建文件"
-        title="输入文件名"
+        label="New file"
+        title="File name"
         onConfirm={noop}
         onCancel={noop}
         {...props}
@@ -69,22 +69,22 @@ describe('TextPromptDialog', () => {
 
   it('labels the dialog by its title and forwards the prompt fields', () => {
     const { dialog, confirm } = renderPrompt({
-      subtitle: '说明',
-      placeholder: '例如：今日总结',
-      confirmLabel: '创建文件',
-      initialValue: '初值',
+      subtitle: 'Description',
+      placeholder: "e.g. Today's summary",
+      confirmLabel: 'Create file',
+      initialValue: 'Initial value',
     })
 
     const title = dialog?.querySelector('.workspace-modal__title')
     expect(dialog?.getAttribute('aria-labelledby')).toBe(title?.getAttribute('id'))
-    expect(dialog?.querySelector('.workspace-modal__label')?.textContent).toBe('新建文件')
-    expect(title?.textContent).toBe('输入文件名')
-    expect(dialog?.querySelector('.workspace-modal__subtitle')?.textContent).toBe('说明')
+    expect(dialog?.querySelector('.workspace-modal__label')?.textContent).toBe('New file')
+    expect(title?.textContent).toBe('File name')
+    expect(dialog?.querySelector('.workspace-modal__subtitle')?.textContent).toBe('Description')
 
     const input = dialog?.querySelector('input')
-    expect(input?.getAttribute('placeholder')).toBe('例如：今日总结')
-    expect(input?.getAttribute('value')).toBe('初值')
-    expect(confirm?.textContent).toBe('创建文件')
+    expect(input?.getAttribute('placeholder')).toBe("e.g. Today's summary")
+    expect(input?.getAttribute('value')).toBe('Initial value')
+    expect(confirm?.textContent).toBe('Create file')
     expect(confirm?.hasAttribute('disabled')).toBe(false)
   })
 
@@ -92,18 +92,18 @@ describe('TextPromptDialog', () => {
     expect(renderPrompt({ initialValue: '  ' }).confirm?.hasAttribute('disabled')).toBe(true)
     expect(
       renderPrompt({
-        initialValue: '同名',
-        canSubmit: (value) => value !== '同名',
+        initialValue: 'duplicate',
+        canSubmit: (value) => value !== 'duplicate',
       }).confirm?.hasAttribute('disabled'),
     ).toBe(true)
     expect(
       renderPrompt({
-        initialValue: '新名',
-        canSubmit: (value) => value !== '同名',
+        initialValue: 'new name',
+        canSubmit: (value) => value !== 'duplicate',
       }).confirm?.hasAttribute('disabled'),
     ).toBe(false)
 
-    const busy = renderPrompt({ initialValue: '新名', disabled: true })
+    const busy = renderPrompt({ initialValue: 'new name', disabled: true })
     expect(busy.buttons.map((button) => button.hasAttribute('disabled'))).toEqual([true, true])
   })
 })

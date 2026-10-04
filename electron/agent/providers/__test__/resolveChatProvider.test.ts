@@ -37,14 +37,14 @@ describe('resolveChatProvider', () => {
 
   it('throws when the active provider has no apiKey configured', () => {
     expect(() => resolveChatProvider(makeSettings({ providerConfigs: {} }))).toThrow(
-      '未填写 API Key',
+      'API Key is missing',
     )
   })
 
   it('treats a whitespace-only provider key as missing', () => {
     expect(() =>
       resolveChatProvider(makeSettings({ providerConfigs: { dashscope: { apiKey: '   ' } } })),
-    ).toThrow('未填写 API Key')
+    ).toThrow('API Key is missing')
   })
 
   it('never reuses another provider key for the active provider', () => {
@@ -55,23 +55,27 @@ describe('resolveChatProvider', () => {
           chatModel: KimiCodeProvider.defaultModels[0]!.id,
         }),
       ),
-    ).toThrow('未填写 API Key')
+    ).toThrow('API Key is missing')
   })
 
   it('throws when chatModel is empty', () => {
-    expect(() => resolveChatProvider(makeSettings({ chatModel: '' }))).toThrow('请选择模型')
-    expect(() => resolveChatProvider(makeSettings({ chatModel: '  ' }))).toThrow('请选择模型')
+    expect(() => resolveChatProvider(makeSettings({ chatModel: '' }))).toThrow(
+      'Please select a model',
+    )
+    expect(() => resolveChatProvider(makeSettings({ chatModel: '  ' }))).toThrow(
+      'Please select a model',
+    )
   })
 
   it('throws with the model name when chatModel is outside the provider catalog', () => {
     expect(() => resolveChatProvider(makeSettings({ chatModel: 'gpt-4o' }))).toThrow(
-      '模型 gpt-4o 不属于当前 provider',
+      'model gpt-4o does not belong to the current provider',
     )
   })
 
   it('throws for an unknown provider', () => {
     expect(() => resolveChatProvider(makeSettings({ activeProviders: { chat: 'nope' } }))).toThrow(
-      '未知的 provider: nope',
+      'unknown provider: nope',
     )
   })
 

@@ -8,8 +8,8 @@ import type {
 import { isStreamStep } from '../ipc.js'
 
 /**
- * 类型看守（compile-time guards）：每个事件契约声明一个收窄函数，
- * 判别联合缺字段/形状不符时本文件编译失败。
+ * Compile-time guards: each event contract declares a narrowing function, so this
+ * file fails to compile when a discriminated union is missing a field or has the wrong shape.
  */
 
 function guardToolStart(

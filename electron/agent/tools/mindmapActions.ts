@@ -33,14 +33,15 @@ function asToolError(err: unknown): { ok: false; error: string } {
  * the mindmap subgraph" lives in the subgraph tool's description. When a self-written
  * fragment fails anyway, the failure feedback carries the correction path.
  */
-const LONG_CONTENT_CORRECTION = '若内容较长，请改用 generateMindmapFragment 生成后再插入。'
+const LONG_CONTENT_CORRECTION =
+  'If the content is long, generate it with generateMindmapFragment and then insert it.'
 
 /** Appends the long-content correction to an insertXmlFragment failure (success acks pass through). */
 function withLongContentCorrection(result: unknown): unknown {
   if (typeof result !== 'object' || result === null) return result
   const ack = result as { ok?: unknown; error?: unknown }
   if (ack.ok !== false || typeof ack.error !== 'string') return result
-  return { ...ack, error: `${ack.error}。${LONG_CONTENT_CORRECTION}` }
+  return { ...ack, error: `${ack.error}. ${LONG_CONTENT_CORRECTION}` }
 }
 
 // ========== insertXmlFragment (unified write entry) ==========
@@ -65,18 +66,22 @@ function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
     },
     {
       name: 'insertXmlFragment',
-      description: `在思维导图中插入一个 XML 片段（嵌套子树，支持批量）。position 定位：child=挂到 parentId 之下（默认）；after/before=插入到 parentId 这个兄弟节点的后面/前面；root=挂到根节点。parentId 省略时按 选中节点 → 根节点 回退。规则：新节点禁止编写 id（系统 mint）；type 必填（text/image/palace）；content 是纯文本属性，特殊字符需转义；图片节点必须引用上下文中的 asset。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      description: `Insert an XML fragment into the mindmap (nested subtree, batching supported). position: child=attach under parentId (default); after/before=insert before/after the sibling parentId; root=attach under the root node. When parentId is omitted the target falls back from the selected node to the root node. Rules: new nodes must not carry an id (the system mints it); type is required (text/image/palace); content is a plain-text attribute whose special characters must be escaped; an image node must reference an asset from the context. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
       schema: z.object({
-        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
-        xml: z.string().describe('要插入的 XML 片段（顶层多个 <node> = 批量插入）'),
+        fileUuid: z.string().optional().describe('Mindmap file identity, fileUuid'),
+        xml: z
+          .string()
+          .describe('XML fragment to insert (several top-level <node> elements = batched insert)'),
         parentId: z
           .string()
           .optional()
-          .describe('position=child 时为父节点 id；position=after/before 时为兄弟节点 id'),
+          .describe(
+            'Parent node id when position=child; sibling node id when position=after/before',
+          ),
         position: z
           .enum(['root', 'child', 'after', 'before'])
           .optional()
-          .describe('插入位置（缺省 child）'),
+          .describe('Insert position (default child)'),
       }),
     },
   )
@@ -99,10 +104,10 @@ function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
     },
     {
       name: 'updateMindmapNode',
-      description: `整体替换一个导图节点（内容/类型/子树）。xml 参数是单个根 <node>，其 id 必须是 readMindmap 提供的现有节点 id；节点本身被替换为新 XML 的形状，原子树被新子树整体替换。root 不可替换。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      description: `Replace a mindmap node wholesale (content/type/subtree). The xml argument is a single root <node> whose id must be an existing node id provided by readMindmap; the node itself takes the shape of the new XML and its old subtree is replaced entirely by the new subtree. root cannot be replaced. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
       schema: z.object({
-        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
-        xml: z.string().describe('单个根 <node> 的 XML（id 引用现有节点）'),
+        fileUuid: z.string().optional().describe('Mindmap file identity, fileUuid'),
+        xml: z.string().describe('XML for a single root <node> (id references an existing node)'),
       }),
     },
   )
@@ -126,15 +131,15 @@ function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
     },
     {
       name: 'moveMindmapNode',
-      description: `移动一个节点（连同其整棵子树）到新位置，原子操作（一次撤销还原）。position：child=成为 targetId 的子节点（默认）；after/before=成为 targetId 的兄弟。root 不可移动；不能移动到自己的子树内。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。`,
+      description: `Move a node (with its whole subtree) to a new position, atomically (one undo restores it). position: child=become a child of targetId (default); after/before=become a sibling of targetId. root cannot be moved; a node cannot move inside its own subtree. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
       schema: z.object({
-        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
-        nodeId: z.string().describe('要移动的节点 id（含其子树）'),
-        targetId: z.string().optional().describe('目标节点 id（缺省 root）'),
+        fileUuid: z.string().optional().describe('Mindmap file identity, fileUuid'),
+        nodeId: z.string().describe('Id of the node to move (with its subtree)'),
+        targetId: z.string().optional().describe('Target node id (default root)'),
         position: z
           .enum(['child', 'after', 'before'])
           .optional()
-          .describe('相对目标的插入位置（缺省 child）'),
+          .describe('Insert position relative to the target (default child)'),
       }),
     },
   )
@@ -158,11 +163,14 @@ function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
     {
       name: 'deleteMindmapNode',
       description:
-        '删除指定的思维导图节点（连同其整棵子树）。nodeId 必须来自 readMindmap 提供的 id；root 不可删除。fileUuid 可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 获得。',
+        'Delete the given mindmap node (with its whole subtree). nodeId must be an id provided by readMindmap; root cannot be deleted. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.',
       schema: z.object({
-        fileUuid: z.string().optional().describe('导图文件身份 fileUuid'),
-        nodeId: z.string().describe('要删除的节点ID（含子树）'),
-        confirmDeleteSubtree: z.boolean().optional().describe('是否确认删除子树，默认为true'),
+        fileUuid: z.string().optional().describe('Mindmap file identity, fileUuid'),
+        nodeId: z.string().describe('Id of the node to delete (with its subtree)'),
+        confirmDeleteSubtree: z
+          .boolean()
+          .optional()
+          .describe('Whether to confirm deleting the subtree; defaults to true'),
       }),
     },
   )

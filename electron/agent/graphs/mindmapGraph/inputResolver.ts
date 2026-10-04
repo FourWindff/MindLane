@@ -3,9 +3,9 @@ import type { DocumentRef } from '../../state.js'
 import { findLatestUserMessageText } from '../../utils.js'
 
 interface MindmapInputResolution {
-  /** 解析后的输入源 */
+  /** Resolved input source */
   source: MindmapInputSource
-  /** 用于生成的标题默认值 */
+  /** Default title used for generation */
   title: string
 }
 
@@ -32,11 +32,12 @@ function resolveTitle(documentRef: DocumentRef | undefined, fileTitle: string | 
 }
 
 /**
- * 从子图状态中解析思维导图生成所需的输入源和标题。
+ * Resolve the input source and title a mindmap generation needs from the
+ * subgraph state.
  *
- * 解析优先级：
- * 1. 当前附加文档（state.context.attachedDocument）
- * 2. 最新一条非空用户消息文本
+ * Priority:
+ * 1. Currently attached document (state.context.attachedDocument)
+ * 2. Latest non-empty user message text
  */
 export class MindmapInputResolver {
   resolve(state: MindmapSubgraphStateType): MindmapInputResolution | null {
@@ -50,7 +51,7 @@ export class MindmapInputResolver {
       }
     }
 
-    // 如果没有新的附加文档，再复用状态里已有的输入源（例如子图重试）。
+    // With no new attachment, reuse the input source already in state (e.g. a subgraph retry).
     if (state.mindmapInputSource) {
       return {
         source: state.mindmapInputSource,

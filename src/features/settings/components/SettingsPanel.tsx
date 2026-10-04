@@ -22,18 +22,18 @@ export interface SettingsFileActions {
 type SettingsSectionId = 'about' | 'workspace' | 'ai' | 'editor' | 'integrations'
 
 const SETTINGS_SECTIONS: { id: SettingsSectionId; label: string; description: string }[] = [
-  { id: 'about', label: '关于', description: '版本与基础信息' },
-  { id: 'workspace', label: '文件与工作区', description: '仓库与文档行为' },
-  { id: 'ai', label: 'AI 配置', description: '模型与密钥' },
-  { id: 'integrations', label: '集成', description: '外部服务连接' },
-  { id: 'editor', label: '编辑器', description: '保存与快捷键' },
+  { id: 'about', label: 'About', description: 'Version and basic info' },
+  { id: 'workspace', label: 'Files & Workspace', description: 'Repository and document behavior' },
+  { id: 'ai', label: 'AI', description: 'Models and keys' },
+  { id: 'integrations', label: 'Integrations', description: 'External service connections' },
+  { id: 'editor', label: 'Editor', description: 'Saving and shortcuts' },
 ]
 
 const AUTO_SAVE_OPTIONS = [
-  { value: 5_000, label: '5 秒' },
-  { value: 10_000, label: '10 秒' },
-  { value: 30_000, label: '30 秒' },
-  { value: 60_000, label: '1 分钟' },
+  { value: 5_000, label: '5 seconds' },
+  { value: 10_000, label: '10 seconds' },
+  { value: 30_000, label: '30 seconds' },
+  { value: 60_000, label: '1 minute' },
 ]
 
 type McpServerStatusInfo = Extract<
@@ -42,10 +42,10 @@ type McpServerStatusInfo = Extract<
 >['data'][number]
 
 const MCP_STATE_LABELS: Record<McpServerStatusInfo['state'], string> = {
-  disconnected: '未连接',
-  connecting: '连接中…',
-  connected: '已连接',
-  failed: '连接失败',
+  disconnected: 'Not connected',
+  connecting: 'Connecting…',
+  connected: 'Connected',
+  failed: 'Connection failed',
 }
 
 // Brand icons live in public/assets, keyed by server id; unknown ids fall back to a generic plug icon.
@@ -55,33 +55,36 @@ const MCP_ICONS: Record<string, string> = {
   feishu: '/assets/feishu.svg',
 }
 
-/** 各 MCP 的简短连接教程：steps 每行一步，悬浮感叹号气泡展示；链接走 shell.openExternal */
+/** Short connection guide per MCP: one step per line in steps, shown in the hover bubble; links go through shell.openExternal */
 const MCP_TUTORIAL: Record<string, { steps: string[]; links: { label: string; url: string }[] }> = {
   obsidian: {
     steps: [
-      '插件仓库：github.com/coddingtonbear/obsidian-local-rest-api（自带 MCP 服务）',
-      'Obsidian → 设置 → 第三方插件：安装并启用 “Local REST API with MCP”',
-      '在插件设置中开启加密端口（HTTPS 27124）',
-      '把插件里的 API Key 粘贴到表单，确认连接',
+      'Plugin repo: github.com/coddingtonbear/obsidian-local-rest-api (bundles the MCP service)',
+      'Obsidian → Settings → Community plugins: install and enable "Local REST API with MCP"',
+      'Enable the encrypted port (HTTPS 27124) in the plugin settings',
+      'Paste the plugin API Key into the form and connect',
     ],
     links: [
-      { label: '打开插件仓库', url: 'https://github.com/coddingtonbear/obsidian-local-rest-api' },
+      {
+        label: 'Open plugin repo',
+        url: 'https://github.com/coddingtonbear/obsidian-local-rest-api',
+      },
     ],
   },
   feishu: {
     steps: [
-      '在开放平台创建自建应用，开通文档搜索/读取/wiki 权限',
-      '「安全设置 → 重定向 URL」登记 http://127.0.0.1:44664/callback',
-      '填入 App ID / App Secret；▾ 展开可用一键获取 UAT',
-      '确认连接后，AI 即可搜索并读取你的云文档',
+      'Create a custom app on the Open Platform with document search/read/wiki permissions',
+      'Register http://127.0.0.1:44664/callback under "Security Settings → Redirect URL"',
+      'Fill in App ID / App Secret; expand with ▾ to fetch the UAT in one click',
+      'Once connected, the AI can search and read your cloud documents',
     ],
     links: [
       {
-        label: '接入教程',
+        label: 'Setup guide',
         url: 'https://open.feishu.cn/document/mcp_open_tools/developers-call-remote-mcp-server',
       },
       {
-        label: '获取 UAT',
+        label: 'Get UAT',
         url: 'https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/authentication-management/access-token/get-user-access-token-v3',
       },
     ],
@@ -117,14 +120,15 @@ function McpIntegrationsSection() {
     }
   }
 
-  /** 打开配置表单并回填已保存的凭据（只回填本 server 声明的字段） */
+  /** Open the config form and prefill saved credentials (only the fields this server declares) */
   const openFormPrefilled = async (server: McpServerStatusInfo) => {
     let secrets: Record<string, string> = {}
     try {
       const res = await window.mindlane?.settings.mcpGetCredentials(server.id)
       if (res?.ok) secrets = res.data
     } catch {
-      // 主进程尚未注册该 handler（如重载后未重启主进程）时降级为空表单，不阻断编辑
+      // Fall back to an empty form when the main process has not registered this handler yet
+      // (e.g. after a reload without a main process restart); it must not block editing
       secrets = {}
     }
     const ids = new Set((server.credentialFields ?? []).map((f) => f.id))
@@ -135,7 +139,7 @@ function McpIntegrationsSection() {
     setFormOpenId(server.id)
   }
 
-  /** 显示配置 toggle：开→关，关→开（打开时回填已保存凭据） */
+  /** Show-config toggle: open → close, closed → open (opening prefills the saved credentials) */
   const toggleForm = (server: McpServerStatusInfo) => {
     if (formOpenId === server.id) {
       setFormOpenId(null)
@@ -155,7 +159,7 @@ function McpIntegrationsSection() {
         setFormValues({})
         setFormError(null)
       } else {
-        setFormError(res?.error ?? '连接失败')
+        setFormError(res?.error ?? 'Connection failed')
       }
     } finally {
       await refresh()
@@ -163,12 +167,12 @@ function McpIntegrationsSection() {
     }
   }
 
-  /** 一键获取飞书 UAT：打开授权页，成功后回填 uat 字段 */
+  /** One-click Feishu UAT: open the authorization page and prefill the uat field on success */
   const acquireUat = async (server: McpServerStatusInfo) => {
     const appId = (formValues['appId'] ?? '').trim()
     const appSecret = (formValues['appSecret'] ?? '').trim()
     if (!appId || !appSecret) {
-      setFormError('请先填写 App ID 与 App Secret 再获取 UAT')
+      setFormError('Fill in App ID and App Secret before fetching the UAT')
       return
     }
     setBusyUat(true)
@@ -181,9 +185,9 @@ function McpIntegrationsSection() {
       })
       if (res?.ok) {
         setFormValues((v) => ({ ...v, uat: res.data.uat }))
-        setFormError('UAT 获取成功，已自动填入；请点击“确认连接”')
+        setFormError('UAT fetched and filled in automatically; click "Connect" to confirm')
       } else {
-        setFormError(res?.error ?? '获取 UAT 失败')
+        setFormError(res?.error ?? 'UAT fetch failed')
       }
     } finally {
       setBusyUat(false)
@@ -264,7 +268,7 @@ function McpIntegrationsSection() {
                   } else void runAction(server.id, true)
                 }}
               >
-                {busy ? '处理中…' : connected ? '断开' : formOpen ? '取消' : '连接'}
+                {busy ? 'Working…' : connected ? 'Disconnect' : formOpen ? 'Cancel' : 'Connect'}
               </button>
               {hasForm && (
                 <button
@@ -272,8 +276,8 @@ function McpIntegrationsSection() {
                   className="btn panel-btn"
                   disabled={busy}
                   aria-expanded={formOpen}
-                  aria-label="配置"
-                  title={formOpen ? '收起配置' : '显示配置'}
+                  aria-label="Configuration"
+                  title={formOpen ? 'Hide configuration' : 'Show configuration'}
                   onClick={() => toggleForm(server)}
                 >
                   <ChevronDown
@@ -308,7 +312,7 @@ function McpIntegrationsSection() {
                           disabled={busyUat}
                           onClick={() => void acquireUat(server)}
                         >
-                          {busyUat ? '获取中…' : '一键获取'}
+                          {busyUat ? 'Fetching…' : 'Fetch'}
                         </button>
                       )}
                     </span>
@@ -321,7 +325,7 @@ function McpIntegrationsSection() {
                   disabled={busy || busyUat}
                   onClick={() => void submitForm(server)}
                 >
-                  确认连接
+                  Connect
                 </button>
               </div>
             )}
@@ -363,13 +367,13 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
   const imageGenEnabled = capabilities.includes('imageGen')
   const effectivePalaceArtwork =
     resolveArtworkStyle(palaceArtworkStyle, new Set(capabilities)) === 'raster'
-      ? '概念图（文生图）'
-      : 'SVG 矢量图'
+      ? 'Concept image (text-to-image)'
+      : 'SVG vector artwork'
 
   return (
     <div className="settings-page">
       <aside className="settings-page__sidebar">
-        <nav className="settings-page__nav" aria-label="设置分类">
+        <nav className="settings-page__nav" aria-label="Settings sections">
           {SETTINGS_SECTIONS.map((section) => (
             <button
               key={section.id}
@@ -387,31 +391,34 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
       <div className="settings-page__content">
         <div className="settings-page__sections">
           <section className="settings-card" hidden={activeSection !== 'about'}>
-            <div className="settings-card__title">关于应用</div>
+            <div className="settings-card__title">About the app</div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">当前版本</div>
+                <div className="settings-card__label">Current version</div>
                 <div className="settings-card__value">0.0.0</div>
-                <div className="settings-card__hint">当前为桌面应用预览版本。</div>
+                <div className="settings-card__hint">This is a desktop preview build.</div>
               </div>
               <button type="button" className="btn panel-btn panel-btn--primary">
-                检查更新
+                Check for updates
               </button>
             </div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">工作区状态</div>
+                <div className="settings-card__label">Workspace status</div>
                 <div className="settings-card__value">
-                  {workspacePath ? '已打开工作区' : '未打开工作区'}
+                  {workspacePath ? 'Workspace open' : 'No workspace open'}
                 </div>
-                <div className="settings-card__hint">{workspacePath ?? '尚未选择本地仓库'}</div>
+                <div className="settings-card__hint">
+                  {workspacePath ?? 'No local repository selected yet'}
+                </div>
               </div>
             </div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">排障日志</div>
+                <div className="settings-card__label">Troubleshooting logs</div>
                 <div className="settings-card__hint">
-                  遇到问题时打开日志目录，把日志文件发给开发者。
+                  When something goes wrong, open the log directory and send the log files to the
+                  developer.
                 </div>
               </div>
               <button
@@ -419,32 +426,38 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                 className="btn panel-btn"
                 onClick={() => void window.mindlane?.shell.openLogs()}
               >
-                打开日志目录
+                Open log directory
               </button>
             </div>
           </section>
 
           <section className="settings-card" hidden={activeSection !== 'workspace'}>
-            <div className="settings-card__title">文件与工作区</div>
+            <div className="settings-card__title">Files & Workspace</div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">当前仓库</div>
-                <div className="settings-card__value">{workspacePath ?? '未打开本地仓库'}</div>
-                <div className="settings-card__hint">切换仓库时会优先自动保存当前编辑内容。</div>
+                <div className="settings-card__label">Current repository</div>
+                <div className="settings-card__value">
+                  {workspacePath ?? 'No local repository open'}
+                </div>
+                <div className="settings-card__hint">
+                  Switching repositories auto-saves the current edits first.
+                </div>
               </div>
               <button
                 type="button"
                 className="btn panel-btn panel-btn--primary"
                 onClick={openWorkspaceDirectory}
               >
-                切换仓库
+                Switch repository
               </button>
             </div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">启动恢复</div>
-                <div className="settings-card__value">打开上次工作区与文件</div>
-                <div className="settings-card__hint">重新启动应用时恢复上一次工作上下文。</div>
+                <div className="settings-card__label">Restore on launch</div>
+                <div className="settings-card__value">Open the last workspace and file</div>
+                <div className="settings-card__hint">
+                  Restores the previous work context when the app restarts.
+                </div>
               </div>
               <label className="settings-card__switch">
                 <input
@@ -452,28 +465,28 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                   checked={restoreLastWorkspaceOnLaunch}
                   onChange={(e) => setRestoreLastWorkspaceOnLaunch(e.target.checked)}
                 />
-                <span>{restoreLastWorkspaceOnLaunch ? '开启' : '关闭'}</span>
+                <span>{restoreLastWorkspaceOnLaunch ? 'On' : 'Off'}</span>
               </label>
             </div>
             <div className="settings-card__action-group">
               <button type="button" className="btn panel-btn" onClick={openFile}>
-                打开文件
+                Open file
               </button>
               <button type="button" className="btn panel-btn" onClick={saveActiveFile}>
-                立即保存
+                Save now
               </button>
               <button type="button" className="btn panel-btn" onClick={saveActiveFileAs}>
-                另存为
+                Save As
               </button>
             </div>
           </section>
 
           <section className="settings-card" hidden={activeSection !== 'ai'}>
-            <div className="settings-card__title">AI 配置</div>
+            <div className="settings-card__title">AI</div>
             {providers.length > 1 && (
               <div className="panel-field">
                 <label className="panel-field__label" htmlFor="settings-provider">
-                  AI 服务商
+                  AI provider
                 </label>
                 <select
                   id="settings-provider"
@@ -499,12 +512,12 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                 className="panel-field__input"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={`输入 ${activeProvider?.displayName ?? 'API'} Key`}
+                placeholder={`Enter your ${activeProvider?.displayName ?? 'API'} Key`}
               />
             </div>
             <div className="panel-field">
               <label className="panel-field__label" htmlFor="settings-model">
-                模型
+                Model
               </label>
               <select
                 id="settings-model"
@@ -513,7 +526,7 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                 onChange={(e) => setChatModel(e.target.value)}
               >
                 <option value="" disabled>
-                  请选择模型
+                  Select a model
                 </option>
                 {models.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -523,7 +536,7 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
               </select>
             </div>
             <fieldset className="panel-field palace-artwork-field" disabled={!imageGenEnabled}>
-              <legend className="panel-field__label">记忆宫殿画面</legend>
+              <legend className="panel-field__label">Memory palace artwork</legend>
               <div className="settings-segmented-control">
                 <label>
                   <input
@@ -533,7 +546,7 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                     checked={palaceArtworkStyle === 'vector'}
                     onChange={() => setPalaceArtworkStyle('vector')}
                   />
-                  <span>使用 SVG 矢量图</span>
+                  <span>Use SVG vector artwork</span>
                 </label>
                 <label>
                   <input
@@ -543,35 +556,39 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                     checked={palaceArtworkStyle === 'raster'}
                     onChange={() => setPalaceArtworkStyle('raster')}
                   />
-                  <span>使用生图模型</span>
+                  <span>Use an image model</span>
                 </label>
               </div>
               {!imageGenEnabled && (
-                <div className="settings-card__hint">当前 provider 无文生图能力，将使用矢量图</div>
+                <div className="settings-card__hint">
+                  The current provider has no text-to-image capability; vector artwork will be used
+                </div>
               )}
             </fieldset>
             {activeProvider && (
               <div className="settings-card__hint">
-                {activeProvider.displayName} 支持的功能：
-                {chatEnabled && ' 对话'}
-                {visionEnabled && ' 视觉理解'}
-                {imageGenEnabled && ' 文生图'}
-                {' | '}记忆宫殿：{effectivePalaceArtwork}
+                {activeProvider.displayName} supports:
+                {chatEnabled && ' chat'}
+                {visionEnabled && ' vision'}
+                {imageGenEnabled && ' text-to-image'}
+                {' | '}Memory palace: {effectivePalaceArtwork}
               </div>
             )}
           </section>
 
           <section className="settings-card" hidden={activeSection !== 'integrations'}>
-            <div className="settings-card__title">集成</div>
+            <div className="settings-card__title">Integrations</div>
             <McpIntegrationsSection />
           </section>
 
           <section className="settings-card" hidden={activeSection !== 'editor'}>
-            <div className="settings-card__title">编辑器</div>
+            <div className="settings-card__title">Editor</div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">自动保存</div>
-                <div className="settings-card__hint">仅对已经有真实文件路径的文档生效。</div>
+                <div className="settings-card__label">Auto save</div>
+                <div className="settings-card__hint">
+                  Only applies to documents that already have a real file path.
+                </div>
               </div>
               <select
                 className="panel-field__select settings-card__select"
@@ -587,15 +604,18 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
             </div>
             <div className="settings-card__row">
               <div>
-                <div className="settings-card__label">快捷键说明</div>
-                <div className="settings-card__hint">所有导图与应用级快捷键直接展示在这里。</div>
+                <div className="settings-card__label">Shortcuts</div>
+                <div className="settings-card__hint">
+                  Every mindmap and app-level shortcut is listed here.
+                </div>
               </div>
             </div>
             <div className="shortcuts-inline">
               <ShortcutsList />
             </div>
             <div className="settings-card__hint">
-              未保存草稿在切换仓库或打开其他文件时会优先自动保存，不再反复打断操作。
+              Unsaved drafts are auto-saved first when you switch repositories or open another file,
+              so the flow is not interrupted over and over.
             </div>
           </section>
         </div>

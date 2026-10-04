@@ -102,10 +102,11 @@ export function useMindmapView({
     [activeInstance.store, editor, reactFlow, reactFlowStore],
   )
 
-  // 折叠节点的整棵子树在渲染层隐藏（数据完整保留，仅 CSS 隐藏）。
-  // 折叠节点自身保持可见（展开按钮仍在）；xyflow 会为节点包装器写入内联
-  // visibility: visible（节点测量完成即可见），类名规则压不过内联样式，
-  // 因此对隐藏节点同时注入 style 覆盖（node.style 在 xyflow 内联样式之后展开）。
+  // A collapsed node hides its whole subtree in the render layer (all data is kept, hidden by CSS
+  // only). The collapsed node itself stays visible (its expand button is still there); xyflow writes
+  // an inline visibility: visible on node wrappers (visible once the node is measured), and class
+  // rules cannot beat inline styles, so hidden nodes also get a style override (node.style expands
+  // after xyflow's inline style).
   const hiddenNodeIds = useMemo(() => {
     const hidden = new Set<string>()
     for (const node of nodes) {
@@ -158,7 +159,7 @@ export function useMindmapView({
       ),
     [hiddenNodeIds, nodes],
   )
-  // 隐藏子树内部的边一并从渲染层移除，避免悬挂边指向空位
+  // Edges inside hidden subtrees are dropped from the render layer too, so no dangling edge points at an empty spot
   const canvasEdges = useMemo(
     () => edges.filter((e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target)),
     [edges, hiddenNodeIds],
@@ -181,7 +182,7 @@ export function useMindmapView({
       }
     }
     if (selectedNodes.length === 0) {
-      reportRendererError('未选中任何主题节点')
+      reportRendererError('No topic node is selected')
       return
     }
     onGeneratePalace(selectedNodes)
@@ -272,7 +273,7 @@ export function useMindmapView({
 
   const openContextMenu = useCallback((menu: ContextMenuState) => setContextMenu(menu), [])
 
-  // 本地图片插入：读文件转 base64 → sha256 去重 → addAsset → image 节点
+  // Local image insert: read the file into base64 -> sha256 dedupe -> addAsset -> image node
   const insertImageRef = useRef<HTMLInputElement | null>(null)
   const insertImage = useCallback(() => {
     if (!insertImageRef.current) {
@@ -288,13 +289,13 @@ export function useMindmapView({
         reader.onload = () => {
           const dataUrl = typeof reader.result === 'string' ? reader.result : null
           if (!dataUrl) {
-            reportRendererError('图片读取失败')
+            reportRendererError('Image read failed')
             return
           }
           void (async () => {
             const asset = await assetFromDataUrl(dataUrl)
             if (!asset) {
-              reportRendererError('图片格式不支持')
+              reportRendererError('Unsupported image format')
               return
             }
             const parentId = selectedId ?? 'root'
@@ -306,7 +307,7 @@ export function useMindmapView({
             })
           })()
         }
-        reader.onerror = () => reportRendererError('图片读取失败')
+        reader.onerror = () => reportRendererError('Image read failed')
         reader.readAsDataURL(file)
       })
       insertImageRef.current = input

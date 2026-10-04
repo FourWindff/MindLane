@@ -1,6 +1,7 @@
 /**
- * mindmapXml 解析模块（PRD 5）：registry / serializer / deserializer / normalize / validate。
- * 解析/序列化/校验/迁移逻辑集中在解析模块，格式问题只在一处修复。
+ * mindmapXml parsing module (PRD 5): registry / serializer / deserializer / normalize / validate.
+ * Parse/serialize/validate/migrate logic lives in this parsing module, so a
+ * format issue is fixed in exactly one place.
  *
  * Only the symbols the barrel consumers actually import are re-exported here;
  * module-internal code and tests import siblings directly.

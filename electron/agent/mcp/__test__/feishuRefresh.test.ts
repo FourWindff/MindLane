@@ -12,8 +12,8 @@ function fakeStore(secrets: Record<string, string>) {
   } as unknown as McpCredentialStore
 }
 
-describe('feishu createAuthHeaders 自动续期', () => {
-  it('UAT 过期且有 refresh_token → 自动刷新并回写新值', async () => {
+describe('feishu createAuthHeaders auto renewal', () => {
+  it('expired UAT with a refresh_token -> refreshes and writes back the new values', async () => {
     const refreshUat = vi.fn(async () => ({
       uat: 'u-new',
       refreshToken: 'ur-new',
@@ -39,7 +39,7 @@ describe('feishu createAuthHeaders 自动续期', () => {
     expect(Number(saved.uatExpiresAt)).toBeGreaterThan(Date.now())
   })
 
-  it('UAT 未过期且有 refresh_token → 不刷新直接用', async () => {
+  it('unexpired UAT with a refresh_token -> used as is without refreshing', async () => {
     const refreshUat = vi.fn()
     const def = createFeishuServer({ refreshUat })
     const store = fakeStore({
@@ -56,7 +56,7 @@ describe('feishu createAuthHeaders 自动续期', () => {
     expect(headers['X-Lark-MCP-UAT']).toBe('u-ok')
   })
 
-  it('无 refresh_token 时保留老行为：有 uat 走用户身份，否则走 TAT', async () => {
+  it('without a refresh_token keeps the old behavior: user identity when a uat is present, otherwise TAT', async () => {
     const def = createFeishuServer({})
     const headers = await def.createAuthHeaders!(fakeStore({ uat: 'u-manual' }))
 

@@ -105,9 +105,13 @@ export class MindLaneAgent extends BaseAgent {
       const formatted = formatAgentError(err)
       log.error('invoke failed:\n', formatted)
       return {
-        messages: [new AIMessage({ content: '处理请求时出错，请稍后重试。' })],
+        messages: [
+          new AIMessage({
+            content: 'Something went wrong while processing the request. Please try again later.',
+          }),
+        ],
         error: formatted,
-        response: '处理请求时出错，请稍后重试。',
+        response: 'Something went wrong while processing the request. Please try again later.',
         pendingSubgraphs: [],
       }
     }
@@ -178,7 +182,8 @@ export class MindLaneAgent extends BaseAgent {
 
       log.warn('Prompt too long, trimming to recent window and retrying once')
 
-      // 非 LLM 裁剪重试：唯一的摘要调用是调用前的滚动压缩，这里只裁窗口、不再生成摘要。
+      // Non-LLM trim retry: the only summary call is the rolling compaction before the call;
+      // here we only trim the window and never generate a summary.
       trimmedMessages = trimToRecentWindow(
         preprocessedMessages,
         AGENT_LIMITS.contextCompactRecentMessages,
@@ -198,12 +203,12 @@ export class MindLaneAgent extends BaseAgent {
 
     // info: decision summary only; full content/args go to debug (file).
     log.info(
-      'model 输出: 内容 %d 字符, tool_calls=[%s], routed=%s',
+      'model output: %d chars of content, tool_calls=[%s], routed=%s',
       content.length,
       toolCalls.map((tc) => tc.name).join(', '),
       subgraphCalls.map((call) => call.subgraph).join('+') || 'none',
     )
-    log.debug('model 输出全量:', {
+    log.debug('model output (full):', {
       rawContent: summarizeMessageContent(response.content),
       toolCalls: toolCalls.map((tc) => ({
         id: tc.id,

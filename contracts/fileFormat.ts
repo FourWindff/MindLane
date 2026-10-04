@@ -25,10 +25,10 @@ export interface MindLaneFile {
     nodes: MindLaneNode[]
     edges: MindLaneEdge[]
     viewport: { x: number; y: number; zoom: number }
-    /** 每个文件的独立样式；旧文件可能缺失，加载时回退默认样式 */
+    /** Per-file style; older files may lack it, and loading falls back to the default style */
     style?: MindmapStyleState
   }
-  /** 内嵌图片资源（XML assets 节），节点经 asset 属性引用，sha256 去重 */
+  /** Embedded image assets (XML assets section); nodes reference them via the asset attribute, deduped by sha256 */
   assets: MindLaneAsset[]
   documents: DocumentRef[]
 }
@@ -59,13 +59,13 @@ export interface DocumentRef {
   importedAt: string
   title?: string
   pageCount?: number
-  /** 解析后的完整文本在 userdata 下的缓存路径（相对路径） */
+  /** Cache path (relative) of the parsed full text under userdata */
   textPath?: string
-  /** 文档内容哈希，用于缓存命中与去重 */
+  /** Document content hash, used for cache hits and deduplication */
   sha256?: string
 }
 
-/** 将旧版带 metadata 的 DocumentRef 迁移为新版扁平结构。 */
+/** Migrate a legacy DocumentRef carrying metadata to the flat shape. */
 export function migrateDocumentRef(doc: unknown): DocumentRef {
   if (typeof doc !== 'object' || doc === null) {
     throw new Error('Invalid DocumentRef: expected object')
@@ -141,7 +141,7 @@ export function isPalaceNodeData(data: unknown): data is PalaceNodeData {
   )
 }
 
-export function createEmptyFile(title = '未命名'): MindLaneFile {
+export function createEmptyFile(title = 'Untitled'): MindLaneFile {
   const now = new Date().toISOString()
   return {
     version: '1.0',
@@ -152,7 +152,7 @@ export function createEmptyFile(title = '未命名'): MindLaneFile {
           id: 'root',
           type: 'text',
           position: { x: 0, y: 0 },
-          data: { label: '中心主题' },
+          data: { label: 'Central Topic' },
         },
       ],
       edges: [],

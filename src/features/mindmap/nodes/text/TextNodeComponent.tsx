@@ -31,9 +31,9 @@ function TextNodeInner({
 
   const editing = !!data.editing
   const collapsed = data.collapsed === true
-  // 双向布局中根节点左侧的分支：收起按钮与折叠箭头镜像到节点左侧
+  // Left branch of the root in bilateral layout: the collapse button and folding arrow mirror to the node's left side
   const leftSide = structureType === 'mindmap' && data.side === 'left'
-  // 折叠控件：节点有子节点时显示（子节点由边派生）
+  // Collapse control: shown when the node has children (children are derived from edges)
   const hasChildren = edges.some((e) => e.source === id)
 
   // Root node in bilateral layout: one collapse button per side, folding/expanding each branch independently
@@ -79,7 +79,7 @@ function TextNodeInner({
 
   const commit = useCallback(() => {
     const before = data.label
-    const next = label.trim() || '未命名'
+    const next = label.trim() || 'Untitled'
     setLabel(next)
     editor.updateNode(id, (n) => ({
       ...n,
@@ -132,7 +132,7 @@ function TextNodeInner({
     [id, editor],
   )
 
-  // 按深度/分支计算节点颜色
+  // Compute node colors from depth/branch
   const depth = data.depth ?? 0
   const branchIndex = data.branchIndex ?? 0
   const nodeColors = getNodeColor(colorScheme, depth, branchIndex)
@@ -166,7 +166,7 @@ function TextNodeInner({
 
   return (
     <div className={className} style={style} onAnimationEnd={onAnimationEnd}>
-      {/* 所有方向 handle 均渲染，CSS 隐藏；xyflow 根据 sourcePosition/targetPosition 路由 */}
+      {/* handles for every direction are rendered and hidden by CSS; xyflow routes by sourcePosition/targetPosition */}
       <Handle type="target" position={Position.Left} />
       <Handle type="target" position={Position.Top} />
       <Handle type="target" position={Position.Right} />
@@ -236,9 +236,9 @@ function TextNodeInner({
 type CollapseSide = 'left' | 'right' | 'subtree'
 
 const COLLAPSE_LABELS: Record<CollapseSide, { collapsed: string; expanded: string }> = {
-  left: { collapsed: '展开左侧分支', expanded: '收起左侧分支' },
-  right: { collapsed: '展开右侧分支', expanded: '收起右侧分支' },
-  subtree: { collapsed: '展开子树', expanded: '折叠子树' },
+  left: { collapsed: 'Expand left branch', expanded: 'Collapse left branch' },
+  right: { collapsed: 'Expand right branch', expanded: 'Collapse right branch' },
+  subtree: { collapsed: 'Expand subtree', expanded: 'Collapse subtree' },
 }
 
 /**

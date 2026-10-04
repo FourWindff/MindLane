@@ -158,7 +158,7 @@
   cursor: not-allowed;
 }
 
-/* AI 服务不可用：保持禁用但红色背景明确提示（覆盖普通 disabled 的淡出）。 */
+/* AI service unavailable: stays disabled with a clear red background hint (overrides the plain disabled fade). */
 .float-toolbar__btn--unavailable {
   background: rgba(201, 55, 61, 0.16);
   color: var(--ml-danger);

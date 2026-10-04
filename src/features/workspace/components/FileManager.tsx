@@ -220,11 +220,11 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
         {/* Dialogs */}
         {dialog.type === 'new-file' && (
           <TextPromptDialog
-            label="新建文件"
-            title="输入文件名"
-            subtitle="创建后会立即保存到当前工作区。"
-            placeholder="例如：今日总结"
-            confirmLabel="创建文件"
+            label="New file"
+            title="File name"
+            subtitle="It is saved to the current workspace right away."
+            placeholder="e.g. Today's summary"
+            confirmLabel="Create file"
             onConfirm={(name) => void handleNewFile(name)}
             onCancel={closeDialog}
           />
@@ -232,10 +232,10 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
         {dialog.type === 'new-folder' && (
           <TextPromptDialog
-            label="新建文件夹"
-            title="输入文件夹名称"
-            placeholder="例如：学习笔记"
-            confirmLabel="创建文件夹"
+            label="New folder"
+            title="Folder name"
+            placeholder="e.g. Study notes"
+            confirmLabel="Create folder"
             onConfirm={(name) => void handleNewFolder(name)}
             onCancel={closeDialog}
           />
@@ -243,11 +243,11 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
         {dialog.type === 'rename' && (
           <TextPromptDialog
-            label="重命名"
-            title={dialog.entry.type === 'file' ? '重命名文件' : '重命名文件夹'}
+            label="Rename"
+            title={dialog.entry.type === 'file' ? 'Rename file' : 'Rename folder'}
             initialValue={renameInitialValue(dialog.entry)}
             selectInitial
-            placeholder={dialog.entry.type === 'file' ? '输入文件名' : '输入文件夹名'}
+            placeholder={dialog.entry.type === 'file' ? 'File name' : 'Folder name'}
             canSubmit={(value) => value !== renameInitialValue(dialog.entry)}
             onConfirm={(newName) => void handleRename(newName)}
             onCancel={closeDialog}
@@ -256,11 +256,13 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
         {dialog.type === 'delete' && (
           <ConfirmDialog
-            title={dialog.entry.type === 'file' ? '删除文件' : '删除文件夹'}
-            message={`确定要将「${dialog.entry.name}」移到回收站吗？${
-              dialog.entry.type === 'directory' ? '该文件夹内的所有内容都将被移到回收站。' : ''
+            title={dialog.entry.type === 'file' ? 'Delete file' : 'Delete folder'}
+            message={`Move "${dialog.entry.name}" to the Trash? ${
+              dialog.entry.type === 'directory'
+                ? 'Everything inside this folder will be moved to the Trash as well.'
+                : ''
             }`}
-            confirmLabel="移到回收站"
+            confirmLabel="Move to Trash"
             danger
             onConfirm={() => void handleDelete()}
             onCancel={closeDialog}

@@ -107,7 +107,7 @@ function collectEnumUsages(files: string[]): Set<string> {
   return usages
 }
 
-/** 7 个 handler 模块的文件清单（注册完整性的守卫对象）。 */
+/** File list of the 7 handler modules (the guard target for registration completeness). */
 const handlerModuleFiles = [
   'electron/main/handlers/fs.ts',
   'electron/main/handlers/ai.ts',
@@ -181,7 +181,7 @@ describe('IPC seam contract', () => {
   })
 
   it('maps handler-registered channels one-to-one with preload request channels', () => {
-    // 预加载桥实际使用的主→渲 channel（invoke/send 请求侧）必须全部在主进程注册，且每个恰好一次。
+    // Every main-to-renderer channel the preload bridge actually uses (the invoke/send request side) must be registered in the main process exactly once.
     const registered = new Set(
       collectApiMembers(handlerModuleFiles, /ipcMain\.(?:handle|on)\(\s*IPC\.([A-Za-z0-9_]+)/g),
     )
@@ -192,11 +192,11 @@ describe('IPC seam contract', () => {
       ),
     )
 
-    // 防漏注册：渲染层调用的 channel 必须有主进程 handler。
+    // Catch missing registrations: every channel the renderer calls must have a main-process handler.
     const missing = [...requested].filter((m) => !registered.has(m))
     expect(missing).toEqual([])
 
-    // 防幽灵注册：主进程注册的 channel 必须被 preload 请求使用。
+    // Catch phantom registrations: every channel the main process registers must be used by a preload request.
     const mainOnly = [...registered].filter((m) => !requested.has(m))
     expect(mainOnly).toEqual([])
   })
@@ -218,8 +218,8 @@ describe('IPC seam contract', () => {
     expectTypeOf<MindLaneBridge>().toMatchTypeOf<Window['mindlane']>()
   })
 
-  it('McpConnect 契约：payload 支持携带凭据，状态信息携带表单字段元数据与失败指引', () => {
-    // payload：非 OAuth server 可通过 credentials 附带表单凭据（OAuth server 省略）
+  it('McpConnect contract: the payload can carry credentials and status info carries form-field metadata plus a failure hint', () => {
+    // payload: non-OAuth servers may attach form credentials via `credentials` (omitted for OAuth servers)
     expectTypeOf<McpConnectPayload>().toMatchTypeOf<{
       serverId: string
       credentials?: Record<string, string>
@@ -229,7 +229,7 @@ describe('IPC seam contract', () => {
       credentials: { apiKey: 'k' },
     }
     expectTypeOf(withCredentials).toMatchTypeOf<McpConnectPayload>()
-    // 状态信息：非 OAuth server 暴露 credentialFields / failureHint 给渲染层画表单、显示指引
+    // status info: non-OAuth servers expose credentialFields / failureHint so the renderer can draw the form and show the hint
     expectTypeOf<McpServerStatusInfo>().toMatchTypeOf<{
       credentialFields?: McpCredentialField[]
       failureHint?: string
@@ -243,8 +243,8 @@ describe('IPC seam contract', () => {
   })
 })
 
-// ---- 渲染层模块边界（ADR-0024 / ADR-0025） ----
-// 静态断言，不是行为测试：层级表是防复发的唯一守卫。
+// ---- Renderer module boundaries (ADR-0024 / ADR-0025) ----
+// Static assertions, not behavior tests: the layer table is the only guard against regressions.
 
 describe('renderer module boundaries', () => {
   const sourceFiles = [

@@ -1,4 +1,4 @@
-/** AI 服务未就绪时的统一失败响应（ai 与 chat 模块共用）。 */
+/** The shared failure response when the AI service is not ready (used by the ai and chat modules). */
 export function aiNotReadyResponse(): { ok: false; error: string } {
   return { ok: false, error: 'AI service not initialized' }
 }

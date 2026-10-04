@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import { buildMindmapWriteRequest, createMindmapWriteRequester } from '../mindmapRequesters.js'
 
-/** 伪 BrowserWindow：只记录发出的请求，不真正触达渲染层。 */
+/** Fake BrowserWindow: records outgoing requests only, and never reaches the renderer. */
 function fakeWindow(): {
   window: unknown
   sent: Array<{
@@ -66,7 +66,7 @@ describe('MindmapWriteRequester', () => {
       action: 'insertXmlFragment',
       data: { nodeCount: 1 },
     })
-    // 渲染层应答 {ok, action, data} 原样透出（requestId 是内部关联，不进结果）
+    // The renderer response {ok, action, data} passes through verbatim (requestId is internal correlation and is not part of the result)
     await expect(promise).resolves.toEqual({
       ok: true,
       action: 'insertXmlFragment',
@@ -108,10 +108,10 @@ describe('MindmapWriteRequester', () => {
     requester.respond({
       requestId: sent[0]!.requestId,
       ok: false,
-      error: '[block_not_found] 节点不存在',
+      error: '[block_not_found] Node not found',
     })
 
-    await expect(promise).rejects.toThrow('[block_not_found] 节点不存在')
+    await expect(promise).rejects.toThrow('[block_not_found] Node not found')
   })
 
   it('ignores responses for unknown requestIds (already timed out / answered)', async () => {
@@ -179,7 +179,9 @@ describe('MindmapWriteRequester', () => {
     const promise = requester.request(() =>
       buildMindmapWriteRequest('file-a', 'insertXmlFragment', {}),
     )
-    const assertion = expect(promise).rejects.toThrow('落盘超时（3s 内未收到渲染层应答）')
+    const assertion = expect(promise).rejects.toThrow(
+      'Save to disk timed out (no ack from the renderer within 3s)',
+    )
     await vi.advanceTimersByTimeAsync(3000)
     await assertion
     expect(requester.pendingCount).toBe(0)
@@ -190,6 +192,6 @@ describe('MindmapWriteRequester', () => {
 
     await expect(
       requester.request(() => buildMindmapWriteRequest('file-a', 'insertXmlFragment', {})),
-    ).rejects.toThrow('编辑器不可用（窗口已关闭），无法落盘')
+    ).rejects.toThrow('Editor is unavailable (the window is closed); cannot save to disk')
   })
 })

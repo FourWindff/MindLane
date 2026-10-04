@@ -13,24 +13,28 @@ function fakeSelfTool(name: string, result: string): DynamicStructuredTool {
 }
 
 describe('notionServer.fetchWorkspaceName', () => {
-  it('从 get-self 工具的 JSON 结果中提取 workspace 名', async () => {
+  it('extracts the workspace name from the get-self tool JSON result', async () => {
     const tools = [
       fakeSelfTool(
         'notion__API-get-self',
-        JSON.stringify({ object: 'user', type: 'bot', bot: { workspace_name: '我的知识库' } }),
+        JSON.stringify({
+          object: 'user',
+          type: 'bot',
+          bot: { workspace_name: 'My Knowledge Base' },
+        }),
       ),
     ]
 
-    await expect(notionServer.fetchWorkspaceName!(tools)).resolves.toBe('我的知识库')
+    await expect(notionServer.fetchWorkspaceName!(tools)).resolves.toBe('My Knowledge Base')
   })
 
-  it('兼容非 JSON 文本结果（正则兜底）', async () => {
+  it('handles non-JSON text results (regex fallback)', async () => {
     const tools = [fakeSelfTool('notion-get-self', 'user info: {"workspace_name":"Acme"} trailing')]
 
     await expect(notionServer.fetchWorkspaceName!(tools)).resolves.toBe('Acme')
   })
 
-  it('没有 get-self 工具或结果中没有 workspace 名时返回 undefined', async () => {
+  it('returns undefined when there is no get-self tool or no workspace name in the result', async () => {
     await expect(notionServer.fetchWorkspaceName!([])).resolves.toBeUndefined()
     await expect(
       notionServer.fetchWorkspaceName!([fakeSelfTool('API-get-self', '{"bot":{}}')]),

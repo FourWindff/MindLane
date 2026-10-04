@@ -12,6 +12,6 @@ describe('displayFileName', () => {
   })
 
   it('returns the last segment of a folder path', () => {
-    expect(displayFileName('/w/学习笔记')).toBe('学习笔记')
+    expect(displayFileName('/w/Study notes')).toBe('Study notes')
   })
 })

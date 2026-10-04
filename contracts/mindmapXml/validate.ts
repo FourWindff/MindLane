@@ -1,18 +1,19 @@
 /**
- * 编辑器侧校验（insertFromXml / updateMindmapNode 共用）：
- * 把解析后的片段对照编辑器活状态做存在性/纯树/asset 引用校验。
+ * Editor-side validation (shared by insertFromXml / updateMindmapNode):
+ * checks a parsed fragment against the editor's live state for existence,
+ * pure-tree and asset-reference validity.
  *
- * 校验失败抛 MindmapXmlError，错误码回传给 AI（PRD 5.4）。
- * 任何失败都不产生部分挂载——调用方必须整体拒绝。
+ * A failure throws MindmapXmlError and the code goes back to the AI (PRD 5.4).
+ * No failure ever produces a partial mount — the caller must reject the whole thing.
  */
 
 import { MindmapXmlError } from './types.js'
 import type { ParsedFragment } from './deserializer.js'
 
 interface EditorValidationContext {
-  /** 编辑器当前全部节点 id（含 root） */
+  /** All current editor node ids (including root) */
   nodeIds: Set<string>
-  /** 编辑器当前 asset id 集合 */
+  /** Current editor asset id set */
   assetIds: Set<string>
 }
 
@@ -30,9 +31,11 @@ function collectAssetRefs(fragment: ParsedFragment): string[] {
 }
 
 /**
- * insertXmlFragment 校验：片段中的 id 不得与编辑器现有节点冲突
- * （冲突 = 多父/重复子树 → tree_invalid）；asset 引用必须存在 → asset_not_found。
- * `excludeIds`：整体替换场景（updateMindmapNode）中被替换节点自身及其旧子树除外。
+ * insertXmlFragment validation: ids in the fragment must not collide with
+ * existing editor nodes (a collision = multiple parents/duplicate subtree →
+ * tree_invalid); asset references must exist → asset_not_found.
+ * `excludeIds`: in whole-replacement scenarios (updateMindmapNode), the replaced
+ * node itself and its old subtree are excluded.
  */
 export function validateFragmentForInsert(
   fragment: ParsedFragment,
@@ -43,7 +46,7 @@ export function validateFragmentForInsert(
     if (ctx.nodeIds.has(id) && !excludeIds.has(id)) {
       throw new MindmapXmlError(
         'tree_invalid',
-        `节点 id「${id}」已存在于导图中（纯树不允许重复 id，否则产生多父/环）`,
+        `Node id "${id}" already exists in the mindmap (a pure tree forbids duplicate ids; otherwise multiple parents/cycles appear)`,
       )
     }
   }
@@ -51,14 +54,15 @@ export function validateFragmentForInsert(
     if (!ctx.assetIds.has(assetId)) {
       throw new MindmapXmlError(
         'asset_not_found',
-        `引用不存在的图片资源「${assetId}」（asset 必须来自上下文）`,
+        `Reference to a nonexistent image asset "${assetId}" (assets must come from context)`,
       )
     }
   }
 }
 
 /**
- * moveMindmapNode 校验：目标 id 存在性、root 不可移动、目标不得位于被移子树内（环）。
+ * moveMindmapNode validation: target id existence, root is immovable, and the
+ * target must not sit inside the moved subtree (cycle).
  */
 export function validateMove(
   nodeId: string,
@@ -66,30 +70,33 @@ export function validateMove(
   ctx: { nodeIds: Set<string>; childrenOf: Map<string, string[]> },
 ): void {
   if (nodeId === 'root') {
-    throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可移动')
+    throw new MindmapXmlError('tree_invalid', 'root is the mindmap anchor and cannot be moved')
   }
   if (!ctx.nodeIds.has(nodeId)) {
     throw new MindmapXmlError(
       'block_not_found',
-      `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
+      `Node "${nodeId}" does not exist; call readMindmap to locate it again`,
     )
   }
   if (targetId === nodeId) {
-    throw new MindmapXmlError('tree_invalid', '目标节点不能是自身')
+    throw new MindmapXmlError('tree_invalid', 'The target node cannot be itself')
   }
   if (!ctx.nodeIds.has(targetId)) {
     throw new MindmapXmlError(
       'block_not_found',
-      `目标节点「${targetId}」不存在，请先 readMindmap 重新定位`,
+      `Target node "${targetId}" does not exist; call readMindmap to locate it again`,
     )
   }
-  // 环检测：targetId 不得位于 nodeId 的子树内（否则 nodeId 成为自身后代的子节点）
+  // Cycle detection: targetId must not sit inside nodeId's subtree (otherwise nodeId becomes a child of its own descendant)
   const stack = [...(ctx.childrenOf.get(nodeId) ?? [])]
   const visited = new Set<string>()
   while (stack.length > 0) {
     const current = stack.pop()!
     if (current === targetId) {
-      throw new MindmapXmlError('tree_invalid', `不能把节点移动到它自己的子树内（会产生环）`)
+      throw new MindmapXmlError(
+        'tree_invalid',
+        `Cannot move a node into its own subtree (this would create a cycle)`,
+      )
     }
     if (visited.has(current)) continue
     visited.add(current)
@@ -98,7 +105,7 @@ export function validateMove(
 }
 
 /**
- * 从节点/边/资源构建校验上下文（编辑器 Node[] 或快照形状均可）。
+ * Build the validation context from nodes/edges/assets (either editor Node[] or a snapshot shape).
  */
 export function buildValidationContext(
   nodes: Array<{ id: string }>,

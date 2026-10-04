@@ -19,29 +19,32 @@ import type { OpenFileState } from '@/features/mindmap/model/store'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 /**
- * Agent 写操作的模拟面板（开发调试用）：四个写操作按钮分别走与 AI 写工具完全相同的
- * 编辑器入口（insertFromXml / replaceNodeFromXml / moveSubtree / deleteSubtree），
- * 用于不调用真实 AI 的情况下肉眼观察级联入场/粒子/滑翔动画。不进入任何
- * 历史以外的状态（动画标记为瞬态，与真实写操作一致）。
+ * Simulation panel for agent writes (dev/debug only): the four write buttons go through the
+ * exact same editor entry points as the AI write tools (insertFromXml / replaceNodeFromXml /
+ * moveSubtree / deleteSubtree), so the cascade entrance / particles / glide animations can be
+ * eyeballed without calling a real AI. Nothing but history is touched (animation flags are
+ * transient, same as real writes).
  *
- * 第五个按钮「模拟宫殿」重放「生成记忆宫殿」的整条用户操作：占位节点插在选中节点
- * 原位、选中节点挂到宫殿下并打处理标记、等假子图返回后内嵌图片并展开。编排是
- * usePalaceGeneration 的 dev 副本——生产 hook 不为此留接缝，代价是两者可能漂移。
+ * The fifth button, "Simulate palace", replays the whole "Generate memory palace" user
+ * operation: a placeholder node goes where the selection was, the selected nodes hang under
+ * the palace and get flagged as processing, and once the fake subgraph returns the picture is
+ * embedded and the palace expands. The orchestration is a dev copy of usePalaceGeneration —
+ * the production hook keeps no seam for it; the cost is that the two may drift.
  */
 
-const INSERT_FRAGMENT = `<node type="text" content="模拟分支A">
+const INSERT_FRAGMENT = `<node type="text" content="Simulated branch A">
   <node type="text" content="A1" />
   <node type="text" content="A2"><node type="text" content="A21" /></node>
 </node>
-<node type="text" content="模拟分支B">
+<node type="text" content="Simulated branch B">
   <node type="text" content="B1" />
 </node>`
 
-// ─── 记忆宫殿模拟：（假子图 + 整体编排）─────────────────────────────────────
+// ─── Memory palace simulation: (fake subgraph + whole orchestration) ─────────
 
-/** 假子图的耗时；够看清「生成中…」占位与处理标记。 */
+/** Fake subgraph duration; long enough to see the "Generating…" placeholder and flag. */
 const PALACE_SIM_GENERATION_MS = 2400
-const PALACE_SIM_LABEL = '模拟记忆宫殿'
+const PALACE_SIM_LABEL = 'Simulated memory palace'
 
 /**
  * ASCII-only SVG so `btoa` can encode it; no text inside (palace images forbid labels).
@@ -153,23 +156,25 @@ const PALACE_SIM_IMAGE_DATA_URL = `data:image/svg+xml;base64,${btoa(PALACE_SIM_I
 /** Stations land on the SVG landmarks above, so the modal pins line up with the picture. */
 const PALACE_SIM_STATIONS = [
   {
-    content: '模拟站点：写操作入口',
-    anchorVisual: '冒着蓝色火焰的巨型炼金炉',
-    association: '炉膛是写入口，蓝焰越旺级联入场越急',
+    content: 'Simulated station: write entry',
+    anchorVisual: 'A giant alchemical furnace blazing with blue fire',
+    association:
+      'The furnace chamber is the write entry; the brighter the blue flame, the faster the cascade entrance',
     x: 0.22,
     y: 0.6,
   },
   {
-    content: '模拟站点：父先子后',
-    anchorVisual: '穹顶垂下的巨型水晶吊灯',
-    association: '吊灯逐层点亮，正如父节点先于子节点入场',
+    content: 'Simulated station: parent before child',
+    anchorVisual: 'A giant crystal chandelier hanging from the dome',
+    association:
+      'The chandelier lights up tier by tier, just as parent nodes enter before child nodes',
     x: 0.5,
     y: 0.26,
   },
   {
-    content: '模拟站点：宫殿图片内嵌',
-    anchorVisual: '缠满藤蔓的旋转石梯',
-    association: '沿石梯盘旋而上，正如沿站点路线巡游',
+    content: 'Simulated station: palace image embedded',
+    anchorVisual: 'A rotating stone staircase wrapped in vines',
+    association: 'Spiralling up the stone staircase, just like touring along the station route',
     x: 0.78,
     y: 0.68,
   },
@@ -179,18 +184,20 @@ interface PalaceSimInput {
   editor: MindmapEditor
   nodes: Node[]
   edges: Edge[]
-  /** 当前选中节点，保持选中顺序 */
+  /** Currently selected nodes, in selection order */
   selectedNodes: Array<{ id: string; label: string }>
   addAsset: OpenFileState['addAsset']
 }
 
 /**
- * 重放记忆宫殿的用户操作（不调主进程、不需要 API Key）：与真实流程同序——插占位 →
- * 重挂选中节点 + 处理标记 + busy/analyzing → 假子图等 2.4s → 内嵌图片 → 提交展开。
- * 真实流程的占位与落图都在落图应答器里（`landPalace` 写动作），本 panel 保留一份独立
- * 副本以便脱离主进程演示；站点与图片按选中节点生成，站点内容取自节点标签。
+ * Replays the memory palace user operation (no main process, no API key): same order as the
+ * real flow — insert the placeholder → re-hang the selected nodes + processing flags +
+ * busy/analyzing → fake subgraph waits 2.4s → embed the picture → commit the expand. The real
+ * flow's placeholder and landing live in the persist responder (the `landPalace` write action);
+ * this panel keeps an independent copy so it can be demoed without the main process; stations
+ * and picture are generated from the selected nodes, station content comes from node labels.
  */
-// eslint-disable-next-line react-refresh/only-export-components -- 由本 panel 的测试直接调用，代价只是 HMR 整页刷新
+// eslint-disable-next-line react-refresh/only-export-components -- called directly by this panel's test; the only cost is a full-page HMR refresh
 export async function simulatePalaceInsert({
   editor,
   nodes,
@@ -219,7 +226,7 @@ export async function simulatePalaceInsert({
       y: firstSelected?.position.y ?? parentNode?.position.y ?? 0,
     },
     data: {
-      label: '生成中…',
+      label: 'Generating…',
       imageUrl: '',
       stations: [],
       sourceNodeIds: selectedIds,
@@ -264,7 +271,7 @@ export async function simulatePalaceInsert({
     // Same rollback shape as the real flow: one undo plus cleared flags.
     editor.undo()
     for (const nodeId of selectedIds) editor.clearNodeFlag(nodeId, 'processing')
-    reportRendererError('模拟宫殿图片解析失败，本次插入已取消')
+    reportRendererError('Failed to parse the simulated palace image; this insertion was cancelled')
     ai.setBusy(false)
     return
   }
@@ -309,7 +316,7 @@ export async function simulatePalaceInsert({
   ai.reset()
 }
 
-// ─── 面板 ─────────────────────────────────────────────────────────────────────
+// ─── Panel ─────────────────────────────────────────────────────────────────────
 
 function rootChildIds(editor: MindmapEditor): string[] {
   const { nodes, edges } = editor.getState()
@@ -339,7 +346,7 @@ export function AgentWriteSimulator() {
     if (!targetId) return
     const stamp = Date.now() % 100000
     void editor.replaceNodeFromXml(
-      `<node id="${targetId}" type="text" content="已更新-${stamp}">
+      `<node id="${targetId}" type="text" content="Updated-${stamp}">
          <node type="text" content="U1" />
          <node type="text" content="U2" />
        </node>`,
@@ -370,45 +377,45 @@ export function AgentWriteSimulator() {
   }, [addAsset, editor, edges, nodes])
 
   return (
-    <div className="agent-write-sim" aria-label="AI 写操作模拟面板">
+    <div className="agent-write-sim" aria-label="AI write simulation panel">
       <button
         type="button"
         className="agent-write-sim__btn"
         onClick={simulateInsert}
-        title="模拟 insertXmlFragment：插入多级片段，观察父先于子的级联入场与粒子"
+        title="Simulate insertXmlFragment: insert a multi-level fragment and watch the parent-before-child cascade entrance and particles"
       >
         <Plus size={14} strokeWidth={1.5} />
-        模拟插入
+        Simulate insert
       </button>
       <button
         type="button"
         className="agent-write-sim__btn"
         onClick={simulateUpdate}
         disabled={!canUpdate}
-        title="模拟 updateMindmapNode：替换根下第一个子树，观察新树级联入场"
+        title="Simulate updateMindmapNode: replace the first subtree under the root and watch the new tree cascade in"
       >
         <PenLine size={14} strokeWidth={1.5} />
-        模拟更新
+        Simulate update
       </button>
       <button
         type="button"
         className="agent-write-sim__btn"
         onClick={simulateMove}
         disabled={!canMove}
-        title="模拟 moveMindmapNode：把第二个根级子树移到第一个之下，观察整棵滑翔"
+        title="Simulate moveMindmapNode: move the second root-level subtree under the first and watch the whole tree glide"
       >
         <Move size={14} strokeWidth={1.5} />
-        模拟移动
+        Simulate move
       </button>
       <button
         type="button"
         className="agent-write-sim__btn"
         onClick={simulateDelete}
         disabled={!canDelete}
-        title="模拟 deleteMindmapNode：删除最后一个根级子树，观察子先父后的反向级联退出"
+        title="Simulate deleteMindmapNode: delete the last root-level subtree and watch the child-before-parent reverse cascade exit"
       >
         <Trash2 size={14} strokeWidth={1.5} />
-        模拟删除
+        Simulate delete
       </button>
       <button
         type="button"
@@ -417,12 +424,12 @@ export function AgentWriteSimulator() {
         disabled={selectedTopicCount === 0}
         title={
           selectedTopicCount === 0
-            ? '先在导图中选中 1 个及以上文本节点，模拟会像「生成记忆宫殿」一样把宫殿插在它们前面'
-            : '模拟生成记忆宫殿：与「生成记忆宫殿」同序——先插入「生成中…」占位节点、把选中节点挂到宫殿下并打上处理标记，等假子图返回后再内嵌图片并展开'
+            ? 'Select one or more text nodes in the mindmap first; the simulation then places the palace in front of them just like "Generate memory palace"'
+            : 'Simulate memory palace generation: same order as "Generate memory palace" — insert a "Generating…" placeholder node first, hang the selected nodes under the palace and mark them as processing, then embed the picture and expand once the fake subgraph returns'
         }
       >
         <Landmark size={14} strokeWidth={1.5} />
-        模拟宫殿
+        Simulate palace
       </button>
     </div>
   )

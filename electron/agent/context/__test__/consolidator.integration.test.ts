@@ -54,7 +54,7 @@ describe('Consolidator integration', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('200 条消息会话归档后进入 LLM 的消息数 ≤ 120 且摘要注入系统提示词', async () =>
+  it('archives a 200-message session so at most 120 messages reach the LLM and the summary is injected into the system prompt', async () =>
     inWs(async () => {
       const sessionId = 'long-session'
       await manager.saveMessages(sessionId, makeMessages(200), fileUuid)
@@ -63,14 +63,16 @@ describe('Consolidator integration', () => {
         messages: BaseMessage[],
         lastSummary?: string,
       ): Promise<BaseMessage[]> => [
-        new SystemMessage(lastSummary ? `历史摘要：${lastSummary}` : 'system'),
+        new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
         ...messages,
       ]
       const getToolDefinitions = () => []
 
       const provider = new FakeProvider(
         new FakeListChatModel({
-          responses: ['用户讨论了 AI 助手项目的技术栈与实现方案'],
+          responses: [
+            'the user discussed the tech stack and implementation plan of the AI assistant project',
+          ],
         }),
       )
 
@@ -95,9 +97,9 @@ describe('Consolidator integration', () => {
 
       const meta = manager.getSessionMeta(sessionId)
       expect(meta?.lastConsolidated).toBeGreaterThan(0)
-      expect(meta?._lastSummary).toContain('AI 助手项目')
+      expect(meta?._lastSummary).toContain('AI assistant project')
 
-      // 不再写 {sessionId}.history.jsonl：摘要只存在会话 meta 中
+      // No {sessionId}.history.jsonl is written anymore: the summary lives only in the session meta
       const sessionsDir = path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1')
       expect(fs.readdirSync(sessionsDir).some((f) => f.endsWith('.history.jsonl'))).toBe(false)
 
@@ -109,10 +111,10 @@ describe('Consolidator integration', () => {
       const systemMessages = contextMessages.filter((m) => m.getType() === 'system')
       expect(systemMessages.length).toBe(0)
 
-      // 验证 buildMessages 回调能把 _lastSummary 注入系统提示词。
+      // Verify the buildMessages callback can inject _lastSummary into the system prompt.
       const fullMessages = await buildMessages(contextMessages, meta?._lastSummary)
       const systemPrompt = fullMessages[0].content
-      expect(systemPrompt).toContain('历史摘要')
-      expect(systemPrompt).toContain('AI 助手项目')
+      expect(systemPrompt).toContain('Summary:')
+      expect(systemPrompt).toContain('AI assistant project')
     }))
 })

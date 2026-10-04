@@ -29,7 +29,7 @@ function endEvent(overrides: Record<string, unknown> = {}) {
   } as never
 }
 
-describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
+describe('MindmapEndEffects (end responsibilities left after live apply)', () => {
   it('applies mindmapData compat and associates the generated document ref when a write tool persisted', () => {
     let listener: ((event: never) => void) | undefined
     const editor = stubEditor()
@@ -91,7 +91,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
           {
             name: 'insertXmlFragment',
             args: {},
-            result: JSON.stringify({ ok: false, error: '[block_not_found] 节点不存在' }),
+            result: JSON.stringify({ ok: false, error: '[block_not_found] Node not found' }),
           },
         ],
       }),
@@ -163,7 +163,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
           {
             name: 'generateMindmapFragment',
             args: {},
-            result: JSON.stringify({ ok: true, title: 'Ruby 学习路线', documentRef: DOC_REF }),
+            result: JSON.stringify({ ok: true, title: 'Ruby learning path', documentRef: DOC_REF }),
           },
           {
             name: 'insertXmlFragment',
@@ -174,7 +174,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
       }),
     )
 
-    expect(backfillTitle).toHaveBeenCalledWith('file-a', 'Ruby 学习路线')
+    expect(backfillTitle).toHaveBeenCalledWith('file-a', 'Ruby learning path')
   })
 
   it('does not backfill a title when this turn produced no map', () => {
@@ -192,7 +192,7 @@ describe('MindmapEndEffects（即时落盘后的 end 残余职责）', () => {
     })
 
     effects.start()
-    listener?.(endEvent({ content: '这份文档讲了三件事' }))
+    listener?.(endEvent({ content: 'This document covers three things' }))
 
     expect(backfillTitle).not.toHaveBeenCalled()
   })

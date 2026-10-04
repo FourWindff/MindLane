@@ -5,8 +5,8 @@ import type { ShortcutRegistration } from '@/shared/shortcuts/types'
 import './shortcuts.css'
 
 const GROUP_LABEL: Record<string, string> = {
-  app: '应用',
-  mindmap: '思维导图',
+  app: 'App',
+  mindmap: 'Mindmap',
 }
 
 const GROUP_ORDER = ['app', 'mindmap']

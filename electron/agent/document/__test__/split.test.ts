@@ -4,9 +4,10 @@ import { splitDocuments, CHUNK_SIZE } from '../split.js'
 
 describe('splitDocuments', () => {
   it('never emits chunks over chunkSize', async () => {
-    const text = Array.from({ length: 50 }, (_, i) => `第 ${i} 段：${'内容'.repeat(100)}`).join(
-      '\n\n',
-    )
+    const text = Array.from(
+      { length: 50 },
+      (_, i) => `Paragraph ${i}: ${'content'.repeat(100)}`,
+    ).join('\n\n')
     const chunks = await splitDocuments([new Document({ pageContent: text })])
 
     expect(chunks.length).toBeGreaterThan(1)
@@ -16,7 +17,7 @@ describe('splitDocuments', () => {
   })
 
   it('splits on paragraph boundaries first', async () => {
-    const para = '句子。'.repeat(300) // one ~900-char paragraph
+    const para = 'Sentence.'.repeat(100) // one ~900-char paragraph
     const text = `${para}\n\n${para}\n\n${para}`
     const chunks = await splitDocuments([new Document({ pageContent: text })], 1000)
 

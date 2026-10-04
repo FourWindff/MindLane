@@ -20,20 +20,21 @@ export type { MindmapInputSource }
  */
 type RunEntry = 'chat' | 'palace'
 
-/** 简单替换型 reducer：直接用新值覆盖旧值。 */
+/** Plain replace reducer: the new value overwrites the old one. */
 function replaceReducer<T>(_prev: T, next: T): T {
   return next
 }
 
 /**
- * 并行分支汇聚型 reducer：分支结果追加到列表尾部;
- * 写 `null` 清空(新一轮归并开始前、以及 run 重置时使用)。
+ * Fan-in reducer for parallel branches: branch results are appended to the end
+ * of the list; writing `null` clears it (used before a new merge round starts
+ * and when a run resets).
  */
 function appendReducer<T>(current: T[], update: T[] | null): T[] {
   return update === null ? [] : [...current, ...update]
 }
 
-// ===== 基础类型定义 =====
+// ===== Base type definitions =====
 
 export type SelectedNodeContent = {
   id: string
@@ -74,12 +75,13 @@ export type MemoryPalaceStation = {
 
 type PendingSubgraph = 'mindmap' | 'palace'
 
-// ===== 状态切片定义（用于组合和复用） =====
+// ===== State slice definitions (for composition and reuse) =====
 
 /**
- * 轮次通道：主图与两个子图共享的输入通道。
+ * Turn channel: the input channel shared by the main graph and both subgraphs.
  *
- * 两个子图都只**读** context，messages 走 append reducer，两种访问都不会互相覆盖。
+ * Both subgraphs only **read** context; messages goes through an append
+ * reducer, so neither access can overwrite the other.
  */
 const TurnAnnotations = {
   messages: Annotation<BaseMessage[]>({
@@ -92,7 +94,7 @@ const TurnAnnotations = {
   }),
 }
 
-/** 主图独有：监督器自己的答复/错误、滚动摘要与路由判别键。 */
+/** Main graph only: the supervisor's own reply/error, the rolling summary and the routing key. */
 const SupervisorAnnotations = {
   /**
    * Subgraph calls declared this round and still awaiting execution, in
@@ -114,10 +116,10 @@ const SupervisorAnnotations = {
     default: () => '',
   }),
   /**
-   * 滚动摘要（running summary）：由 contextCompact 节点从会话 meta 的
-   * `_lastSummary` 读入，supervisor 构建 system prompt 时经
-   * `ContextBuilder.withLastSummary` 注入 `## 历史摘要` 段。
-   * 非压缩路径（I/O 失败降级）下为空字符串。
+   * Rolling summary: read by the contextCompact node from the session meta's
+   * `_lastSummary`; when the supervisor builds the system prompt,
+   * `ContextBuilder.withLastSummary` injects it into the `## History Summary`
+   * section. Empty string on the non-compaction path (I/O failure fallback).
    */
   summary: Annotation<string>({
     reducer: replaceReducer,
@@ -126,13 +128,17 @@ const SupervisorAnnotations = {
 }
 
 /**
- * 子图自有标量通道：每个子图各一套，键名带子图前缀。
+ * Subgraph-owned scalar channels: one set per subgraph, keys prefixed with the
+ * subgraph name.
  *
- * 这些通道必须按子图拆名：它们都带替换型 reducer，两个子图在同一超步里写同一个键
- * 会**静默**后写覆盖（只有不带 reducer 的通道才会响亮报错）。调用信息（调用 id、
- * 工具名）同理每图一份，收口时不必猜是哪个子图发起的。
+ * These channels must be split by subgraph: they all use replace reducers, and
+ * two subgraphs writing the same key in one super-step would **silently**
+ * overwrite each other (only channels without a reducer error out loudly).
+ * Call info (call id, tool name) is likewise per-graph so close-out never has
+ * to guess which subgraph issued it.
  *
- * 两个虚拟工具的 schema 都是空对象，所以没有「调用输入」可留；等 schema 有了参数再加。
+ * Both virtual tools have an empty-object schema, so there is no "call input"
+ * to keep; add one once a schema grows arguments.
  */
 const MindmapScalarAnnotations = {
   mindmapError: Annotation<string>({
@@ -154,7 +160,7 @@ const MindmapScalarAnnotations = {
 }
 
 const PalaceScalarAnnotations = {
-  /** 子图阶段轨迹（与 step 流事件同源），由子图收口并随子图状态返回主图。 */
+  /** Subgraph phase trace (same source as the step stream events), closed out by the subgraph and returned to the main graph with the subgraph state. */
   palaceToolSteps: Annotation<ChatToolCallStep[]>({
     reducer: replaceReducer,
     default: () => [],
@@ -168,8 +174,10 @@ const PalaceScalarAnnotations = {
     default: () => '',
   }),
   /**
-   * 落图应答器的结果（空 = 成功）：宫殿生成成功但写动作失败时，子图收口把它写进
-   * ToolMessage 与运行 `end` 载荷，渲染层据此把占位节点标成待继续。
+   * Result of the landing responder (empty = success): when palace generation
+   * succeeded but the write action failed, the subgraph close-out writes it into
+   * the ToolMessage and the run's `end` payload, and the renderer marks the
+   * placeholder node as pending.
    */
   palaceLandingError: Annotation<string>({
     reducer: replaceReducer,
@@ -198,7 +206,8 @@ const RunAnnotations = {
 }
 
 /**
- * 记忆宫殿状态切片（私有键：只此一图写，主图照走合并）
+ * Memory palace state slice (private keys: only this graph writes them; the main
+ * graph still merges them like any other)
  */
 const PalaceStateAnnotations = {
   artworkStyle: Annotation<PalaceArtworkStyle>({
@@ -244,14 +253,14 @@ const PalaceStateAnnotations = {
 }
 
 /**
- * 思维导图状态切片
+ * Mindmap state slice
  *
- * 波浪式并发（ADR-0008）:
- * - `batchIndex` / `mergeGroup` 是 Send 分支的输入载体,每个分支只读自己的那份。
- * - `leafResults` / `mergeResults` 用 append reducer 汇聚并行分支结果;
- *   写 `null` 可清空(新一轮归并开始前、以及 run 重置时使用)。
- * - `mergeInputs` 语义收窄为「当前归并轮次的输入树列表」,由 start_merge_round
- *   节点写入,供波式路由跨 super-step 稳定读取。
+ * Wave concurrency (ADR-0008):
+ * - `batchIndex` / `mergeGroup` are the Send branch inputs; each branch reads only its own.
+ * - `leafResults` / `mergeResults` fan parallel branch results in with an append reducer;
+ *   writing `null` clears them (before a new merge round starts and when a run resets).
+ * - `mergeInputs` narrows to "the input tree list of the current merge round", written by the
+ *   start_merge_round node so wave routing can read it stably across super-steps.
  */
 const MindmapStateAnnotations = {
   mindmapInputSource: Annotation<MindmapInputSource | null>({
@@ -306,13 +315,15 @@ const MindmapStateAnnotations = {
   }),
 }
 
-// ===== 组合状态定义 =====
+// ===== Composed state definitions =====
 
 /**
- * 主图状态 - MindLaneAgent 使用
+ * Main graph state - used by MindLaneAgent
  *
- * 逐片展开（而不是挑几个键）是刻意的：子图写而主图未声明的键会被**静默丢弃**，
- * 所以这里必须是两个子图通道的并集，新增子图键只能改这里一处。
+ * Spreading every slice in (rather than picking a few keys) is deliberate: keys
+ * a subgraph writes but the main graph does not declare are **silently
+ * dropped**, so this must be the union of both subgraph channels; new subgraph
+ * keys are added here and nowhere else.
  */
 export const MainGraphState = Annotation.Root({
   ...RunAnnotations,
@@ -325,8 +336,8 @@ export const MainGraphState = Annotation.Root({
 })
 
 /**
- * Palace 子图专用状态
- * 包含：轮次通道 + Palace 标量通道 + Palace 完整状态
+ * State dedicated to the palace subgraph
+ * Contains: turn channel + palace scalar channels + full palace state
  */
 export const PalaceSubgraphState = Annotation.Root({
   ...TurnAnnotations,
@@ -335,8 +346,8 @@ export const PalaceSubgraphState = Annotation.Root({
 })
 
 /**
- * 思维导图子图专用状态
- * 包含：轮次通道 + 思维导图标量通道 + 思维导图状态
+ * State dedicated to the mindmap subgraph
+ * Contains: turn channel + mindmap scalar channels + mindmap state
  */
 export const MindmapSubgraphState = Annotation.Root({
   ...TurnAnnotations,
@@ -344,7 +355,7 @@ export const MindmapSubgraphState = Annotation.Root({
   ...MindmapStateAnnotations,
 })
 
-// ===== 类型导出 =====
+// ===== Type exports =====
 
 export type MainGraphStateType = typeof MainGraphState.State
 export type PalaceSubgraphStateType = typeof PalaceSubgraphState.State

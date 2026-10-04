@@ -18,16 +18,16 @@ export function buildAnalyzeInputMessages(conversation: string): WorkflowPromptM
     {
       role: 'system',
       content: [
-        '你是记忆材料拆解助手。',
-        '请根据对话上下文，提取用户当前这一轮真正要记忆的内容。',
-        '把内容拆成有序条目，每条必须是可记忆的具体信息点。',
-        '不要生成画面、不要解释，只返回结构化结果。',
-        '如果用户给的是清单、知识点、定义、单词、流程，都要拆成顺序明确的 items。',
+        'You are a memory-material decomposition assistant.',
+        'Based on the conversation context, extract what the user actually wants to memorize in this turn.',
+        'Break the content into ordered items; each item must be a concrete, memorable piece of information.',
+        'Do not generate imagery and do not explain; return only the structured result.',
+        'Lists, knowledge points, definitions, vocabulary words, and processes must all be broken into items with a clear order.',
       ].join('\n'),
     },
     {
       role: 'user',
-      content: `对话上下文：\n${conversation}\n\n请拆解用户最新要记忆的内容。`,
+      content: `Conversation context:\n${conversation}\n\nBreak down what the user most recently wants to memorize.`,
     },
   ]
 }
@@ -40,17 +40,17 @@ export function buildDesignMnemonicsMessages(
     {
       role: 'system',
       content: [
-        '你是记忆宫殿设计师。',
-        '请为用户设计一个单张图可承载的记忆宫殿场景。',
-        '每个站点都必须包含：content、anchorVisual、mnemonicMethod、association。',
-        'anchorVisual 必须是图片里能直接看到的具体物体或局部场景。',
-        'mnemonicMethod 要指出助记方法，例如谐音、夸张、故事、动作、形状联想。',
-        'association 要简洁说明为什么这个锚点能帮助回忆 content。',
+        'You are a memory palace designer.',
+        'Design a memory palace scene that a single image can carry for the user.',
+        'Every station must include: content, anchorVisual, mnemonicMethod, association.',
+        'anchorVisual must be a concrete object or scene fragment directly visible in the image.',
+        'mnemonicMethod must name the mnemonic technique, such as homophone, exaggeration, story, action, or shape association.',
+        'association must briefly explain why this anchor helps recall the content.',
       ].join('\n'),
     },
     {
       role: 'user',
-      content: `请为以下条目设计记忆宫殿：\n${itemsText}`,
+      content: `Design a memory palace for the following items:\n${itemsText}`,
     },
   ]
 }
@@ -63,20 +63,20 @@ export function buildImagePromptGeneratorMessages(input: {
     {
       role: 'system',
       content: [
-        '你是记忆宫殿文生图提示词工程师。',
-        '请把记忆宫殿设计转换成单张图片提示词。',
-        '要求：一条连续通道；锚点按顺序排布；画面中无文字；每个锚点互不混淆；风格清晰。',
-        '只输出提示词，不要加标题和解释。',
+        'You are a memory palace text-to-image prompt engineer.',
+        'Convert the memory palace design into a single-image prompt.',
+        'Requirements: one continuous pathway; anchors arranged in order; no text in the frame; anchors clearly distinct from one another; clean style.',
+        'Output only the prompt, with no title and no explanation.',
       ].join('\n'),
     },
     {
       role: 'user',
       content: [
-        `场景主题：${input.theme}`,
-        `总站点数：${input.stations.length}`,
+        `Scene theme: ${input.theme}`,
+        `Total stations: ${input.stations.length}`,
         ...input.stations.map(
           (station) =>
-            `第 ${station.order} 站：内容=${station.content}；画面锚点=${station.anchorVisual}；联想=${station.association ?? ''}`,
+            `Station ${station.order}: content=${station.content}; visual anchor=${station.anchorVisual}; association=${station.association ?? ''}`,
         ),
       ].join('\n'),
     },
@@ -92,20 +92,20 @@ export function buildSummaryMessages(input: {
     {
       role: 'system',
       content: [
-        '你是记忆宫殿讲解助手。',
-        '请用简洁中文说明如何沿路线回忆。',
-        '每个站点都要点出：位置顺序、内容、助记法。',
-        '控制在 6-12 句，不要使用表格。',
+        'You are a memory palace walkthrough assistant.',
+        'Explain in concise English how to recall along the route.',
+        'Each station must mention: position order, content, and mnemonic technique.',
+        'Keep it to 6-12 sentences; do not use tables.',
       ].join('\n'),
     },
     {
       role: 'user',
       content: [
-        `场景主题：${input.theme}`,
-        `是否已生成图片：${input.hasImage ? '是' : '否'}`,
+        `Scene theme: ${input.theme}`,
+        `Image generated: ${input.hasImage ? 'yes' : 'no'}`,
         ...input.memoryRoute.map(
           (station) =>
-            `第 ${station.order} 站：内容=${station.content}；画面=${station.anchorVisual ?? ''}；助记法=${station.mnemonicMethod ?? ''}；关联=${station.association ?? ''}`,
+            `Station ${station.order}: content=${station.content}; visual=${station.anchorVisual ?? ''}; mnemonic=${station.mnemonicMethod ?? ''}; association=${station.association ?? ''}`,
         ),
       ].join('\n'),
     },

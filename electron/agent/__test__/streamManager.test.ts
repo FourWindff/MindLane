@@ -69,13 +69,13 @@ function createHarness() {
 type MessageChunk = {
   id: string
   content: string
-  /** supervisor AI 消息携带的工具调用（子图补发 tool-start 用） */
+  /** Tool calls carried by a supervisor AI message (used to re-emit subgraph tool-start) */
   toolCalls?: Array<{ id?: string; name?: string; args?: Record<string, unknown> }>
-  /** tool 消息 chunk（子图 ToolMessage 补发 tool-end 用） */
+  /** Tool message chunk (used to re-emit subgraph tool-end) */
   type?: 'tool'
   name?: string
   toolCallId?: string
-  /** 消息所属节点（默认 supervisor；tool 消息默认子图收口节点） */
+  /** Node the message belongs to (defaults to supervisor; tool messages default to the subgraph collector node) */
   node?: string
 }
 
@@ -255,7 +255,7 @@ describe('StreamManager + Runner', () => {
 
     manager.startStream({
       sessionId: 'session-raster',
-      message: '生成记忆宫殿',
+      message: 'Generate a memory palace',
       ...defaultRequestFields,
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
@@ -270,30 +270,31 @@ describe('StreamManager + Runner', () => {
 
     manager.startStream({
       sessionId: 'session-a',
-      message: '请整理我的导图',
+      message: 'Please tidy up my mindmap',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         filePath: '/a.mindlane',
-        fileTitle: 'A 导图',
-        selectedNodes: [{ id: 'n1', type: 'text', label: '选中节点' }],
+        fileTitle: 'A mindmap',
+        selectedNodes: [{ id: 'n1', type: 'text', label: 'Selected node' }],
       },
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
-    // 持久化格式：`问题\n<EDITOR_STATE>…</EDITOR_STATE>`
+    // Persisted format: `question\n<EDITOR_STATE>…</EDITOR_STATE>`
     const userMessage = persisted.get('session-a')?.find((m) => m.getType() === 'human')
     expect(userMessage).toBeDefined()
     const content = String(userMessage!.content)
-    expect(content.startsWith('请整理我的导图\n<EDITOR_STATE')).toBe(true)
+    expect(content.startsWith('Please tidy up my mindmap\n<EDITOR_STATE')).toBe(true)
     expect(content.endsWith('</EDITOR_STATE>')).toBe(true)
     expect(content).toContain('file_uuid="file-a"')
     expect(content).toContain('<SELECTED_NODES count="1">')
-    expect(content).toContain('content="选中节点"')
-    // 导图树不进轮次状态（无 <MINDMAP 外壳）。
+    expect(content).toContain('content="Selected node"')
+    // The mindmap tree does not enter the turn state (no <MINDMAP wrapper).
     expect(content).not.toContain('<MINDMAP')
 
-    // 重载会话重建模型输入：该块仍在（模型输入不过滤）。
+    // Reloading a session rebuilds the model input: the block is still there
+    // (model input is not filtered).
     const modelInput = capturedInputs[0]?.messages
     expect(modelInput).toBeDefined()
     expect(modelInput!.some((m) => String(m.content).endsWith('</EDITOR_STATE>'))).toBe(true)
@@ -305,7 +306,7 @@ describe('StreamManager + Runner', () => {
 
     manager.startStream({
       sessionId: 'session-empty',
-      message: '没有选中任何节点',
+      message: 'No nodes selected',
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane', fileTitle: 'A' },
     })
@@ -527,7 +528,7 @@ describe('StreamManager + Runner', () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     const subgraphResult = JSON.stringify({
       ok: true,
-      title: '测试导图',
+      title: 'Test mindmap',
       xmlFragment: 'root:',
       documentRef: null,
     })
@@ -546,7 +547,7 @@ describe('StreamManager + Runner', () => {
             name: 'generateMindmapFragment',
             toolCallId: 'call-sub-1',
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
       }),
     )
@@ -558,8 +559,9 @@ describe('StreamManager + Runner', () => {
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
-    // 子图虚拟调用不走 ToolNode：tool-start 由 supervisor 消息 chunk 补发（带 id），
-    // tool-end 由子图 ToolMessage 到达补发（状态来自结果 ok 字段）。
+    // Virtual subgraph calls do not go through ToolNode: tool-start is re-emitted from
+    // the supervisor message chunk (with its id), tool-end when the subgraph ToolMessage
+    // arrives (status comes from the result's ok field).
     expect(events).toContainEqual({
       streamId,
       sessionId: 'session-a',
@@ -581,7 +583,7 @@ describe('StreamManager + Runner', () => {
 
   it('re-emits palace subgraph tool-end as well, and error results derive status from the ok field', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
-    const palaceError = JSON.stringify({ ok: false, error: '生成失败' })
+    const palaceError = JSON.stringify({ ok: false, error: 'Generation failed' })
     setRuntimeFactory(() =>
       createRuntime({
         messageChunks: [
@@ -597,7 +599,7 @@ describe('StreamManager + Runner', () => {
             name: 'generatePalace',
             toolCallId: 'call-palace-1',
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
       }),
     )
@@ -646,7 +648,7 @@ describe('StreamManager + Runner', () => {
             name: 'generateMindmapFragment',
             toolCallId: 'call-sub-1',
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
       }),
     )
@@ -694,7 +696,7 @@ describe('StreamManager + Runner', () => {
     manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
-    // 回归：无子图调用时，不产生任何子图 tool-start/tool-end 补发。
+    // Regression: with no subgraph call, no subgraph tool-start/tool-end is re-emitted.
     const subgraphEvents = events.filter(
       (e) =>
         (e.type === 'tool-start' || e.type === 'tool-end') &&
@@ -720,7 +722,7 @@ describe('StreamManager + Runner', () => {
             content: '',
             toolCalls: [{ id: 'call-sub', name: 'generateMindmapFragment', args: { doc: 'x' } }],
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
       }),
     )
@@ -741,7 +743,7 @@ describe('StreamManager + Runner', () => {
     const mindmapResult = JSON.stringify({ ok: true, title: 'T', xmlFragment: 'root:' })
     const palaceResult = JSON.stringify({
       ok: true,
-      label: '宫殿',
+      label: 'Palace',
       stations: [],
       imageUrl: '',
       sourceNodeIds: [],
@@ -771,7 +773,7 @@ describe('StreamManager + Runner', () => {
             name: 'generateMindmapFragment',
             toolCallId: 'call-mm',
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
         // The palace progresses first although it was declared second: FIFO
         // anchoring would put its stages on the mindmap card.
@@ -836,7 +838,7 @@ describe('StreamManager + Runner', () => {
             name: 'generateMindmapFragment',
             toolCallId: 'call-sub',
           },
-          { id: 'm2', content: '完成' },
+          { id: 'm2', content: 'Done' },
         ],
       }),
     )

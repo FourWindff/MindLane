@@ -73,9 +73,10 @@ export class Workspace {
   }
 
   /**
-   * 写入/更新会话文件索引单条映射（fileUuid -> filePath）。
-   * 供打开/新建/另存路径（主进程）与改名/移动路径（渲染层经桥）调用。
-   * fileUuid 或 filePath 为空时静默跳过，不落盘。
+   * Write/update one session file index mapping (fileUuid -> filePath).
+   * Called by the open/new/save-as paths (main process) and the rename/move paths
+   * (renderer via the bridge). Silently skipped when fileUuid or filePath is empty;
+   * nothing is written to disk in that case.
    */
   async updateFileUuidPath(
     workspacePath: string,
@@ -126,7 +127,7 @@ export class Workspace {
     return this.saveState(workspacePath, async () => partial)
   }
 
-  /** 剔除路径已不存在的会话文件索引条目，避免失效路径长期残留。 */
+  /** Drop session file index entries whose path no longer exists, so stale paths do not linger. */
   async pruneFileUuidPaths(workspacePath: string): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => {
       const current = await this.loadFromDisk(workspacePath)

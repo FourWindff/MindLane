@@ -2,19 +2,19 @@ import { useId, useRef, useState } from 'react'
 import { Modal } from '@/shared/components/Modal'
 
 interface TextPromptDialogProps {
-  /** 面板顶部的小字说明 */
+  /** Small caption at the top of the panel */
   label: string
   title: string
   subtitle?: string
   placeholder?: string
   confirmLabel?: string
-  /** 输入框初值 */
+  /** Initial value of the input */
   initialValue?: string
-  /** 聚焦时全选初值（重命名要全选） */
+  /** Select the initial value on focus (renaming must select all of it) */
   selectInitial?: boolean
-  /** 额外提交条件（默认只要求非空）；收到的是 trim 后的值 */
+  /** Extra submit condition (defaults to non-empty only); receives the trimmed value */
   canSubmit?: (value: string) => boolean
-  /** 忙碌时禁用两个按钮，Enter 一并失效 */
+  /** Disables both buttons while busy; Enter stops working as well */
   disabled?: boolean
   onConfirm: (value: string) => void
   onCancel: () => void
@@ -27,7 +27,7 @@ export function TextPromptDialog({
   title,
   subtitle,
   placeholder,
-  confirmLabel = '确认',
+  confirmLabel = 'Confirm',
   initialValue = '',
   selectInitial,
   canSubmit,
@@ -76,7 +76,7 @@ export function TextPromptDialog({
           onClick={onCancel}
           disabled={disabled}
         >
-          取消
+          Cancel
         </button>
         <button
           type="button"

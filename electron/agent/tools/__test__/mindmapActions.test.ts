@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createMindmapActionTools, type MindmapWriteProxy } from '../mindmapActions.js'
 
-/** 伪渲染层客户端：记录转发参数，默认回 `{ok: true, action, data}` 原样应答。 */
+/** Fake renderer client: records forwarded args and, by default, acks with `{ok: true, action, data}` as-is. */
 function fakeProxy(overrides: { fail?: string } = {}): {
   tools: ReturnType<typeof createMindmapActionTools>
   proxy: ReturnType<typeof vi.fn<MindmapWriteProxy>>
@@ -15,7 +15,7 @@ function fakeProxy(overrides: { fail?: string } = {}): {
   return { tools: createMindmapActionTools(proxy), proxy }
 }
 
-describe('createMindmapActionTools（固定 4 写工具）', () => {
+describe('createMindmapActionTools (fixed 4 write tools)', () => {
   it('registers exactly the 4 write tools', () => {
     const { tools: t } = fakeProxy()
     expect(Object.keys(t).sort()).toEqual([
@@ -27,28 +27,28 @@ describe('createMindmapActionTools（固定 4 写工具）', () => {
   })
 })
 
-describe('insertXmlFragment（渲染层代理）', () => {
+describe('insertXmlFragment (renderer proxy)', () => {
   it('forwards args to the write channel and returns the renderer ack as-is', async () => {
     const { tools: t, proxy } = fakeProxy()
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
-      xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
+      xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
       parentId: 'n1',
       position: 'child',
     })
 
     expect(proxy).toHaveBeenCalledTimes(1)
     expect(proxy).toHaveBeenCalledWith('file-a', 'insertXmlFragment', {
-      xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
+      xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
       parentId: 'n1',
       position: 'child',
     })
-    // 渲染层应答原样作为工具结果（模型视角契约：{ok, action, data}）
+    // The renderer ack is returned as-is as the tool result (model-facing contract: {ok, action, data})
     expect(result).toEqual({
       ok: true,
       action: 'insertXmlFragment',
       data: {
-        xml: `<node type="text" content="分支"><node type="text" content="子" /></node>`,
+        xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
         parentId: 'n1',
         position: 'child',
       },
@@ -62,26 +62,26 @@ describe('insertXmlFragment（渲染层代理）', () => {
   })
 })
 
-describe('updateMindmapNode（渲染层代理）', () => {
+describe('updateMindmapNode (renderer proxy)', () => {
   it('forwards xml to the update action', async () => {
     const { tools: t, proxy } = fakeProxy()
     const result = await t.updateNodeTool.invoke({
       fileUuid: 'file-a',
-      xml: `<node id="n1" type="text" content="新内容" />`,
+      xml: `<node id="n1" type="text" content="new content" />`,
     })
 
     expect(proxy).toHaveBeenCalledWith('file-a', 'updateMindmapNode', {
-      xml: `<node id="n1" type="text" content="新内容" />`,
+      xml: `<node id="n1" type="text" content="new content" />`,
     })
     expect(result).toEqual({
       ok: true,
       action: 'updateMindmapNode',
-      data: { xml: `<node id="n1" type="text" content="新内容" />` },
+      data: { xml: `<node id="n1" type="text" content="new content" />` },
     })
   })
 })
 
-describe('moveMindmapNode（渲染层代理）', () => {
+describe('moveMindmapNode (renderer proxy)', () => {
   it('forwards nodeId/targetId/position to the move action', async () => {
     const { tools: t, proxy } = fakeProxy()
     const result = await t.moveNodeTool.invoke({
@@ -100,7 +100,7 @@ describe('moveMindmapNode（渲染层代理）', () => {
   })
 })
 
-describe('deleteMindmapNode（渲染层代理）', () => {
+describe('deleteMindmapNode (renderer proxy)', () => {
   it('forwards to the deleteNode action the renderer responder applies', async () => {
     const { tools: t, proxy } = fakeProxy()
     const result = await t.deleteNodeTool.invoke({
@@ -117,10 +117,10 @@ describe('deleteMindmapNode（渲染层代理）', () => {
   })
 })
 
-describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径）', () => {
+describe('renderer unresponsive / ok:false / window unavailable (tool failure paths)', () => {
   it('returns the renderer error as a tool failure result with the long-content correction', async () => {
     const { tools: t } = fakeProxy({
-      fail: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+      fail: '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
     })
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
@@ -129,16 +129,17 @@ describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径�
     const failure = result as { ok: boolean; error: string }
     expect(failure.ok).toBe(false)
     expect(failure.error).toContain(
-      '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+      '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
     )
-    // ADR-0023：判据错判（长内容自己写）时的纠偏路径。
+    // ADR-0023: the correction path when the criterion is misjudged (long content written by hand).
     expect(failure.error).toContain('generateMindmapFragment')
   })
 
   it('appends the long-content correction to a renderer ok:false ack', async () => {
     const proxy = vi.fn<MindmapWriteProxy>(async () => ({
       ok: false,
-      error: '[xml_parse_error] 第 1 行标签未闭合。恢复策略：重写 XML 后重试',
+      error:
+        '[xml_parse_error] The tag on line 1 is not closed. Recovery: rewrite the XML and retry',
     }))
     const tools = createMindmapActionTools(proxy)
     const result = await tools.insertXmlFragmentTool.invoke({
@@ -148,13 +149,14 @@ describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径�
     const failure = result as { ok: boolean; error: string }
     expect(failure.ok).toBe(false)
     expect(failure.error).toContain('generateMindmapFragment')
-    expect(failure.error).toContain('重写 XML 后重试')
+    expect(failure.error).toContain('rewrite the XML and retry')
   })
 
   it('does not add the correction to the other write tools', async () => {
     const proxy = vi.fn<MindmapWriteProxy>(async () => ({
       ok: false,
-      error: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+      error:
+        '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
     }))
     const tools = createMindmapActionTools(proxy)
     const result = await tools.updateNodeTool.invoke({
@@ -163,7 +165,8 @@ describe('渲染层无响应 / ok:false / 窗口不可用（工具失败路径�
     })
     expect(result).toEqual({
       ok: false,
-      error: '[block_not_found] 节点「ghost」不存在。恢复策略：先调用 readMindmap 重新定位后再操作',
+      error:
+        '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
     })
   })
 

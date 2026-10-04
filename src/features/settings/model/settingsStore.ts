@@ -37,7 +37,8 @@ function persistToBackend(partial: Record<string, unknown>) {
 }
 
 /**
- * 当前 provider 的 API Key：providerConfigs 是密钥唯一来源，不再有全局兜底 key。
+ * API Key of the active provider: providerConfigs is the only source of secrets; there is no
+ * global fallback key anymore.
  */
 export function selectActiveApiKey(
   state: Pick<SettingsState, 'activeChatProvider' | 'providerConfigs'>,
@@ -46,8 +47,8 @@ export function selectActiveApiKey(
 }
 
 /**
- * 对话就绪判定：settings 已加载、当前 provider 已填 API Key、已选模型。
- * ChatInputBar 门控与 palace 生成预检共用这一份判定。
+ * Chat readiness: settings loaded, API Key filled for the active provider, model selected.
+ * The ChatInputBar gate and the palace generation precheck share this one predicate.
  */
 export function selectChatReady(
   state: Pick<SettingsState, 'loaded' | 'activeChatProvider' | 'providerConfigs' | 'chatModel'>,

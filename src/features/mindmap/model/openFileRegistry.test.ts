@@ -39,7 +39,7 @@ describe('OpenFileRegistry', () => {
     fileB.newFile('B')
     openFileRegistry.setActive('/b.mindlane')
 
-    // 切换回 a 时历史应保留
+    // History must survive switching back to a
     openFileRegistry.setActive('/a.mindlane')
     expect(openFileRegistry.getActive()?.store.getState().canUndo).toBe(true)
   })
@@ -55,7 +55,7 @@ describe('OpenFileRegistry', () => {
       nodeIds.push(nodeId)
     }
 
-    // 撤销 10 次后应剩下 root 和最早未被丢弃的 2 个子节点
+    // After 10 undos, root plus the 2 oldest surviving children are left
     for (let i = 0; i < 10; i += 1) {
       file.editor.undo()
     }

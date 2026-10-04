@@ -18,7 +18,7 @@ export function registerShellHandlers(ctx: HandlerContext): void {
     }
 
     if (doc.type === 'text' && !fs.existsSync(resolved.target)) {
-      return { ok: false, error: '缓存文件不存在' }
+      return { ok: false, error: 'Cached file does not exist' }
     }
 
     try {
@@ -52,15 +52,15 @@ export function registerShellHandlers(ctx: HandlerContext): void {
   })
 
   ipcMain.handle(IPC.ShellOpenExternal, (_e, payload: { url: string }) => {
-    // 只放行 http/https，防止渲染层把任意指令塞给 openExternal
+    // Allow http/https only, so the renderer cannot hand arbitrary commands to openExternal
     let url: URL
     try {
       url = new URL(payload.url)
     } catch {
-      return { ok: false, error: '链接无效' }
+      return { ok: false, error: 'Invalid link' }
     }
     if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-      return { ok: false, error: '仅支持打开 http/https 链接' }
+      return { ok: false, error: 'Only http/https links can be opened' }
     }
     void shell.openExternal(url.toString())
     return { ok: true }

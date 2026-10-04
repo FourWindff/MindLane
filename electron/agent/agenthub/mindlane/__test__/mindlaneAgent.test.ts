@@ -28,7 +28,7 @@ function createMockProvider(mockInvoke: ReturnType<typeof vi.fn>): LLMProvider {
 
 const mockSearchTool = new DynamicStructuredTool({
   name: 'searchKnowledge',
-  description: '搜索知识库',
+  description: 'Search the knowledge base',
   schema: z.object({ query: z.string() }),
   func: async (input) => JSON.stringify({ results: [`result for ${input.query}`] }),
 })
@@ -107,7 +107,7 @@ describe('MindLaneAgent.invoke()', () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
         content: [
-          { type: 'text', text: '我来从 PDF 生成思维导图' },
+          { type: 'text', text: 'I will generate a mindmap from the PDF' },
           {
             type: 'tool_use',
             id: 'call-1',
@@ -140,14 +140,14 @@ describe('MindLaneAgent.invoke()', () => {
     expect(result.mindmapInputTitle).toBeUndefined()
     expect(result.messages).toHaveLength(1)
     const savedMessage = result.messages?.[0] as AIMessage
-    expect(savedMessage.content).toBe('我来从 PDF 生成思维导图')
+    expect(savedMessage.content).toBe('I will generate a mindmap from the PDF')
     expect(savedMessage.tool_calls?.[0]?.name).toBe(GENERATE_MINDMAP_FRAGMENT_TOOL)
   })
 
   it('routes generatePalace to palace subgraph', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '我来生成记忆宫殿',
+        content: 'I will generate the memory palace',
         tool_calls: [
           {
             name: GENERATE_PALACE_TOOL,
@@ -175,7 +175,7 @@ describe('MindLaneAgent.invoke()', () => {
   it('returns ordinary tool calls for ToolNode execution', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '让我搜索一下',
+        content: 'Let me search for that',
         tool_calls: [
           {
             name: 'searchKnowledge',
@@ -200,7 +200,7 @@ describe('MindLaneAgent.invoke()', () => {
   it('keeps the subgraph call when the same round also declares a plain tool', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '先读图再生成',
+        content: 'Read the map first, then generate',
         tool_calls: [
           {
             name: 'searchKnowledge',
@@ -232,7 +232,7 @@ describe('MindLaneAgent.invoke()', () => {
   it('declares both subgraphs when the model asks for both', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(
       new AIMessage({
-        content: '两件都做',
+        content: 'Do both',
         tool_calls: [
           { name: GENERATE_MINDMAP_FRAGMENT_TOOL, args: {}, id: 'call-mm', type: 'tool_call' },
           { name: GENERATE_PALACE_TOOL, args: {}, id: 'call-pl', type: 'tool_call' },
@@ -252,7 +252,7 @@ describe('MindLaneAgent.invoke()', () => {
   })
 
   it('direct response ends without subgraph routing', async () => {
-    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: '这是一个回答' }))
+    const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: 'Here is an answer' }))
     const agent = new MindLaneAgent(
       createMockProvider(mockInvoke),
       createTestRegistry({ extraTools: [mockSearchTool] }),
@@ -261,7 +261,7 @@ describe('MindLaneAgent.invoke()', () => {
     const result = await agent.invoke(createInitialState())
 
     expect(result.pendingSubgraphs).toEqual([])
-    expect(result.response).toBe('这是一个回答')
+    expect(result.response).toBe('Here is an answer')
   })
 
   it('surfaces a failed subgraph as the turn answer without calling the model', async () => {
@@ -272,15 +272,17 @@ describe('MindLaneAgent.invoke()', () => {
     )
     const state = {
       ...createInitialState(),
-      mindmapError: '[xml_parse_error] 标签 <node> 未闭合',
-      mindmapResponse: '生成思维导图失败：未能生成有效的结构',
+      mindmapError: '[xml_parse_error] tag <node> is not closed',
+      mindmapResponse: 'Failed to generate the mindmap: no valid structure was produced',
     }
 
     const result = await agent.invoke(state)
 
     expect(mockInvoke).not.toHaveBeenCalled()
-    expect((result.messages?.[0] as AIMessage).content).toBe('生成思维导图失败：未能生成有效的结构')
-    expect(result.response).toBe('生成思维导图失败：未能生成有效的结构')
+    expect((result.messages?.[0] as AIMessage).content).toBe(
+      'Failed to generate the mindmap: no valid structure was produced',
+    )
+    expect(result.response).toBe('Failed to generate the mindmap: no valid structure was produced')
     expect(result.mindmapError).toBe('')
   })
 
@@ -470,7 +472,7 @@ describe('MindLaneAgent trim retry', () => {
     const agent = new MindLaneAgent(provider, createTestRegistry({ extraTools: [mockSearchTool] }))
 
     const state = createInitialState()
-    // 超过 contextCompactRecentMessages(10) 的消息，让裁剪窗口真实生效
+    // More messages than contextCompactRecentMessages(10), so the trim window really kicks in
     state.messages = Array.from({ length: 7 }, (_, i) => [
       new HumanMessage(`msg${i}`),
       new AIMessage(`reply${i}`),
@@ -479,11 +481,11 @@ describe('MindLaneAgent trim retry', () => {
 
     const result = await agent.invoke(state)
 
-    // 第一次调用失败，第二次裁剪后重试成功
+    // First call fails; the second call succeeds after trimming
     expect(mockInvoke).toHaveBeenCalledTimes(2)
     expect(result.response).toBe('Compacted response')
 
-    // 重试输入的消息数应少于首次（窗口裁剪生效）
+    // The retry carries fewer messages than the first call (window trimming took effect)
     const firstCallMessages = mockInvoke.mock.calls[0][0]
     const retryCallMessages = mockInvoke.mock.calls[1][0]
     expect(retryCallMessages.length).toBeLessThan(firstCallMessages.length)
@@ -532,10 +534,10 @@ describe('MindLaneAgent trim retry', () => {
 
     const result = await agent.invoke(state)
 
-    // 首次失败 + 裁剪重试失败 -> 共 2 次调用后放弃
+    // First failure + failed trim retry -> gives up after 2 calls total
     expect(mockInvoke).toHaveBeenCalledTimes(2)
     expect(result.error).toBeDefined()
-    expect(result.response).toContain('处理请求时出错')
+    expect(result.response).toContain('Something went wrong while processing the request')
   })
 
   it('does not trigger trim retry on non-context errors', async () => {
@@ -551,23 +553,23 @@ describe('MindLaneAgent trim retry', () => {
     expect(result.error).toBeDefined()
     expect(result.error).toContain('model connection refused')
     expect(result.error).toContain('at')
-    expect(result.response).toContain('处理请求时出错')
+    expect(result.response).toContain('Something went wrong while processing the request')
   })
 
-  it('injects the rolling summary into the system prompt as 历史摘要', async () => {
+  it('injects the rolling summary into the system prompt as History Summary', async () => {
     const mockInvoke = vi.fn().mockResolvedValue(new AIMessage({ content: 'ok' }))
 
     const provider = createMockProvider(mockInvoke)
     const agent = new MindLaneAgent(provider, createTestRegistry({ extraTools: [mockSearchTool] }))
 
     const state = createInitialState()
-    state.summary = '用户正在整理一份关于知识管理的思维导图。'
+    state.summary = 'The user is organizing a mindmap about knowledge management.'
 
     const result = await agent.invoke(state)
     expect(result.response).toBe('ok')
 
     const systemPrompt = mockInvoke.mock.calls[0][0][0].content as string
-    expect(systemPrompt).toContain('## 历史摘要')
-    expect(systemPrompt).toContain('用户正在整理一份关于知识管理的思维导图。')
+    expect(systemPrompt).toContain('## History Summary')
+    expect(systemPrompt).toContain('The user is organizing a mindmap about knowledge management.')
   })
 })

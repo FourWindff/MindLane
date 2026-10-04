@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import { buildMindmapReadRequest, createMindmapReadRequester } from '../mindmapRequesters.js'
 
-/** 伪 BrowserWindow：只记录发出的请求，不真正触达渲染层。 */
+/** Fake BrowserWindow: records outgoing requests only, and never reaches the renderer. */
 function fakeWindow(): {
   window: unknown
   sent: Array<{ requestId: string; fileUuid: string; query?: unknown }>
@@ -38,8 +38,8 @@ describe('MindmapReadRequester', () => {
     const request = sent[0]!
     expect(request.fileUuid).toBe('file-a')
 
-    requester.respond({ requestId: request.requestId, ok: true, summary: '实时树' })
-    await expect(promise).resolves.toBe('实时树')
+    requester.respond({ requestId: request.requestId, ok: true, summary: 'Live tree' })
+    await expect(promise).resolves.toBe('Live tree')
     expect(requester.pendingCount).toBe(0)
   })
 
@@ -61,10 +61,10 @@ describe('MindmapReadRequester', () => {
     requester.respond({
       requestId: sent[0]!.requestId,
       ok: false,
-      error: '该文件未打开，无法读取导图',
+      error: 'This file is not open, cannot read the mindmap',
     })
 
-    await expect(promise).rejects.toThrow('该文件未打开，无法读取导图')
+    await expect(promise).rejects.toThrow('This file is not open, cannot read the mindmap')
   })
 
   it('ignores responses for unknown requestIds (already timed out / answered)', async () => {
@@ -73,11 +73,11 @@ describe('MindmapReadRequester', () => {
 
     const promise = requester.request<string>(() => buildMindmapReadRequest('file-a'))
     requester.respond({ requestId: 'unknown', ok: true, summary: 'x' })
-    // 未知 requestId 是 no-op：挂起请求仍在等待。
+    // An unknown requestId is a no-op: the pending request is still waiting.
     expect(requester.pendingCount).toBe(1)
 
-    requester.respond({ requestId: sent[0]!.requestId, ok: true, summary: '树' })
-    await expect(promise).resolves.toBe('树')
+    requester.respond({ requestId: sent[0]!.requestId, ok: true, summary: 'Tree' })
+    await expect(promise).resolves.toBe('Tree')
   })
 
   it('correlates concurrent requests so multi-file generation does not cross wires', async () => {
@@ -88,11 +88,11 @@ describe('MindmapReadRequester', () => {
     const promiseB = requester.request<string>(() => buildMindmapReadRequest('file-b'))
     expect(sent.map((r) => r.fileUuid)).toEqual(['file-a', 'file-b'])
 
-    requester.respond({ requestId: sent[1]!.requestId, ok: true, summary: '树 B' })
-    requester.respond({ requestId: sent[0]!.requestId, ok: true, summary: '树 A' })
+    requester.respond({ requestId: sent[1]!.requestId, ok: true, summary: 'Tree B' })
+    requester.respond({ requestId: sent[0]!.requestId, ok: true, summary: 'Tree A' })
 
-    await expect(promiseA).resolves.toBe('树 A')
-    await expect(promiseB).resolves.toBe('树 B')
+    await expect(promiseA).resolves.toBe('Tree A')
+    await expect(promiseB).resolves.toBe('Tree B')
   })
 
   it('times out after ~3s with a clear error', async () => {
@@ -100,8 +100,10 @@ describe('MindmapReadRequester', () => {
     const requester = createMindmapReadRequester(() => window as unknown as BrowserWindow)
 
     const promise = requester.request<string>(() => buildMindmapReadRequest('file-a'))
-    // 先挂上断言处理器，避免计时器触发时出现 unhandled rejection。
-    const assertion = expect(promise).rejects.toThrow('读取导图超时（3s 内未收到渲染层响应）')
+    // Attach the assertion handler first to avoid an unhandled rejection when the timer fires.
+    const assertion = expect(promise).rejects.toThrow(
+      'Read mindmap timed out (no response from the renderer within 3s)',
+    )
     await vi.advanceTimersByTimeAsync(3000)
     await assertion
     expect(requester.pendingCount).toBe(0)
@@ -112,6 +114,6 @@ describe('MindmapReadRequester', () => {
 
     await expect(
       requester.request<string>(() => buildMindmapReadRequest('file-a')),
-    ).rejects.toThrow('编辑器不可用（窗口已关闭），无法读取导图')
+    ).rejects.toThrow('Editor is unavailable (the window is closed); cannot read mindmap')
   })
 })

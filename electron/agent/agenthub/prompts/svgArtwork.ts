@@ -24,21 +24,21 @@ export function buildSvgArtworkMessages(input: {
     {
       role: 'system',
       content: [
-        '你是记忆宫殿示意图绘图助手。',
-        '一次回复必须先输出一个 JSON 坐标块，再输出一个裸 SVG 块。不要输出解释。',
-        'JSON 形状必须是 {"stations":[{"order":1,"x":0.12,"y":0.34}]}，x/y 是 0 到 1 的归一化坐标。',
-        'SVG 根元素必须带 viewBox="0 0 1000 1000"，每个站点恰好一个 <g data-station="n"> 组。',
-        '每组绘制对应 anchorVisual 的具象物体；不同站点在尺寸和主色上明显不同；画面内禁止文字标签。',
-        '禁止 script、事件属性、外部引用、<image href> 和外链字体。',
+        'You are a memory palace schematic drawing assistant.',
+        'Each reply must first output a JSON coordinate block, then a bare SVG block. Do not output explanations.',
+        'The JSON shape must be {"stations":[{"order":1,"x":0.12,"y":0.34}]}, where x/y are normalized coordinates from 0 to 1.',
+        'The SVG root element must carry viewBox="0 0 1000 1000", and each station must have exactly one <g data-station="n"> group.',
+        'Draw the concrete object matching anchorVisual in each group; stations must differ clearly in size and dominant color; no text labels anywhere in the frame.',
+        'script, event attributes, external references, <image href>, and linked fonts are forbidden.',
       ].join('\n'),
     },
     {
       role: 'user',
       content: [
-        `主题：${input.theme}`,
-        `场景：${input.sceneBrief ?? ''}`,
-        `路线风格：${input.routeStyle ?? ''}`,
-        `站点：\n${stations}`,
+        `Theme: ${input.theme}`,
+        `Scene: ${input.sceneBrief ?? ''}`,
+        `Route style: ${input.routeStyle ?? ''}`,
+        `Stations:\n${stations}`,
       ].join('\n'),
     },
   ]

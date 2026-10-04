@@ -38,8 +38,9 @@ const GLIDE_MS = 1000
 export type SiblingInsertMode = 'end' | 'above' | 'below'
 
 /**
- * 导图编辑器的唯一公共入口。所有结构变更（增删改、拖拽、连接、AI 批量插入）
- * 都应通过此类的方法执行，以便自动记录历史并支持撤销/重做。
+ * The single public entry point of the mindmap editor. Every structural change
+ * (add/edit/delete, drag, connect, AI batch insert) goes through this class so
+ * history is recorded automatically and undo/redo keep working.
  */
 export class MindmapEditor {
   private pendingDeleteTimers = new Set<ReturnType<typeof setTimeout>>()
@@ -53,12 +54,12 @@ export class MindmapEditor {
     return this.store.getState()
   }
 
-  /** 只读当前编辑器状态（校验场景用，如落盘应答器按活状态做存在性/纯树校验）。 */
+  /** Read the current editor state (validation scenarios, e.g. the write responder checking existence/pure-tree against live state). */
   getState(): OpenFileState {
     return this.state
   }
 
-  // ─── 历史操作 ───
+  // ─── History operations ───
 
   undo(): void {
     this.cancelPendingDeletes()
@@ -102,7 +103,7 @@ export class MindmapEditor {
     return this.history.canRedo
   }
 
-  // ─── 核心命令执行 ───
+  // ─── Core command execution ───
 
   execute(command: MindmapCommand): void {
     this.runBatch([command], false)
@@ -137,7 +138,7 @@ export class MindmapEditor {
     this.syncHistoryState()
   }
 
-  // ─── 便捷构建器 ───
+  // ─── Convenience builders ───
 
   addNode(options: {
     type: string
@@ -154,7 +155,7 @@ export class MindmapEditor {
       parentId = selected?.id ?? findRootNode(nodes, edges)?.id ?? nodes[0]?.id ?? 'root'
     }
     if (parentId === 'root' && !nodes.some((n) => n.id === 'root')) {
-      // root 锚点不存在（重置/空文档）：以第一个节点为父
+      // No root anchor (reset/empty document): use the first node as the parent
       parentId = nodes[0]?.id ?? 'root'
     }
 
@@ -212,7 +213,7 @@ export class MindmapEditor {
   addChild(parentId: string, data?: { label?: string }): { nodeId: string } {
     return this.addNode({
       type: 'text',
-      data: { label: data?.label ?? '新主题' },
+      data: { label: data?.label ?? 'Untitled' },
       parentId,
     })
   }
@@ -243,7 +244,7 @@ export class MindmapEditor {
     }
     return this.addNode({
       type: 'text',
-      data: { label: data?.label ?? '新主题', ...(side ? { side } : {}) },
+      data: { label: data?.label ?? 'Untitled', ...(side ? { side } : {}) },
       parentId,
       position,
     })
@@ -273,7 +274,7 @@ export class MindmapEditor {
         y: node.position.y - gapY,
       },
       data: {
-        label: data?.label ?? '新主题',
+        label: data?.label ?? 'Untitled',
         justAdded: true,
         ...(node.data.side ? { side: node.data.side } : {}),
         // Inherit the node's branchIndex so the branch keeps its color: the new parent
@@ -327,7 +328,8 @@ export class MindmapEditor {
   }
 
   /**
-   * 切换节点折叠状态（通用属性，走命令历史可撤销；折叠只影响展示，子树完整保留）。
+   * Toggle a node's collapsed state (a generic property, undoable through command history;
+   * collapsing only affects display and keeps the subtree intact).
    */
   setNodeCollapsed(nodeId: string, collapsed: boolean): void {
     this.updateNodeData(nodeId, { collapsed: collapsed || undefined })
@@ -355,9 +357,9 @@ export class MindmapEditor {
   }
 
   /**
-   * 移动子树到新位置（摘除 + 重挂 + 重布局，单条 batch 历史，原子）。
-   * position: child=挂到 targetId 之下（默认）；after/before=成为 targetId 兄弟的前/后。
-   * root 不可移动；目标不得位于被移子树内（环）。
+   * Move a subtree to a new position (detach + reattach + reflow, one atomic batch history entry).
+   * position: child=attach under targetId (default); after/before=become the sibling before/after targetId.
+   * root cannot be moved; the target must not sit inside the moved subtree (cycle).
    */
   moveSubtree(
     nodeId: string,
@@ -383,7 +385,7 @@ export class MindmapEditor {
       commands.push({ type: 'removeEdge', edgeId: incomingEdge.id })
     }
 
-    // after/before：垂直对齐到目标兄弟上/下方，保证重布局后的兄弟顺序
+    // after/before: align vertically above/below the target sibling so reflow keeps sibling order
     if (position !== 'child' && oldParentId === newParentId) {
       const sibling = this.state.nodes.find((n) => n.id === targetId)
       const node = this.state.nodes.find((n) => n.id === nodeId)
@@ -426,7 +428,7 @@ export class MindmapEditor {
         return { ...n, data: { ...n.data, gliding: true, glideFrom: from } }
       }),
     )
-    // runBatch 内联重布局（removeEdge/addEdge 触发 shouldReflowAfter）
+    // runBatch reflows inline (removeEdge/addEdge both trigger shouldReflowAfter)
     this.runBatch(commands, false)
     setTimeout(() => {
       this.state.setNodesTransient((ns) =>
@@ -527,13 +529,13 @@ export class MindmapEditor {
     this.state.addDocumentRef(ref)
   }
 
-  // ─── AI 批量插入 ───
+  // ─── AI batch insert ───
 
   /**
-   * 解析并插入 XML 片段（AI 写操作统一入口之一）。
-   * 校验失败抛 MindmapXmlError（错误码回传给 AI），不产生部分挂载。
-   * position: child=挂到 parentId 之下（默认）；after/before=插入到 parentId 兄弟的前/后；
-   * root=挂到根节点。
+   * Parse and insert an XML fragment (one of the unified entry points for AI write actions).
+   * A failed validation throws MindmapXmlError (the error code goes back to the AI) and mounts nothing partially.
+   * position: child=attach under parentId (default); after/before=insert before/after parentId's sibling;
+   * root=attach to the root node.
    */ async insertFromXml(
     xml: string,
     options: { parentId?: string; position?: 'root' | 'child' | 'after' | 'before' } = {},
@@ -548,10 +550,16 @@ export class MindmapEditor {
 
     const position = options.position ?? 'child'
     if ((position === 'after' || position === 'before') && !options.parentId?.trim()) {
-      throw new MindmapXmlError('block_not_found', `${position} 插入必须提供定位节点`)
+      throw new MindmapXmlError(
+        'block_not_found',
+        `Inserting at position "${position}" requires an anchor node`,
+      )
     }
     if (position !== 'root' && options.parentId && !ctx.nodeIds.has(options.parentId)) {
-      throw new MindmapXmlError('block_not_found', `定位节点「${options.parentId}」不存在`)
+      throw new MindmapXmlError(
+        'block_not_found',
+        `Anchor node "${options.parentId}" does not exist`,
+      )
     }
     // Pending assets become live only after parsing and structural validation succeed.
     for (const asset of pendingAssets) this.state.addAsset(asset)
@@ -567,27 +575,28 @@ export class MindmapEditor {
   }
 
   /**
-   * 整体替换节点（含子树，updateMindmapNode 前端执行）：
-   * 删除旧子树 → 用片段（同 id 根）重挂到旧父节点下，单条 batch 历史。
+   * Replace a whole node (including its subtree, the updateMindmapNode front end):
+   * delete the old subtree, then reattach the fragment (same root id) under the old
+   * parent as one batch history entry.
    */
   async replaceNodeFromXml(xml: string, pendingAssets: MindLaneAsset[] = []): Promise<void> {
     const parsed = await parseXmlFragment(xml)
     if (parsed.rootIds.length !== 1) {
       throw new MindmapXmlError(
         'tree_invalid',
-        'updateMindmapNode 必须提供恰好一个根 <node>（含子树）',
+        'updateMindmapNode must provide exactly one root <node> (including its subtree)',
       )
     }
     const nodeId = parsed.rootIds[0]!
     if (nodeId === 'root') {
-      throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可被替换')
+      throw new MindmapXmlError('tree_invalid', 'root is the mindmap anchor and cannot be replaced')
     }
     const nodes = this.state.nodes
     const edges = this.state.edges
     if (!nodes.some((n) => n.id === nodeId)) {
       throw new MindmapXmlError(
         'block_not_found',
-        `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
+        `Node "${nodeId}" does not exist; call readMindmap to locate it again`,
       )
     }
     const { ctx } = buildValidationContext(nodes, edges, [...this.state.assets, ...pendingAssets])
@@ -596,9 +605,10 @@ export class MindmapEditor {
     // Keep materialization in the same validated write operation as the replacement.
     for (const asset of pendingAssets) this.state.addAsset(asset)
 
-    // 保序：删除前记录旧 position 与旧父边下标。重挂时根节点恢复旧 position
-    // （否则 (0,0) 会按 y 重排漂移），父边插回原下标（否则 edges 顺序即 XML
-    // 序列化/保存顺序会把该节点排到最后）。
+    // Order preservation: record the old position and the old parent edge index before
+    // deleting. On reattach the root node restores its old position (otherwise (0,0)
+    // drifts in the y reorder) and the parent edge goes back at its old index (otherwise
+    // the edges order, which is the XML serialization/save order, puts the node last).
     const oldParentId = findParentId(edges, nodeId)
     const oldNode = nodes.find((n) => n.id === nodeId)
     const oldEdgeIndex = edges.findIndex((e) => e.target === nodeId)
@@ -649,8 +659,8 @@ export class MindmapEditor {
   }
 
   /**
-   * insertFromXml 的落图逻辑（布局/聚合/历史/回退链对齐）。
-   * 回退链：显式 parentId → 选中节点 → 根节点。
+   * The map-landing logic behind insertFromXml (layout/aggregation/history/fallback chain aligned).
+   * Fallback chain: explicit parentId -> selected node -> root node.
    */
   private insertParsedFragment(
     parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
@@ -666,13 +676,13 @@ export class MindmapEditor {
       nodes[0]?.id
 
     if (!targetParentId) {
-      console.warn('[insertParsedFragment] 无法确定父节点')
+      console.warn('[insertParsedFragment] cannot determine the parent node')
       return
     }
 
     const parentNode = nodes.find((n) => n.id === targetParentId)
     if (!parentNode) {
-      console.warn('[insertParsedFragment] 父节点不存在:', targetParentId)
+      console.warn('[insertParsedFragment] parent node does not exist:', targetParentId)
       return
     }
 
@@ -681,7 +691,8 @@ export class MindmapEditor {
   }
 
   /**
-   * 兄弟定位插入（after/before）：目标父 = 兄弟的父节点，垂直对齐到兄弟上/下方。
+   * Sibling-anchored insert (after/before): the target parent is the sibling's parent and the
+   * fragment is aligned vertically above/below the sibling.
    */
   private insertParsedFragmentSibling(
     parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
@@ -691,12 +702,12 @@ export class MindmapEditor {
     const edges = this.state.edges
     const sibling = nodes.find((n) => n.id === options.siblingId)
     if (!sibling) {
-      console.warn('[insertParsedFragmentSibling] 兄弟节点不存在:', options.siblingId)
+      console.warn('[insertParsedFragmentSibling] sibling node does not exist:', options.siblingId)
       return
     }
     const parentId = findParentId(edges, options.siblingId) ?? findRootNode(nodes, edges)?.id
     if (!parentId) {
-      console.warn('[insertParsedFragmentSibling] 无法确定兄弟的父节点')
+      console.warn('[insertParsedFragmentSibling] cannot determine the sibling parent node')
       return
     }
     const parentNode = nodes.find((n) => n.id === parentId)
@@ -712,7 +723,8 @@ export class MindmapEditor {
   }
 
   /**
-   * 共用的片段落图核心：dagre 初始布局 → 平移对齐锚点 → 批量命令 → 单条历史。
+   * Shared fragment-landing core: dagre initial layout -> translate to align the anchor ->
+   * batch commands -> one history entry.
    */
   private insertParsedFragmentAt(
     parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
@@ -728,13 +740,13 @@ export class MindmapEditor {
 
     const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {
-      console.warn('[insertParsedFragment] 无法找到子树根节点')
+      console.warn('[insertParsedFragment] cannot find the subtree root node')
       return
     }
 
     const firstSubRoot = laidOut.find((n) => n.id === subRootIds[0])
     if (!firstSubRoot) {
-      console.warn('[insertParsedFragment] 子树根节点不在布局结果中')
+      console.warn('[insertParsedFragment] the subtree root node is not in the layout result')
       return
     }
 
@@ -842,7 +854,7 @@ export class MindmapEditor {
       })
     }
 
-    // 避免与现有边重复；AI 返回的 mindmapData 通常是独立子图
+    // Avoid duplicates of existing edges; the mindmapData returned by the AI is usually a detached subgraph
     const existingEdgeIds = new Set(edges.map((e) => e.id))
     const existingNodeIds = new Set(nodes.map((n) => n.id))
     const filteredCommands = commands.filter((c) => {
@@ -854,7 +866,7 @@ export class MindmapEditor {
     this.runBatch(filteredCommands, true)
   }
 
-  // ─── ReactFlow 原生变化转发 ───
+  // ─── ReactFlow native change forwarding ───
 
   applyNativeNodeChanges(changes: NodeChange[]): void {
     const positionChanges: Array<{ id: string; position: { x: number; y: number } }> = []
@@ -921,7 +933,7 @@ export class MindmapEditor {
       nodes.map((n) => {
         if (n.id === nodeId)
           return { ...n, data: { ...n.data, editing: editing ? true : undefined } }
-        // 开始编辑新节点时清除其它节点的编辑标记
+        // Starting to edit a node clears the editing flag on the others
         return editing && n.data.editing ? { ...n, data: { ...n.data, editing: undefined } } : n
       }),
     )
@@ -944,7 +956,7 @@ export class MindmapEditor {
     this.state.setNodesTransient((nodes) =>
       nodes.map((n) => {
         if (ids.has(n.id)) return { ...n, selected }
-        // 选择新节点时取消其它节点的选中状态，保持当前单选行为
+        // Selecting a node clears the other nodes' selection, keeping the current single-select behavior
         return selected ? { ...n, selected: false } : n
       }),
     )
@@ -960,7 +972,7 @@ export class MindmapEditor {
     this.state.setNodesTransient((nodes) => nodes.map((n) => ({ ...n, selected: false })))
   }
 
-  // ─── 布局与生命周期 ───
+  // ─── Layout and lifecycle ───
 
   reflow(): void {
     const nodes = layoutReflow(this.state.nodes, this.state.edges, this.state.style.structureType)
@@ -992,7 +1004,7 @@ export class MindmapEditor {
     this.syncHistoryState()
   }
 
-  // ─── 内部工具 ───
+  // ─── Internal helpers ───
 
   private takeSnapshot(): MindmapSnapshot {
     return {
@@ -1062,7 +1074,8 @@ export class MindmapEditor {
           edges,
         }
       case 'addEdge':
-        // 可选 index：原位插入（保序场景，如 replaceNodeFromXml 重挂）；缺省追加到末尾。
+        // Optional index: insert in place (order-preserving cases such as the replaceNodeFromXml
+        // reattach); omitted, it appends at the end.
         if (command.index !== undefined && command.index >= 0 && command.index <= edges.length) {
           return {
             nodes,

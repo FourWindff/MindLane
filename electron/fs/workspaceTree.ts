@@ -17,11 +17,11 @@ export class WorkspaceTree {
     return guard(async () => {
       const resolvedPath = path.resolve(workspacePath)
       if (!fs.existsSync(resolvedPath)) {
-        throw new Error('工作目录不存在')
+        throw new Error('Workspace directory does not exist')
       }
       const stats = await fs.promises.stat(resolvedPath)
       if (!stats.isDirectory()) {
-        throw new Error('工作目录不存在')
+        throw new Error('Workspace directory does not exist')
       }
 
       const entries = await fs.promises.readdir(resolvedPath, { withFileTypes: true })
@@ -39,7 +39,7 @@ export class WorkspaceTree {
           }),
       )
 
-      return files.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+      return files.sort((a, b) => a.name.localeCompare(b.name, 'en-US'))
     })
   }
 
@@ -85,19 +85,19 @@ export class WorkspaceTree {
       }
     }
 
-    dirs.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-    files.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
+    dirs.sort((a, b) => a.name.localeCompare(b.name, 'en-US'))
+    files.sort((a, b) => a.name.localeCompare(b.name, 'en-US'))
     results.push(...dirs, ...files)
     return results
   }
 
   async createDirectory(parentPath: string, name: string): Promise<IpcResult<string>> {
     return guard(() => {
-      const trimmedName = assertEntryName(name, '仓库名称')
+      const trimmedName = assertEntryName(name, 'Workspace name')
 
       const targetPath = path.resolve(parentPath, trimmedName)
       if (fs.existsSync(targetPath)) {
-        throw new Error('目标目录已存在')
+        throw new Error('Target directory already exists')
       }
 
       return fs.promises.mkdir(targetPath, { recursive: false }).then(() => targetPath)
@@ -110,7 +110,7 @@ export class WorkspaceTree {
     workspacePath: string,
   ): Promise<IpcResult<string>> {
     return guard(() => {
-      const trimmedName = assertEntryName(name, '文件夹名称')
+      const trimmedName = assertEntryName(name, 'Folder name')
 
       const resolvedParent = path.resolve(parentPath)
       const targetPath = path.join(resolvedParent, trimmedName)
@@ -119,10 +119,10 @@ export class WorkspaceTree {
         !isWithinWorkspace(targetPath, workspacePath) &&
         path.resolve(targetPath) !== path.resolve(workspacePath)
       ) {
-        throw new Error('目标路径不在工作区内')
+        throw new Error('Target path is not inside the workspace')
       }
       if (fs.existsSync(targetPath)) {
-        throw new Error('文件夹已存在')
+        throw new Error('Folder already exists')
       }
 
       return fs.promises.mkdir(targetPath, { recursive: false }).then(() => targetPath)
@@ -133,10 +133,10 @@ export class WorkspaceTree {
     return guard(async () => {
       const resolved = path.resolve(targetPath)
       if (!isWithinWorkspace(resolved, workspacePath)) {
-        throw new Error('目标路径不在工作区内')
+        throw new Error('Target path is not inside the workspace')
       }
       if (!fs.existsSync(resolved)) {
-        throw new Error('目标不存在')
+        throw new Error('Target does not exist')
       }
       await shell.trashItem(resolved)
     })
@@ -148,14 +148,14 @@ export class WorkspaceTree {
     workspacePath: string,
   ): Promise<IpcResult<string>> {
     return guard(async () => {
-      const trimmedName = assertEntryName(newName, '名称')
+      const trimmedName = assertEntryName(newName, 'Name')
 
       const resolvedOld = path.resolve(oldPath)
       if (!isWithinWorkspace(resolvedOld, workspacePath)) {
-        throw new Error('目标路径不在工作区内')
+        throw new Error('Target path is not inside the workspace')
       }
       if (!fs.existsSync(resolvedOld)) {
-        throw new Error('目标不存在')
+        throw new Error('Target does not exist')
       }
 
       const parentDir = path.dirname(resolvedOld)
@@ -167,7 +167,7 @@ export class WorkspaceTree {
 
       const newPath = path.join(parentDir, finalName)
       if (fs.existsSync(newPath)) {
-        throw new Error('同名文件或文件夹已存在')
+        throw new Error('A file or folder with the same name already exists')
       }
 
       await fs.promises.rename(resolvedOld, newPath)
@@ -185,21 +185,21 @@ export class WorkspaceTree {
       const resolvedTarget = path.resolve(targetDirPath)
 
       if (!isWithinWorkspace(resolvedSource, workspacePath)) {
-        throw new Error('源路径不在工作区内')
+        throw new Error('Source path is not inside the workspace')
       }
 
       const targetIsWorkspaceRoot = resolvedTarget === path.resolve(workspacePath)
       if (!targetIsWorkspaceRoot && !isWithinWorkspace(resolvedTarget, workspacePath)) {
-        throw new Error('目标目录不在工作区内')
+        throw new Error('Target directory is not inside the workspace')
       }
 
       if (!fs.existsSync(resolvedSource)) {
-        throw new Error('源文件或文件夹不存在')
+        throw new Error('Source file or folder does not exist')
       }
 
       const targetStats = await fs.promises.stat(resolvedTarget)
       if (!targetStats.isDirectory()) {
-        throw new Error('目标路径不是一个文件夹')
+        throw new Error('Target path is not a folder')
       }
 
       const baseName = path.basename(resolvedSource)
@@ -209,7 +209,9 @@ export class WorkspaceTree {
         return newPath
       }
       if (fs.existsSync(newPath)) {
-        throw new Error('目标目录中已存在同名文件或文件夹')
+        throw new Error(
+          'A file or folder with the same name already exists in the target directory',
+        )
       }
 
       // Prevent moving a directory into itself
@@ -217,7 +219,7 @@ export class WorkspaceTree {
       if (sourceStats.isDirectory()) {
         const rel = path.relative(resolvedSource, resolvedTarget)
         if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
-          throw new Error('不能将文件夹移动到其自身内部')
+          throw new Error('Cannot move a folder into itself')
         }
       }
 

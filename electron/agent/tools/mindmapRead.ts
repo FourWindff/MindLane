@@ -5,21 +5,27 @@ import type { MindmapReadQuery } from '../../ipc.js'
 export type { MindmapReadQuery }
 
 /**
- * 导图快照提供者：按 fileUuid + 查询参数拉取实时导图 XML。
- * 由装配方注入（主进程经反向 IPC 向渲染层请求），工具自身不接触 IPC——
- * 与 readFile 工具的 getter 注入同一模式，保持工具无状态、可单测。
+ * Mindmap snapshot provider: pulls the live mindmap XML by fileUuid + query
+ * params. Injected by the assembler (the main process requests it from the
+ * renderer over reverse IPC); the tool itself never touches IPC - the same
+ * pattern as the readFile tool's getter injection, which keeps the tool
+ * stateless and unit-testable.
  */
 type MindmapSnapshotProvider = (fileUuid: string, query: MindmapReadQuery) => Promise<string>
 
 /**
- * 创建按需读导图工具（PRD 6.2，原 getMindmapContext 改造）。
- * 树查询：scope/subtreeId/type/textContains/maxDepth；数据源为编辑器活状态
- * （反向 IPC 实时拉取，不读磁盘）；输出只含 mindmap 节 XML（metadata/assets/
- * documents 不进 AI 上下文）。
+ * Create the on-demand mindmap read tool (PRD 6.2, reworked from
+ * getMindmapContext).
+ * Tree queries: scope/subtreeId/type/textContains/maxDepth; the data source is
+ * the editor's live state (pulled over reverse IPC, never read from disk); the
+ * output holds only the mindmap section XML (metadata/assets/documents never
+ * enter the AI context).
  *
- * 语义限制：写工具执行即落盘（渲染层活编辑器即时应用），成功（结果 ok: true）后
- * 本工具能看到刚写入的节点；失败时按错误码中的恢复策略处理（如 block_not_found
- * → 先调用 readMindmap 重新定位）。
+ * Semantics: write tools land as soon as they execute (the renderer's live
+ * editor applies immediately), so once a write succeeds (result ok: true) this
+ * tool can see the freshly written nodes; on failure, follow the recovery
+ * strategy named by the error code (e.g. block_not_found → call readMindmap
+ * first to re-locate).
  */
 export function createReadMindmapTool(provider: MindmapSnapshotProvider) {
   return tool(
@@ -42,25 +48,30 @@ export function createReadMindmapTool(provider: MindmapSnapshotProvider) {
     },
     {
       name: 'readMindmap',
-      description: `读取当前思维导图的实时结构（XML 片段，携带 id/type/content/collapsed），用于回答「我的导图里有什么」、定位要编辑的节点。数据源是编辑器活状态，不是磁盘文件。fileUuid 可从当前用户消息末尾的 <EDITOR_STATE> 块中 file_uuid 属性获得（形如 <EDITOR_STATE file_uuid="...">）。注意：写工具（insertXmlFragment / updateMindmapNode / moveMindmapNode / deleteMindmapNode）执行即落盘——成功（结果 ok: true）后本工具能看到刚写入的节点；失败（如 block_not_found）时按错误信息里的恢复策略处理，通常需先调用 readMindmap 重新定位。`,
+      description: `Read the live structure of the current mindmap (an XML fragment carrying id/type/content/collapsed), to answer "what is in my mindmap" and to locate the nodes to edit. The data source is the editor's live state, not a file on disk. fileUuid is available from the file_uuid attribute of the <EDITOR_STATE> block at the end of the current user message (shaped like <EDITOR_STATE file_uuid="...">). Note: write tools (insertXmlFragment / updateMindmapNode / moveMindmapNode / deleteMindmapNode) land as soon as they execute - once a write succeeds (result ok: true) this tool sees the freshly written nodes; on failure (e.g. block_not_found) follow the recovery strategy in the error message, which usually means calling readMindmap first to re-locate.`,
       schema: z.object({
         fileUuid: z
           .string()
           .optional()
           .describe(
-            '导图文件身份 fileUuid，可从用户消息末尾 <EDITOR_STATE file_uuid="..."> 中获得',
+            'Mindmap file identity, fileUuid, available from <EDITOR_STATE file_uuid="..."> at the end of the user message',
           ),
         scope: z
           .enum(['whole', 'subtree'])
           .optional()
-          .describe('查询范围：whole=整图（默认），subtree=以 subtreeId 为根的子树'),
+          .describe(
+            'Query scope: whole=the entire mindmap (default), subtree=the subtree rooted at subtreeId',
+          ),
         subtreeId: z
           .string()
           .optional()
-          .describe('scope=subtree 时的子树根节点 id（必须来自上下文）'),
-        type: z.string().optional().describe('按节点类型过滤（text/image/palace）'),
-        textContains: z.string().optional().describe('按节点内容包含过滤（纯文本匹配）'),
-        maxDepth: z.number().optional().describe('深度截断（0=只返回根）'),
+          .describe('Subtree root node id when scope=subtree (must come from the context)'),
+        type: z.string().optional().describe('Filter by node type (text/image/palace)'),
+        textContains: z
+          .string()
+          .optional()
+          .describe('Filter by node content containment (plain-text match)'),
+        maxDepth: z.number().optional().describe('Depth truncation (0=return the root only)'),
       }),
     },
   )

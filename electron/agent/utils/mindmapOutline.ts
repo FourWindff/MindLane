@@ -1,13 +1,18 @@
 /**
- * mindmap 子图模型协议（ADR-0016）：leaf 提取 / 归并 / 修复循环的模型方言。
+ * Mindmap subgraph model protocol (ADR-0016): the model dialect of the leaf
+ * extraction / merge / repair loop.
  *
- * 模型方言：`<node>标题</node>` 嵌套，元素文本承载 label（解析时 trim），
- * 零属性、无 id（id 由编辑器 mint）。解析走共享容错内核（parseXmlTolerant，
- * 与 insertXmlFragment 同源），转义复用共享 escapeXml；不在本模块再造平行工具。
+ * Model dialect: nested `<node>label</node>`, where the element text carries the
+ * label (trimmed at parse time), with zero attributes and no ids (ids are minted
+ * by the editor). Parsing goes through the shared tolerant kernel
+ * (parseXmlTolerant, the same one as insertXmlFragment), and escaping reuses the
+ * shared escapeXml; this module does not build a parallel toolkit.
  *
- * 校验规则：恰好单根（多根片段包合成根容错）、根 label 非空、根 ≥1 子节点、
- * 全节点 label 非空、任何属性视为协议违例拒绝。失败 reason 带共享
- * MindmapXmlError 错误码前缀（`[code] message`），供修复循环回传给模型。
+ * Validation rules: exactly one root (a multi-root fragment is wrapped in a
+ * synthetic root instead of failing), non-empty root label, root has >= 1 child,
+ * every node label non-empty, and any attribute is rejected as a protocol
+ * violation. Failures carry the shared MindmapXmlError code prefix in their
+ * reason (`[code] message`) so the repair loop can hand them back to the model.
  */
 
 import {
@@ -20,7 +25,7 @@ import {
   type DomElementLike,
 } from '../../../contracts/mindmapXml/index.js'
 
-/** 子图内部树类型（ADR-0016：降为 {label, children}，page_range/summary 已删）。 */
+/** Subgraph-internal tree type (ADR-0016: reduced to {label, children}; page_range/summary were removed). */
 export interface MindmapOutlineNode {
   label: string
   children: MindmapOutlineNode[]
@@ -33,7 +38,7 @@ function isNodeElement(el: DomElementLike): boolean {
   return el.tagName.toLowerCase() === NODE_TAG
 }
 
-/** 元素 label = 直接文本子节点拼接后 trim（嵌套 <node> 由 children 承载，不算 label）。 */
+/** Element label = trimmed concatenation of direct text children (nested <node> elements are carried by children, not counted as label). */
 function elementLabel(el: DomElementLike): string {
   let text = ''
   for (const child of Array.from(el.childNodes)) {
@@ -43,18 +48,19 @@ function elementLabel(el: DomElementLike): string {
 }
 
 /**
- * 解析并校验模型方言 XML 片段。
+ * Parse and validate a model-dialect XML fragment.
  *
- * - 空输出 → `[empty_xml] 模型返回为空`；
- * - 结构不完整/不可解析 → `[xml_parse_error]` 带位置的解析错误；
- * - 未找到任何 `<node>` → `[empty_xml]`；
- * - 全节点 label 非空（含根）；根 ≥1 子节点；零属性；
- * - 多根片段包一个合成根（fallbackTitle）容错，不整轮失败。
+ * - Empty output → `[empty_xml] Model returned an empty response`;
+ * - Incomplete / unparsable structure → `[xml_parse_error]` with a positioned parse error;
+ * - No `<node>` found → `[empty_xml]`;
+ * - Every node label non-empty (root included); root has >= 1 child; zero attributes;
+ * - A multi-root fragment is wrapped in a synthetic root (fallbackTitle) instead of
+ *   failing the whole round.
  */
 export function parseOutlineXml(text: string, fallbackTitle: string): MindmapOutlineParseResult {
   const trimmed = text.trim()
   if (!trimmed) {
-    return { ok: false, reason: '[empty_xml] 模型返回为空' }
+    return { ok: false, reason: '[empty_xml] Model returned an empty response' }
   }
 
   let doc: ReturnType<typeof parseXmlTolerant>
@@ -66,7 +72,7 @@ export function parseOutlineXml(text: string, fallbackTitle: string): MindmapOut
 
   const rootElements = topLevelElements(doc).filter(isNodeElement)
   if (rootElements.length === 0) {
-    return { ok: false, reason: '[empty_xml] XML 片段中未找到任何 <node> 元素' }
+    return { ok: false, reason: '[empty_xml] No <node> element found in the XML fragment' }
   }
 
   const trees: MindmapOutlineNode[] = []
@@ -80,29 +86,32 @@ export function parseOutlineXml(text: string, fallbackTitle: string): MindmapOut
     trees.length === 1 ? trees[0]! : { label: fallbackTitle, children: trees }
 
   if (!candidate.label.trim()) {
-    return { ok: false, reason: '[tree_invalid] XML 根节点 label 为空' }
+    return { ok: false, reason: '[tree_invalid] XML root node label is empty' }
   }
   if (candidate.children.length === 0) {
-    return { ok: false, reason: '[tree_invalid] XML 根节点必须包含至少一个子节点' }
+    return {
+      ok: false,
+      reason: '[tree_invalid] XML root node must contain at least one child node',
+    }
   }
 
   return { ok: true, tree: candidate }
 }
 
-/** 递归转换单个 <node> 元素；任一层级协议违例（属性/空 label）即整体失败。 */
+/** Recursively convert a single <node> element; a protocol violation at any level (attribute / empty label) fails the whole thing. */
 function nodeFromElement(
   el: DomElementLike,
 ): { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string } {
   for (const attr of Array.from(el.attributes)) {
     return {
       ok: false,
-      reason: `[tree_invalid] <node> 不允许携带属性「${attr.name}」（模型方言零属性）`,
+      reason: `[tree_invalid] <node> must not carry attribute "${attr.name}" (the model dialect allows zero attributes)`,
     }
   }
 
   const label = elementLabel(el)
   if (!label) {
-    return { ok: false, reason: '[tree_invalid] XML 包含空节点标签' }
+    return { ok: false, reason: '[tree_invalid] XML contains an empty node label' }
   }
 
   const children: MindmapOutlineNode[] = []
@@ -118,8 +127,9 @@ function nodeFromElement(
 }
 
 /**
- * 模型方言序列化（merge 输入面）：`<node>标题</node>` 嵌套，label 经共享转义。
- * 输出可被 parseOutlineXml 原样解析（多根则包合成根）。
+ * Model-dialect serialization (merge input side): nested `<node>label</node>`, labels escaped
+ * through the shared helper. The output can be parsed back by parseOutlineXml as-is
+ * (multiple roots get wrapped in a synthetic root).
  */
 export function serializeOutlineXml(node: MindmapOutlineNode, depth = 0): string {
   const indent = '  '.repeat(depth)
@@ -131,9 +141,10 @@ export function serializeOutlineXml(node: MindmapOutlineNode, depth = 0): string
 }
 
 /**
- * 存储方言 writer（子图输出面）：规范化重序列化校验后的树为
- * `<node type="text" content="…" />` 存储形状。模型原串不外泄，最终片段
- * 恒为 well-formed 存储方言（id 由编辑器插入时 mint）。
+ * Storage-dialect writer (subgraph output side): re-serializes a validated tree into the
+ * `<node type="text" content="…" />` storage shape. The model's raw string never leaks out;
+ * the final fragment is always well-formed storage dialect (ids are minted by the editor
+ * on insert).
  */
 export function serializeStorageFragment(node: MindmapOutlineNode, depth = 0): string {
   const indent = '  '.repeat(depth)

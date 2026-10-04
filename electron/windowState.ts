@@ -4,7 +4,7 @@ import path from 'node:path'
 
 const FILE_NAME = 'window-state.json'
 
-/** 首次打开或没有记录时的默认尺寸（避免过小） */
+/** Default size on first open or when there is no saved record (avoids a window that is too small) */
 const DEFAULT_WIDTH = 1280
 const DEFAULT_HEIGHT = 820
 export const MIN_WIDTH = 880
@@ -50,7 +50,7 @@ function parseSaved(raw: string): SavedBounds | null {
   }
 }
 
-/** 读取上次保存的窗口矩形；无效则返回 null */
+/** Read the last saved window rectangle; returns null when invalid */
 export function loadWindowBounds(): SavedBounds | null {
   try {
     const p = statePath()
@@ -61,7 +61,7 @@ export function loadWindowBounds(): SavedBounds | null {
   }
 }
 
-/** 结合主显示器工作区，得到 BrowserWindow 可用的 bounds */
+/** Combine with the primary display work area to get bounds usable by BrowserWindow */
 export function resolveWindowBounds(saved: SavedBounds | null): SavedBounds {
   const primary = screen.getPrimaryDisplay().workArea
   const w = saved

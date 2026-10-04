@@ -14,9 +14,9 @@ describe('simulatePalaceInsert', () => {
   it('replays the palace user operation in front of the selection, then lands the picture', async () => {
     const store = createMindmapStore()
     const editor = new MindmapEditor(store, new MindmapHistory())
-    editor.newFile('测试')
-    const first = editor.addChild('root', { label: '要点一' }).nodeId
-    const second = editor.addChild('root', { label: '要点二' }).nodeId
+    editor.newFile('Test')
+    const first = editor.addChild('root', { label: 'Point one' }).nodeId
+    const second = editor.addChild('root', { label: 'Point two' }).nodeId
     editor.setNodeSelected(first, true)
     editor.setNodeSelected(second, true)
     const firstPosition = store.getState().nodes.find((node) => node.id === first)!.position
@@ -27,8 +27,8 @@ describe('simulatePalaceInsert', () => {
       nodes: store.getState().nodes,
       edges: store.getState().edges,
       selectedNodes: [
-        { id: first, label: '要点一' },
-        { id: second, label: '要点二' },
+        { id: first, label: 'Point one' },
+        { id: second, label: 'Point two' },
       ],
       addAsset: store.getState().addAsset,
     })
@@ -36,7 +36,7 @@ describe('simulatePalaceInsert', () => {
     // Generating phase: placeholder palace where the selection was, selection hung off it.
     const palace = store.getState().nodes.find((node) => node.type === 'palace')!
     const placeholder = palace.data as PalaceNodeData
-    expect(placeholder.label).toBe('生成中…')
+    expect(placeholder.label).toBe('Generating…')
     expect(placeholder.generating).toBe(true)
     // Same column the selection sat in; the layout then re-spreads siblings vertically.
     expect(palace.position.x).toBe(firstPosition.x)
@@ -62,10 +62,10 @@ describe('simulatePalaceInsert', () => {
     const data = landed.data as PalaceNodeData
     expect(data.generating).toBeUndefined()
     expect(data.expanded).toBe(true)
-    expect(data.label).toBe('模拟记忆宫殿')
+    expect(data.label).toBe('Simulated memory palace')
     expect(data.stations.map((station) => station.order)).toEqual([1, 2])
     expect(data.stations.map((station) => station.linkedNodeId)).toEqual([first, second])
-    expect(data.stations.map((station) => station.content)).toEqual(['要点一', '要点二'])
+    expect(data.stations.map((station) => station.content)).toEqual(['Point one', 'Point two'])
     // Picture embedded as a real asset, exactly like a generated one.
     expect(data.assetId).toBeTruthy()
     expect(store.getState().assets.some((asset) => asset.id === data.assetId)).toBe(true)

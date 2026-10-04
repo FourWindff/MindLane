@@ -530,7 +530,7 @@ export const useAiStore = create<AiState>((set, get) => ({
     if ((!text && !doc) || busy) return false
     if (!selectChatReady(useSettingsStore.getState())) return false
 
-    const message = text || `请根据「${doc?.filename}」生成思维导图`
+    const message = text || `Generate a mindmap from "${doc?.filename}"`
 
     // Entry conversation: with no file open this send creates and opens its own
     // .mindlane first (create → open → wait for editor ready → start stream),
@@ -896,7 +896,7 @@ export function subscribeToChatStreamEvents(
 }
 
 function dispatchStreamEvent(event: ChatStreamEvent): void {
-  // Manual palace runs (CONTEXT.md「临时运行」) are not sessions: their events
+  // Manual palace runs (CONTEXT.md "ephemeral run") are not sessions: their events
   // never enter a FileChatState, so they are routed before the session route.
   if (handlePalaceRunEvent(event)) return
   if (!routeStreamEvent(event)) return

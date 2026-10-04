@@ -18,22 +18,22 @@ interface FileContextMenuProps {
 function getMenuItems(entry: WorkspaceTreeEntry | null): ContextMenuAction[] {
   if (!entry) {
     return [
-      { label: '新建文件', key: 'new-file' },
-      { label: '新建文件夹', key: 'new-folder' },
+      { label: 'New file', key: 'new-file' },
+      { label: 'New folder', key: 'new-folder' },
     ]
   }
   if (entry.type === 'directory') {
     return [
-      { label: '新建文件', key: 'new-file' },
-      { label: '新建子文件夹', key: 'new-folder' },
-      { label: '重命名', key: 'rename' },
-      { label: '删除', key: 'delete', danger: true },
+      { label: 'New file', key: 'new-file' },
+      { label: 'New subfolder', key: 'new-folder' },
+      { label: 'Rename', key: 'rename' },
+      { label: 'Delete', key: 'delete', danger: true },
     ]
   }
   return [
-    { label: '打开', key: 'open' },
-    { label: '重命名', key: 'rename' },
-    { label: '删除', key: 'delete', danger: true },
+    { label: 'Open', key: 'open' },
+    { label: 'Rename', key: 'rename' },
+    { label: 'Delete', key: 'delete', danger: true },
   ]
 }
 

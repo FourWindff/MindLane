@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { shortcutRegistry } from './ShortcutRegistry'
 
-/** 一行快捷键：`[id, combo, description, handler, options?]`；options 可覆盖表级 preventWhenTyping。 */
+/** One shortcut row: `[id, combo, description, handler, options?]`; options can override the table-level preventWhenTyping. */
 export type ShortcutRow = readonly [
   id: string,
   combo: string,
@@ -10,7 +10,7 @@ export type ShortcutRow = readonly [
   options?: { enabled?: () => boolean; preventWhenTyping?: boolean },
 ]
 
-/** 一张表的公共元信息 */
+/** Shared metadata for one table */
 type ShortcutDefaults = {
   group: string
   preventWhenTyping: boolean
@@ -19,8 +19,9 @@ type ShortcutDefaults = {
 type ShortcutRowsRef = { current: readonly ShortcutRow[] }
 
 /**
- * 注册一张快捷键表，返回一次性注销函数。
- * handler / enabled 每次派发都从 `rows.current` 读取，所以表可以每渲染重算。
+ * Register one shortcut table, returning a one-shot unregister function.
+ * handler / enabled are read from `rows.current` on every dispatch, so the table may be
+ * recomputed on each render.
  */
 export function registerShortcutRows(
   rows: ShortcutRowsRef,
@@ -44,8 +45,9 @@ export function registerShortcutRows(
 }
 
 /**
- * 注册一张快捷键表；仅在元信息（id / combo / description / preventWhenTyping / group）变化时
- * 重新挂载注册——否则每渲染都会 register + emit，帮助面板跟着白刷。
+ * Register one shortcut table; registrations are only remounted when the metadata (id / combo /
+ * description / preventWhenTyping / group) changes — otherwise every render would register +
+ * emit, making the help panel re-render for nothing.
  */
 export function useShortcuts(rows: readonly ShortcutRow[], defaults: ShortcutDefaults): void {
   const { group, preventWhenTyping } = defaults

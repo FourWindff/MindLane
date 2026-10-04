@@ -6,14 +6,14 @@ import {
   type MindmapOutlineNode,
 } from '../mindmapOutline.js'
 
-const VALID_TREE_XML = `<node>人工智能导论
-  <node>机器学习
-    <node>监督学习</node>
-    <node>无监督学习</node>
+const VALID_TREE_XML = `<node>Introduction to AI
+  <node>Machine Learning
+    <node>Supervised Learning</node>
+    <node>Unsupervised Learning</node>
   </node>
-  <node>深度学习
-    <node>神经网络</node>
-    <node>反向传播</node>
+  <node>Deep Learning
+    <node>Neural Networks</node>
+    <node>Backpropagation</node>
   </node>
 </node>`
 
@@ -23,11 +23,14 @@ describe('parseOutlineXml', () => {
 
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.tree.label).toBe('人工智能导论')
-      expect(result.tree.children.map((n) => n.label)).toEqual(['机器学习', '深度学习'])
+      expect(result.tree.label).toBe('Introduction to AI')
+      expect(result.tree.children.map((n) => n.label)).toEqual([
+        'Machine Learning',
+        'Deep Learning',
+      ])
       expect(result.tree.children[0]!.children.map((n) => n.label)).toEqual([
-        '监督学习',
-        '无监督学习',
+        'Supervised Learning',
+        'Unsupervised Learning',
       ])
     }
   })
@@ -61,15 +64,18 @@ describe('parseOutlineXml', () => {
   it('rejects empty output with empty_xml', () => {
     const result = parseOutlineXml('   \n ', 'Batch 1')
 
-    expect(result).toMatchObject({ ok: false, reason: '[empty_xml] 模型返回为空' })
+    expect(result).toMatchObject({
+      ok: false,
+      reason: '[empty_xml] Model returned an empty response',
+    })
   })
 
   it('rejects output without any <node> element with empty_xml', () => {
-    const result = parseOutlineXml('随便一段文本', 'Batch 1')
+    const result = parseOutlineXml('just some text', 'Batch 1')
 
     expect(result).toMatchObject({
       ok: false,
-      reason: '[empty_xml] XML 片段中未找到任何 <node> 元素',
+      reason: '[empty_xml] No <node> element found in the XML fragment',
     })
   })
 
@@ -78,7 +84,7 @@ describe('parseOutlineXml', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: '[xml_parse_error] XML 结构不完整：标签 <node> 未闭合',
+      reason: '[xml_parse_error] XML structure is incomplete: Tag <node> is not closed',
     })
   })
 
@@ -88,7 +94,7 @@ describe('parseOutlineXml', () => {
     expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.reason).toContain('[xml_parse_error]')
-      expect(result.reason).toContain('位置')
+      expect(result.reason).toContain('position')
     }
   })
 
@@ -97,7 +103,7 @@ describe('parseOutlineXml', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: '[tree_invalid] XML 根节点必须包含至少一个子节点',
+      reason: '[tree_invalid] XML root node must contain at least one child node',
     })
   })
 
@@ -105,8 +111,14 @@ describe('parseOutlineXml', () => {
     const emptyChild = parseOutlineXml('<node>Root\n  <node>   </node>\n</node>', 'Batch 1')
     const emptyRoot = parseOutlineXml('<node><node>Child</node></node>', 'Batch 1')
 
-    expect(emptyChild).toMatchObject({ ok: false, reason: '[tree_invalid] XML 包含空节点标签' })
-    expect(emptyRoot).toMatchObject({ ok: false, reason: '[tree_invalid] XML 包含空节点标签' })
+    expect(emptyChild).toMatchObject({
+      ok: false,
+      reason: '[tree_invalid] XML contains an empty node label',
+    })
+    expect(emptyRoot).toMatchObject({
+      ok: false,
+      reason: '[tree_invalid] XML contains an empty node label',
+    })
   })
 
   it('rejects attributes on <node> as protocol violations', () => {
@@ -115,11 +127,13 @@ describe('parseOutlineXml', () => {
 
     expect(typed).toMatchObject({
       ok: false,
-      reason: '[tree_invalid] <node> 不允许携带属性「type」（模型方言零属性）',
+      reason:
+        '[tree_invalid] <node> must not carry attribute "type" (the model dialect allows zero attributes)',
     })
     expect(withId).toMatchObject({
       ok: false,
-      reason: '[tree_invalid] <node> 不允许携带属性「id」（模型方言零属性）',
+      reason:
+        '[tree_invalid] <node> must not carry attribute "id" (the model dialect allows zero attributes)',
     })
   })
 
@@ -140,7 +154,10 @@ describe('parseOutlineXml', () => {
   it('rejects a wrapped root whose fallbackTitle is empty', () => {
     const result = parseOutlineXml('<node>A</node><node>B</node>', '  ')
 
-    expect(result).toMatchObject({ ok: false, reason: '[tree_invalid] XML 根节点 label 为空' })
+    expect(result).toMatchObject({
+      ok: false,
+      reason: '[tree_invalid] XML root node label is empty',
+    })
   })
 })
 

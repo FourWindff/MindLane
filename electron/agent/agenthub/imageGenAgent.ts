@@ -6,17 +6,17 @@ import { logger } from '../../shared/logger.js'
 import { formatAgentError } from '../utils.js'
 
 /**
- * ImageGenAgent - 图像生成智能体
+ * ImageGenAgent - image generation agent.
  *
- * 架构职责：
- * 1. 根据记忆宫殿设计生成图像提示词
- * 2. 调用 LLM Provider 的图像生成功能
- * 3. 返回生成的图像 URL
+ * Architectural responsibilities:
+ * 1. Generate an image prompt from the memory palace design.
+ * 2. Call the LLM provider's image generation capability.
+ * 3. Return the URL of the generated image.
  *
- * 无状态设计：
- * - 不涉及持久化记忆访问
- * - 所有输入通过 state.palace 传递
- * - 输出 imagePrompt 和 imageUrls
+ * Stateless design:
+ * - No persistent memory access.
+ * - All input travels through state.palace.
+ * - Outputs imagePrompt and imageUrls.
  */
 export class ImageGenAgent extends PalaceAgent {
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
@@ -25,7 +25,7 @@ export class ImageGenAgent extends PalaceAgent {
     try {
       let imagePrompt: string
 
-      // 如果有预设的场景描述和路线风格，直接构建提示词
+      // With a preset scene brief and route style, build the prompt directly
       if (state.palace.sceneBrief && state.palace.routeStyle) {
         imagePrompt = buildPalaceImagePrompt({
           theme: state.palace.theme,
@@ -34,7 +34,7 @@ export class ImageGenAgent extends PalaceAgent {
           stations: state.palace.stations,
         })
       } else {
-        // 否则使用 LLM 生成提示词
+        // Otherwise let the LLM generate the prompt
         const promptResponse = await this.provider.model.invoke(
           buildImagePromptGeneratorMessages(state.palace),
         )
@@ -60,7 +60,7 @@ export class ImageGenAgent extends PalaceAgent {
       }
     } catch (err) {
       const formatted = formatAgentError(err)
-      logger.withContext('ImageGenAgent').error('图像生成失败:', formatted)
+      logger.withContext('ImageGenAgent').error('Image generation failed:', formatted)
       return {
         imagePrompt: '',
         imageUrls: [],

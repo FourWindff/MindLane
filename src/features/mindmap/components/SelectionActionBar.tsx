@@ -15,16 +15,16 @@ export function SelectionActionBar({
 
   return (
     <div className="selection-bar">
-      <span className="selection-bar__count">已选 {selectedTopicCount} 个主题</span>
+      <span className="selection-bar__count">{selectedTopicCount} topics selected</span>
       <button
         type="button"
         className="btn selection-bar__btn"
         onClick={onGeneratePalace}
         disabled={!palaceEnabled}
-        title={palaceEnabled ? undefined : '需要配置对话模型'}
+        title={palaceEnabled ? undefined : 'Chat model configuration required'}
       >
         <Landmark size={14} strokeWidth={1.6} />
-        生成记忆宫殿
+        Generate memory palace
       </button>
     </div>
   )

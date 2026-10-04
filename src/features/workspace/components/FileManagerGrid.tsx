@@ -36,7 +36,7 @@ export function FileManagerGrid({
           const isFolder = entry.type === 'directory'
           const displayName = isFolder ? entry.name : displayFileName(entry.name)
           const childCount = isFolder ? (entry.children?.length ?? 0) : 0
-          const dateLabel = isFolder ? `${childCount} 项内容` : formatDate(entry.lastModifiedAt)
+          const dateLabel = isFolder ? `${childCount} items` : formatDate(entry.lastModifiedAt)
 
           return (
             <button
@@ -85,7 +85,7 @@ export function FileManagerGrid({
               </div>
 
               <div className="file-manager__card-hint">
-                {isFolder ? '打开' : '编辑'}
+                {isFolder ? 'Open' : 'Edit'}
                 <ArrowRight size={12} />
               </div>
 
@@ -105,8 +105,8 @@ export function FileManagerGrid({
               <Plus size={20} strokeWidth={2} />
             </div>
             <div className="file-manager__new-card-text">
-              <span className="file-manager__new-card-label">新建文件</span>
-              <span className="file-manager__new-card-sublabel">创建 .mindlane</span>
+              <span className="file-manager__new-card-label">New file</span>
+              <span className="file-manager__new-card-sublabel">Create .mindlane</span>
             </div>
           </button>
         )}
@@ -114,9 +114,9 @@ export function FileManagerGrid({
         {items.length === 0 && workspacePath && (
           <div className="file-manager__empty">
             <FolderOpen size={28} strokeWidth={1.5} className="file-manager__empty-icon" />
-            <p className="file-manager__empty-title">目录为空</p>
+            <p className="file-manager__empty-title">This folder is empty</p>
             <p className="file-manager__empty-desc">
-              右键点击空白处，或点击上方按钮来创建文件或文件夹
+              Right-click the empty area, or use the buttons above, to create a file or folder
             </p>
           </div>
         )}
@@ -124,9 +124,10 @@ export function FileManagerGrid({
         {!workspacePath && (
           <div className="file-manager__empty">
             <HardDrive size={28} strokeWidth={1.5} className="file-manager__empty-icon" />
-            <p className="file-manager__empty-title">未选择工作区</p>
+            <p className="file-manager__empty-title">No workspace selected</p>
             <p className="file-manager__empty-desc">
-              点击右上角切换仓库按钮，选择一个目录作为工作区
+              Use the switch repository button in the top right to pick a directory as your
+              workspace
             </p>
           </div>
         )}
@@ -142,10 +143,10 @@ function formatDate(isoString: string): string {
     const diffMs = now.getTime() - date.getTime()
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) return '今天'
-    if (diffDays === 1) return '昨天'
-    if (diffDays < 7) return `${diffDays} 天前`
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} 周前`
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
 
     return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
   } catch {

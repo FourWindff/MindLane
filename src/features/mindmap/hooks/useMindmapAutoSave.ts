@@ -61,7 +61,7 @@ export function useMindmapAutoSave({
       })
       return result?.ok ? result.data.previewUrl : null
     } catch (error) {
-      console.warn('[MindLane] 预览图生成失败：', error)
+      console.warn('[MindLane] Preview image generation failed:', error)
       return null
     }
   }, [])
@@ -75,7 +75,7 @@ export function useMindmapAutoSave({
         const data = store.toMindLaneFile()
         const result = await window.mindlane?.file.save({ filePath: null, data })
         if (!result?.ok) {
-          reportRendererError(`保存失败：${result?.error ?? '未知错误'}`)
+          reportRendererError(`Save failed: ${result?.error ?? 'Unknown error'}`)
           return
         }
 
@@ -87,8 +87,10 @@ export function useMindmapAutoSave({
           if (previewUrl) updateFilePreviewUrl(result.data.filePath, previewUrl)
         })
       } catch (error) {
-        console.error('[MindLane] 保存失败：', error)
-        reportRendererError(`保存失败：${error instanceof Error ? error.message : String(error)}`)
+        console.error('[MindLane] Save failed:', error)
+        reportRendererError(
+          `Save failed: ${error instanceof Error ? error.message : String(error)}`,
+        )
       }
       return
     }

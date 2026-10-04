@@ -137,7 +137,9 @@ export class SvgAgent extends PalaceAgent {
       )
       const artifact = extractSvgArtifact(messageContentToString(response.content))
       if (!artifact) {
-        logger.withContext('SvgAgent').warn('矢量画面输出无法解析，使用无图宫殿')
+        logger
+          .withContext('SvgAgent')
+          .warn('Vector artwork output could not be parsed; using a palace without an image')
         return {
           imageUrls: [],
           memoryRoute: fallbackRoute,
@@ -150,11 +152,15 @@ export class SvgAgent extends PalaceAgent {
         ? buildVectorRoute(stations, artifact.stations)
         : fallbackRoute
       if (!validCoordinates) {
-        logger.withContext('SvgAgent').warn('矢量站点坐标非法，使用标准布局')
+        logger
+          .withContext('SvgAgent')
+          .warn('Vector station coordinates are invalid; using the canonical layout')
       }
 
       if (!isValidSvgArtwork(artifact.svg, stations.length)) {
-        logger.withContext('SvgAgent').warn('矢量画面未通过闸门，使用无图宫殿')
+        logger
+          .withContext('SvgAgent')
+          .warn('Vector artwork failed the gate; using a palace without an image')
         return {
           imageUrls: [],
           memoryRoute,
@@ -170,7 +176,10 @@ export class SvgAgent extends PalaceAgent {
     } catch (error) {
       logger
         .withContext('SvgAgent')
-        .warn('矢量画面生成失败，使用无图宫殿:\n', formatAgentError(error))
+        .warn(
+          'Vector artwork generation failed; using a palace without an image:\n',
+          formatAgentError(error),
+        )
       return {
         imageUrls: [],
         memoryRoute: fallbackRoute,

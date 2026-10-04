@@ -21,16 +21,16 @@ export class ThumbnailManager {
     return path.join(this.thumbnailsDir, `${this.hashPath(filePath)}.png`)
   }
 
-  /** 保存缩略图，返回 DataURL */
+  /** Save a thumbnail and return its DataURL */
   async save(filePath: string, imageData: string): Promise<string> {
     const targetPath = this.thumbnailPath(filePath)
-    // imageData 格式: data:image/png;base64,iVBORw0KGgo...
+    // imageData format: data:image/png;base64,iVBORw0KGgo...
     const base64Data = imageData.replace(/^data:image\/png;base64,/, '')
     await fs.promises.writeFile(targetPath, base64Data, 'base64')
     return imageData
   }
 
-  /** 获取缩略图 DataURL，不存在返回 null */
+  /** Get the thumbnail DataURL, or null when it does not exist */
   async get(filePath: string): Promise<string | null> {
     const targetPath = this.thumbnailPath(filePath)
     try {
@@ -42,13 +42,13 @@ export class ThumbnailManager {
     }
   }
 
-  /** 删除指定文件的缩略图 */
+  /** Delete the thumbnail of the given file */
   async delete(filePath: string): Promise<void> {
     const targetPath = this.thumbnailPath(filePath)
     try {
       await fs.promises.unlink(targetPath)
     } catch {
-      // 静默忽略删除失败
+      // Silently ignore deletion failures
     }
   }
 }

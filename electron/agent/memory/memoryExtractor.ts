@@ -55,9 +55,10 @@ export class MemoryExtractor {
     const conversation = messages
       .filter((m) => m.getType() === 'human' || m.getType() === 'ai')
       .map((m) => {
-        const role = m.getType() === 'human' ? '用户' : 'AI'
-        // 提取证据剥离：去掉用户消息末尾的 `<EDITOR_STATE>` 块，
-        // 避免 XML 状态噪声混入记忆整理。复用共享契约的单一 strip 实现。
+        const role = m.getType() === 'human' ? 'User' : 'AI'
+        // Extraction-evidence stripping: drop the trailing `<EDITOR_STATE>` block
+        // from user messages so XML state noise does not pollute memory
+        // consolidation. Reuses the single strip implementation from the shared contract.
         const text = stripTurnState(messageContentToString(m.content))
         return `${role}: ${text}`
       })
@@ -65,36 +66,36 @@ export class MemoryExtractor {
 
     const editlog =
       editlogEntries.length > 0
-        ? editlogEntries.map((e) => `节点 ${e.nodeId}: 「${e.before}」→「${e.after}」`).join('\n')
-        : '（无）'
+        ? editlogEntries.map((e) => `Node ${e.nodeId}: "${e.before}" → "${e.after}"`).join('\n')
+        : '(none)'
 
-    const existingFacts = existing.trim() || '（暂无）'
+    const existingFacts = existing.trim() || '(none yet)'
 
-    return `你是用户的认知档案管理员。维护一份 MEMORY.md，记录用户的思维方式、偏好与习惯，一行一条事实。
+    return `You are the curator of the user's cognitive profile. You maintain a MEMORY.md that records the user's ways of thinking, preferences, and habits, one fact per line.
 
-任务：
-1. 阅读下方「现有 MEMORY.md」与「新证据」（对话内容 + 节点编辑历史）。
-2. 把新证据中沉淀出的新事实加入清单；对与现有事实明显重复或相近的条目进行合并去重。
-3. 输出整理后的完整事实清单（全量，不是增量）。
+Task:
+1. Read the "Existing MEMORY.md" and the "New evidence" below (conversation content + node edit history).
+2. Add the new facts distilled from the new evidence to the list; merge and deduplicate entries that clearly repeat or are close to existing facts.
+3. Output the full consolidated fact list (the entire list, not a delta).
 
-规则：
-- 一行一条事实，语句完整、简洁、独立成句（如「用户偏好将问题拆分为独立模块」）。
-- 不分类、不打标签、不写证据原文。
-- 除明显重复/相近需合并外，现有事实一律保留，不要遗漏或改写原意。
-- 只输出 JSON，不要其他文本：{"facts": ["事实一", "事实二", ...]}
-- 没有新事实且现有事实为空时返回 {"facts": []}
+Rules:
+- One fact per line; complete, concise, standalone sentences (e.g. "The user prefers splitting problems into independent modules").
+- No categories, no tags, no quoting the evidence verbatim.
+- Keep every existing fact as is, except for clear duplicates/close entries that need merging; do not omit them or reword their meaning.
+- Output JSON only, no other text: {"facts": ["fact one", "fact two", ...]}
+- When there are no new facts and the existing facts are empty, return {"facts": []}
 
-现有 MEMORY.md：
+Existing MEMORY.md:
 ${existingFacts}
 
-新证据：
-对话内容：
+New evidence:
+Conversation:
 ${conversation}
 
-节点编辑历史（用户手动修改节点文本的前后对比）：
+Node edit history (before/after of node text the user edited by hand):
 ${editlog}
 
-请输出整理后的完整事实清单。`
+Output the full consolidated fact list.`
   }
 
   private parseExtractionResponse(content: unknown): string[] {

@@ -17,17 +17,17 @@ function textLoader(content: string) {
 describe('prepareDocument DocumentRef assembly', () => {
   it('builds a text ref keyed on the content hash', async () => {
     const { documentRef } = await prepareDocument({
-      source: textSource('人工智能文档'),
-      loaders: textLoader('人工智能文档'),
+      source: textSource('AI document'),
+      loaders: textLoader('AI document'),
       budgetChars: 1000,
     })
 
     expect(documentRef).toMatchObject({
       type: 'text',
-      id: hashText('人工智能文档'),
-      sha256: hashText('人工智能文档'),
-      source: '人工智能文档',
-      filename: `用户输入_${hashText('人工智能文档').slice(0, 8)}.txt`,
+      id: hashText('AI document'),
+      sha256: hashText('AI document'),
+      source: 'AI document',
+      filename: `User input_${hashText('AI document').slice(0, 8)}.txt`,
     })
     expect(documentRef.importedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
   })
@@ -41,7 +41,7 @@ describe('prepareDocument DocumentRef assembly', () => {
 
     expect(documentRef.type).toBe('url')
     expect(documentRef.source).toBe('https://example.test/a')
-    expect(documentRef.filename).toContain('URL来源')
+    expect(documentRef.filename).toContain('URL source')
   })
 
   it('backfills the title from loaded metadata.title when absent', async () => {

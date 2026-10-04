@@ -1,24 +1,27 @@
 /**
- * 节点类型注册表（mindmapXml 侧）：typeId / name / description / XML 形状契约。
+ * Node type registry (mindmapXml side): typeId / name / description / XML shape contract.
  *
- * 每类型自带 writer（ReactFlow Node → XML 属性）与 reader（XML 属性 + 类型专属
- * 子元素 → NodeData）。新增节点类型 = 注册一条目（PRD 3.3），工具集与核心管线不动；
- * 描述经 `describeNodeTypes()` 注入系统提示稳定前缀（issue 06）。
+ * Each type carries its own writer (ReactFlow Node → XML attributes) and reader
+ * (XML attributes + type-specific child elements → NodeData). Adding a node type
+ * = registering one entry (PRD 3.3), with the tool set and core pipeline
+ * untouched; the descriptions are injected into the system prompt's stable prefix
+ * via `describeNodeTypes()` (issue 06).
  */
 
 import { escapeXml } from './escape.js'
 import type { MindLaneAsset, MindmapXmlNode, XmlElementLike } from './types.js'
 
 interface XmlNodeReaderContext {
-  /** XML 属性（键小写，实体已反转义） */
+  /** XML attributes (lowercase keys, entities already unescaped) */
   attrs: Record<string, string>
-  /** 类型专属子元素（不含 <node> 树子节点，text 已去空白） */
+  /** Type-specific child elements (excluding <node> tree children; text is trimmed) */
   elements: XmlElementLike[]
 }
 
 /**
- * 大小写不敏感地读取属性：`elementView` 为每个属性同时存原名与小写键，
- * 所以「精确 + 小写」两次查表就够（XML 区分大小写，HTML parser 会小写化）。
+ * Read an attribute case-insensitively: `elementView` stores both the original
+ * name and a lowercase key for every attribute, so an "exact + lowercase"
+ * double lookup is enough (XML is case-sensitive; the HTML parser lowercases).
  */
 export function attrOf(attrs: Record<string, string>, name: string): string | undefined {
   return attrs[name] ?? attrs[name.toLowerCase()]
@@ -26,21 +29,21 @@ export function attrOf(attrs: Record<string, string>, name: string): string | un
 
 interface XmlNodeTypeDescriptor {
   typeId: string
-  /** 展示名（注入系统提示） */
+  /** Display name (injected into the system prompt) */
   name: string
-  /** 语义与用途描述（注入系统提示） */
+  /** Semantics and purpose description (injected into the system prompt) */
   description: string
-  /** Node → XML 属性。不含 id/type/collapsed（通用层处理）。 */
+  /** Node → XML attributes. Excludes id/type/collapsed (handled by the generic layer). */
   write(node: MindmapXmlNode): Record<string, string | undefined>
-  /** 类型专属子元素 XML（如 palace 的 <station>）。空字符串 = 无。 */
+  /** Type-specific child element XML (e.g. palace's <station>). Empty string = none. */
   writeChildren?(node: MindmapXmlNode): string
-  /** XML 属性 + 专属子元素 → ReactFlow NodeData。 */
+  /** XML attributes + specific child elements → ReactFlow NodeData. */
   read(ctx: XmlNodeReaderContext): Record<string, unknown>
 }
 
 const descriptors = new Map<string, XmlNodeTypeDescriptor>()
 
-/** 注册（或覆盖）一个节点类型：内置三个类型，新增类型 = 在此加一条。 */
+/** Register (or override) a node type: three built-ins; a new type = one more entry here. */
 function register(descriptor: XmlNodeTypeDescriptor): void {
   descriptors.set(descriptor.typeId, descriptor)
 }
@@ -50,12 +53,12 @@ export const xmlNodeTypeRegistry = {
     return descriptors.get(typeId)
   },
 
-  /** 全部类型的 name/description/形状契约，注入系统提示稳定前缀。 */
+  /** name/description/shape contract of all types, injected into the system prompt's stable prefix. */
   describeAll(): string {
     return [...descriptors.values()]
       .map(
         (d) =>
-          `- ${d.typeId}（${d.name}）：${d.description}；XML 形状见类型校验规则（type 属性必填，未知类型报 invalid_type）`,
+          `- ${d.typeId} (${d.name}): ${d.description}; for the XML shape see the type validation rules (the type attribute is required; unknown types report invalid_type)`,
       )
       .join('\n')
   },
@@ -65,9 +68,9 @@ export const xmlNodeTypeRegistry = {
 
 register({
   typeId: 'text',
-  name: '文本节点',
+  name: 'Text node',
   description:
-    '导图的基本节点，content 属性为纯文本内容（唯一内容通道）；示例 <node type="text" content="标题" />',
+    'Basic mindmap node; the content attribute holds plain-text content (the only content channel); example <node type="text" content="Title" />',
   write(node) {
     const data = node.data as Record<string, unknown>
     return {
@@ -93,9 +96,9 @@ register({
 
 register({
   typeId: 'image',
-  name: '图片节点',
+  name: 'Image node',
   description:
-    '展示内嵌图片的节点，asset 属性引用 <assets> 节中的资源 id（必须来自上下文，禁用外部 URL）；可选 alt/width/height；示例 <node type="image" asset="a1" alt="架构图" width="400" />',
+    'Node showing an embedded image; the asset attribute references a resource id in the <assets> section (must come from context; external URLs are disabled); optional alt/width/height; example <node type="image" asset="a1" alt="Architecture diagram" width="400" />',
   write(node) {
     const data = node.data as Record<string, unknown>
     return {
@@ -121,9 +124,9 @@ register({
 
 register({
   typeId: 'palace',
-  name: '记忆宫殿节点',
+  name: 'Memory palace node',
   description:
-    '记忆宫殿：content 为宫殿名，asset 引用宫殿图片资源；站点以 <station order="1" x="0" y="0" linkedNodeId="n1" anchorVisual="…" association="…">记忆内容</station> 子元素表达；示例 <node type="palace" content="宫殿名" asset="a1"><station order="1" linkedNodeId="n1">内容</station></node>',
+    'Memory palace: content is the palace name and asset references the palace image; stations are expressed as <station order="1" x="0" y="0" linkedNodeId="n1" anchorVisual="…" association="…">memory content</station> child elements; example <node type="palace" content="Palace name" asset="a1"><station order="1" linkedNodeId="n1">content</station></node>',
   write(node) {
     const data = node.data as Record<string, unknown>
     const attrs: Record<string, string | undefined> = {
@@ -132,7 +135,8 @@ register({
     if (typeof data.assetId === 'string' && data.assetId) {
       attrs.asset = data.assetId
     } else if (typeof data.imageUrl === 'string' && data.imageUrl) {
-      // 迁移期例外（PRD 7）：下载失败的旧 URL 图片保留引用，仅迁移期允许。
+      // Migration-period exception (PRD 7): old URL images whose download failed keep
+      // their reference; allowed only during migration.
       attrs.imageUrl = data.imageUrl
     }
     if (Array.isArray(data.sourceNodeIds) && data.sourceNodeIds.length > 0) {
@@ -195,6 +199,6 @@ register({
   },
 })
 
-// ─── 通用工具 ────────────────────────────────────────────────────────────────
+// ─── Shared utilities ────────────────────────────────────────────────────────────────
 
 export type { MindLaneAsset }

@@ -4,7 +4,7 @@ import { displayFileName } from '@/shared/lib/displayFileName'
 import type { DocumentRef } from '@contracts/fileFormat'
 
 /**
- * Entry conversation (CONTEXT.md「入口对话」): with no file open the send box is
+ * Entry conversation (CONTEXT.md "entry conversation"): with no file open the send box is
  * still usable — sending creates and opens its own `.mindlane` file first, and
  * that turn becomes the file's first round.
  *
@@ -13,11 +13,11 @@ import type { DocumentRef } from '@contracts/fileFormat'
  * in the first turn would have no editor to accept it.
  */
 
-/** Cap for the file name derived from user input (Chinese titles are 3 bytes per char). */
+/** Cap for the file name derived from user input (CJK titles take 3 bytes per char). */
 const MAX_TITLE_LENGTH = 60
 /** Illegal in file names on at least one supported platform. */
 const ILLEGAL_NAME_CHARS = /[\\/:*?"<>|]/g
-/** Trailing extension of a plausible document name (`报告.pdf` → `报告`, `example.com/a` stays). */
+/** Trailing extension of a plausible document name (`report.pdf` → `report`, `example.com/a` stays). */
 const TRAILING_EXTENSION = /\.[A-Za-z0-9]{1,5}$/
 
 /**
@@ -31,7 +31,7 @@ export function entryFileTitle(text: string, document: DocumentRef | null): stri
     .replace(ILLEGAL_NAME_CHARS, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-  return cleaned.slice(0, MAX_TITLE_LENGTH) || '未命名'
+  return cleaned.slice(0, MAX_TITLE_LENGTH) || 'Untitled'
 }
 
 interface EntryFile {

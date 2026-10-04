@@ -24,7 +24,7 @@ function makeMemoryIO(): { io: FileSinkIO; files: Map<string, string> } {
   return { io, files }
 }
 
-describe('logger 级别路由', () => {
+describe('logger level routing', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -35,7 +35,7 @@ describe('logger 级别路由', () => {
     vi.restoreAllMocks()
   })
 
-  it('debug 只进文件 sink，不进 console', () => {
+  it('debug goes only to the file sink, not to console', () => {
     const { sink, lines } = makeCapturingSink()
     logger.setSink(sink)
 
@@ -48,7 +48,7 @@ describe('logger 级别路由', () => {
     expect(console.error).not.toHaveBeenCalled()
   })
 
-  it('info 同时进 console 和文件 sink', () => {
+  it('info goes to both console and the file sink', () => {
     const { sink, lines } = makeCapturingSink()
     logger.setSink(sink)
 
@@ -60,7 +60,7 @@ describe('logger 级别路由', () => {
     expect(vi.mocked(console.log).mock.calls[0][0]).toContain('info message')
   })
 
-  it('error 走 console.error 并进文件 sink', () => {
+  it('error goes through console.error and to the file sink', () => {
     const { sink, lines } = makeCapturingSink()
     logger.setSink(sink)
 
@@ -70,7 +70,7 @@ describe('logger 级别路由', () => {
     expect(console.error).toHaveBeenCalledTimes(1)
   })
 
-  it('文件行不含 ANSI 颜色码', () => {
+  it('file lines contain no ANSI color codes', () => {
     const { sink, lines } = makeCapturingSink()
     logger.setSink(sink)
 
@@ -81,12 +81,12 @@ describe('logger 级别路由', () => {
   })
 })
 
-describe('logger 脱敏', () => {
+describe('logger redaction', () => {
   afterEach(() => {
     logger.setSink(null)
   })
 
-  it('已配置的 API key 被字面量替换', () => {
+  it('a configured API key is replaced literally', () => {
     const { io, files } = makeMemoryIO()
     const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
     sink.setSecrets(['sk-live-abcdef123456'])
@@ -99,7 +99,7 @@ describe('logger 脱敏', () => {
     expect(content).toContain('[REDACTED]')
   })
 
-  it('Bearer 通用凭据模式被正则替换', () => {
+  it('the generic Bearer credential pattern is replaced by regex', () => {
     const { io, files } = makeMemoryIO()
     const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
     logger.setSink(sink)
@@ -111,7 +111,7 @@ describe('logger 脱敏', () => {
     expect(content).toContain('[REDACTED]')
   })
 
-  it('短于 8 字符的 secret 不参与替换', () => {
+  it('secrets shorter than 8 characters are not replaced', () => {
     const { io, files } = makeMemoryIO()
     const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
     sink.setSecrets(['abc'])
@@ -123,8 +123,8 @@ describe('logger 脱敏', () => {
   })
 })
 
-describe('RotatingFileSink 轮转', () => {
-  it('超大小触发轮转，只保留 3 代', () => {
+describe('RotatingFileSink rotation', () => {
+  it('exceeding the size triggers rotation and keeps only 3 generations', () => {
     const { io, files } = makeMemoryIO()
     const sink = new RotatingFileSink({
       filePath: '/logs/mindlane.log',
@@ -147,12 +147,12 @@ describe('RotatingFileSink 轮转', () => {
   })
 })
 
-describe('logger withContext 前缀', () => {
+describe('logger withContext prefix', () => {
   afterEach(() => {
     logger.setSink(null)
   })
 
-  it('上下文以冒号链式拼接并包在方括号内', () => {
+  it('context is chained with colons and wrapped in brackets', () => {
     const { sink, lines } = makeCapturingSink()
     logger.setSink(sink)
 

@@ -6,7 +6,7 @@ import type {
   WorkspaceTreeEntry,
 } from '../ipc.js'
 
-// 边界 DTO 与结果信封由契约模块单一声明，主进程 fs 域经 re-export 复用同一类型。
+// Boundary DTOs and the result envelope are declared once in the contracts module; the main-process fs domain re-exports and reuses the same types.
 export type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry }
 
 export interface AppSettings {
@@ -19,21 +19,21 @@ export interface AppSettings {
   editor: {
     autoSaveIntervalMs: number
   }
-  /** 最近 workspace 路径列表的上限（命名沿用历史字段，作用于 workspace 而非文件）。 */
+  /** Upper bound on the recent workspace path list (name kept for history; it applies to workspaces, not files). */
   recentFilesMax: number
   lastWorkspacePath: string | null
   recentWorkspacePaths: string[]
   restoreLastWorkspaceOnLaunch: boolean
   workspacePathsByUuid: Record<string, string>
   filePathsByUuid: Record<string, string>
-  /** MCP 用户态：每个 server 的连接状态与非敏感展示信息（不含任何凭据） */
+  /** MCP user state: connection state and non-sensitive display info per server (no credentials) */
   mcpServers: Record<string, McpServerUserState>
 }
 
 export interface WorkspaceState {
   workspaceUuid: string
   activeSessionIds: Record<string, string>
-  /** 会话文件索引：fileUuid -> filePath 的持久映射，跨启动渲染胶囊条用。 */
+  /** Session file index: a persistent fileUuid -> filePath map, used by the renderer's capsule bar across launches. */
   fileUuidPaths: Record<string, string>
   lastOpenedFilePath: string | null
 }

@@ -24,13 +24,13 @@ describe('SessionMessageStore', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('空会话返回空消息列表', async () =>
+  it('returns an empty message list for an empty session', async () =>
     inWs(async () => {
       const messages = await store.loadMessages('new-session')
       expect(messages).toEqual([])
     }))
 
-  it('追加消息后元数据正确', async () =>
+  it('metadata is correct after appending messages', async () =>
     inWs(async () => {
       await store.saveMessage('s1', new HumanMessage('hello'), 'file-uuid-1')
       await store.saveMessage('s1', new AIMessage('hi'), fileUuid)
@@ -56,7 +56,7 @@ describe('SessionMessageStore', () => {
       expect(messages).toHaveLength(2)
     }))
 
-  it('跳过已经由并发写入持久化的批次开头消息', async () =>
+  it('skips batch-leading messages already persisted by a concurrent write', async () =>
     inWs(async () => {
       await store.saveMessage('race', new HumanMessage('hello'), fileUuid)
       await store.saveMessages('race', [new HumanMessage('hello'), new AIMessage('hi')], fileUuid)
@@ -68,7 +68,7 @@ describe('SessionMessageStore', () => {
       ])
     }))
 
-  it('列出会话按 updatedAt 降序', async () =>
+  it('lists sessions by updatedAt descending', async () =>
     inWs(async () => {
       await store.saveMessage('a', new HumanMessage('a'), fileUuid)
       await new Promise((r) => setTimeout(r, 20))
@@ -78,7 +78,7 @@ describe('SessionMessageStore', () => {
       expect(sessions.map((s) => s.id)).toEqual(['b', 'a'])
     }))
 
-  it('不同工作区互相隔离', async () => {
+  it('different workspaces stay isolated', async () => {
     await inWs(() => store.saveMessage('s1', new HumanMessage('ws1 msg'), fileUuid))
     await inWs(() => store.saveMessage('s2', new HumanMessage('ws2 msg'), fileUuid), 'ws2')
 
@@ -104,12 +104,12 @@ describe('SessionMessageStore', () => {
     expect(fromWs2[0]?.content).toBe('from ws2')
   })
 
-  it('缺少工作区上下文时显式报错，不再静默回退', async () => {
-    expect(() => store.resolveSessionPath('s1')).toThrow(/缺少工作区上下文/)
-    await expect(store.loadMessages('s1')).rejects.toThrow(/缺少工作区上下文/)
+  it('fails loudly without a workspace context instead of silently falling back', async () => {
+    expect(() => store.resolveSessionPath('s1')).toThrow(/missing workspace context/)
+    await expect(store.loadMessages('s1')).rejects.toThrow(/missing workspace context/)
   })
 
-  it('保存并读取含 lastConsolidated 与 _lastSummary 的元数据', async () =>
+  it('saves and reads metadata containing lastConsolidated and _lastSummary', async () =>
     inWs(async () => {
       const meta: SessionMeta = {
         id: 'meta-extra',
@@ -119,7 +119,7 @@ describe('SessionMessageStore', () => {
         updatedAt: new Date().toISOString(),
         messageCount: 0,
         lastConsolidated: 5,
-        _lastSummary: '用户讨论了技术栈选择',
+        _lastSummary: 'the user discussed the tech stack choice',
       }
       await store.createSession('meta-extra', meta)
 
@@ -127,17 +127,17 @@ describe('SessionMessageStore', () => {
       expect(read).toMatchObject({
         id: 'meta-extra',
         lastConsolidated: 5,
-        _lastSummary: '用户讨论了技术栈选择',
+        _lastSummary: 'the user discussed the tech stack choice',
       })
 
       const sessions = await store.listSessions('ws1')
       expect(sessions[0]).toMatchObject({
         lastConsolidated: 5,
-        _lastSummary: '用户讨论了技术栈选择',
+        _lastSummary: 'the user discussed the tech stack choice',
       })
     }))
 
-  it('删除会话后无法读取', async () =>
+  it('cannot read a session after deleting it', async () =>
     inWs(async () => {
       await store.saveMessage('del', new HumanMessage('x'), fileUuid)
       await store.deleteSession('del')
@@ -145,7 +145,7 @@ describe('SessionMessageStore', () => {
       expect(await store.listSessions('ws1')).toEqual([])
     }))
 
-  it('跳过损坏行并返回有效消息', async () =>
+  it('skips corrupt lines and returns valid messages', async () =>
     inWs(async () => {
       const sessionPath = path.join(tmpDir, 'ws1', 'corrupt.jsonl')
       fs.mkdirSync(path.dirname(sessionPath), { recursive: true })
@@ -169,12 +169,12 @@ describe('SessionMessageStore', () => {
       expect(messages[0].getType()).toBe('human')
     }))
 
-  it('保存含 tool_calls 的助手消息后可正确加载', async () =>
+  it('loads an assistant message with tool_calls correctly after saving', async () =>
     inWs(async () => {
       await store.saveMessage(
         'tool',
         new AIMessage({
-          content: '使用工具',
+          content: 'using a tool',
           tool_calls: [{ id: 'call-1', name: 'search', args: { q: 'x' } }],
         }),
         fileUuid,

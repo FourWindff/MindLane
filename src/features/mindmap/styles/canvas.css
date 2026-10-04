@@ -15,8 +15,8 @@
 }
 
 .mindmap-canvas-wrap .react-flow {
-  /* --canvas-bg / --canvas-dot 由 data-color-scheme 选择器注入，
-     回退到全局 --ml-bg 保证默认外观不变 */
+  /* --canvas-bg / --canvas-dot are injected by the data-color-scheme selectors; falling back to
+     the global --ml-bg keeps the default look unchanged */
   background: var(--canvas-bg, var(--ml-bg));
   background-image: radial-gradient(
     circle,
@@ -57,7 +57,7 @@
   cursor: default;
 }
 
-/* 折叠节点的整棵子树在渲染层隐藏（数据完整保留） */
+/* A collapsed node hides its whole subtree in the render layer (all data is kept) */
 .mindmap-node--hidden {
   visibility: hidden;
   pointer-events: none;

@@ -102,7 +102,7 @@ describe('MindmapInputResolver', () => {
     const documentRef: DocumentRef = {
       id: 'doc-3',
       type: 'text',
-      source: '这是附加文本内容。',
+      source: 'This is attached text content.',
       filename: 'notes.txt',
       importedAt: new Date().toISOString(),
       sha256: 'text-hash-1',
@@ -114,7 +114,7 @@ describe('MindmapInputResolver', () => {
     )
 
     expect(result).toEqual({
-      source: { type: 'text', content: '这是附加文本内容。' },
+      source: { type: 'text', content: 'This is attached text content.' },
       title: 'notes.txt',
     })
   })
@@ -194,8 +194,8 @@ describe('MindmapInputResolver', () => {
 
     const result = new MindmapInputResolver().resolve(
       createState({
-        mindmapInputSource: { type: 'docx', path: '/data/简历.docx' },
-        mindmapInputTitle: '简历.docx',
+        mindmapInputSource: { type: 'docx', path: '/data/resume.docx' },
+        mindmapInputTitle: 'resume.docx',
         context: { fileUuid: 'file-1', attachedDocument: currentDocument },
       }),
     )

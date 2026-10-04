@@ -8,11 +8,11 @@ describe('store.viewport', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('测试')
+    store.getState().newFile('Test')
   })
 
   it('should restore viewport from loaded file', () => {
-    const file = createEmptyFile('测试文件')
+    const file = createEmptyFile('Test file')
     file.mindmap.viewport = { x: 100, y: 200, zoom: 0.8 }
 
     store.getState().loadFile('/test/path.mindlane', file, null)
@@ -31,7 +31,7 @@ describe('store.viewport', () => {
   it('should reset viewport on newFile', () => {
     store.getState().setViewport({ x: 999, y: 999, zoom: 2 })
 
-    store.getState().newFile('新文件')
+    store.getState().newFile('New file')
 
     expect(store.getState().viewport).toEqual(DEFAULT_VIEWPORT)
   })
@@ -50,11 +50,11 @@ describe('store.style', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('测试')
+    store.getState().newFile('Test')
   })
 
   it('should restore per-file style from loaded file', () => {
-    const file = createEmptyFile('测试文件')
+    const file = createEmptyFile('Test file')
     file.mindmap.style = {
       structureType: 'mindmap',
       visualVariant: 'minimal',
@@ -71,7 +71,7 @@ describe('store.style', () => {
   })
 
   it('should fall back to default style for files without a style field', () => {
-    const file = createEmptyFile('旧文件')
+    const file = createEmptyFile('Legacy file')
 
     store.getState().loadFile('/test/legacy.mindlane', file, null)
 
@@ -104,7 +104,7 @@ describe('store.style', () => {
   it('should reset style on newFile', () => {
     store.getState().setStyle({ structureType: 'mindmap', colorScheme: 'night' })
 
-    store.getState().newFile('新文件')
+    store.getState().newFile('New file')
 
     expect(store.getState().style).toEqual({
       structureType: 'logic',
@@ -158,7 +158,7 @@ describe('store.documentRefs', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('测试')
+    store.getState().newFile('Test')
   })
 
   it('should persist document refs in toMindLaneFile', () => {
@@ -183,7 +183,7 @@ describe('store.documentRefs', () => {
   })
 
   it('should migrate legacy document refs with metadata on loadFile', () => {
-    const file = createEmptyFile('测试文件')
+    const file = createEmptyFile('Test file')
     file.documents = [
       {
         id: 'legacy-doc',

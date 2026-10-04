@@ -12,7 +12,7 @@ describe('normalizePalaceImageUrls', () => {
     global.fetch = originalFetch
   })
 
-  it('保留已有的 data URL', async () => {
+  it('keeps an existing data URL', async () => {
     const state = {
       palaceError: '',
       imageUrls: ['data:image/png;base64,abc123'],
@@ -23,7 +23,7 @@ describe('normalizePalaceImageUrls', () => {
     expect(result.imageUrls).toEqual(['data:image/png;base64,abc123'])
   })
 
-  it('将远程 URL 转换为 data URL', async () => {
+  it('converts a remote URL into a data URL', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       headers: new Headers({ 'content-type': 'image/png' }),
@@ -40,7 +40,7 @@ describe('normalizePalaceImageUrls', () => {
     expect(result.imageUrls[0]).toMatch(/^data:image\/png;base64,/)
   })
 
-  it('转换失败时保留原 URL 作为降级', async () => {
+  it('keeps the original URL as a fallback when conversion fails', async () => {
     global.fetch = vi.fn().mockRejectedValue(new Error('network error'))
 
     const state = {
@@ -53,9 +53,9 @@ describe('normalizePalaceImageUrls', () => {
     expect(result.imageUrls).toEqual(['https://example.com/image.png'])
   })
 
-  it('state 有错误时返回空更新', async () => {
+  it('returns the original imageUrls when state has an error', async () => {
     const state = {
-      palaceError: '子图执行失败',
+      palaceError: 'subgraph failed',
       imageUrls: ['https://example.com/image.png'],
     }
 
@@ -64,7 +64,7 @@ describe('normalizePalaceImageUrls', () => {
     expect(result.imageUrls).toEqual(['https://example.com/image.png'])
   })
 
-  it('空 imageUrls 返回空数组', async () => {
+  it('returns an empty array for empty imageUrls', async () => {
     const state = {
       palaceError: '',
       imageUrls: [],

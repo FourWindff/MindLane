@@ -17,7 +17,7 @@ export function resolveDocumentRef(doc: DocumentRef, userDataPath: string): Reso
       return { ok: true, displayText: doc.source, target: doc.source, external: true }
     case 'text': {
       if (!doc.textPath) {
-        return { ok: false, displayText: doc.source, error: '缓存文件路径缺失' }
+        return { ok: false, displayText: doc.source, error: 'Cached file path is missing' }
       }
       return {
         ok: true,

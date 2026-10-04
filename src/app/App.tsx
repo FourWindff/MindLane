@@ -85,19 +85,20 @@ function WorkspaceEmptyState() {
   return (
     <div className="workspace-empty">
       <div className="workspace-empty__card">
-        <div className="workspace-empty__label">工作区已就绪</div>
-        <h2 className="workspace-empty__title">选择一个 .mindlane 文件开始编辑</h2>
+        <div className="workspace-empty__label">Workspace ready</div>
+        <h2 className="workspace-empty__title">Select a .mindlane file to start editing</h2>
         <p className="workspace-empty__subtitle">
-          左侧显示当前工作目录中的文档。你也可以先在空白画布上编辑，再通过"另存为"保存到当前仓库。
+          The left side lists documents in the current working directory. You can also edit on a
+          blank canvas first, then save it into the current repository with "Save As".
         </p>
         <div className="workspace-empty__actions">
           <button
             type="button"
             className="workspace-empty__action workspace-empty__action--primary"
-            onClick={() => void createMindLaneFile('未命名')}
+            onClick={() => void createMindLaneFile('Untitled')}
             disabled={busy}
           >
-            新建 .mindlane 文件
+            New .mindlane file
           </button>
           <button
             type="button"
@@ -105,7 +106,7 @@ function WorkspaceEmptyState() {
             onClick={() => void openWorkspaceDirectory()}
             disabled={busy}
           >
-            切换仓库
+            Switch repository
           </button>
         </div>
       </div>
@@ -122,7 +123,8 @@ function AppContent() {
   const setCapsuleExpanded = useAiStore((s) => s.setCapsuleExpanded)
   // Palace generation is chat orchestration; the mindmap only emits the intent.
   const generatePalace = usePalaceGeneration()
-  // AI 服务就绪：启动时经桥读取一次，只读向下传递（不建状态机）。
+  // AI service readiness: read once through the bridge at startup, then passed down read-only
+  // (no state machine).
   const [aiReady, setAiReady] = useState(false)
   const loaded = useSettingsStore((s) => s.loaded)
   const workspaceInitialized = useWorkspaceStore((s) => s.initialized)
@@ -151,19 +153,24 @@ function AppContent() {
     void loadSettingsFromBackend()
     void window.mindlane?.ai.isReady().then((ready) => {
       setAiReady(ready)
-      // AI 服务就绪 = 会话服务可用：补刷一次胶囊条持久输入，
-      // 覆盖启动早期 refreshCapsuleData 遇 not-ready 后重试耗尽的情况。
+      // AI service ready = session service available: refresh the capsule bar's persistent input
+      // once, covering the case where an early-startup refreshCapsuleData hit not-ready and
+      // exhausted its retries.
       if (ready) void useAiStore.getState().refreshCapsuleData()
     })
     const disconnectAiStore = connectAiStore(openFileRegistry)
-    // 「文件正在被 AI 写入」是打开的文件自己的状态：chat 订阅自己的每文件忙闲，
-    // 单点投影进打开的文件；导图侧读文件，不读 chat。
+    // "The file is being written by AI" is the open file's own state: chat subscribes to its
+    // per-file busy state and projects it into the open file from one place; the mindmap reads
+    // the file, not chat.
     const disconnectAiWriting = connectAiWritingProjection(openFileRegistry)
-    // 工作区与打开的文件变化由 chat 自己观察后重投影：工作区 store 不再反向 poke chat。
+    // Workspace and open-file changes are observed and re-projected by chat itself: the
+    // workspace store no longer pokes chat back.
     const disconnectWorkspaceSync = connectChatWorkspaceSync(openFileRegistry)
-    // 按需读导图应答器：主进程经反向通道拉实时导图时，按 fileUuid 取编辑器回包。
+    // On-demand mindmap read responder: when the main process pulls the live mindmap over the
+    // reverse channel, look the editor up by fileUuid and reply.
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
-    // 落盘应答器：主进程转发写工具参数，这里按 fileUuid 串行化校验+落图并回 ack。
+    // Persist responder: the main process forwards write-tool params, and here we serialize
+    // validation plus applying the map by fileUuid and ack back.
     const stopWriteResponder = createMindmapWriteResponder({
       subscribe: (listener) => window.mindlane?.ai.onMindmapWriteRequest(listener) ?? (() => {}),
       resolveEditor: (fileUuid) => openFileRegistry.getByFileUuid(fileUuid)?.editor,
@@ -213,11 +220,11 @@ function AppContent() {
 
   useShortcuts(
     [
-      ['app.openSettings', 'mod+comma', '打开设置', () => setSettingsOpen(true)],
+      ['app.openSettings', 'mod+comma', 'Open settings', () => setSettingsOpen(true)],
       [
         'app.openFileManager',
         'mod+shift+f',
-        '打开文件管理器',
+        'Open file manager',
         () => setFileManagerOpen((open) => !open),
       ],
     ],
@@ -230,7 +237,7 @@ function AppContent() {
       <div className="app-frame__content">
         {!loaded || !workspaceInitialized ? (
           <div className="app-shell app-shell--loading">
-            <span style={{ color: '#888', fontSize: '0.9rem' }}>加载配置中…</span>
+            <span style={{ color: '#888', fontSize: '0.9rem' }}>Loading configuration…</span>
           </div>
         ) : !workspacePath ? (
           <WorkspaceHome />
@@ -262,7 +269,7 @@ function AppContent() {
             </main>
             <aside
               className={`chat-panel${hasDocumentOpen ? '' : ' chat-panel--entry'}`}
-              aria-label="聊天面板"
+              aria-label="Chat panel"
             >
               <ChatCapsuleBar
                 expanded={capsuleExpanded}

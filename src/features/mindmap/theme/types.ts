@@ -1,12 +1,12 @@
 /**
- * 导图样式由两条独立轴构成：
- *   structureType（结构）：logic 逻辑图 | mindmap 思维导图 —— 只影响布局算法
- *   visualVariant（视觉）：card 卡片 | outline 线框 | minimal 极简 —— 只影响节点/边/间距
+ * A mindmap style is made of two independent axes:
+ *   structureType (structure): logic logic chart | mindmap mindmap -- layout algorithm only
+ *   visualVariant (visual): card | outline | minimal -- node/edge/spacing only
  *
- * 配色方案 colorScheme 与两者正交。
+ * The color scheme colorScheme is orthogonal to both.
  *
- * 持久化形状（structureType/visualVariant/colorScheme）住在契约层，与文件格式
- * 同一份定义；本模块只保留界面描述符。
+ * The persisted shape (structureType/visualVariant/colorScheme) lives in the contracts layer, in the
+ * same definition as the file format; this module keeps UI descriptors only.
  */
 import type { ColorSchemeId, StructureType, VisualVariant } from '@contracts/mindmapStyle'
 
@@ -17,19 +17,19 @@ export type {
   VisualVariant,
 } from '@contracts/mindmapStyle'
 
-/** 边路径算法 */
+/** Edge path algorithm */
 type EdgePathKind = 'bezier' | 'smooth-step' | 'step'
-/** trunk=树干渐变填充（卡片式）；line=普通描边 */
+/** trunk = tapered filled trunk (card); line = plain stroke */
 type EdgeStrokeKind = 'trunk' | 'line'
-/** 边连接节点的位置：side=侧边中点；bottom=节点下边框 */
+/** Where an edge joins the node: side = side midpoint; bottom = node bottom border */
 export type ConnectPosition = 'side' | 'bottom'
 
-/** 某个视觉变体的边配置 */
+/** Edge config of one visual variant */
 interface EdgeModeConfig {
   path: EdgePathKind
   stroke: EdgeStrokeKind
   connect: ConnectPosition
-  /** line 模式的描边宽度；trunk 模式不使用 */
+  /** Stroke width in line mode; unused in trunk mode */
   strokeWidth: number
 }
 
@@ -49,5 +49,5 @@ export interface VisualVariantDef {
 export interface ColorSchemeDef {
   id: ColorSchemeId
   label: string
-  /** 在选色器中显示的代表色 */
+  /** Representative color shown in the color picker */
 }

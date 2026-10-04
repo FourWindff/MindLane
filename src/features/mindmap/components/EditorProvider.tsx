@@ -7,9 +7,9 @@ function resolveActiveInstance(): ActiveOpenFile {
 }
 
 /**
- * 为 React 组件提供当前活动文件的 OpenFile。
- * 通过 OpenFileRegistry 实现多文件历史隔离：切换文件时保留各文件的历史栈。
- * 没有活动文件时回退到默认实例，保证组件始终能访问 store。
+ * Provide React components with the OpenFile of the currently active file.
+ * The OpenFileRegistry isolates history per file: switching files keeps each file's history stack.
+ * With no active file it falls back to the default instance, so components always reach a store.
  */
 export function MindmapEditorProvider({ children }: { children: ReactNode }) {
   const [instance, setInstance] = useState<ActiveOpenFile>(resolveActiveInstance)

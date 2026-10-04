@@ -10,16 +10,16 @@ import type {
 import type { McpCredentialStore } from './credentials.js'
 
 /**
- * 基于 loopback 回调的 OAuth 2.0 授权码 + PKCE provider。
+ * OAuth 2.0 authorization code + PKCE provider based on a loopback callback.
  *
- * 配合 MCP SDK 的 auth() 使用：SDK 负责 DCR、PKCE 生成、token 交换与刷新，
- * 本类负责凭据持久化（credentialStore）、打开浏览器（openBrowser）与 state 生成。
+ * Used together with the MCP SDK's auth(): the SDK handles DCR, PKCE generation, token exchange and refresh,
+ * while this class handles credential persistence (credentialStore), opening the browser (openBrowser) and state generation.
  *
- * interactive=false 时（启动静默重连）redirectToAuthorization 只置标记不打开浏览器，
- * 由调用方据此判断需要用户重新授权并走失败降级。
+ * When interactive=false (silent reconnect at startup) redirectToAuthorization only sets a flag instead of opening the browser,
+ * so the caller can tell that the user must re-authorize and fall back to failure.
  */
 export class LoopbackOAuthProvider implements OAuthClientProvider {
-  /** SDK 是否已走到需要浏览器授权的一步（据此区分"凭据失效"与其他连接错误） */
+  /** Whether the SDK has reached the step that needs browser authorization (used to tell "invalid credentials" apart from other connection errors) */
   authRedirected = false
   private currentState?: string
   private verifier = ''
@@ -53,7 +53,7 @@ export class LoopbackOAuthProvider implements OAuthClientProvider {
     return this.currentState
   }
 
-  /** 最近一次生成的 state，用于校验 loopback 回调 */
+  /** Most recently generated state, used to verify the loopback callback */
   get expectedState(): string | undefined {
     return this.currentState
   }
@@ -89,17 +89,17 @@ export class LoopbackOAuthProvider implements OAuthClientProvider {
 }
 
 export interface LoopbackCallbackServer {
-  /** 形如 http://127.0.0.1:<port>/callback */
+  /** Of the form http://127.0.0.1:<port>/callback */
   redirectUrl: string
-  /** 等待浏览器回调，校验 state 后 resolve 授权码；超时或出错则 reject */
+  /** Waits for the browser callback, verifies state, then resolves the authorization code; rejects on timeout or error */
   waitForCallback: (expectedState: string | undefined, timeoutMs: number) => Promise<string>
   close: () => void
 }
 
 /**
- * 在 127.0.0.1 上启动临时 HTTP 服务接收 OAuth 回调（RFC 8252 loopback）。
- * 回调可能在 waitForCallback 被调用前到达，因此先缓存结果。
- * port 缺省时随机选择；传入固定 port 用于需要预先注册回调地址的场景（如飞书 UAT）。
+ * Starts a temporary HTTP server on 127.0.0.1 to receive the OAuth callback (RFC 8252 loopback).
+ * The callback may arrive before waitForCallback is called, so the result is buffered first.
+ * When port is omitted a random one is chosen; a fixed port is used for flows that must pre-register the callback URL (e.g. Feishu UAT).
  */
 export async function startLoopbackCallbackServer(opts?: {
   port?: number
@@ -124,8 +124,8 @@ export async function startLoopbackCallbackServer(opts?: {
     res.end(
       '<html><body style="font-family:sans-serif;text-align:center;padding-top:4em">' +
         (received.error
-          ? '<p>授权失败，可以关闭此页面并返回 MindLane 重试。</p>'
-          : '<p>授权完成，可以关闭此页面并返回 MindLane。</p>') +
+          ? '<p>Authorization failed. You can close this page and retry in MindLane.</p>'
+          : '<p>Authorization complete. You can close this page and return to MindLane.</p>') +
         '</body></html>',
     )
   })
@@ -147,15 +147,15 @@ export async function startLoopbackCallbackServer(opts?: {
     waitForCallback: (expectedState, timeoutMs) =>
       new Promise<string>((resolve, reject) => {
         const timer = setTimeout(() => {
-          reject(new Error('等待授权回调超时'))
+          reject(new Error('Timed out waiting for the authorization callback'))
         }, timeoutMs)
         const check = () => {
           if (!received) return false
           clearTimeout(timer)
-          if (received.error) reject(new Error(`授权失败: ${received.error}`))
-          else if (!received.code) reject(new Error('授权回调缺少 code'))
+          if (received.error) reject(new Error(`Authorization failed: ${received.error}`))
+          else if (!received.code) reject(new Error('Authorization callback is missing the code'))
           else if (expectedState && received.state !== expectedState) {
-            reject(new Error('授权 state 校验失败'))
+            reject(new Error('Authorization state verification failed'))
           } else resolve(received.code)
           return true
         }
@@ -163,10 +163,10 @@ export async function startLoopbackCallbackServer(opts?: {
           check()
         }
         if (check()) return
-        // server 关闭时不再等待
+        // Stop waiting once the server closes
         server.once('close', () => {
           clearTimeout(timer)
-          if (!received) reject(new Error('授权回调服务已关闭'))
+          if (!received) reject(new Error('Authorization callback server was closed'))
         })
       }),
   }

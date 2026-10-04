@@ -1,15 +1,18 @@
 /**
- * 解析内核（不自研）：浏览器端 DOMParser，主进程 linkedom。
+ * Parsing core (not home-grown): browser DOMParser, main-process linkedom.
  *
- * 两套严格度分开（PRD 1.3-2）：
- * - 文件（编辑器生成）→ 严格 XML 模式，畸形输入映射 `xml_parse_error`；
- * - AI 交互片段（工具参数/上下文）→ 容错 HTML 模式。
+ * Two strictness levels are kept apart (PRD 1.3-2):
+ * - Files (produced by the editor) → strict XML mode; malformed input maps to
+ *   `xml_parse_error`;
+ * - AI interaction fragments (tool arguments/context) → tolerant HTML mode.
  *
- * 解析器按进程装配（设计文档：浏览器端 DOMParser，主进程 linkedom）：
- * - 渲染层：`globalThis.DOMParser` 恒可用，本模块不 import linkedom
- *   （linkedom 的可选依赖 canvas 无法被 Vite/Rollup 静态解析，必须留在渲染层图外）；
- * - 主进程：启动时 `registerXmlDomParser(linkedom.DOMParser)` 注入；
- * - 测试环境（Electron-as-Node）：vitest setup 注入。
+ * The parser is assembled per process (design doc: browser DOMParser,
+ * main-process linkedom):
+ * - Renderer: `globalThis.DOMParser` is always available and this module does
+ *   not import linkedom (linkedom's optional canvas dependency cannot be
+ *   statically resolved by Vite/Rollup, so it must stay out of the renderer graph);
+ * - Main process: injected at startup via `registerXmlDomParser(linkedom.DOMParser)`;
+ * - Test environment (Electron-as-Node): injected by the vitest setup.
  */
 
 import { MindmapXmlError } from './types.js'
@@ -24,8 +27,9 @@ type DomParserCtor = new () => {
 
 let injectedParser: DomParserCtor | undefined
 
-/** 主进程装配入口：把进程内 XML/HTML parser 注入（Node 侧为 linkedom.DOMParser）。
- * 参数用 unknown 接受：linkedom 的 DOM 类型与浏览器 lib.dom 结构不兼容，装配处收窄。 */
+/** Main-process assembly entry: inject the in-process XML/HTML parser (linkedom.DOMParser on Node).
+ * The parameter is typed unknown because linkedom's DOM types are structurally incompatible
+ * with the browser's lib.dom; the assembly site narrows it. */
 export function registerXmlDomParser(ctor: unknown): void {
   injectedParser = ctor as DomParserCtor
 }
@@ -36,17 +40,18 @@ function getDomParser(): DomParserCtor {
   if (injectedParser) return injectedParser
   throw new MindmapXmlError(
     'xml_parse_error',
-    '当前环境没有可用的 XML parser：渲染层需 DOMParser，主进程/测试环境需注入 linkedom',
+    'No XML parser is available in this environment: the renderer needs DOMParser, and the main process/test environment needs linkedom injected',
   )
 }
 
 /**
- * 严格解析 XML（文件面）。畸形输入抛 `xml_parse_error`，绝不裸抛。
+ * Strictly parse XML (file surface). Malformed input throws `xml_parse_error`,
+ * never bare.
  */
 export function parseXmlStrict(xml: string): ParsedDocumentLike {
   const structureError = checkXmlWellFormed(xml)
   if (structureError) {
-    throw new MindmapXmlError('xml_parse_error', `XML 结构不完整：${structureError}`)
+    throw new MindmapXmlError('xml_parse_error', `XML structure is incomplete: ${structureError}`)
   }
   const Parser = getDomParser()
   try {
@@ -54,30 +59,30 @@ export function parseXmlStrict(xml: string): ParsedDocumentLike {
     const parserError = doc.querySelector?.('parsererror')
     if (parserError) {
       const detail = parserError.textContent?.trim().slice(0, 200) ?? ''
-      throw new MindmapXmlError('xml_parse_error', `XML 解析失败：${detail}`)
+      throw new MindmapXmlError('xml_parse_error', `XML parse failed: ${detail}`)
     }
     if (!doc.documentElement) {
-      throw new MindmapXmlError('xml_parse_error', 'XML 为空或没有根元素')
+      throw new MindmapXmlError('xml_parse_error', 'XML is empty or has no root element')
     }
     return doc
   } catch (err) {
     if (err instanceof MindmapXmlError) throw err
     throw new MindmapXmlError(
       'xml_parse_error',
-      `XML 解析失败：${err instanceof Error ? err.message : String(err)}`,
+      `XML parse failed: ${err instanceof Error ? err.message : String(err)}`,
     )
   }
 }
 
 /**
- * 容错解析（AI 片段面）：HTML parser 容忍 AI 的不规范输出。
- * 调用方应先经 normalizeSelfClosingTags 预处理。
+ * Tolerant parsing (AI fragment surface): the HTML parser tolerates irregular
+ * AI output. The caller must preprocess with normalizeSelfClosingTags first.
  */
 export function parseXmlTolerant(xml: string): ParsedDocumentLike {
   const structureError = checkXmlWellFormed(xml)
   if (structureError) {
-    // 容错模式的底线：标签配对仍必须成立，否则 AI 拿到的是残缺结构
-    throw new MindmapXmlError('xml_parse_error', `XML 结构不完整：${structureError}`)
+    // The tolerant mode's floor: tag pairing must still hold, otherwise the AI gets a broken structure
+    throw new MindmapXmlError('xml_parse_error', `XML structure is incomplete: ${structureError}`)
   }
   const Parser = getDomParser()
   try {
@@ -85,12 +90,12 @@ export function parseXmlTolerant(xml: string): ParsedDocumentLike {
   } catch (err) {
     throw new MindmapXmlError(
       'xml_parse_error',
-      `XML 解析失败：${err instanceof Error ? err.message : String(err)}`,
+      `XML parse failed: ${err instanceof Error ? err.message : String(err)}`,
     )
   }
 }
 
-/** 解析结果中的顶层元素列表。 */
+/** Top-level element list from a parse result. */
 export function topLevelElements(doc: ParsedDocumentLike): DomElementLike[] {
   const root = doc.documentElement
   if (!root) return []

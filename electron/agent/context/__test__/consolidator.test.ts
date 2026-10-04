@@ -62,7 +62,7 @@ describe('Consolidator', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('消息数量未超阈值时跳过归档', async () =>
+  it('skips archiving while the message count is below the threshold', async () =>
     inWs(async () => {
       const sessionId = 'skip'
       await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
@@ -86,7 +86,7 @@ describe('Consolidator', () => {
       expect(meta?.lastConsolidated).toBeUndefined()
     }))
 
-  it('触发阈值低于容量时按阈值触发（策略与容量解耦）', async () =>
+  it('triggers at the threshold when it is below capacity (policy decoupled from capacity)', async () =>
     inWs(async () => {
       const sessionId = 'trigger'
       await manager.saveMessages(sessionId, makeMessages(12), fileUuid)
@@ -95,7 +95,7 @@ describe('Consolidator', () => {
       const consolidator = new Consolidator(
         { sessionManager: manager, provider, buildMessages, getToolDefinitions },
         {
-          // 容量远大于会话：只有策略阈值能触发归档。
+          // Capacity is far larger than the session: only the policy threshold can trigger archiving.
           inputBudgetTokens: 100_000,
           consolidationTriggerTokens: 10,
           consolidationRatio: 0.5,
@@ -111,7 +111,7 @@ describe('Consolidator', () => {
       expect(manager.getSessionMeta(sessionId)?.lastConsolidated).toBeGreaterThan(0)
     }))
 
-  it('pickConsolidationBoundary 优先在 user 消息边界处结束', () =>
+  it('pickConsolidationBoundary ends at a user message boundary when possible', () =>
     inWs(async () => {
       const provider = new FakeProvider(new FakeListChatModel({ responses: [] }))
       const consolidator = new Consolidator(
@@ -136,7 +136,7 @@ describe('Consolidator', () => {
       expect(boundary).toBe(2)
     }))
 
-  it('多轮压缩后推进 lastConsolidated 并写入滚动摘要', async () =>
+  it('advances lastConsolidated and writes the rolling summary after multiple compaction rounds', async () =>
     inWs(async () => {
       const sessionId = 'archive'
       const messages = makeMessages(20)
@@ -161,11 +161,11 @@ describe('Consolidator', () => {
 
       const meta = manager.getSessionMeta(sessionId)
       expect(meta?.lastConsolidated ?? 0).toBeGreaterThan(0)
-      // 滚动摘要：最新一轮摘要写入 meta，不再写 history 文件
+      // Rolling summary: the latest round's summary is written to meta; no history file is written anymore
       expect(meta?._lastSummary).toContain('summary one')
     }))
 
-  it('LLM 失败时不推进游标（下轮 run 自愈）', async () =>
+  it('does not advance the cursor when the LLM fails (next run self-heals)', async () =>
     inWs(async () => {
       const sessionId = 'raw'
       const messages = makeMessages(20)
@@ -195,7 +195,7 @@ describe('Consolidator', () => {
       expect(meta?._lastSummary).toBeUndefined()
     }))
 
-  it('getMessagesForContext 限制条数与 token 预算', async () =>
+  it('getMessagesForContext limits the message count and the token budget', async () =>
     inWs(async () => {
       const sessionId = 'context'
       const messages = makeMessages(11)
@@ -217,15 +217,15 @@ describe('Consolidator', () => {
         maxMessages: 4,
       })
 
-      // 条数上限 4 条非系统消息 + 可能保留的系统消息
+      // Message-count cap of 4 non-system messages + a possibly retained system message
       const nonSystem = contextMessages.filter((m) => m.getType() !== 'system')
       expect(nonSystem.length).toBeLessThanOrEqual(4)
 
-      // 最后一条是当前用户消息
+      // The last message is the current user message
       expect(contextMessages[contextMessages.length - 1].getType()).toBe('human')
     }))
 
-  it('getMessagesForContext 保留系统消息与当前用户消息', async () =>
+  it('getMessagesForContext keeps system messages and the current user message', async () =>
     inWs(async () => {
       const sessionId = 'retain'
       const messages: BaseMessage[] = [
@@ -258,7 +258,7 @@ describe('Consolidator', () => {
       expect(contextMessages[contextMessages.length - 1].content).toBe('current')
     }))
 
-  it('并发调用同一会话串行执行', async () =>
+  it('serializes concurrent calls to the same session', async () =>
     inWs(async () => {
       const sessionId = 'concurrent'
       const messages = makeMessages(30)
@@ -287,7 +287,7 @@ describe('Consolidator', () => {
     }))
 })
 
-describe('Consolidator 轮次状态剥离', () => {
+describe('Consolidator turn-state stripping', () => {
   let tmpDir: string
   let manager: SessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
@@ -322,14 +322,14 @@ describe('Consolidator 轮次状态剥离', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('归档消息喂给滚动摘要前剥离末尾 EDITOR_STATE 块', async () =>
+  it('strips a trailing EDITOR_STATE block before archived messages feed the rolling summary', async () =>
     inWs(async () => {
       const sessionId = 'strip'
       const turnStateSuffix =
-        '\n<EDITOR_STATE file_uuid="file-uuid-1" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+        '\n<EDITOR_STATE file_uuid="file-uuid-1" file_path="/a.mindlane" file_title="t">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="old node"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
       const messages = [
-        new HumanMessage(`第一轮问题${turnStateSuffix}`),
-        new AIMessage('第一轮回复'),
+        new HumanMessage(`first turn question${turnStateSuffix}`),
+        new AIMessage('first turn reply'),
         ...makeMessages(18),
       ]
       await manager.saveMessages(sessionId, messages, fileUuid)
@@ -346,17 +346,17 @@ describe('Consolidator 轮次状态剥离', () => {
       expect(changed).toBe(true)
 
       const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
-      // 块被剥离：任何输入都不含 <EDITOR_STATE，且剥离后的问题文本在。
+      // The block is stripped: no input contains <EDITOR_STATE and the stripped question text is present.
       expect(summaryInputs.some((m) => String(m.content).includes('<EDITOR_STATE'))).toBe(false)
-      expect(summaryInputs.some((m) => m.content === '第一轮问题')).toBe(true)
+      expect(summaryInputs.some((m) => m.content === 'first turn question')).toBe(true)
     }))
 
-  it('无块消息原样进入摘要输入（no-op）', async () =>
+  it('passes block-free messages into the summary input unchanged (no-op)', async () =>
     inWs(async () => {
       const sessionId = 'noop'
       const messages = [
-        new HumanMessage('纯文本问题'),
-        new AIMessage('纯文本回复'),
+        new HumanMessage('plain text question'),
+        new AIMessage('plain text reply'),
         ...makeMessages(18),
       ]
       await manager.saveMessages(sessionId, messages, fileUuid)
@@ -372,12 +372,12 @@ describe('Consolidator 轮次状态剥离', () => {
       await consolidator.maybe_consolidate_by_tokens(sessionId)
 
       const summaryInputs = invokeSpy.mock.calls[0]![0] as BaseMessage[]
-      expect(summaryInputs.some((m) => m.content === '纯文本问题')).toBe(true)
-      expect(summaryInputs.some((m) => m.content === '纯文本回复')).toBe(true)
+      expect(summaryInputs.some((m) => m.content === 'plain text question')).toBe(true)
+      expect(summaryInputs.some((m) => m.content === 'plain text reply')).toBe(true)
     }))
 })
 
-describe('Consolidator 提取回调接缝', () => {
+describe('Consolidator extraction callback seam', () => {
   let tmpDir: string
   let manager: SessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
@@ -393,18 +393,20 @@ describe('Consolidator 提取回调接缝', () => {
   }
 
   const EXTRACTION_JSON = JSON.stringify({
-    facts: ['用户偏好模块化设计', '用户偏好先跑 MVP'],
+    facts: ['the user prefers modular design', 'the user prefers shipping an MVP first'],
   })
 
   /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
   const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
 
-  /** Summary calls return text; extraction calls (prompt contains the curator marker) return JSON. */
+  /** Summary calls carry the rolling-summary prompt; every other call (extraction) returns JSON. */
   function makeExtractionAwareModel(): BaseChatModel {
     const model = new FakeListChatModel({ responses: ['summary'] })
     model.invoke = (async (input: unknown) => {
       const text = JSON.stringify(input)
-      return new AIMessage(text.includes('认知档案管理员') ? EXTRACTION_JSON : 'summary')
+      return new AIMessage(
+        text.includes('Maintain a rolling summary') ? 'summary' : EXTRACTION_JSON,
+      )
     }) as unknown as BaseChatModel['invoke']
     return model
   }
@@ -425,7 +427,7 @@ describe('Consolidator 提取回调接缝', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('归档后 onArchived 收到全部归档切片', async () =>
+  it('onArchived receives every archived slice after archiving', async () =>
     inWs(async () => {
       const sessionId = 'callback-slice'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
@@ -450,12 +452,12 @@ describe('Consolidator 提取回调接缝', () => {
       const slice = onArchived.mock.calls[0]![0] as BaseMessage[]
       expect(slice.length).toBeGreaterThan(0)
       expect(slice.every((m) => typeof m.getType === 'function')).toBe(true)
-      // 回调切片与推进后的游标一致：同一批消息不会被重复提取
+      // The callback slice matches the advanced cursor: the same messages are never extracted twice
       const meta = manager.getSessionMeta(sessionId)
       expect(slice.length).toBe(meta?.lastConsolidated)
     }))
 
-  it('未发生归档时不触发 onArchived', async () =>
+  it('does not fire onArchived when no archiving happened', async () =>
     inWs(async () => {
       const sessionId = 'no-archive'
       await manager.saveMessages(sessionId, makeMessages(2), fileUuid)
@@ -478,7 +480,7 @@ describe('Consolidator 提取回调接缝', () => {
       expect(onArchived).not.toHaveBeenCalled()
     }))
 
-  it('提取成功后 editlog 被删除且记忆已写入', async () =>
+  it('deletes the editlog and writes memory after a successful extraction', async () =>
     inWs(async () => {
       const sessionId = 'extract-success'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
@@ -487,8 +489,8 @@ describe('Consolidator 提取回调接缝', () => {
       await editLogStore.append(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
-        before: 'AI 写的',
-        after: '用户改的',
+        before: 'written by the AI',
+        after: 'edited by the user',
       })
 
       const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
@@ -513,7 +515,7 @@ describe('Consolidator 提取回调接缝', () => {
       const changed = await consolidator.maybe_consolidate_by_tokens(sessionId)
       expect(changed).toBe(true)
 
-      // 提取回调是 fire-and-forget：等它落地后断言产物
+      // The extraction callback is fire-and-forget: wait for it to land, then assert on its output
       await vi.waitFor(async () => {
         expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
       })
@@ -521,10 +523,10 @@ describe('Consolidator 提取回调接缝', () => {
         path.join(tmpDir, 'mindlanememory', 'MEMORY.md'),
         'utf-8',
       )
-      expect(memoryContent).toContain('用户偏好模块化设计')
+      expect(memoryContent).toContain('the user prefers modular design')
     }))
 
-  it('提取回调抛错时压缩不受影响且 editlog 保留', async () =>
+  it('compression is unaffected and the editlog is kept when the extraction callback throws', async () =>
     inWs(async () => {
       const sessionId = 'extract-failure'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
@@ -533,8 +535,8 @@ describe('Consolidator 提取回调接缝', () => {
       await editLogStore.append(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
-        before: 'AI 写的',
-        after: '用户改的',
+        before: 'written by the AI',
+        after: 'edited by the user',
       })
 
       const failingExtractor = {
@@ -565,10 +567,10 @@ describe('Consolidator 提取回调接缝', () => {
 
       await vi.waitFor(() => expect(failingExtractor.extractAndPersist).toHaveBeenCalled())
 
-      // 压缩主流程产物完好
+      // Artifacts of the main compression path are intact
       const meta = manager.getSessionMeta(sessionId)
       expect(meta?._lastSummary).toBe('summary')
-      // 提取失败：editlog 证据保留
+      // Extraction failed: the editlog evidence is kept
       expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
     }))
 })

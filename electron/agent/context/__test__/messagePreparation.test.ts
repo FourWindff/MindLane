@@ -36,7 +36,7 @@ function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePre
 }
 
 describe('prepareMessagesForModel', () => {
-  it('按固定顺序执行预处理步骤', async () => {
+  it('runs the preparation steps in a fixed order', async () => {
     const messages = [
       new SystemMessage('system'),
       new HumanMessage('hello'),
@@ -65,7 +65,7 @@ describe('prepareMessagesForModel', () => {
     expect(bigToolResults[0].content).toContain('exceeded')
   })
 
-  it('功能关闭时直接返回原数组', async () => {
+  it('returns the original array unchanged when disabled', async () => {
     const messages = [new HumanMessage('hello')]
 
     const result = await prepareMessagesForModel(messages, makeConfig({ enabled: false }))
@@ -73,7 +73,7 @@ describe('prepareMessagesForModel', () => {
     expect(result).toBe(messages)
   })
 
-  it('缺失的 tool_result 被补全', async () => {
+  it('backfills a missing tool_result', async () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -124,7 +124,7 @@ describe('prepareMessagesForModel', () => {
 })
 
 describe('dropOrphanToolResults', () => {
-  it('删除没有对应 tool_use 的孤儿 tool_result', () => {
+  it('drops orphan tool_results with no matching tool_use', () => {
     const messages = [
       new HumanMessage('hello'),
       new AIMessage({
@@ -143,7 +143,7 @@ describe('dropOrphanToolResults', () => {
     ).toBe(false)
   })
 
-  it('保留所有配对完整的 tool_result', () => {
+  it('keeps every fully paired tool_result', () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -163,7 +163,7 @@ describe('dropOrphanToolResults', () => {
 })
 
 describe('backfillMissingToolResults', () => {
-  it('为缺失 tool_result 的 tool_use 插入占位结果', () => {
+  it('inserts a placeholder result for a tool_use missing its tool_result', () => {
     const messages = [
       new HumanMessage('hello'),
       new AIMessage({
@@ -181,7 +181,7 @@ describe('backfillMissingToolResults', () => {
     expect(backfill.content).toContain('unavailable')
   })
 
-  it('不重复补全已有结果', () => {
+  it('does not backfill a result that already exists', () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -195,7 +195,7 @@ describe('backfillMissingToolResults', () => {
     expect(result).toHaveLength(2)
   })
 
-  it('保持消息顺序', () => {
+  it('preserves message order', () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -214,7 +214,7 @@ describe('backfillMissingToolResults', () => {
     ).toEqual(['ai', 'call-1', 'call-2'])
   })
 
-  it('处理混合场景', () => {
+  it('handles mixed scenarios', () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -251,7 +251,7 @@ describe('applyToolResultBudget', () => {
     }
   }
 
-  it('不压缩在预算内的 tool_result', async () => {
+  it('does not compress a tool_result within budget', async () => {
     const original = 'small result'
     const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
@@ -264,7 +264,7 @@ describe('applyToolResultBudget', () => {
     expect((result[0] as ToolMessage).content).toBe(original)
   })
 
-  it('超限内容写入磁盘并用引用替换', async () => {
+  it('writes oversized content to disk and replaces it with a reference', async () => {
     const original = 'x'.repeat(20_000)
     const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
@@ -285,7 +285,7 @@ describe('applyToolResultBudget', () => {
     expect(restored).toBe(original)
   })
 
-  it('没有 userDataPath 时回退到截断', async () => {
+  it('falls back to truncation without a userDataPath', async () => {
     const original = 'x'.repeat(20_000)
     const messages = [new ToolMessage({ tool_call_id: 't1', name: 'tool', content: original })]
 
@@ -309,7 +309,7 @@ describe('snipHistory', () => {
     }
   }
 
-  it('未超预算时保留所有消息', () => {
+  it('keeps every message while under budget', () => {
     const messages = [new SystemMessage('system'), new HumanMessage('hello'), new AIMessage('hi')]
 
     const result = snipHistory(messages, makeConfig({ inputBudgetTokens: 10_000 }))
@@ -317,7 +317,7 @@ describe('snipHistory', () => {
     expect(result).toHaveLength(3)
   })
 
-  it('超预算时保留 system 和最后一条 user 消息', () => {
+  it('keeps system and the last user message when over budget', () => {
     const messages = [
       new SystemMessage('system'),
       new HumanMessage('old'),
@@ -331,7 +331,7 @@ describe('snipHistory', () => {
     expect(result[result.length - 1].content).toBe('current')
   })
 
-  it('截断后修复 tool_use / tool_result 配对', () => {
+  it('repairs tool_use / tool_result pairing after truncation', () => {
     const messages = [
       new SystemMessage('system'),
       new AIMessage({
@@ -349,7 +349,7 @@ describe('snipHistory', () => {
     expect(toolResults.length).toBe(toolCalls.length)
   })
 
-  it('截断后删除孤儿 tool_result', () => {
+  it('drops orphan tool_results after truncation', () => {
     const messages = [
       new AIMessage({
         content: '',
@@ -367,7 +367,7 @@ describe('snipHistory', () => {
     ).toBe(false)
   })
 
-  it('允许关闭 system 保留', () => {
+  it('allows disabling system-message preservation', () => {
     const messages = [new SystemMessage('system'), new HumanMessage('current')]
 
     const result = snipHistory(
@@ -380,14 +380,14 @@ describe('snipHistory', () => {
 })
 
 describe('mergeMessagePreparationConfig', () => {
-  it('未显式给预算时从模型窗口推导，且始终小于窗口', () => {
+  it('derives the budget from the model window when not given explicitly, always below the window', () => {
     const config = mergeMessagePreparationConfig(undefined, 32_768)
 
     expect(config.inputBudgetTokens).toBe(23_744)
     expect(config.inputBudgetTokens).toBeLessThan(32_768)
   })
 
-  it('显式给出的输入预算优先于推导值', () => {
+  it('an explicit input budget wins over the derived value', () => {
     const config = mergeMessagePreparationConfig({ inputBudgetTokens: 20 }, 1_000_000)
 
     expect(config.inputBudgetTokens).toBe(20)

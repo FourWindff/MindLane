@@ -22,17 +22,18 @@ export interface SessionMeta {
   createdAt: string
   updatedAt: string
   messageCount: number
-  /** 已归档到的消息行索引（0 表示未归档） */
+  /** Message line index archived up to (0 means nothing archived) */
   lastConsolidated?: number
-  /** 最近一次归档生成的历史摘要，用于注入系统提示词 */
+  /** History summary produced by the last archive round, injected into the system prompt */
   _lastSummary?: string
 }
 
 /**
- * 基于 JSONL 的会话消息存储。
+ * JSONL-based session message store.
  *
- * 每个会话对应一个文件：`{baseDir}/{workspaceUuid}/{sessionId}.jsonl`
- * 文件首行为 SessionMetadata，后续每行为一条 LangChain BaseMessage 的序列化对象。
+ * Each session maps to one file: `{baseDir}/{workspaceUuid}/{sessionId}.jsonl`
+ * The first line is SessionMetadata; every line after that is a serialized
+ * LangChain BaseMessage.
  */
 export class SessionMessageStore {
   private baseDir = ''
@@ -40,7 +41,7 @@ export class SessionMessageStore {
   private readonly writeLocks = new Map<string, Promise<void>>()
 
   /**
-   * 初始化存储根目录。
+   * Initialize the store root directory.
    */
   async init(baseDir: string): Promise<void> {
     this.baseDir = baseDir
@@ -57,15 +58,15 @@ export class SessionMessageStore {
   }
 
   /**
-   * 追加单条 LangChain 消息到对应会话文件，并更新首行元数据。
+   * Append a single LangChain message to the session file and update the first-line metadata.
    */
   async saveMessage(sessionId: string, message: BaseMessage, fileUuid: string): Promise<void> {
     await this.appendMessages(sessionId, [message], fileUuid, false)
   }
 
   /**
-   * 批量追加 LangChain 消息到对应会话文件，并更新首行元数据。
-   * 整个批次在同一写锁内完成，保证原子性。
+   * Append LangChain messages to the session file in a batch and update the first-line metadata.
+   * The whole batch completes under one write lock, guaranteeing atomicity.
    */
   async saveMessages(sessionId: string, messages: BaseMessage[], fileUuid: string): Promise<void> {
     await this.appendMessages(sessionId, messages, fileUuid, true)
@@ -98,7 +99,7 @@ export class SessionMessageStore {
   }
 
   /**
-   * 读取会话的全部历史消息，跳过损坏行并记录警告。
+   * Read all history messages of a session, skipping corrupt lines and logging a warning.
    */
   async loadMessages(sessionId: string): Promise<BaseMessage[]> {
     const sessionPath = this.resolveSessionPath(sessionId)
@@ -114,7 +115,7 @@ export class SessionMessageStore {
         result.push(mapStoredMessageToChatMessage(stored))
       } catch (err) {
         logger.warn(
-          `[SessionMessageStore] 跳过损坏的消息行 (session=${sessionId}, line=${i + 1}):`,
+          `[SessionMessageStore] skipping corrupt message line (session=${sessionId}, line=${i + 1}):`,
           err,
         )
       }
@@ -123,7 +124,7 @@ export class SessionMessageStore {
   }
 
   /**
-   * 列出指定工作区下的所有会话元数据，按 updatedAt 降序排列。
+   * List all session metadata under the given workspace, sorted by updatedAt descending.
    */
   async listSessions(workspaceUuid: string): Promise<SessionMeta[]> {
     const dir = path.join(this.baseDir, workspaceUuid)
@@ -145,7 +146,7 @@ export class SessionMessageStore {
   }
 
   /**
-   * 删除会话文件。
+   * Delete the session file.
    */
   async deleteSession(sessionId: string): Promise<void> {
     const sessionPath = this.resolveSessionPath(sessionId)
@@ -155,7 +156,7 @@ export class SessionMessageStore {
   }
 
   /**
-   * 读取会话元数据，文件不存在时返回 null。
+   * Read session metadata; returns null when the file does not exist.
    */
   getSessionMeta(sessionId: string): SessionMeta | null {
     const sessionPath = this.resolveSessionPath(sessionId)
@@ -164,8 +165,8 @@ export class SessionMessageStore {
   }
 
   /**
-   * 原子创建会话文件，包含元数据与可选的初始消息。
-   * 用于迁移或批量写入场景。
+   * Atomically create a session file with metadata and optional initial messages.
+   * Used for migration or bulk-write scenarios.
    */
   async createSession(
     sessionId: string,
@@ -185,7 +186,7 @@ export class SessionMessageStore {
   }
 
   /**
-   * 仅更新会话首行元数据，不修改消息内容。
+   * Update only the first-line session metadata without touching message content.
    */
   async updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void> {
     const sessionPath = this.resolveSessionPath(sessionId)
@@ -208,7 +209,7 @@ export class SessionMessageStore {
     const workspaceUuid = this.workspaceContext.getStore()
     if (!workspaceUuid) {
       throw new Error(
-        '[SessionMessageStore] 缺少工作区上下文（workspaceUuid），请通过 runInWorkspace() 执行会话操作',
+        '[SessionMessageStore] missing workspace context (workspaceUuid); run session operations through runInWorkspace()',
       )
     }
     return workspaceUuid
@@ -219,7 +220,7 @@ export class SessionMessageStore {
     return {
       id: sessionId,
       fileUuid,
-      title: `新对话 ${new Date().toLocaleString('zh-CN', {
+      title: `New chat ${new Date().toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -284,7 +285,10 @@ export class SessionMessageStore {
         fs.closeSync(fd)
       }
     } catch (err) {
-      logger.warn(`[SessionMessageStore] 读取会话首行失败 (${filePath}):`, err)
+      logger.warn(
+        `[SessionMessageStore] failed to read the session header line (${filePath}):`,
+        err,
+      )
       return null
     }
   }

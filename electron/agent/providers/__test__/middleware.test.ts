@@ -28,7 +28,7 @@ describe('withRetry', () => {
     const retryableErrors = [
       new TimeoutError(),
       new TypeError('fetch failed'),
-      new Error('上游异常 HTTP 503'),
+      new Error('upstream error HTTP 503'),
       new Error('HTTP 500 internal'),
       new Error('HTTP 429 too many requests'),
     ]

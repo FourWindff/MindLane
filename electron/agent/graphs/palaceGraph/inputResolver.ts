@@ -12,11 +12,11 @@ function mapSelectedNodes(nodes: { id: string; label: string }[]): SelectedNodeC
 
 export class PalaceInputResolver {
   /**
-   * 解析记忆宫殿子图的输入。
+   * Resolve the input of the memory palace subgraph.
    *
-   * 优先级：
-   * 1. 当前选中的节点
-   * 2. 最新用户消息文本
+   * Priority:
+   * 1. Currently selected nodes
+   * 2. Latest user message text
    */
   async resolve(state: PalaceSubgraphStateType): Promise<PalaceInputResolution | null> {
     const selectedNodes = state.context?.selectedNodes

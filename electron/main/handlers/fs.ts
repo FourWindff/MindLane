@@ -36,7 +36,7 @@ async function syncWorkspaceFromFile(
 
   await ctx.fsService.appState.switchWorkspace(workspacePath).catch(() => {})
   await ctx.fsService.workspace.openFile(workspacePath, filePath).catch(() => {})
-  // 顺手落盘会话文件索引；fileUuid 缺失（旧文件/无元数据）时静默跳过。
+  // Also persist the session file index; silently skipped when fileUuid is missing (old file / no metadata).
   const fileUuid = data?.metadata?.fileUuid
   if (fileUuid) {
     await ctx.fsService.workspace
@@ -137,12 +137,12 @@ export function registerFsHandlers(ctx: HandlerContext): void {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await ctx.fsService.appState.load()
     const result = await dialog.showOpenDialog(win, {
-      title: '打开本地仓库',
+      title: 'Open local workspace',
       defaultPath: settings.lastWorkspacePath ?? undefined,
       properties: ['openDirectory'],
     })
     if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
+      return { ok: false, error: 'Canceled' }
     }
     const workspacePath = path.resolve(result.filePaths[0]!)
     const switchResult = await ctx.fsService.appState.switchWorkspace(workspacePath)
@@ -156,12 +156,12 @@ export function registerFsHandlers(ctx: HandlerContext): void {
     if (!win) return { ok: false, error: 'No window' }
     const settings = await ctx.fsService.appState.load()
     const parentResult = await dialog.showOpenDialog(win, {
-      title: '选择仓库父目录',
+      title: 'Choose workspace parent directory',
       defaultPath: settings.lastWorkspacePath ?? undefined,
       properties: ['openDirectory'],
     })
     if (parentResult.canceled || parentResult.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
+      return { ok: false, error: 'Canceled' }
     }
     const createResult = await ctx.fsService.workspaceTree.createDirectory(
       parentResult.filePaths[0]!,
@@ -217,7 +217,7 @@ export function registerFsHandlers(ctx: HandlerContext): void {
     IPC.WorkspaceUpdateFileUuidPath,
     async (_e, payload: { workspacePath: string; fileUuid: string; filePath: string }) => {
       if (!payload.workspacePath || !payload.fileUuid || !payload.filePath) {
-        return { ok: false, error: '参数缺失' }
+        return { ok: false, error: 'Missing parameters' }
       }
       return ctx.fsService.workspace.updateFileUuidPath(
         payload.workspacePath,
@@ -256,7 +256,7 @@ export function registerFsHandlers(ctx: HandlerContext): void {
         const result =
           payload.lastOpenedFilePath === null
             ? await ctx.fsService.workspace.clearLastOpenedFile(payload.workspacePath)
-            : { ok: false, error: '不支持直接设置 lastOpenedFilePath' }
+            : { ok: false, error: 'Setting lastOpenedFilePath directly is not supported' }
         if (!result.ok) return result
       }
       return { ok: true }
@@ -296,9 +296,9 @@ export function registerFsHandlers(ctx: HandlerContext): void {
         payload.workspacePath,
       )
       if (!result.ok) return result
-      // 清理缩略图
+      // Clean up the thumbnail
       await ctx.fsService.thumbnails.delete(payload.targetPath).catch(() => {})
-      // 清理会话文件索引里指向已删路径的失效映射（文件/文件夹均被移入回收站，路径立即失效）。
+      // Drop stale session file index mappings that point at the deleted path (files and folders are moved to the trash, so the path is invalid immediately).
       await ctx.fsService.workspace.pruneFileUuidPaths(payload.workspacePath).catch(() => {})
       return { ok: true }
     },

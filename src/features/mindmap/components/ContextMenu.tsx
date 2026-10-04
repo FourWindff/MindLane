@@ -59,39 +59,39 @@ export function MindmapContextMenu({
   }
 
   const items: MenuEntry[] = [
-    { label: '子主题', onClick: onAddChild, disabled: aiBusy },
-    { label: '添加父节点', onClick: onAddParent, disabled: !canAddParent || aiBusy },
+    { label: 'Child topic', onClick: onAddChild, disabled: aiBusy },
+    { label: 'Add parent node', onClick: onAddParent, disabled: !canAddParent || aiBusy },
     {
-      label: '在上面插入同级',
+      label: 'Insert sibling above',
       onClick: () => onAddSibling('above'),
       disabled: !canAddSibling || aiBusy,
     },
     {
-      label: '在下面插入同级',
+      label: 'Insert sibling below',
       onClick: () => onAddSibling('below'),
       disabled: !canAddSibling || aiBusy,
     },
     {
-      label: '插入同级（末尾）',
+      label: 'Insert sibling (at end)',
       onClick: () => onAddSibling('end'),
       disabled: !canAddSibling || aiBusy,
     },
-    { label: '插入图片', onClick: () => onInsertImage?.(), disabled: !onInsertImage || aiBusy },
-    { label: '删除', onClick: onRemove, disabled: !canRemove || aiBusy, modifier: 'danger' },
+    { label: 'Insert image', onClick: () => onInsertImage?.(), disabled: !onInsertImage || aiBusy },
+    { label: 'Delete', onClick: onRemove, disabled: !canRemove || aiBusy, modifier: 'danger' },
     ...(menu.scope === 'node'
       ? ([
           'separator',
           {
-            label: `生成记忆宫殿${selectedCount > 1 ? ` (${selectedCount} 节点)` : ''}`,
+            label: `Generate memory palace${selectedCount > 1 ? ` (${selectedCount} nodes)` : ''}`,
             onClick: () => onGeneratePalace?.(),
             disabled: !onGeneratePalace || aiBusy || !palaceEnabled,
             modifier: 'accent',
-            title: palaceEnabled ? undefined : '需要配置对话模型',
+            title: palaceEnabled ? undefined : 'Chat model configuration required',
           },
         ] as MenuEntry[])
       : []),
     'separator',
-    { label: '重置', onClick: onReset, disabled: aiBusy, modifier: 'muted' },
+    { label: 'Reset', onClick: onReset, disabled: aiBusy, modifier: 'muted' },
   ]
 
   const vw = typeof window !== 'undefined' ? window.innerWidth : 0
@@ -107,7 +107,7 @@ export function MindmapContextMenu({
       className="mindmap-ctx"
       style={{ left, top }}
       role="menu"
-      aria-label="导图菜单"
+      aria-label="Mindmap menu"
     >
       {items.map((item, i) =>
         item === 'separator' ? (

@@ -76,7 +76,7 @@ describe('MindmapHeader style panel dismissal', () => {
     expect(removeEventListener).toHaveBeenCalledWith('pointerdown', pointerDown, true)
   })
 
-  it.each(['.style-panel', '[aria-label="导图样式"]'])(
+  it.each(['.style-panel', '[aria-label="Mindmap style"]'])(
     'keeps the style panel open for interactions matching %s',
     (selector) => {
       const { onToggleStylePanel } = mount(true)
@@ -99,14 +99,14 @@ describe('MindmapHeader style panel dismissal', () => {
     )
 
     expect(html).toContain('mindmap-header--capsule-expanded')
-    expect(html).toContain('aria-label="隐藏聊天"')
+    expect(html).toContain('aria-label="Hide chat"')
   })
 
   it('restores the regular header state when the chat panel is collapsed', () => {
     const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} chatOpen={false} />)
 
     expect(html).not.toContain('mindmap-header--capsule-expanded')
-    expect(html).toContain('aria-label="显示聊天"')
+    expect(html).toContain('aria-label="Show chat"')
   })
 
   it('disables the chat entry with a red unavailable state when AI is not ready', () => {
@@ -114,13 +114,13 @@ describe('MindmapHeader style panel dismissal', () => {
 
     expect(html).toContain('float-toolbar__btn--unavailable')
     expect(html).toContain('disabled')
-    expect(html).toContain('聊天服务不可用')
+    expect(html).toContain('Chat service unavailable')
   })
 
   it('keeps the chat entry usable when AI is ready', () => {
     const html = ReactDOMServer.renderToString(<MindmapHeader {...defaultProps} aiReady />)
 
     expect(html).not.toContain('float-toolbar__btn--unavailable')
-    expect(html).toContain('aria-label="隐藏聊天"')
+    expect(html).toContain('aria-label="Hide chat"')
   })
 })

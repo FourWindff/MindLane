@@ -19,33 +19,33 @@ import { MCP_SERVERS } from './servers/index.js'
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 15_000
 const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000
-/** 非交互模式下 OAuth provider 的占位回调地址（不会真正发起 DCR/重定向，仅满足 clientMetadata） */
+/** Placeholder callback URL for the OAuth provider in non-interactive mode (no real DCR/redirect happens, it only satisfies clientMetadata) */
 const NON_INTERACTIVE_REDIRECT_URL = 'http://127.0.0.1/callback'
 
 export interface McpManagerOptions {
   userDataPath: string
-  /** 唯一测试接缝：client 创建工厂 */
+  /** The single test seam: client creation factory */
   createClient: (
     serverDef: McpServerDefinition,
     authProvider?: LoopbackOAuthProvider,
-    /** 非 OAuth 模式：createAuthHeaders 解析出的认证头，透传到 http transport */
+    /** Non-OAuth mode: auth headers resolved by createAuthHeaders, passed through to the http transport */
     headers?: Record<string, string>,
   ) => McpClientLike
   servers?: McpServerDefinition[]
-  /** 凭据加密；缺失时凭据仅保存在内存并警告 */
+  /** Credential encryption; when missing, credentials are kept in memory only with a warning */
   credentialCrypto?: McpCredentialCrypto
   openBrowser?: (url: string) => void
   onToolsChanged?: (tools: StructuredToolInterface[]) => void
   onStatusChanged?: (serverId: string, status: McpServerStatus) => void
-  /** 单次 getTools 超时（默认 15s） */
+  /** Per-call getTools timeout (15s by default) */
   connectTimeoutMs?: number
-  /** 等待用户完成浏览器授权的超时（默认 5min） */
+  /** Timeout for waiting on the user to finish browser authorization (5min by default) */
   authTimeoutMs?: number
 }
 
 /**
- * MCP 生命周期核心：启动时连接已授权 server、单点失败降级、
- * 授权完成/断开时热重载工具、对外暴露连接状态。
+ * MCP lifecycle core: connects authorized servers at startup, degrades gracefully on a single failure,
+ * hot-reloads tools on authorization completion/disconnect, and exposes connection status.
  */
 export class McpManager {
   private readonly servers: Map<string, McpServerDefinition>
@@ -61,14 +61,14 @@ export class McpManager {
   }
 
   /**
-   * 启动：用持久化的 MCP 用户态水合展示信息（如 workspace 名），
-   * 并静默重连所有已授权 server；单点失败互不影响，永不 reject。
+   * Startup: hydrates display info (e.g. the workspace name) from persisted MCP user state,
+   * then silently reconnects every authorized server; a single failure does not affect the others and it never rejects.
    */
   async start(persistedState: Record<string, McpServerUserState>): Promise<void> {
     const authorized: string[] = []
     for (const [serverId, userState] of Object.entries(persistedState)) {
       if (!this.servers.has(serverId)) continue
-      // 直接写内部状态而不走 setStatus——水合不是状态迁移，不应触发持久化回调
+      // Write internal state directly instead of going through setStatus - hydration is not a state transition and must not trigger the persistence callback
       if (userState.workspaceName) {
         this.statuses.set(serverId, {
           state: 'disconnected',
@@ -80,15 +80,15 @@ export class McpManager {
     await Promise.allSettled(authorized.map((serverId) => this.connectServer(serverId, false)))
   }
 
-  /** 交互式连接（设置面板“连接”按钮）：OAuth server 触发浏览器授权，非 OAuth server 用随凭据直接连接 */
+  /** Interactive connect (the settings panel "connect" button): OAuth servers trigger browser authorization, non-OAuth servers connect directly with the supplied credentials */
   async connect(serverId: string, credentials?: Record<string, string>): Promise<McpServerStatus> {
     await this.connectServer(serverId, true, credentials)
-    return this.statuses.get(serverId) ?? { state: 'failed', error: '未知的 MCP server' }
+    return this.statuses.get(serverId) ?? { state: 'failed', error: 'Unknown MCP server' }
   }
 
-  /** 断开：移除工具、关闭连接。
-   *  OAuth server 同时删除已存 token；表单配置类 server（obsidian/feishu）**保留**
-   *  凭据，方便重连时直接修改上次配置而不用从零填写。 */
+  /** Disconnect: remove tools and close the connection.
+   *  OAuth servers also delete stored tokens; form-configured servers (obsidian/feishu) **keep**
+   *  their credentials, so a reconnect can edit the last config instead of filling it from scratch. */
   async disconnect(serverId: string): Promise<void> {
     this.bumpToken(serverId)
     const client = this.clients.get(serverId)
@@ -102,19 +102,19 @@ export class McpManager {
     this.emitToolsChanged()
   }
 
-  /** 返回表单配置类 server 已保存的凭据键值（供设置面板“显示配置”回填；无则空对象） */
+  /** Returns the saved credential key/values of a form-configured server (for the settings panel "show config" fill-in; empty object when none) */
   getSecrets(serverId: string): Record<string, string> {
     return this.getCredentialStore(serverId).load().secrets ?? {}
   }
 
-  /** 当前已注入的全部 MCP 工具（已加 server 前缀） */
+  /** All MCP tools currently injected (already prefixed with the server id) */
   getTools(): StructuredToolInterface[] {
     return [...this.toolsByServer.values()].flat()
   }
 
   /**
-   * 非表单来源的追加凭据写入（如一键获取的 refresh_token），merge 进该 server 的凭据存储。
-   * 供 handler 在 UAT 授权完成后落盘，连接时 createAuthHeaders 可据此自动续期。
+   * Writes extra credentials that do not come from the form (e.g. a refresh_token obtained via one-click), merged into that server's credential store.
+   * Lets the handler persist them after UAT authorization completes, so createAuthHeaders can auto-renew on connect.
    */
   persistSecrets(serverId: string, secrets: Record<string, string>): void {
     this.getCredentialStore(serverId).saveSecrets(secrets)
@@ -155,7 +155,7 @@ export class McpManager {
         ?.close()
         .catch(() => {})
       this.clients.set(serverId, client)
-      // allowlist 裁剪先于加前缀与注册：破坏性/副作用工具永远不进入 ToolRegistry
+      // Allowlist trimming happens before prefixing and registration: destructive/side-effect tools never reach ToolRegistry
       const exclude = def.excludeTools
       const toolsToRegister =
         exclude && exclude.length > 0 ? tools.filter((tool) => !exclude.includes(tool.name)) : tools
@@ -180,8 +180,8 @@ export class McpManager {
   }
 
   /**
-   * 表单凭据：按定义的 credentialFields 校验必填项后写入凭据存储；
-   * 校验失败时置 failed 并返回 false 中止连接（不发起任何请求）。
+   * Form credentials: validates required entries against the definition's credentialFields, then writes them to the credential store;
+   * on validation failure it sets failed and returns false to abort the connection (without sending any request).
    */
   private async applyCredentials(
     def: McpServerDefinition,
@@ -194,11 +194,11 @@ export class McpManager {
       const hint = def.failureHint ? ` ${def.failureHint}` : ''
       this.setStatus(def.id, {
         state: 'failed',
-        error: `缺少必填连接凭据：${missing.map((f) => f.label).join('、')}${hint}`,
+        error: `Missing required connection credentials: ${missing.map((f) => f.label).join(', ')}${hint}`,
       })
       return false
     }
-    // 只写入定义声明过的字段，避免未知键混入加密文件
+    // Only write fields the definition declares, so unknown keys never leak into the encrypted file
     const known = Object.fromEntries(
       fields.map((f) => [f.id, credentials[f.id]]).filter(([, v]) => v != null),
     )
@@ -207,9 +207,9 @@ export class McpManager {
   }
 
   /**
-   * 建立连接并取回工具。
-   * 交互式模式下，若 SDK 因缺少有效凭据走到浏览器授权（provider.authRedirected），
-   * 则等待 loopback 回调拿授权码、换 token 后重试一次。
+   * Establishes the connection and retrieves the tools.
+   * In interactive mode, if the SDK falls back to browser authorization because of missing valid credentials (provider.authRedirected),
+   * it waits for the loopback callback, exchanges the authorization code for a token, and retries once.
    */
   private async establish(
     def: McpServerDefinition,
@@ -228,7 +228,7 @@ export class McpManager {
           openBrowser: this.options.openBrowser ?? (() => {}),
         })
       }
-      // 非 OAuth 模式：从凭据存储解析认证头，注入 client 工厂（经 http transport 透传）
+      // Non-OAuth mode: resolve auth headers from the credential store and inject them into the client factory (passed through the http transport)
       const headers = def.createAuthProvider ? undefined : await def.createAuthHeaders?.(store)
 
       const attempt = async (): Promise<{
@@ -300,7 +300,7 @@ export class McpManager {
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('连接超时')), timeoutMs)
+    const timer = setTimeout(() => reject(new Error('Connection timed out')), timeoutMs)
     promise.then(
       (value) => {
         clearTimeout(timer)

@@ -1,30 +1,30 @@
 import type { ColorSchemeId } from './types'
 
-/** 单个颜色层级：对应节点的某个深度级别 */
+/** One color level: one depth level of a node */
 interface DepthColor {
   nodeBg: string
   nodeBorder: string
   nodeText: string
 }
 
-/** 单条分支的颜色：root子节点（depth1）→ 孙节点（depth2）→ 更深（depth3+） */
+/** Colors of one branch: children of the root (depth1) -> grandchildren (depth2) -> deeper (depth3+) */
 interface BranchPalette {
   depth1: DepthColor
   depth2: DepthColor
-  depth3: DepthColor // depth≥3 复用此层
+  depth3: DepthColor // depth >= 3 reuses this level
 }
 
-/** 一套配色方案的完整定义 */
+/** Full definition of one color scheme */
 interface SchemePalette {
-  /** 画布背景色 */
-  /** 画布点阵颜色 */
-  /** 根节点样式（depth=0，不参与分支着色） */
+  /** Canvas background color */
+  /** Canvas dot color */
+  /** Root node style (depth=0, not branch-tinted) */
   root: { nodeBg: string; nodeBorder: string; nodeText: string }
-  /** 各分支配色，按 branchIndex % 6 循环使用 */
+  /** Per-branch colors, cycled by branchIndex % 6 */
   branches: BranchPalette[]
 }
 
-// ─── 各方案调色板 ─────────────────────────────────────────────────────────────
+// ─── Palettes per scheme ───────────────────────────────────────────────────────────
 const DEFAULT_GRAY: SchemePalette = {
   root: { nodeBg: '#ffffff', nodeBorder: '#b1b1b7', nodeText: '#222222' },
   branches: [
@@ -263,9 +263,9 @@ export const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
 }
 
 /**
- * 根据配色方案、分支索引和深度，返回节点着色参数。
- * - depth=0: 根节点，使用 root 样式
- * - depth≥1: 从 branches 中按 branchIndex % 6 取对应分支，再按深度取颜色
+ * Return node coloring parameters for a color scheme, branch index and depth.
+ * - depth=0: root node, using the root style
+ * - depth>=1: pick the branch from branches by branchIndex % 6, then the color for the depth
  */
 export function getNodeColor(
   scheme: ColorSchemeId,
@@ -282,7 +282,8 @@ export function getNodeColor(
 }
 
 /**
- * 返回边的描边颜色：与节点边框同色。深度指边的起点（source节点）所在深度。
+ * Return the edge stroke color: the same color as the node border. Depth means the depth of the
+ * edge source node.
  */
 export function getEdgeColor(scheme: ColorSchemeId, depth: number, branchIndex: number): string {
   return getNodeColor(scheme, depth, branchIndex).nodeBorder

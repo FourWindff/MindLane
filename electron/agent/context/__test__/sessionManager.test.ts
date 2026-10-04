@@ -27,7 +27,7 @@ describe('SessionManager', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  /** 夹具：走 runner 同一条公共追加路径（UI 消息 → BaseMessage 落盘）。 */
+  /** Fixture: uses the same shared append path as the runner (UI message → BaseMessage on disk). */
   async function appendUiMessages(
     sessionId: string,
     messages: ChatMessage[],
@@ -71,7 +71,7 @@ describe('SessionManager', () => {
       ])
     }))
 
-  it('listSessions 返回按 updatedAt 排序的结果', async () =>
+  it('listSessions returns results sorted by updatedAt', async () =>
     inWs(async () => {
       await appendUiMessages('session-older', [{ role: 'user', content: 'Msg 1' }])
       await new Promise((r) => setTimeout(r, 10))
@@ -83,7 +83,7 @@ describe('SessionManager', () => {
       expect(sessions[1].id).toBe('session-older')
     }))
 
-  it('listSessions 支持分页', async () =>
+  it('listSessions supports pagination', async () =>
     inWs(async () => {
       for (let i = 1; i <= 5; i++) {
         await appendUiMessages(`session-${i}`, [{ role: 'user', content: `Message ${i}` }])
@@ -110,7 +110,7 @@ describe('SessionManager', () => {
       expect(page3[0].id).toBe('session-1')
     }))
 
-  it('deleteSession 删除会话元数据', async () =>
+  it('deleteSession removes session metadata', async () =>
     inWs(async () => {
       await appendUiMessages('session-delete', [{ role: 'user', content: 'Hello' }])
 
@@ -123,7 +123,7 @@ describe('SessionManager', () => {
       expect(sessionsAfter).toHaveLength(0)
     }))
 
-  it('不同 workspace 的数据互相隔离', async () => {
+  it('data in different workspaces stays isolated', async () => {
     await inWs(async () => {
       await appendUiMessages('session-ws1', [{ role: 'user', content: 'Workspace 1' }])
     })
@@ -173,7 +173,7 @@ describe('SessionManager', () => {
       const messages: ChatMessage[] = [
         {
           role: 'assistant',
-          content: '生成导图完成',
+          content: 'mindmap generation complete',
           toolCalls: [
             {
               name: 'generateMindmapFragment',
@@ -207,7 +207,7 @@ describe('SessionManager', () => {
       expect(deletedThreads).toEqual(['session-delete-linked'])
     }))
 
-  it('loadSessionBaseMessages 无消息时返回空', async () =>
+  it('loadSessionBaseMessages returns empty when there are no messages', async () =>
     inWs(async () => {
       const loaded = await manager.loadSessionBaseMessages('non-existent-session')
       expect(loaded).toHaveLength(0)

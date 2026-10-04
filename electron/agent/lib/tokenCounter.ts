@@ -3,9 +3,9 @@ import cl100k_base from 'js-tiktoken/ranks/cl100k_base'
 import type { BaseMessage } from '@langchain/core/messages'
 import { messageContentToString } from '../utils.js'
 
-// 使用 cl100k_base（GPT-4 系列）作为通用近似估算。
-// 国内中文模型（Qwen / Kimi / MiniMax）各有自己的 tokenizer，
-// 但 cl100k_base 的估算仍远优于字符数 / 3 的粗估。
+// cl100k_base (the GPT-4 family) is used as a general-purpose approximation.
+// Chinese-focused models (Qwen / Kimi / MiniMax) each have their own tokenizer,
+// but the cl100k_base estimate still beats the crude characters / 3 approximation by far.
 const encoder = new Tiktoken(cl100k_base)
 
 export function estimateTokenCount(text: string): number {

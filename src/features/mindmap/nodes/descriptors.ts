@@ -5,7 +5,7 @@ import { ImageNodeComponent } from './image/ImageNodeComponent'
 import { PalaceNodeComponent } from './palace/PalaceNodeComponent'
 import type { TextNodeData, ImageNodeData, PalaceNodeData } from '@contracts/nodeData'
 
-/** 一个节点类型：React Flow 渲染组件 + 落盘序列化。 */
+/** One node type: React Flow render component + on-disk serialization. */
 export interface NodeTypeDescriptor<
   TData extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -23,7 +23,7 @@ const TEXT: NodeTypeDescriptor<TextNodeData> = {
       ...(data.palaceId != null && { palaceId: data.palaceId }),
       ...(data.pageRange != null && { pageRange: data.pageRange }),
       ...(data.summary != null && { summary: data.summary }),
-      // 布局产物（depth/branchIndex/side）不落盘（PRD 2.2），打开时布局重算
+      // Layout artifacts (depth/branchIndex/side) are not persisted (PRD 2.2); layout is recomputed on open
       ...(data.collapsed === true && { collapsed: true }),
       ...(data.leftCollapsed === true && { leftCollapsed: true }),
       ...(data.rightCollapsed === true && { rightCollapsed: true }),
@@ -58,5 +58,5 @@ const PALACE: NodeTypeDescriptor<PalaceNodeData> = {
   },
 }
 
-/** 节点类型描述符表：新增类型只需在此加一项，注册表随之就绪。 */
+/** Node type descriptor table: adding a type here is all the registry needs. */
 export const NODE_TYPE_DESCRIPTORS: NodeTypeDescriptor[] = [TEXT, IMAGE, PALACE]

@@ -6,7 +6,7 @@
  * AsyncLocalStorage (see shared/runContext).
  *
  * It also counts model calls per streamId so graph summaries can report
- * "模型调用 N 次" without instrumenting every invoke site.
+ * "model calls: N" without instrumenting every invoke site.
  */
 
 import { BaseCallbackHandler } from '@langchain/core/callbacks/base'
@@ -104,7 +104,7 @@ class MeteringHandler extends BaseCallbackHandler {
     // supervisor calls from subgraph calls; falls back to plain `llm`.
     const line = record.node ? logger.withContext(`llm:${record.node}`) : log
     line.info(
-      '%s 完成，耗时 %ss，tokens in=%s out=%s',
+      '%s completed in %ss, tokens in=%s out=%s',
       record.model,
       elapsed.toFixed(1),
       usage.input ?? '?',

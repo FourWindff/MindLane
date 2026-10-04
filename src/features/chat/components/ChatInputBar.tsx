@@ -63,11 +63,12 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   // no file open, sending creates and opens the .mindlane file for this turn.
   const inputEnabled = chatReady && (hasActiveFile || hasWorkspace)
 
-  let placeholder = attachedDocument ? '输入提示词（可选）...' : '输入消息…'
+  let placeholder = attachedDocument ? 'Enter a prompt (optional)...' : 'Type a message...'
   if (!chatReady && settingsLoaded) {
-    if (!hasApiKey && !hasChatModel) placeholder = '请先在设置中配置 API Key 并选择模型'
-    else if (!hasApiKey) placeholder = '请先在设置中配置 API Key'
-    else if (!hasChatModel) placeholder = '请先在设置中选择模型'
+    if (!hasApiKey && !hasChatModel)
+      placeholder = 'Configure an API Key and model in settings first'
+    else if (!hasApiKey) placeholder = 'Configure an API Key in settings first'
+    else if (!hasChatModel) placeholder = 'Select a model in settings first'
   }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -163,14 +164,14 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     const draft = e.target.value
     setUrlDraft(draft)
     setUrlError(
-      draft.trim() ? (validateUrl(draft) ? null : '请输入有效的 http:// 或 https:// 链接') : null,
+      draft.trim() ? (validateUrl(draft) ? null : 'Enter a valid http:// or https:// link') : null,
     )
   }, [])
 
   const handleUrlConfirm = useCallback(() => {
     const url = validateUrl(urlDraft)
     if (!url) {
-      setUrlError('请输入有效的 http:// 或 https:// 链接')
+      setUrlError('Enter a valid http:// or https:// link')
       return
     }
     setAttachedDocument(createUrlDocumentRef(url))
@@ -237,25 +238,25 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               value={urlDraft}
               onChange={handleUrlDraftChange}
               onKeyDown={handleUrlKeyDown}
-              placeholder="粘贴链接，仅支持 http/https"
-              aria-label="粘贴链接"
+              placeholder="Paste a link, http/https only"
+              aria-label="Paste link"
               spellCheck={false}
             />
             <button
               type="button"
               className="chat-input-bar__url-btn"
               onClick={handleUrlConfirm}
-              aria-label="添加链接"
+              aria-label="Add link"
             >
-              添加
+              Add
             </button>
             <button
               type="button"
               className="chat-input-bar__url-btn chat-input-bar__url-btn--ghost"
               onClick={closeAttachMenu}
-              aria-label="取消粘贴链接"
+              aria-label="Cancel pasting link"
             >
-              取消
+              Cancel
             </button>
             {urlError && <span className="chat-input-bar__url-error">{urlError}</span>}
           </div>
@@ -270,7 +271,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
                   type="button"
                   className="chat-input-bar__tag-remove"
                   onClick={() => editor.clearNodeSelection()}
-                  aria-label="清除节点选择"
+                  aria-label="Clear node selection"
                 >
                   <X size={10} strokeWidth={2} />
                 </button>
@@ -288,7 +289,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
                   type="button"
                   className="chat-input-bar__tag-remove"
                   onClick={handleRemoveAttachment}
-                  aria-label="移除附件"
+                  aria-label="Remove attachment"
                 >
                   <X size={10} strokeWidth={2} />
                 </button>
@@ -311,8 +312,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               type="button"
               className="chat-input-bar__stop"
               onClick={stopChatStream}
-              title="停止生成"
-              aria-label="停止生成"
+              title="Stop generating"
+              aria-label="Stop generating"
             >
               <Square size={14} fill="currentColor" strokeWidth={0} />
             </button>
@@ -322,8 +323,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               className="chat-input-bar__send"
               onClick={() => void send()}
               disabled={!inputEnabled}
-              title="发送 (Enter)"
-              aria-label="发送"
+              title="Send (Enter)"
+              aria-label="Send"
             >
               <Send size={14} strokeWidth={2} />
             </button>
@@ -335,8 +336,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
               <button
                 type="button"
                 className="chat-input-bar__tool"
-                title="添加附件"
-                aria-label="添加附件"
+                title="Add attachment"
+                aria-label="Add attachment"
                 onClick={() => setAttachMenuOpen((open) => !open)}
                 disabled={busy || !inputEnabled}
               >
@@ -346,11 +347,11 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
                 <div className="chat-input-bar__menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => void handleAttachFile()}>
                     <FileText size={13} strokeWidth={2} />
-                    添加文件
+                    Add file
                   </button>
                   <button type="button" role="menuitem" onClick={handleOpenUrlMode}>
                     <Link size={13} strokeWidth={2} />
-                    粘贴链接
+                    Paste link
                   </button>
                 </div>
               )}
@@ -358,8 +359,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             <button
               type="button"
               className="chat-input-bar__tool"
-              title="设置"
-              aria-label="设置"
+              title="Settings"
+              aria-label="Settings"
               onClick={onOpenSettings}
             >
               <SlidersHorizontal size={14} strokeWidth={2} />
@@ -369,8 +370,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
             <button
               type="button"
               className="chat-input-bar__tool"
-              title="语音输入"
-              aria-label="语音输入"
+              title="Voice input"
+              aria-label="Voice input"
               onPointerDown={() => setRecording(true)}
               onPointerUp={() => setRecording(false)}
               onPointerLeave={() => setRecording(false)}

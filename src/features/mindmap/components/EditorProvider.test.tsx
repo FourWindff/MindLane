@@ -17,7 +17,7 @@ function ProbeComponent() {
   const nodeCount = useActiveMindmapStore((s) => s.nodes.length)
 
   useEffect(() => {
-    // 仅用于让 React 认为组件有副作用，避免被优化掉
+    // Only there so React sees a side effect and does not optimize the component away
   }, [instance, editor, nodeCount])
 
   return (
@@ -32,7 +32,7 @@ function ProbeComponent() {
 function prepareActiveInstance(key: string) {
   resetRegistry()
   const instance = openFileRegistry.getOrCreate(key)
-  instance.newFile('测试')
+  instance.newFile('Test file')
   openFileRegistry.setActive(key)
   return instance
 }
@@ -52,7 +52,7 @@ describe('MindmapEditorProvider', () => {
     )
 
     expect(html).toContain('editor')
-    // 默认空文件包含一个 root 节点
+    // A default empty file holds a single root node
     expect(html).toContain('>1<')
     expect(html).toContain('/test.mindlane')
   })

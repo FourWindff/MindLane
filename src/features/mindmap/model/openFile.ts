@@ -4,8 +4,9 @@ import { MindmapEditor } from './editor'
 import type { MindLaneFile } from '@contracts/fileFormat'
 
 /**
- * 单个打开文件对应的导图实例，包含独立的 store、history 和 editor。
- * 实例在文件打开期间保持存活，切换活动文件不会销毁历史栈。
+ * The mindmap instance behind one open file, with its own store, history and editor.
+ * The instance lives as long as the file stays open, so switching the active file never
+ * destroys the history stack.
  */
 export class OpenFile {
   key: string
@@ -14,8 +15,9 @@ export class OpenFile {
   readonly editor: MindmapEditor
 
   /**
-   * 「文件正在被 AI 写入」：打开的文件自己的瞬时状态，不进导图文档模型、
-   * 不落盘、不参与脏检查。chat 侧投影写入（见 aiWritingProjection），导图侧订阅读取。
+   * "The AI is writing to this file": a transient flag owned by the open file. It never enters
+   * the mindmap document model, is never persisted and does not take part in the dirty check.
+   * The chat side projects writes into it (see aiWritingProjection); the mindmap side subscribes.
    */
   private aiWriting = false
   private aiWritingListeners = new Set<() => void>()
@@ -32,8 +34,8 @@ export class OpenFile {
   }
 
   /**
-   * 写这个标记只通知自己的订阅者，绝不触碰导图 store：否则自动保存会在
-   * AI 忙闲切换时被误触发。
+   * Writing this flag notifies only its own subscribers and never touches the mindmap store:
+   * otherwise autosave would fire spuriously on every AI busy/idle toggle.
    */
   setAiWriting(value: boolean): void {
     if (this.aiWriting === value) return

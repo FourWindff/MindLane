@@ -65,22 +65,22 @@ describe('loadDocument registry routing', () => {
 
   it('throws a clear error when the registry lacks the loader', async () => {
     await expect(loadDocument({ type: 'pdf', path: '/tmp/a.pdf' }, {})).rejects.toThrow(
-      '不支持的输入类型: pdf',
+      'Unsupported input type: pdf',
     )
   })
 })
 
 describe('default text loader', () => {
   it('wraps text into a single Document', async () => {
-    const docs = await loadDocument({ type: 'text', content: '直接粘贴的内容' })
+    const docs = await loadDocument({ type: 'text', content: 'directly pasted content' })
 
     expect(docs).toHaveLength(1)
-    expect(docs[0]!.pageContent).toBe('直接粘贴的内容')
+    expect(docs[0]!.pageContent).toBe('directly pasted content')
   })
 
   it('throws a clear error for empty text', async () => {
     await expect(loadDocument({ type: 'text', content: '   ' })).rejects.toThrow(
-      '文本输入内容为空。',
+      'Text input is empty.',
     )
   })
 })
@@ -225,7 +225,7 @@ describe('default file loaders', () => {
     const filePath = await fixturePath('broken.docx', 'not an office archive')
 
     await expect(loadDocument({ type: 'docx', path: filePath })).rejects.toThrow(
-      '无法解析 DOCX 文档',
+      'Failed to parse DOCX document',
     )
   })
 
@@ -233,7 +233,7 @@ describe('default file loaders', () => {
     const filePath = await fixturePath('empty.markdown', '   \n')
 
     await expect(loadDocument({ type: 'markdown', path: filePath })).rejects.toThrow(
-      'Markdown 文档未包含文本内容。',
+      'Markdown document contains no text content.',
     )
   })
 })
@@ -305,7 +305,7 @@ describe('default URL loader', () => {
 
     await expect(
       loadDocument({ type: 'url', url: 'https://example.test/img.png' }),
-    ).rejects.toThrow('暂不支持的链接类型: image/png')
+    ).rejects.toThrow('Unsupported link type: image/png')
   })
 
   it('reports non-2xx responses clearly', async () => {
@@ -313,7 +313,7 @@ describe('default URL loader', () => {
 
     await expect(
       loadDocument({ type: 'url', url: 'https://example.test/missing' }),
-    ).rejects.toThrow('链接返回 HTTP 404')
+    ).rejects.toThrow('The link returned HTTP 404')
   })
 
   it('rejects non-http(s) protocols before fetching', async () => {
@@ -321,10 +321,10 @@ describe('default URL loader', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await expect(loadDocument({ type: 'url', url: 'file:///etc/passwd' })).rejects.toThrow(
-      '仅支持 http:// 与 https://',
+      'Only http:// and https://',
     )
     await expect(loadDocument({ type: 'url', url: 'javascript:alert(1)' })).rejects.toThrow(
-      '仅支持 http:// 与 https://',
+      'Only http:// and https://',
     )
     expect(fetchMock).not.toHaveBeenCalled()
   })

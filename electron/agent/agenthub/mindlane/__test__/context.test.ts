@@ -12,7 +12,7 @@ function tmpMemoryDir(): string {
 
 async function withMemoryManager(dir: string): Promise<MemoryManager> {
   const mm = new MemoryManager(dir)
-  await mm.writeMemory('用户偏好模块化设计\n用户偏好时间轴叙事')
+  await mm.writeMemory('The user prefers modular design\nThe user prefers timeline narratives')
   return mm
 }
 
@@ -34,8 +34,8 @@ describe('buildSystemPrompt memory', () => {
     try {
       const prompt = await buildSystemPrompt({ ...baseInput, memoryManager: mm })
       expect(prompt).toContain('<MEMORY>')
-      expect(prompt).toContain('用户偏好模块化设计')
-      expect(prompt).toContain('用户偏好时间轴叙事')
+      expect(prompt).toContain('The user prefers modular design')
+      expect(prompt).toContain('The user prefers timeline narratives')
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true })
     }
@@ -53,7 +53,7 @@ describe('buildSystemPrompt memory', () => {
 
       expect(withPreload).toBe(fresh)
       expect(withPreload).toContain('<MEMORY>')
-      expect(withPreload).toContain('用户偏好模块化设计')
+      expect(withPreload).toContain('The user prefers modular design')
     } finally {
       await fs.promises.rm(dir, { recursive: true, force: true })
     }
@@ -69,10 +69,10 @@ describe('buildSystemPrompt sections', () => {
   it('injects last summary into system prompt', async () => {
     const prompt = await buildSystemPrompt({
       ...baseInput,
-      lastSummary: '用户想做一个 AI 助手项目',
+      lastSummary: 'The user wants to build an AI assistant project',
     })
-    expect(prompt).toContain('历史摘要')
-    expect(prompt).toContain('用户想做一个 AI 助手项目')
+    expect(prompt).toContain('## History Summary')
+    expect(prompt).toContain('The user wants to build an AI assistant project')
     expect(prompt).toContain('</SYSTEM_PROMPT>')
   })
 
@@ -81,7 +81,7 @@ describe('buildSystemPrompt sections', () => {
       ...baseInput,
       context: {
         ...ctx,
-        selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }],
+        selectedNodes: [{ id: 'n1', type: 'text', label: 'Node one' }],
       },
     })
 
@@ -100,25 +100,25 @@ describe('buildSystemPrompt sections', () => {
       context: {
         ...ctx,
         hasDocumentOpen: true,
-        selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }],
+        selectedNodes: [{ id: 'n1', type: 'text', label: 'Node one' }],
       },
     })
 
-    // 选中节点、导图树、附件、MINDMAP 外壳都不进 system prompt。
+    // Selected nodes, the mindmap tree, attachments, and the MINDMAP shell never enter the system prompt.
     expect(prompt).not.toContain('<MINDMAP')
     expect(prompt).not.toContain('<SELECTED_NODES')
     expect(prompt).not.toContain('mindmapSummary')
     expect(prompt).not.toContain('getContextSummary')
-    expect(prompt).not.toContain('节点一')
+    expect(prompt).not.toContain('Node one')
   })
 
   it('injects the node type registry into the XML contract (stable prefix)', async () => {
     const prompt = await buildSystemPrompt(baseInput)
     expect(prompt).toContain('<MINDLANE_XML_CONTRACT>')
-    expect(prompt).toContain('### 节点类型注册表')
-    expect(prompt).toContain('text（文本节点）')
-    expect(prompt).toContain('image（图片节点）')
-    expect(prompt).toContain('palace（记忆宫殿节点）')
+    expect(prompt).toContain('### Node Type Registry')
+    expect(prompt).toContain('text (Text node)')
+    expect(prompt).toContain('image (Image node)')
+    expect(prompt).toContain('palace (Memory palace node)')
     expect(prompt).toContain('block_not_found')
     expect(prompt).not.toContain('batchAddMindmapNodes')
     expect(prompt).not.toContain('addPalaceNode')
@@ -127,14 +127,14 @@ describe('buildSystemPrompt sections', () => {
   it('is byte-identical across turns when memory and summary are unchanged', async () => {
     const promptA = await buildSystemPrompt({
       ...baseInput,
-      context: { ...ctx, selectedNodes: [{ id: 'n1', type: 'text', label: '节点一' }] },
+      context: { ...ctx, selectedNodes: [{ id: 'n1', type: 'text', label: 'Node one' }] },
     })
     const promptB = await buildSystemPrompt({
       ...baseInput,
-      context: { ...ctx, selectedNodes: [{ id: 'n2', type: 'text', label: '另一个节点' }] },
+      context: { ...ctx, selectedNodes: [{ id: 'n2', type: 'text', label: 'Another node' }] },
     })
 
-    // 易变编辑器状态（选中节点变化）不影响 system prompt。
+    // Volatile editor state (selected-node changes) does not affect the system prompt.
     expect(promptB).toBe(promptA)
   })
 })

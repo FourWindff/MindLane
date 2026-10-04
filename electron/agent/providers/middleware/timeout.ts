@@ -1,18 +1,21 @@
 /**
- * withTimeout - 统一超时控制中间件。
+ * withTimeout - unified timeout-control middleware.
  *
- * 把任意 async 操作包一层超时：`AbortSignal.timeout` 负责超时，外部 signal 经
- * `AbortSignal.any` 接力；超时与外部取消都表现为 operation 收到的 signal 触发。
+ * Wrap any async operation with a timeout: `AbortSignal.timeout` owns the
+ * timeout and an external signal is chained in via `AbortSignal.any`; both a
+ * timeout and an external cancel surface as the signal the operation receives
+ * firing.
  *
- * 注意：被包裹的 operation 必须能感知 signal，否则只是调用方提前 reject。
+ * Note: the wrapped operation must observe the signal, otherwise this only makes
+ * the caller reject early.
  */
 
 import { TimeoutError, raceWithAbort } from './abort.js'
 
 type WithTimeoutOptions = {
-  /** 外部 AbortSignal，可与超时联动 */
+  /** External AbortSignal, can be chained with the timeout */
   signal?: AbortSignal | null
-  /** 超时时抛出的错误消息（仅用作 TimeoutError 的 message） */
+  /** Error message thrown on timeout (used only as the TimeoutError message) */
   timeoutMessage?: string
 }
 
@@ -22,7 +25,7 @@ export async function withTimeout<T>(
   options: WithTimeoutOptions = {},
 ): Promise<T> {
   const parent = options.signal ?? null
-  // 没有超时约束时退化为带 signal 的直通调用。
+  // Without a timeout constraint this degrades to a pass-through call that still carries a signal.
   const timeoutSignal =
     Number.isFinite(timeoutMs) && timeoutMs > 0 ? AbortSignal.timeout(timeoutMs) : null
   const signal = timeoutSignal
@@ -35,7 +38,7 @@ export async function withTimeout<T>(
     return await raceWithAbort(operation(signal), signal)
   } catch (err) {
     if (timeoutSignal?.aborted) {
-      throw new TimeoutError(options.timeoutMessage ?? `操作超时（${timeoutMs}ms）`)
+      throw new TimeoutError(options.timeoutMessage ?? `operation timed out (${timeoutMs}ms)`)
     }
     throw err
   }

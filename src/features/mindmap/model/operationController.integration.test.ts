@@ -8,7 +8,7 @@ describe('MindmapOperationController integration', () => {
   it('keeps consecutive children attached to the selected parent', () => {
     const store = createMindmapStore()
     const editor = new MindmapEditor(store, new MindmapHistory())
-    editor.newFile('测试')
+    editor.newFile('Test')
 
     const rootId = store.getState().nodes[0]!.id
     const parentId = editor.addChild(rootId).nodeId

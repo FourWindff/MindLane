@@ -35,17 +35,17 @@ export function DocumentRefsPanel({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <div className="document-refs-panel" role="dialog" aria-label="关联文件">
+    <div className="document-refs-panel" role="dialog" aria-label="Linked files">
       <div className="document-refs-panel__header">
         <span className="document-refs-panel__title">
           <Paperclip size={14} strokeWidth={1.5} />
-          关联文件
+          Linked files
         </span>
         {onClose && (
           <button
             className="icon-btn icon-btn--xs document-refs-panel__close"
             onClick={onClose}
-            aria-label="关闭关联文件面板"
+            aria-label="Close linked files panel"
           >
             ✕
           </button>

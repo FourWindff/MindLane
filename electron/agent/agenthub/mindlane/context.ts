@@ -4,14 +4,15 @@ import { xmlNodeTypeRegistry } from '../../../../contracts/mindmapXml/registry.j
 
 const MEMORY_TAG = 'MEMORY'
 
-// 系统提示只包含跨轮次逐字节稳定的前缀：记忆段 + 核心规则 + 环境策略 + `## 历史摘要`。
-// 易变编辑器状态（选中节点、附件、文件身份）不进 system prompt，改由主进程序列化为
-// `<EDITOR_STATE>` 块附加到用户消息末尾（轮次状态），保住前缀缓存命中。
+// The system prompt holds only the byte-stable prefix shared across turns: memory section + core
+// rules + environment policy + `## History Summary`. Volatile editor state (selected nodes,
+// attachments, file identity) never enters the system prompt; the main process serializes it into
+// an `<EDITOR_STATE>` block appended to the last user message (turn state) to preserve prefix-cache hits.
 
 /**
- * 预载记忆上下文：`MEMORY.md` 的完整内容。
- * 由 `loadMemoryContext` 一次性读盘产出，供预算估算路径复用，
- * 避免每轮估算重复读盘；supervisor 真实调用仍现读现用（新鲜优先）。
+ * Preloaded memory context: the full contents of `MEMORY.md`.
+ * Produced by a single `loadMemoryContext` disk read so the budget-estimation path can reuse it
+ * instead of re-reading the disk every turn; real supervisor calls still read on demand (freshness first).
  */
 interface MemoryContext {
   memory: string
@@ -21,13 +22,13 @@ export interface SystemPromptInput {
   context?: ChatContext
   memoryManager?: MemoryManager
   lastSummary?: string
-  /** 预载记忆：提供时跳过 `memoryManager` 的磁盘加载。 */
+  /** Preloaded memory: when provided, skips the `memoryManager` disk load. */
   memory?: MemoryContext
 }
 
 /**
- * 从磁盘加载一次记忆上下文（`MEMORY.md` 全文）。
- * 无记忆管理器时返回 undefined。
+ * Load the memory context (`MEMORY.md` full text) from disk once.
+ * Returns undefined when there is no memory manager.
  */
 export async function loadMemoryContext(
   memoryManager: MemoryManager | undefined,
@@ -38,12 +39,12 @@ export async function loadMemoryContext(
 }
 
 /**
- * 构建监督器的 system message 全文（系统提示）。
+ * Build the supervisor's full system message (the system prompt).
  *
- * 调用方只提供输入，从不编排段落；段落顺序固定：
- * 记忆 → SYSTEM_PROMPT → ENV。
- * 易变编辑器状态不在此处渲染（见文件顶部注释）。
- * 新增或调整段落只有一个入口。
+ * Callers only supply input, never compose sections; the section order is fixed:
+ * memory → SYSTEM_PROMPT → ENV.
+ * Volatile editor state is not rendered here (see the file header comment).
+ * There is a single entry point for adding or adjusting sections.
  */
 export async function buildSystemPrompt(input: SystemPromptInput): Promise<string> {
   const parts: string[] = []
@@ -59,8 +60,8 @@ export async function buildSystemPrompt(input: SystemPromptInput): Promise<strin
 }
 
 /**
- * 记忆段：`<MEMORY>`（内容非空时）。
- * `memory` 预载优先于 `memoryManager` 加载。
+ * Memory section: `<MEMORY>` (only when the content is non-empty).
+ * A preloaded `memory` takes precedence over loading through `memoryManager`.
  */
 async function buildMemorySection(input: SystemPromptInput): Promise<string> {
   let memory: string
@@ -80,17 +81,17 @@ async function buildMemorySection(input: SystemPromptInput): Promise<string> {
 }
 
 function buildCorePrompt(lastSummary: string | undefined): string {
-  const features = ['思维导图创作', '记忆训练']
+  const features = ['mindmap authoring', 'memory training']
 
   let prompt = `<SYSTEM_PROMPT>
-你是 MindLane 的 AI 助手，帮助用户进行${features.join('、')}。
-当用户需要生成思维导图时，是否先调用 generateMindmapFragment 由该工具的描述决定（短内容自己写 XML，文档或长文本才走它）；调用后工具返回 XML 片段，再根据当前思维导图上下文调用 insertXmlFragment 选择插入位置。
-当用户需要生成记忆宫殿时，调用 generatePalace；宫殿由系统按选中节点所在的层级自动落图（你不需要再调用 insertXmlFragment 放置它，也不要向用户复述站点数据）。
-generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要直接复制给用户。
+You are MindLane's AI assistant, helping users with ${features.join(' and ')}.
+When the user needs a mindmap, whether to call generateMindmapFragment first is decided by that tool's description (write short content as XML yourself; only documents or long text go through it). After the call the tool returns an XML fragment, and you then call insertXmlFragment to choose the insertion position based on the current mindmap context.
+When the user needs a memory palace, call generatePalace; the system places the palace automatically at the level of the selected nodes (you do not need to call insertXmlFragment to place it, and do not repeat station data back to the user).
+The results of generateMindmapFragment and generatePalace are data waiting to be placed into the map, so do not copy them directly to the user.
 `
 
   if (lastSummary) {
-    prompt += `\n## 历史摘要\n${lastSummary}\n`
+    prompt += `\n## History Summary\n${lastSummary}\n`
   }
 
   prompt += `</SYSTEM_PROMPT>
@@ -99,33 +100,34 @@ generateMindmapFragment 和 generatePalace 的结果是待落图数据，不要�
 }
 
 /**
- * 导图 XML 契约段（PRD 6.5 / issue 06）：注册表描述注入稳定前缀。
+ * Mindmap XML contract section (PRD 6.5 / issue 06): the registry description joins the stable prefix.
  *
- * 内容完全由代码定义（xmlNodeTypeRegistry），跨轮次逐字节稳定，不破坏前缀缓存命中；
- * 新增节点类型只需注册条目，提示词段落自动更新，无需手写。
+ * The content is entirely code-defined (xmlNodeTypeRegistry) and byte-stable across turns, so it
+ * does not break prefix-cache hits; new node types only need a registry entry, and this prompt
+ * section updates itself with no hand-written text.
  */
 function buildMindmapXmlContract(): string {
   return `<MINDLANE_XML_CONTRACT>
-## 导图 XML 契约
+## Mindmap XML Contract
 
-- 节点：<node id="…" type="text|image|…" content="内容" [collapsed="true"]>
-- type 必填；未知类型报 invalid_type。
-- 子树：<node> 内嵌套 <node> 即父子；同级多个 <node> 为兄弟；顶层多个 = 批量插入。
-- 纯树：不允许出现环或多父；root 不可创建/删除/移动。
-- content 是纯文本；含 " < > & 时用实体 &quot; &lt; &gt; &amp;。
-- 图片：<node type="image" asset="a1" … />，asset 必须来自上下文（readMindmap 输出）。
-- id：创建新节点时禁止编写 id；引用节点必须使用 readMindmap 提供的 id。
-- 定位：insertXmlFragment 的 position 用 child（挂子节点）或 after/before（兄弟）。
+- Node: <node id="…" type="text|image|…" content="content" [collapsed="true"]>
+- type is required; an unknown type reports invalid_type.
+- Subtree: nesting a <node> inside a <node> means parent-child; multiple <node>s at the same level are siblings; multiple at the top level = batch insert.
+- Pure tree: no cycles or multiple parents; root cannot be created/deleted/moved.
+- content is plain text; when it contains " < > & use the entities &quot; &lt; &gt; &amp;.
+- Images: <node type="image" asset="a1" … />, asset must come from context (readMindmap output).
+- id: never write an id when creating new nodes; referencing a node requires the id provided by readMindmap.
+- Positioning: insertXmlFragment's position uses child (attach to a parent) or after/before (siblings).
 
-### 节点类型注册表
+### Node Type Registry
 ${xmlNodeTypeRegistry.describeAll()}
 
-## 失败恢复
+## Failure Recovery
 
-- block_not_found: 重新调用 readMindmap 定位后再操作。
-- xml_parse_error / text_unescaped: 修正 XML 后重试。
-- invalid_type / asset_not_found: 按错误信息改用注册类型/引用。
-- tree_invalid: 修正为纯树（去重 id、避开 root、目标不得在被移子树内）。
+- block_not_found: call readMindmap again to locate before operating.
+- xml_parse_error / text_unescaped: fix the XML and retry.
+- invalid_type / asset_not_found: switch to a registered type/reference as the error message says.
+- tree_invalid: fix into a pure tree (dedupe ids, avoid root, and the target must not be inside the moved subtree).
 </MINDLANE_XML_CONTRACT>
 `
 }

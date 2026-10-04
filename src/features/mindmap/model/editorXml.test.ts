@@ -5,7 +5,7 @@ import { MindmapEditor } from './editor'
 import { serializeMindLaneFile } from '@contracts/mindmapXml'
 import { MindmapXmlError } from '@contracts/mindmapXml'
 
-describe('MindmapEditor XML 集成', () => {
+describe('MindmapEditor XML integration', () => {
   let store: ReturnType<typeof createMindmapStore>
   let history: MindmapHistory
   let editor: MindmapEditor
@@ -14,15 +14,15 @@ describe('MindmapEditor XML 集成', () => {
     store = createMindmapStore()
     history = new MindmapHistory()
     editor = new MindmapEditor(store, history)
-    editor.newFile('测试')
+    editor.newFile('Test')
   })
 
   describe('insertFromXml', () => {
     it('inserts a nested fragment under the target parent with derived edges', async () => {
       await editor.insertFromXml(
-        `<node type="text" content="分支A">
-           <node type="text" content="子节点1" />
-           <node type="text" content="子节点2" />
+        `<node type="text" content="Branch A">
+           <node type="text" content="Child 1" />
+           <node type="text" content="Child 2" />
          </node>`,
         { parentId: 'root' },
       )
@@ -31,12 +31,12 @@ describe('MindmapEditor XML 集成', () => {
       expect(state.nodes).toHaveLength(4) // root + 3
       expect(state.edges).toHaveLength(3)
       const labels = new Map(state.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
-      expect(labels.get('root')).toBe('中心主题')
+      expect(labels.get('root')).toBe('Central Topic')
       const childIds = state.edges.filter((e) => e.source === 'root').map((e) => e.target)
       expect(childIds).toHaveLength(1)
-      expect(labels.get(childIds[0]!)).toBe('分支A')
+      expect(labels.get(childIds[0]!)).toBe('Branch A')
 
-      // 走命令历史：可撤销
+      // Goes through command history: undoable
       expect(state.canUndo).toBe(true)
       editor.undo()
       expect(store.getState().nodes).toHaveLength(1)
@@ -61,7 +61,7 @@ describe('MindmapEditor XML 集成', () => {
     })
 
     it('rejects fragments colliding with existing ids (tree_invalid) without partial mount', async () => {
-      const { nodeId } = editor.addChild('root', { label: '已有' })
+      const { nodeId } = editor.addChild('root', { label: 'Existing' })
       const before = store.getState().nodes.length
 
       await expect(
@@ -71,7 +71,7 @@ describe('MindmapEditor XML 集成', () => {
       ).rejects.toBeInstanceOf(MindmapXmlError)
 
       expect(store.getState().nodes.length).toBe(before)
-      expect(store.getState().edges).toHaveLength(1) // 仅原有的加子边
+      expect(store.getState().edges).toHaveLength(1) // Only the pre-existing add-child edge
     })
 
     it('rejects fragments referencing missing assets (asset_not_found)', async () => {
@@ -87,21 +87,24 @@ describe('MindmapEditor XML 集成', () => {
         sha256: 'h1',
         data: 'iVBORw0KGgo=',
       })
-      await editor.insertFromXml(`<node type="image" asset="${assetId}" alt="图" width="200" />`, {
-        parentId: 'root',
-      })
+      await editor.insertFromXml(
+        `<node type="image" asset="${assetId}" alt="Image" width="200" />`,
+        {
+          parentId: 'root',
+        },
+      )
       const node = store.getState().nodes.find((n) => n.type === 'image')!
       expect((node.data as { assetId: string }).assetId).toBe('a1')
     })
 
     it('inserts collapsed state from fragments', async () => {
       await editor.insertFromXml(
-        `<node type="text" content="折叠分支" collapsed="true"><node type="text" content="隐藏" /></node>`,
+        `<node type="text" content="Collapsed branch" collapsed="true"><node type="text" content="Hidden" /></node>`,
         { parentId: 'root' },
       )
       const node = store
         .getState()
-        .nodes.find((n) => (n.data as { label: string }).label === '折叠分支')!
+        .nodes.find((n) => (n.data as { label: string }).label === 'Collapsed branch')!
       expect((node.data as { collapsed?: boolean }).collapsed).toBe(true)
     })
   })
@@ -225,7 +228,7 @@ describe('MindmapEditor XML 集成', () => {
     })
   })
 
-  describe('纯树约束', () => {
+  describe('pure-tree constraint', () => {
     it('deleteSubtree ignores root', () => {
       const before = store.getState().nodes.length
       editor.deleteSubtree('root')
@@ -243,7 +246,7 @@ describe('MindmapEditor XML 集成', () => {
       expect(parentOfA).toBe(b)
       expect(state.edges.find((e) => e.target === a1)!.source).toBe(a)
 
-      // 单条 batch 历史：一次 undo 全部还原
+      // One batch history entry: a single undo restores everything
       editor.undo()
       const after = store.getState()
       expect(after.edges.find((e) => e.target === a)!.source).toBe('root')
@@ -255,17 +258,17 @@ describe('MindmapEditor XML 集成', () => {
       const { nodeId: a1 } = editor.addChild(a, { label: 'A1' })
       const edgesBefore = store.getState().edges.length
 
-      editor.moveSubtree('root', a) // root 不可移动
-      editor.moveSubtree(a, a1) // 移入自己子树（环）
-      editor.moveSubtree(a, a) // 自身
+      editor.moveSubtree('root', a) // root cannot be moved
+      editor.moveSubtree(a, a1) // moving into its own subtree (cycle)
+      editor.moveSubtree(a, a) // itself
 
       expect(store.getState().edges).toHaveLength(edgesBefore)
     })
   })
 
-  describe('collapsed 折叠', () => {
+  describe('collapsed state', () => {
     it('setNodeCollapsed goes through history and marks dirty', () => {
-      const { nodeId } = editor.addChild('root', { label: '子' })
+      const { nodeId } = editor.addChild('root', { label: 'Child' })
       editor.setNodeCollapsed(nodeId, true)
       expect(
         (store.getState().nodes.find((n) => n.id === nodeId)!.data as { collapsed?: boolean })
@@ -280,14 +283,14 @@ describe('MindmapEditor XML 集成', () => {
     })
 
     it('collapsed persists through XML roundtrip and load', () => {
-      const { nodeId } = editor.addChild('root', { label: '子' })
+      const { nodeId } = editor.addChild('root', { label: 'Child' })
       editor.setNodeCollapsed(nodeId, true)
 
       const file = store.getState().toMindLaneFile()
       const xml = serializeMindLaneFile(file)
       expect(xml).toContain(`collapsed="true"`)
 
-      // 重新加载（打开文件 → 布局重算 → 保持折叠态）
+      // Reload (open file -> reflow -> collapsed state kept)
       const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
       editor2.loadFile('/tmp/x.mindlane', file, null)
       const restored = editor2['store'].getState().nodes.find((n) => n.id === nodeId)!
@@ -306,7 +309,7 @@ describe('MindmapEditor XML 集成', () => {
       const childAfter = store
         .getState()
         .nodes.find((n) => (n.data as { label: string }).label === 'A1')!
-      // 折叠后子节点不再被布局：位置停留在折叠前的值
+      // A collapsed child is no longer laid out: its position stays at the pre-collapse value
       expect(childAfter.position).toEqual(childBefore.position)
 
       editor.setNodeCollapsed(a, false)
@@ -317,10 +320,10 @@ describe('MindmapEditor XML 集成', () => {
     })
   })
 
-  describe('文件 roundtrip', () => {
+  describe('file roundtrip', () => {
     it('editor state → XML → deserialize → reload keeps structure/style/attr', async () => {
       const { nodeId: a } = editor.addChild('root', { label: 'A & <B>' })
-      editor.addChild(a, { label: '叶子' })
+      editor.addChild(a, { label: 'Leaf' })
       editor.setNodeCollapsed(a, true)
       store.getState().addAsset({ id: 'a1', mime: 'image/png', sha256: 'h', data: 'QUJD' })
       store.getState().setViewport({ x: 5, y: 6, zoom: 0.9 })
@@ -330,7 +333,7 @@ describe('MindmapEditor XML 集成', () => {
 
       const { deserializeMindLaneFile } = await import('@contracts/mindmapXml')
       const parsed = await deserializeMindLaneFile(xml)
-      expect(parsed.metadata.title).toBe('测试')
+      expect(parsed.metadata.title).toBe('Test')
       expect(parsed.mindmap.viewport).toEqual({ x: 5, y: 6, zoom: 0.9 })
       expect(parsed.mindmap.style).toEqual(file.mindmap.style)
       expect(parsed.assets).toHaveLength(1)
@@ -345,13 +348,13 @@ describe('MindmapEditor XML 集成', () => {
       expect(
         (state2.nodes.find((n) => n.id === a)!.data as { collapsed?: boolean }).collapsed,
       ).toBe(true)
-      // 打开时布局重算：位置不再为 {0,0}
+      // Reflow on open: the position is no longer {0,0}
       expect(state2.nodes.find((n) => n.id === a)!.position.x).toBeGreaterThan(0)
     })
   })
 
-  describe('replaceNodeFromXml 保序', () => {
-    /** 插入三个根级兄弟 A/B/C，返回 { aId, bId, cId } 与 label 映射。 */
+  describe('replaceNodeFromXml order preservation', () => {
+    /** Insert three root-level siblings A/B/C and return { aId, bId, cId } plus a label map. */
     async function seedSiblings() {
       await editor.insertFromXml(
         `<node type="text" content="A" /><node type="text" content="B" /><node type="text" content="C" />`,
@@ -375,7 +378,7 @@ describe('MindmapEditor XML 集成', () => {
         .map((x) => x.id)
     }
 
-    it('重挂后兄弟顺序保持原位（edges 顺序与 y 布局）', async () => {
+    it('keeps sibling order in place after a reattach (edges order and y layout)', async () => {
       const { bId, labels } = await seedSiblings()
 
       await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
@@ -383,16 +386,16 @@ describe('MindmapEditor XML 集成', () => {
       const labelOf = (id: string) =>
         (state.nodes.find((n) => n.id === id)!.data as { label: string }).label
 
-      // edges 顺序（= XML 序列化/保存顺序）
+      // edges order (= XML serialization/save order)
       expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
-      // 视觉布局顺序（y 升序）
+      // Visual layout order (y ascending)
       expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
-      // 内容确实被替换
+      // The content really was replaced
       expect(labelOf(bId)).toBe('B-updated')
       expect(labels.get(bId)).toBe('B')
     })
 
-    it('带子树的节点更新后原位保持，子树顺序由 XML 决定', async () => {
+    it('keeps a node with a subtree in place after an update, subtree order decided by the XML', async () => {
       const { bId } = await seedSiblings()
 
       await editor.replaceNodeFromXml(
@@ -407,14 +410,14 @@ describe('MindmapEditor XML 集成', () => {
 
       expect(rootChildOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
       expect(yOrder(state).map(labelOf)).toEqual(['A', 'B-updated', 'C'])
-      // 子树内部顺序：按 XML 声明顺序（B1 在 B2 前）
+      // Subtree order: XML declaration order (B1 before B2)
       const b1 = state.edges.find((e) => e.source === bId)!.target
       const b2 = state.edges.filter((e) => e.source === bId)[1]!.target
       expect(labelOf(b1)).toBe('B1')
       expect(labelOf(b2)).toBe('B2')
     })
 
-    it('保存→重载 roundtrip 后顺序仍保持（序列化顺序 = edges 顺序）', async () => {
+    it('keeps order across a save -> reload roundtrip (serialization order = edges order)', async () => {
       const { bId } = await seedSiblings()
       await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
 
@@ -430,7 +433,8 @@ describe('MindmapEditor XML 集成', () => {
         (state2.nodes.find((n) => n.id === id)!.data as { label: string }).label
       const order = state2.edges.filter((e) => e.source === 'root').map((e) => labelOf(e.target))
       expect(order).toEqual(['A', 'B-updated', 'C'])
-      // 重载后 position 全部重算（y 归零退化排序）也不得改变顺序
+      // After a reload every position is recomputed (y ties degrade the sort) yet the order
+      // must not change
       const ySorted = state2.edges
         .filter((e) => e.source === 'root')
         .map((e) => ({ id: e.target, y: state2.nodes.find((n) => n.id === e.target)!.position.y }))
@@ -439,7 +443,7 @@ describe('MindmapEditor XML 集成', () => {
       expect(ySorted).toEqual(['A', 'B-updated', 'C'])
     })
 
-    it('undo 整单还原（含顺序）', async () => {
+    it('undo restores the whole transaction (including order)', async () => {
       const { bId } = await seedSiblings()
       await editor.replaceNodeFromXml(`<node id="${bId}" type="text" content="B-updated" />`)
 

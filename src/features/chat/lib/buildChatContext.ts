@@ -20,14 +20,17 @@ function collectWorkspaceFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileInfo
  * Reads the active mindmap instance, workspace state, and aiStore directly so
  * the sendChatMessage store action can call it outside any component.
  *
- * 源头不变量：调用时必有活动文件。有文件时直接用；没有文件时发送路径先经入口分支
- * 建并打开一个新文件（编辑器就绪）才走到这里，所以这里不兜底默认实例、不做空 uuid 早退。
- * 导图树摘要（mindmapSummary）已删除：模型需要结构时按需调用读工具。
+ * Source invariant: an active file always exists at call time. With a file it is
+ * used directly; without one the send path goes through the entry branch first,
+ * which creates and opens a new file (editor ready) before reaching here, so this
+ * function has no default-instance fallback and no empty-uuid early return. The
+ * mindmap summary (mindmapSummary) was removed: the model calls read tools on
+ * demand when it needs structure.
  */
 export function buildChatContext(): ChatContext {
   const instance = openFileRegistry.getActive()
   if (!instance) {
-    throw new Error('没有打开的文件，无法发起对话')
+    throw new Error('No file is open, cannot start a chat')
   }
   const openFileState = instance.store.getState()
   const wsState = useWorkspaceStore.getState()

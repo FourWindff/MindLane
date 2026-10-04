@@ -19,9 +19,16 @@ function svgDataUrl(): string {
 function palacePayload(): PalaceRunPayload {
   return {
     ok: true,
-    label: '测试宫殿',
+    label: 'Test palace',
     stations: [
-      { order: 1, content: '第一站', anchorVisual: '铜钟', x: 0.2, y: 0.3, linkedNodeId: 'n1' },
+      {
+        order: 1,
+        content: 'First stop',
+        anchorVisual: 'Bronze bell',
+        x: 0.2,
+        y: 0.3,
+        linkedNodeId: 'n1',
+      },
     ],
     imageUrl: svgDataUrl(),
     sourceNodeIds: ['n1'],
@@ -115,7 +122,7 @@ beforeEach(() => {
 })
 
 describe('palaceRun', () => {
-  it('启动一次带入口标记的临时运行；阶段进度落在占位节点上，结束只结算不落图', async () => {
+  it('starts an ephemeral run with an entry marker; stage progress lands on the placeholder node and the end only settles without landing', async () => {
     harness = setup()
     await expect(harness.start()).resolves.toEqual({ ok: true })
 
@@ -144,13 +151,16 @@ describe('palaceRun', () => {
     expect(harness.settle).toHaveBeenCalledTimes(1)
   })
 
-  it('落图失败（ok:false）时保留占位节点并提供继续', async () => {
+  it('keeps the placeholder node and offers resume when landing fails (ok:false)', async () => {
     harness = setup()
     await harness.start()
 
     harness.event({
       type: 'end',
-      payload: { content: '', palaceData: { ok: false, error: '该文件未打开，无法落盘' } },
+      payload: {
+        content: '',
+        palaceData: { ok: false, error: 'This file is not open, cannot land' },
+      },
     } as never)
 
     expect(harness.editor.setNodeFlag).toHaveBeenLastCalledWith(NODE_ID, 'runStopped', true)
@@ -158,12 +168,12 @@ describe('palaceRun', () => {
     expect(harness.settle).toHaveBeenCalledTimes(1)
   })
 
-  it('中止后保留占位节点，续跑复用同一私有线程且标记继续', async () => {
+  it('keeps the placeholder node after an abort; resuming reuses the same private thread and the marker continues', async () => {
     harness = setup()
     await harness.start()
 
     // A stopped run ends without a palace payload.
-    harness.event({ type: 'end', payload: { content: '（已停止生成）' } } as never)
+    harness.event({ type: 'end', payload: { content: '(Generation stopped)' } } as never)
     expect(harness.editor.setNodeFlag).toHaveBeenLastCalledWith(NODE_ID, 'runStopped', true)
     expect(harness.editor.batch).not.toHaveBeenCalled()
     expect(harness.settle).toHaveBeenCalledTimes(1)
@@ -180,14 +190,14 @@ describe('palaceRun', () => {
     expect(harness.editor.clearNodeFlag).toHaveBeenCalledWith(NODE_ID, 'runStopped')
   })
 
-  it('中止按钮停的是这次运行的流', async () => {
+  it('the abort button stops the stream of this run', async () => {
     harness = setup()
     await harness.start()
     stopPalaceRun(FILE_UUID, NODE_ID)
     expect(harness.stopStream).toHaveBeenCalledWith(harness.streamId)
   })
 
-  it('invoke 未 resolve 期间到达的事件在注册后补投', async () => {
+  it('re-delivers events that arrive before invoke resolves once the run is registered', async () => {
     harness = setup({ startDeferred: true })
     const starting = harness.start()
 
@@ -209,7 +219,7 @@ describe('palaceRun', () => {
     expect(harness.editor.setNodeFlag).toHaveBeenCalledWith(NODE_ID, 'runStage', 'Generating image')
   })
 
-  it('非本次运行的流事件交回聊天路由', async () => {
+  it('hands stream events from another run back to the chat router', async () => {
     harness = setup()
     await harness.start()
     expect(
@@ -222,9 +232,9 @@ describe('palaceRun', () => {
     ).toBe(false)
   })
 
-  it('启动失败时不留下运行，占位节点由调用方回滚', async () => {
-    harness = setup({ streamResult: { ok: false, error: '未就绪' } })
-    await expect(harness.start()).resolves.toEqual({ ok: false, error: '未就绪' })
+  it('leaves no run behind when starting fails; the caller rolls back the placeholder node', async () => {
+    harness = setup({ streamResult: { ok: false, error: 'Not ready' } })
+    await expect(harness.start()).resolves.toEqual({ ok: false, error: 'Not ready' })
     await resumePalaceRun(FILE_UUID, NODE_ID)
     expect(harness.chatStream).toHaveBeenCalledTimes(1)
   })

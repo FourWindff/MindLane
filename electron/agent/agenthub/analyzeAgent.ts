@@ -67,10 +67,10 @@ function buildPlannedStations(
 
       unusedIds.delete(linkedNodeId)
       const sourceNode = selectedById.get(linkedNodeId)
-      const content = sourceNode?.label.trim() || (row.content ?? '').trim() || `节点 ${index + 1}`
+      const content = sourceNode?.label.trim() || (row.content ?? '').trim() || `Node ${index + 1}`
       const anchorVisual =
         (row.anchor_visual ?? row.anchorVisual ?? '').trim() ||
-        `与「${content.slice(0, 60)}」强相关的大型具象物体`
+        `A large, concrete object strongly related to "${content.slice(0, 60)}"`
       const association =
         row.association?.trim() || row.visual_bridge?.trim() || row.visualBridge?.trim() || ''
 
@@ -78,7 +78,7 @@ function buildPlannedStations(
         order: row.order ?? index + 1,
         content,
         anchorVisual,
-        mnemonicMethod: '形象联想',
+        mnemonicMethod: 'Visual association',
         association,
         linkedNodeId,
       } as StationDesign
@@ -86,13 +86,13 @@ function buildPlannedStations(
     .filter((s) => s != null) as StationDesign[]
 
   const leftovers: StationDesign[] = [...unusedIds].map((nodeId, index) => {
-    const content = selectedById.get(nodeId)?.label.trim() || `节点 ${planned.length + index + 1}`
+    const content = selectedById.get(nodeId)?.label.trim() || `Node ${planned.length + index + 1}`
     return {
       order: planned.length + index + 1,
       content,
-      anchorVisual: `与「${content.slice(0, 60)}」强相关的大型具象物体`,
-      mnemonicMethod: '形象联想',
-      association: `通过与「${content}」直接相关的具象视觉锚点帮助回忆原节点内容。`,
+      anchorVisual: `A large, concrete object strongly related to "${content.slice(0, 60)}"`,
+      mnemonicMethod: 'Visual association',
+      association: `A concrete visual anchor directly related to "${content}" helps recall the original node content.`,
       linkedNodeId: nodeId,
     }
   })
@@ -118,17 +118,17 @@ function normalizeRouteStyle(value: string | undefined, stationCount: number): s
 }
 
 /**
- * AnalyzeAgent - 记忆内容分析智能体
+ * AnalyzeAgent - memory-content analysis agent.
  *
- * 架构职责：
- * 1. 分析文本内容，提取需要记忆的关键条目
- * 2. 设计记忆宫殿的站点布局
- * 3. 从选中的思维导图节点规划记忆宫殿
+ * Architectural responsibilities:
+ * 1. Analyze text content and extract the key items to memorize.
+ * 2. Design the station layout of the memory palace.
+ * 3. Plan a memory palace from the selected mindmap nodes.
  *
- * 无状态设计：
- * - 不涉及持久化记忆访问
- * - 所有输入通过 state 传递
- * - 输出结果写入 state 返回
+ * Stateless design:
+ * - No persistent memory access.
+ * - All input travels through state.
+ * - Outputs are written to state and returned.
  */
 export class AnalyzeAgent extends PalaceAgent {
   private readonly analyzeModel
@@ -147,7 +147,7 @@ export class AnalyzeAgent extends PalaceAgent {
 
     const text = state.palaceInputText
     if (!text) {
-      return { palaceError: '未提供要记忆的内容' }
+      return { palaceError: 'No content provided to memorize' }
     }
 
     const chatMessages = state.messages
@@ -170,7 +170,7 @@ export class AnalyzeAgent extends PalaceAgent {
     const conversation = messages
       .map(
         (m) =>
-          `${m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'}: ${m.content}`,
+          `${m.role === 'user' ? 'User' : m.role === 'assistant' ? 'Assistant' : 'System'}: ${m.content}`,
       )
       .join('\n')
     const inputText = conversation || text
@@ -190,7 +190,7 @@ export class AnalyzeAgent extends PalaceAgent {
         .map((item, index) => ({ ...item, order: index + 1 }))
 
       if (memoryItems.length === 0) {
-        return { palaceError: '未拆解出有效记忆条目' }
+        return { palaceError: 'No valid memory items extracted' }
       }
 
       const designResult = (await this.designModel.invoke(
@@ -210,7 +210,7 @@ export class AnalyzeAgent extends PalaceAgent {
         .map((station, index) => ({ ...station, order: index + 1 }))
 
       if (stations.length !== memoryItems.length) {
-        return { palaceError: '记忆站点数量与条目数量不一致' }
+        return { palaceError: 'The number of memory stations does not match the number of items' }
       }
 
       return {
@@ -221,7 +221,7 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      logger.withContext('AnalyzeAgent').error('analyzeFromText 失败:\n', formatAgentError(error))
+      logger.withContext('AnalyzeAgent').error('analyzeFromText failed:\n', formatAgentError(error))
       return { palaceError: formatAgentError(error) }
     }
   }
@@ -235,7 +235,7 @@ export class AnalyzeAgent extends PalaceAgent {
       const text = typeof response.content === 'string' ? response.content : ''
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) {
-        return { palaceError: 'AI 未返回有效的 JSON 规划' }
+        return { palaceError: 'The AI did not return a valid JSON plan' }
       }
 
       const raw = JSON.parse(jsonMatch[0]) as {
@@ -259,14 +259,14 @@ export class AnalyzeAgent extends PalaceAgent {
 
       const stations = buildPlannedStations(raw.stations ?? [], selectedNodes)
       if (stations.length === 0) {
-        return { palaceError: '未规划出有效站点' }
+        return { palaceError: 'No valid stations planned' }
       }
 
-      const theme = raw.theme?.trim() || `记忆宫殿 (${selectedNodes.length} 站)`
+      const theme = raw.theme?.trim() || `Memory palace (${selectedNodes.length} stations)`
       const sceneBrief =
         raw.scene_brief?.trim() ||
         raw.sceneBrief?.trim() ||
-        `围绕 ${selectedNodes.length} 个知识点展开的统一记忆场景`
+        `A unified memory scene built around ${selectedNodes.length} knowledge points`
       const routeStyle = normalizeRouteStyle(raw.route_style ?? raw.routeStyle, stations.length)
 
       const memoryItems: MemoryItem[] = stations.map((s) => ({
@@ -284,7 +284,9 @@ export class AnalyzeAgent extends PalaceAgent {
         },
       }
     } catch (error) {
-      logger.withContext('AnalyzeAgent').error('analyzeFromNodes 失败:\n', formatAgentError(error))
+      logger
+        .withContext('AnalyzeAgent')
+        .error('analyzeFromNodes failed:\n', formatAgentError(error))
       return { palaceError: formatAgentError(error) }
     }
   }

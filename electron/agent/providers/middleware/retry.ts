@@ -1,11 +1,11 @@
 /**
- * withRetry - 指数退避重试中间件。
+ * withRetry - exponential backoff retry middleware.
  *
- * 规则：
- * - 最多重试 maxRetries 次（默认 3 次，总调用次数 = 1 + maxRetries）。
- * - 指数退避：delay = min(baseDelay * 2^attempt, maxDelay) + jitter。
- * - 可重试错误：HTTP 5xx、429、网络错误（fetch 抛 TypeError）、AbortError（timeout 导致）。
- * - 不可重试错误：认证 4xx（除 429 外）、其他明确客户端错误。
+ * Rules:
+ * - Retry at most maxRetries times (default 3; total calls = 1 + maxRetries).
+ * - Exponential backoff: delay = min(baseDelay * 2^attempt, maxDelay) + jitter.
+ * - Retryable errors: HTTP 5xx, 429, network errors (fetch throwing TypeError), AbortError (caused by a timeout).
+ * - Non-retryable errors: auth 4xx (except 429) and other explicit client errors.
  */
 
 import { TimeoutError } from './abort.js'
@@ -14,15 +14,15 @@ import { logger } from '../../../shared/logger.js'
 const log = logger.withContext('provider')
 
 type RetryOptions = {
-  /** 最多重试次数（默认 3） */
+  /** Maximum retry count (default 3) */
   maxRetries?: number
-  /** 初始退避间隔（默认 500ms） */
+  /** Initial backoff interval (default 500ms) */
   baseDelay?: number
-  /** 最大退避间隔（默认 8000ms） */
+  /** Maximum backoff interval (default 8000ms) */
   maxDelay?: number
-  /** jitter 范围（默认 200ms） */
+  /** Jitter range (default 200ms) */
   jitterMs?: number
-  /** 自定义可重试判定 */
+  /** Custom retryability predicate */
   isRetryable?: (err: unknown) => boolean
 }
 
@@ -38,9 +38,9 @@ class RetryExhaustedError extends Error {
 }
 
 /**
- * 判断一个错误是否属于"可重试"类别。
- * 可重试：HTTP 5xx、429、网络错误（TypeError）、TimeoutError、AbortError。
- * 不可重试：4xx（除 429 外）。
+ * Decide whether an error belongs to the "retryable" category.
+ * Retryable: HTTP 5xx, 429, network errors (TypeError), TimeoutError, AbortError.
+ * Non-retryable: 4xx (except 429).
  */
 function isRetryableError(err: unknown): boolean {
   if (err instanceof TimeoutError) return true
@@ -55,7 +55,7 @@ function isRetryableError(err: unknown): boolean {
       return true
     }
 
-    // 从消息中提取 HTTP 状态码，如 "HTTP 503"、"HTTP 429"
+    // Extract the HTTP status code from the message, e.g. "HTTP 503", "HTTP 429"
     const match = err.message.match(/\bHTTP\s+(\d{3})/i)
     if (match) {
       const status = Number(match[1])
@@ -64,12 +64,12 @@ function isRetryableError(err: unknown): boolean {
     }
   }
 
-  // 默认保守策略：未知错误不重试
+  // Default conservative policy: unknown errors are not retried
   return false
 }
 
 /**
- * 指数退避 + jitter 计算。
+ * Exponential backoff + jitter.
  */
 function computeBackoffDelay(
   attempt: number,
@@ -81,7 +81,7 @@ function computeBackoffDelay(
 }
 
 /**
- * 包装一个异步操作，失败时按策略重试。
+ * Wrap an async operation, retrying on failure according to the policy.
  */
 export async function withRetry<T>(
   operation: () => Promise<T>,
@@ -104,7 +104,7 @@ export async function withRetry<T>(
       if (attempt >= maxRetries || !retryable) {
         if (attempt >= maxRetries && retryable) {
           log.error(
-            '重试 %d 次后仍失败：%s',
+            'still failed after %d retries: %s',
             maxRetries + 1,
             err instanceof Error ? err.message : String(err),
           )
@@ -113,20 +113,20 @@ export async function withRetry<T>(
       }
       const delay = computeBackoffDelay(attempt, { baseDelay, maxDelay, jitterMs })
       log.warn(
-        'attempt %d/%d 失败：%s，%ss 后重试',
+        'attempt %d/%d failed: %s, retrying in %ss',
         attempt + 1,
         maxRetries + 1,
         err instanceof Error ? err.message : String(err),
         (delay / 1000).toFixed(1),
       )
-      // 全局 setTimeout：与测试假时钟兼容，且退避睡眠不需要取消能力。
+      // Global setTimeout: compatible with the test fake timers, and the backoff sleep needs no cancellation.
       await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
 
   const attempts = maxRetries + 1
   throw new RetryExhaustedError(
-    `重试 ${attempts} 次后仍失败：${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+    `still failed after ${attempts} retries: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
     lastErr,
     attempts,
   )

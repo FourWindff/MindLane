@@ -1,4 +1,4 @@
-/** 基于 KeyboardEvent.code，避免布局/大小写差异 */
+/** Based on KeyboardEvent.code, avoiding layout/case differences */
 export function eventComboFromCode(e: KeyboardEvent): string {
   const mods: string[] = []
   if (e.metaKey || e.ctrlKey) mods.push('mod')

@@ -6,21 +6,21 @@ import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
 import type { ChatMessage } from '../../../contracts/fileFormat.js'
 
 /**
- * 聊天历史管理器 - JSONL 版本
+ * Chat history manager - JSONL version
  *
- * 职责：
- * 1. 基于 JSONL 文件持久化每个会话的元数据与消息
- * 2. 为 LangGraph 提供 BaseMessage[] 格式的历史消息
- * 3. 为 UI 提供 ChatMessage[] 格式的历史消息
- * 4. 提供消息压缩/截断策略
- * 5. 支持会话的 CRUD 操作
+ * Responsibilities:
+ * 1. Persist each session's metadata and messages in a JSONL file
+ * 2. Provide history to LangGraph as BaseMessage[]
+ * 3. Provide history to the UI as ChatMessage[]
+ * 4. Provide message compaction / truncation policies
+ * 5. Support session CRUD operations
  */
 export class SessionManager {
   private store: SessionMessageStore | null = null
   private checkpointer: CheckpointerManager | null = null
 
   /**
-   * 初始化 JSONL 存储。
+   * Initialize the JSONL store.
    */
   async init(userDataPath: string): Promise<void> {
     const baseDir = path.join(userDataPath, 'memory', 'sessions')
@@ -30,7 +30,8 @@ export class SessionManager {
   }
 
   /**
-   * 注入 CheckpointerManager（由 initAgentServices 装配时创建并完成交叉接线）
+   * Inject the CheckpointerManager (created during initAgentServices assembly, with
+   * cross-wiring completed)
    */
   setCheckpointer(cp: CheckpointerManager): void {
     this.checkpointer = cp
@@ -42,7 +43,7 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的 UI 消息。
+   * Load the UI messages of the given session.
    */
   async loadSessionMessages(threadId: string): Promise<ChatMessage[]> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -51,7 +52,7 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的原始 LangChain 消息（含 system 消息）。
+   * Load the raw LangChain messages of the given session (including system messages).
    */
   async loadMessages(threadId: string): Promise<BaseMessage[]> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -59,7 +60,7 @@ export class SessionManager {
   }
 
   /**
-   * 读取会话元数据。
+   * Read session metadata.
    */
   getSessionMeta(sessionId: string): SessionMeta | null {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -67,7 +68,7 @@ export class SessionManager {
   }
 
   /**
-   * 更新会话元数据。
+   * Update session metadata.
    */
   async updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -75,14 +76,14 @@ export class SessionManager {
   }
 
   /**
-   * 加载指定会话的消息并转换为 LangChain Message 格式
+   * Load the messages of the given session and convert them to LangChain Message format
    */
   async loadSessionBaseMessages(
     threadId: string,
     options: {
-      /** 是否包含 system 消息（默认：true） */
+      /** Whether to include system messages (default: true) */
       includeSystem?: boolean
-      /** 最大消息数量限制（默认：无限制） */
+      /** Maximum number of messages (default: unlimited) */
       maxMessages?: number
     } = {},
   ): Promise<BaseMessage[]> {
@@ -105,7 +106,7 @@ export class SessionManager {
   }
 
   /**
-   * 加载所有会话列表（支持分页）
+   * List all sessions (supports pagination)
    */
   async listSessions(
     options: { fileUuid?: string; limit?: number; offset?: number } = {},
@@ -122,7 +123,7 @@ export class SessionManager {
   }
 
   /**
-   * 删除会话（包括元数据文件和 checkpoint）
+   * Delete a session (including its metadata file and checkpoint)
    */
   async deleteSession(sessionId: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -131,7 +132,7 @@ export class SessionManager {
   }
 
   /**
-   * 持久化单条 LangChain 消息。
+   * Persist a single LangChain message.
    */
   async saveMessage(sessionId: string, message: BaseMessage, fileUuid: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -139,7 +140,7 @@ export class SessionManager {
   }
 
   /**
-   * 批量持久化 LangChain 消息。
+   * Persist LangChain messages in a batch.
    */
   async saveMessages(sessionId: string, messages: BaseMessage[], fileUuid: string): Promise<void> {
     if (!this.store) throw new Error('SessionManager not initialized')
@@ -147,7 +148,7 @@ export class SessionManager {
   }
 
   /**
-   * 关闭资源
+   * Close resources
    */
   close(): void {
     this.store = null

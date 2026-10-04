@@ -46,7 +46,7 @@ export function currentStreamId(): string | undefined {
  */
 export function requireStreamId(subject: string): string {
   const streamId = currentStreamId()
-  if (!streamId) throw new Error(`${subject}缺少运行上下文（streamId）`)
+  if (!streamId) throw new Error(`${subject} is missing the run context (streamId)`)
   return streamId
 }
 
@@ -66,7 +66,7 @@ export function currentWorkspacePath(): string | undefined {
  */
 export function requireWorkspaceUuid(subject: string): string {
   const workspaceUuid = storage.getStore()?.workspace?.uuid
-  if (!workspaceUuid) throw new Error(`${subject}缺少工作区上下文（workspaceUuid）`)
+  if (!workspaceUuid) throw new Error(`${subject} is missing the workspace context (workspaceUuid)`)
   return workspaceUuid
 }
 

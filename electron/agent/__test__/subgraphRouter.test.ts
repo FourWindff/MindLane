@@ -9,13 +9,13 @@ import {
 } from '../subgraphRouter.js'
 
 describe('SubgraphRouter.getToolSchemas', () => {
-  it('返回 mindmap 与 palace 两个虚拟工具', () => {
+  it('returns the two virtual tools, mindmap and palace', () => {
     const tools = getToolSchemas()
 
     expect(tools.map((t) => t.name)).toEqual([GENERATE_MINDMAP_FRAGMENT_TOOL, GENERATE_PALACE_TOOL])
   })
 
-  it('工具 schema 为空且严格，拒绝额外字段', () => {
+  it('tool schemas are empty and strict, rejecting extra fields', () => {
     const tools = getToolSchemas()
 
     for (const tool of tools) {
@@ -25,40 +25,40 @@ describe('SubgraphRouter.getToolSchemas', () => {
     }
   })
 
-  it('工具描述包含生成思维导图/记忆宫殿的语义', () => {
+  it('tool descriptions carry the meaning of generating a mindmap / memory palace', () => {
     const tools = getToolSchemas()
 
     const mindmapTool = tools.find((t) => t.name === GENERATE_MINDMAP_FRAGMENT_TOOL)
     const palaceTool = tools.find((t) => t.name === GENERATE_PALACE_TOOL)
 
-    expect(mindmapTool?.description).toContain('思维导图')
-    expect(palaceTool?.description).toContain('记忆宫殿')
+    expect(mindmapTool?.description).toMatch(/mindmap/i)
+    expect(palaceTool?.description).toMatch(/memory palace/i)
   })
 
-  it('导图生成工具的描述携带「何时该用子图」的判据（短内容自写 / 文档或长文本走本工具）', () => {
+  it('the mindmap generation tool description carries the "when to use the subgraph" criteria (short content written directly / documents or long text go through this tool)', () => {
     const mindmapTool = getToolSchemas().find((t) => t.name === GENERATE_MINDMAP_FRAGMENT_TOOL)
 
     expect(mindmapTool?.description).toContain('insertXmlFragment')
-    expect(mindmapTool?.description).toContain('文档')
-    expect(mindmapTool?.description).toContain('长文本')
-    expect(mindmapTool?.description).toContain('短内容')
+    expect(mindmapTool?.description).toMatch(/document/i)
+    expect(mindmapTool?.description).toMatch(/long text/i)
+    expect(mindmapTool?.description).toMatch(/short content/i)
   })
 })
 
 describe('SubgraphRouter.isSubgraphCall', () => {
-  it('将已知虚拟工具名识别为子图调用', () => {
+  it('recognizes known virtual tool names as subgraph calls', () => {
     expect(isSubgraphCall(GENERATE_MINDMAP_FRAGMENT_TOOL)).toBe(true)
     expect(isSubgraphCall(GENERATE_PALACE_TOOL)).toBe(true)
   })
 
-  it('将普通 action 工具名排除在外', () => {
+  it('excludes plain action tool names', () => {
     expect(isSubgraphCall('batchAddMindmapNodes')).toBe(false)
     expect(isSubgraphCall('unknown')).toBe(false)
   })
 })
 
 describe('SubgraphRouter.detect', () => {
-  it('识别 generateMindmapFragment 为 mindmap 子图调用', () => {
+  it('recognizes generateMindmapFragment as a mindmap subgraph call', () => {
     const toolCalls: ToolCallLike[] = [{ name: GENERATE_MINDMAP_FRAGMENT_TOOL, id: 'call-1' }]
 
     const result = detect(toolCalls)
@@ -72,7 +72,7 @@ describe('SubgraphRouter.detect', () => {
     ])
   })
 
-  it('识别 generatePalace 为 palace 子图调用', () => {
+  it('recognizes generatePalace as a palace subgraph call', () => {
     const toolCalls: ToolCallLike[] = [{ name: GENERATE_PALACE_TOOL, id: 'call-2' }]
 
     const result = detect(toolCalls)
@@ -86,7 +86,7 @@ describe('SubgraphRouter.detect', () => {
     ])
   })
 
-  it('返回全部子图调用（同一轮里的第二个调用不再被丢弃）', () => {
+  it('returns every subgraph call (a second call in the same round is no longer dropped)', () => {
     const toolCalls: ToolCallLike[] = [
       { name: 'batchAddMindmapNodes', id: 'call-1' },
       { name: GENERATE_PALACE_TOOL, id: 'call-2' },
@@ -99,13 +99,13 @@ describe('SubgraphRouter.detect', () => {
     expect(result.map((call) => call.toolCallId)).toEqual(['call-2', 'call-3'])
   })
 
-  it('没有子图调用时返回空列表', () => {
+  it('returns an empty list when there are no subgraph calls', () => {
     const toolCalls: ToolCallLike[] = [{ name: 'batchAddMindmapNodes', id: 'call-1' }]
 
     expect(detect(toolCalls)).toEqual([])
   })
 
-  it('空列表返回空列表', () => {
+  it('returns an empty list for an empty list', () => {
     expect(detect([])).toEqual([])
   })
 })

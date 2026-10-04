@@ -40,14 +40,14 @@ export function createReadFileTool(getWorkspacePath: () => string) {
     async ({ path: inputPath, start, end }): Promise<ReadFileResult> => {
       const workspaceRoot = getWorkspacePath()
       if (!workspaceRoot) {
-        return fail('当前没有打开的工作区，无法读取文件')
+        return fail('No workspace is open, cannot read files')
       }
 
       if (start !== undefined && start < 1) {
-        return fail(`无效的起始行号 ${start}：行号从 1 开始`)
+        return fail(`Invalid start line ${start}: lines are 1-based`)
       }
       if (end !== undefined && end < (start ?? 1)) {
-        return fail(`无效的行号范围：end（${end}）不能小于 start（${start ?? 1}）`)
+        return fail(`Invalid line range: end (${end}) cannot be less than start (${start ?? 1})`)
       }
 
       // Resolve first, then check the boundary, so `../` cannot escape.
@@ -57,29 +57,29 @@ export function createReadFileTool(getWorkspacePath: () => string) {
 
       if (!isWithinWorkspace(resolved, path.resolve(workspaceRoot))) {
         // Echo only the user-supplied path, never the resolved absolute path.
-        return fail(`路径 "${inputPath}" 不在工作区内，已拒绝读取`)
+        return fail(`Path "${inputPath}" is outside the workspace, read refused`)
       }
 
       let buffer: Buffer
       try {
         const stat = await fs.stat(resolved)
         if (stat.isDirectory()) {
-          return fail(`路径 "${inputPath}" 是一个目录，不是文件`)
+          return fail(`Path "${inputPath}" is a directory, not a file`)
         }
         buffer = await fs.readFile(resolved)
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-          return fail(`文件 "${inputPath}" 不存在，请检查路径是否正确`)
+          return fail(`File "${inputPath}" does not exist, check the path`)
         }
         // Do not interpolate err.message: fs errors embed the resolved
         // absolute path, which must not leak into agent context.
-        return fail(`读取文件 "${inputPath}" 失败`)
+        return fail(`Failed to read file "${inputPath}"`)
       }
 
       // NUL byte sniff: treat as binary and refuse, so context is not flooded
       // with mojibake.
       if (buffer.includes(0)) {
-        return fail(`文件 "${inputPath}" 是二进制文件，无法作为文本读取`)
+        return fail(`File "${inputPath}" is binary and cannot be read as text`)
       }
 
       const lines = buffer.toString('utf8').split('\n')
@@ -113,14 +113,14 @@ export function createReadFileTool(getWorkspacePath: () => string) {
           const lineNo = startLine + i
           const text =
             line.length > MAX_LINE_CHARS
-              ? `${line.slice(0, MAX_LINE_CHARS)} …[本行已截断，共 ${line.length} 字符]`
+              ? `${line.slice(0, MAX_LINE_CHARS)} …[line truncated, ${line.length} chars total]`
               : line
           return `${lineNo}→${text}`
         })
         .join('\n')
 
       const content = truncated
-        ? `${body}\n[输出已截断：文件共 ${totalLines} 行，本次返回第 ${startLine}-${endLine} 行，可用 start=${endLine + 1} 继续读取]`
+        ? `${body}\n[Output truncated: the file has ${totalLines} lines; this call returned lines ${startLine}-${endLine}, use start=${endLine + 1} to continue]`
         : body
 
       return { ok: true, path: inputPath, totalLines, startLine, endLine, truncated, content }
@@ -128,11 +128,13 @@ export function createReadFileTool(getWorkspacePath: () => string) {
     {
       name: 'readFile',
       description:
-        '读取工作区内文本文件的内容。path 可以是相对工作区根目录的相对路径或工作区内的绝对路径；start/end 为 1-based 行号闭区间，省略则读取全文（超过 2000 行会被截断）。返回内容每行带行号前缀，并附文件总行数。只能读取工作区内的文本文件。',
+        'Read the contents of a text file inside the workspace. path may be a relative path from the workspace root or an absolute path inside the workspace; start/end are a 1-based inclusive line range, omit them to read the whole file (over 2000 lines is truncated). The returned content prefixes every line with its line number and includes the file total line count. Only text files inside the workspace can be read.',
       schema: z.object({
-        path: z.string().describe('文件路径（相对工作区根目录，或工作区内的绝对路径）'),
-        start: z.number().int().optional().describe('起始行号（1-based，可选）'),
-        end: z.number().int().optional().describe('结束行号（1-based 闭区间，可选）'),
+        path: z
+          .string()
+          .describe('File path (relative to the workspace root, or absolute inside the workspace)'),
+        start: z.number().int().optional().describe('Start line (1-based, optional)'),
+        end: z.number().int().optional().describe('End line (1-based, inclusive, optional)'),
       }),
     },
   )

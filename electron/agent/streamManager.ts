@@ -42,7 +42,7 @@ const runnerLog = logger.withContext('runner')
 function toolEventId(id: string | undefined, name: string | undefined, phase: string): string {
   if (!id) {
     runnerLog.error(
-      '%s 缺少 toolCallId（langgraph 契约违例）：%s，卡片将退化为按 name 匹配',
+      '%s is missing toolCallId (langgraph contract violation): %s, the card degrades to name matching',
       phase,
       name ?? 'unknown',
     )
@@ -58,10 +58,10 @@ function summarizeToolPayload(payload: unknown): string {
 
 /** Result summary must expose scale (chars / node count) so "succeeded but empty" is visible. */
 function summarizeToolResult(output: string): string {
-  let size = `${output.length} 字符`
+  let size = `${output.length} chars`
   try {
     const parsed = JSON.parse(output) as { nodes?: unknown[] }
-    if (Array.isArray(parsed?.nodes)) size = `${parsed.nodes.length} 节点, ${size}`
+    if (Array.isArray(parsed?.nodes)) size = `${parsed.nodes.length} nodes, ${size}`
   } catch {
     /* not JSON — chars only */
   }
@@ -132,7 +132,9 @@ export class Runner {
   abort(): void {
     // Called from the IPC context (outside AsyncLocalStorage), so the streamId
     // is attached explicitly rather than auto-derived from the run context.
-    logger.withContext(`runner:${shortStreamId(this.options.streamId)}`).info('用户主动停止生成')
+    logger
+      .withContext(`runner:${shortStreamId(this.options.streamId)}`)
+      .info('user aborted generation')
     this.abortController.abort()
   }
 
@@ -291,8 +293,8 @@ export class Runner {
           if (event.event === 'on_tool_start') {
             if (event.name === 'insertXmlFragment' || event.name === 'generateMindmapFragment')
               this.emit('step', { step: 'generating-map' })
-            runnerLog.info('tool 调用： %s, 参数 %s', event.name, summarizeToolPayload(event.input))
-            runnerLog.debug('tool 参数全量： %s, %o', event.name, event.input)
+            runnerLog.info('tool call: %s, args %s', event.name, summarizeToolPayload(event.input))
+            runnerLog.debug('tool args (full): %s, %o', event.name, event.input)
             this.emit('tool-start', {
               id: toolEventId(event.toolCallId, event.name, 'tool-start'),
               name: event.name ?? 'unknown',
@@ -301,7 +303,7 @@ export class Runner {
           } else if (event.event === 'on_tool_end') {
             const output =
               typeof event.output === 'string' ? event.output : JSON.stringify(event.output ?? '')
-            runnerLog.info('tool 结果： %s, %s', event.name, summarizeToolResult(output))
+            runnerLog.info('tool result: %s, %s', event.name, summarizeToolResult(output))
             this.emit('tool-end', {
               id: toolEventId(event.toolCallId, event.name, 'tool-end'),
               name: event.name ?? 'unknown',
@@ -314,7 +316,7 @@ export class Runner {
             const err = event.error as unknown
             const output =
               typeof err === 'string' ? err : err instanceof Error ? err.message : String(err ?? '')
-            runnerLog.error('tool 错误： %s, %s', event.name, output)
+            runnerLog.error('tool error: %s, %s', event.name, output)
             this.emit('tool-end', {
               id: toolEventId(event.toolCallId, event.name, 'tool-error'),
               name: event.name ?? 'unknown',
@@ -361,7 +363,7 @@ export class Runner {
       const result = await this.readResult()
       if (this.abortController.signal.aborted) {
         await this.persistAbortedResult(result, fullContent)
-        this.emit('end', { content: fullContent || '（已停止生成）' })
+        this.emit('end', { content: fullContent || '(Generation stopped)' })
         return
       }
       if (result) {
@@ -369,12 +371,12 @@ export class Runner {
         this.emit('end', runtime.buildResponse(result, fullContent))
       } else {
         await this.persistPartialContent(fullContent)
-        this.emit('end', { content: fullContent || '（已停止生成）' })
+        this.emit('end', { content: fullContent || '(Generation stopped)' })
       }
     } catch (error) {
       if (this.abortController.signal.aborted) {
         await this.persistPartialContent(fullContent)
-        this.emit('end', { content: fullContent || '（已停止生成）' })
+        this.emit('end', { content: fullContent || '(Generation stopped)' })
         return
       }
       this.emit('error', error instanceof Error ? error.message : String(error))

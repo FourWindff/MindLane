@@ -9,7 +9,7 @@ import type { MindmapWriteRequest } from '@contracts/ipc'
 import { createMindmapWriteResponder, insertPalacePlaceholder } from './mindmapWriteResponder'
 import { serializePalaceNodeXml } from '@contracts/mindmapXml'
 
-/** 可观察的假编辑器：记录方法调用，state 可注入，落图方法可挂起/放行。 */
+/** Observable fake editor: records method calls, takes an injectable state, and lets landing calls be held/released. */
 function createFakeEditor() {
   const state = {
     nodes: [] as Node[],
@@ -26,7 +26,7 @@ function createFakeEditor() {
   return { editor, state }
 }
 
-/** 测试中的编辑器按 DI 缝注入（伪造活编辑器，与生产装配同构）。 */
+/** The test injects the editor through the DI seam (a fake live editor, shaped like the production wiring). */
 function asEditor(fake: ReturnType<typeof createFakeEditor>): MindmapEditor {
   return fake.editor as unknown as MindmapEditor
 }
@@ -95,7 +95,7 @@ describe('MindmapWriteResponder', () => {
       action: 'insertXmlFragment',
       args: {
         parentId: 'root',
-        xml: `<node type="palace" content="宫殿" imageUrl="${imageUrl}"><station order="1" x="0.1" y="0.1">入口</station></node>`,
+        xml: `<node type="palace" content="Palace" imageUrl="${imageUrl}"><station order="1" x="0.1" y="0.1">Entrance</station></node>`,
       },
     })
     await vi.waitFor(() => expect(respond).toHaveBeenCalled())
@@ -116,7 +116,7 @@ describe('MindmapWriteResponder', () => {
       fileUuid: 'file-a',
       action: 'updateMindmapNode',
       args: {
-        xml: `<node id="${palace!.id}" type="palace" content="更新宫殿" imageUrl="${updatedImageUrl}"><station order="1" x="0.2" y="0.2">大厅</station></node>`,
+        xml: `<node id="${palace!.id}" type="palace" content="Updated palace" imageUrl="${updatedImageUrl}"><station order="1" x="0.2" y="0.2">Hall</station></node>`,
       },
     })
     await vi.waitFor(() => expect(respond).toHaveBeenCalled())
@@ -143,7 +143,7 @@ describe('MindmapWriteResponder', () => {
       action: 'insertXmlFragment',
       args: {
         parentId: 'root',
-        xml: `<node type="palace" content="宫殿" imageUrl="${imageUrl}"><station order="1">入口</station></node>`,
+        xml: `<node type="palace" content="Palace" imageUrl="${imageUrl}"><station order="1">Entrance</station></node>`,
       },
     })
     await vi.waitFor(() => expect(respond).toHaveBeenCalled())
@@ -174,7 +174,7 @@ describe('MindmapWriteResponder', () => {
       action: 'insertXmlFragment',
       args: {
         parentId: 'root',
-        xml: `<node type="palace" content="既有宫殿" asset="${existingAssetId}" />`,
+        xml: `<node type="palace" content="Existing palace" asset="${existingAssetId}" />`,
       },
     })
     await vi.waitFor(() => expect(respond).toHaveBeenCalled())
@@ -189,7 +189,7 @@ describe('MindmapWriteResponder', () => {
 
   it('does not retain a materialized asset when the palace write is rejected', async () => {
     const { editor, store } = createRealEditor()
-    const duplicateId = editor.addChild('root', { label: '已有节点' }).nodeId
+    const duplicateId = editor.addChild('root', { label: 'Existing node' }).nodeId
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const imageUrl = svgDataUrl('<svg viewBox="0 0 10 10" />')
 
@@ -246,14 +246,17 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
-      args: { xml: '<node type="text" content="分支" />', parentId: 'root' },
+      args: { xml: '<node type="text" content="Branch" />', parentId: 'root' },
     })
     await flush()
 
-    expect(fake.editor.insertFromXml).toHaveBeenCalledWith('<node type="text" content="分支" />', {
-      parentId: 'root',
-      position: 'child',
-    })
+    expect(fake.editor.insertFromXml).toHaveBeenCalledWith(
+      '<node type="text" content="Branch" />',
+      {
+        parentId: 'root',
+        position: 'child',
+      },
+    )
     expect(persistFile).toHaveBeenCalledWith('file-a')
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
@@ -276,7 +279,7 @@ describe('MindmapWriteResponder', () => {
     fake.editor.insertFromXml.mockRejectedValueOnce(
       new MindmapXmlError(
         'tree_invalid',
-        '节点 id「n1」已存在于导图中（纯树不允许重复 id，否则产生多父/环）',
+        'Node id "n1" already exists in the mindmap (a pure tree forbids duplicate ids; otherwise multiple parents/cycles appear)',
       ),
     )
     const { send, respond, persistFile, stop } = setupResponder({ 'file-a': asEditor(fake) })
@@ -296,7 +299,7 @@ describe('MindmapWriteResponder', () => {
       error: formatXmlError(
         new MindmapXmlError(
           'tree_invalid',
-          '节点 id「n1」已存在于导图中（纯树不允许重复 id，否则产生多父/环）',
+          'Node id "n1" already exists in the mindmap (a pure tree forbids duplicate ids; otherwise multiple parents/cycles appear)',
         ),
       ),
     })
@@ -322,7 +325,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error: '[block_not_found] 节点「missing」不存在，请先 readMindmap 重新定位',
+      error: '[block_not_found] Node "missing" does not exist; call readMindmap to locate it again',
     })
     stop()
   })
@@ -341,7 +344,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error: '该文件未打开，无法落盘',
+      error: 'This file is not open, cannot land',
     })
     stop()
   })
@@ -369,7 +372,7 @@ describe('MindmapWriteResponder', () => {
     })
     await flush()
 
-    // 第一个请求挂起时，第二个请求不得开始应用
+    // While the first request is pending, the second request must not start applying
     expect(fake.editor.insertFromXml).toHaveBeenCalledTimes(1)
     expect(fake.editor.replaceNodeFromXml).not.toHaveBeenCalled()
 
@@ -413,7 +416,7 @@ describe('MindmapWriteResponder', () => {
     })
     await flush()
 
-    // file-a 挂起时 file-b 照常执行
+    // While file-a is pending, file-b still runs
     expect(fakeA.editor.insertFromXml).toHaveBeenCalledTimes(1)
     expect(fakeB.editor.insertFromXml).toHaveBeenCalledTimes(1)
 
@@ -464,7 +467,9 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error: formatXmlError(new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可删除')),
+      error: formatXmlError(
+        new MindmapXmlError('tree_invalid', 'root is the mindmap anchor and cannot be deleted'),
+      ),
     })
     stop()
   })
@@ -485,7 +490,10 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       ok: false,
       error: formatXmlError(
-        new MindmapXmlError('block_not_found', '节点「ghost」不存在，请先 readMindmap 重新定位'),
+        new MindmapXmlError(
+          'block_not_found',
+          'Node "ghost" does not exist; call readMindmap to locate it again',
+        ),
       ),
     })
     stop()
@@ -510,7 +518,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error: 'position 参数无效：sideways，只能是 root/child/after/before',
+      error: 'Invalid position argument: sideways; must be root/child/after/before',
     })
     stop()
   })
@@ -535,7 +543,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: false,
-      error: 'position 参数无效：root，只能是 child/after/before',
+      error: 'Invalid position argument: root; must be child/after/before',
     })
     stop()
   })
@@ -566,22 +574,24 @@ describe('MindmapWriteResponder', () => {
 })
 
 /**
- * 宫殿落图（landPalace）：手动与 AI 两条触发面共用的新写动作。位置、层级与
- * 图片物化都由代码确定（不依模型选择），XML 由代码从子图 payload 序列化而来。
+ * Palace landing (landPalace): the write action shared by the manual and AI
+ * trigger surfaces. Position, hierarchy and image materialization are all decided
+ * by code (never by the model's choice), and the XML is serialized by code from
+ * the subgraph payload.
  */
 describe('MindmapWriteResponder landPalace', () => {
   const station = (order: number, content: string) => ({ order, content, x: 0.2, y: 0.3 })
 
-  it('无占位节点时新建宫殿，并按「新宫殿 → 选中节点」重挂父边', async () => {
+  it('creates a new palace when there is no placeholder and rewires the parent edges as "new palace → selected nodes"', async () => {
     const { editor, store } = createRealEditor()
-    const chapter = editor.addChild('root', { label: '章节' }).nodeId
-    const first = editor.addChild(chapter, { label: '第一站' }).nodeId
-    const second = editor.addChild(chapter, { label: '第二站' }).nodeId
+    const chapter = editor.addChild('root', { label: 'Chapter' }).nodeId
+    const first = editor.addChild(chapter, { label: 'First station' }).nodeId
+    const second = editor.addChild(chapter, { label: 'Second station' }).nodeId
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const xml = serializePalaceNodeXml({
-      label: '测试宫殿',
+      label: 'Test palace',
       imageUrl: svgDataUrl('<svg viewBox="0 0 10 10"><g data-station="1" /></svg>'),
-      stations: [station(1, '第一站')],
+      stations: [station(1, 'First station')],
       sourceNodeIds: [first, second],
     })
 
@@ -592,7 +602,7 @@ describe('MindmapWriteResponder landPalace', () => {
     const palace = state.nodes.find((node) => node.type === 'palace')!
     expect(state.assets).toHaveLength(1)
     expect(palace.data).toMatchObject({
-      label: '测试宫殿',
+      label: 'Test palace',
       assetId: state.assets[0]!.id,
       sourceNodeIds: [first, second],
       expanded: true,
@@ -615,15 +625,15 @@ describe('MindmapWriteResponder landPalace', () => {
     stop()
   })
 
-  it('跨父选择全部收进新宫殿下，纯树不破且 root 不被重挂', async () => {
+  it('collects a selection spanning parents under the new palace without breaking the pure tree or reparenting root', async () => {
     const { editor, store } = createRealEditor()
-    const first = editor.addChild('root', { label: '第一站' }).nodeId
-    const nested = editor.addChild(first, { label: '嵌套站' }).nodeId
+    const first = editor.addChild('root', { label: 'First station' }).nodeId
+    const nested = editor.addChild(first, { label: 'Nested station' }).nodeId
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const xml = serializePalaceNodeXml({
-      label: '测试宫殿',
+      label: 'Test palace',
       imageUrl: '',
-      stations: [station(1, '第一站')],
+      stations: [station(1, 'First station')],
       // A selection spanning parents, plus the root anchor itself.
       sourceNodeIds: ['root', first, nested],
     })
@@ -643,9 +653,9 @@ describe('MindmapWriteResponder landPalace', () => {
     stop()
   })
 
-  it('有手动运行的占位节点时就地更新：id 不变、运行标记清掉、图片物化', async () => {
+  it('updates the manual run placeholder in place: same id, run flags cleared, image materialized', async () => {
     const { editor, store } = createRealEditor()
-    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const first = editor.addChild('root', { label: 'First station' }).nodeId
     const { nodeId: placeholderId } = insertPalacePlaceholder(editor, [first])
 
     // Placeholder: progress node under root, source node rewired under it.
@@ -665,9 +675,9 @@ describe('MindmapWriteResponder landPalace', () => {
 
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const xml = serializePalaceNodeXml({
-      label: '测试宫殿',
+      label: 'Test palace',
       imageUrl: svgDataUrl('<svg viewBox="0 0 10 10"><g data-station="1" /></svg>'),
-      stations: [station(1, '第一站')],
+      stations: [station(1, 'First station')],
       sourceNodeIds: [first],
     })
     send({ requestId: 'palace-update', fileUuid: 'file-a', action: 'landPalace', args: { xml } })
@@ -677,7 +687,7 @@ describe('MindmapWriteResponder landPalace', () => {
     expect(state.nodes.filter((node) => node.type === 'palace')).toHaveLength(1)
     const palace = state.nodes.find((node) => node.id === placeholderId)!
     expect(state.assets).toHaveLength(1)
-    expect(palace.data).toMatchObject({ label: '测试宫殿', assetId: state.assets[0]!.id })
+    expect(palace.data).toMatchObject({ label: 'Test palace', assetId: state.assets[0]!.id })
     expect(palace.data.generating).toBeUndefined()
     expect(palace.data.runStage).toBeUndefined()
     expect(palace.data.runStopped).toBeUndefined()
@@ -691,14 +701,14 @@ describe('MindmapWriteResponder landPalace', () => {
     stop()
   })
 
-  it('输入节点已不存在时跳过它，不产生悬空边', async () => {
+  it('skips a source node that no longer exists instead of leaving a dangling edge', async () => {
     const { editor, store } = createRealEditor()
-    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const first = editor.addChild('root', { label: 'First station' }).nodeId
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const xml = serializePalaceNodeXml({
-      label: '测试宫殿',
+      label: 'Test palace',
       imageUrl: '',
-      stations: [station(1, '第一站')],
+      stations: [station(1, 'First station')],
       sourceNodeIds: [first, 'ghost'],
     })
 
@@ -714,14 +724,14 @@ describe('MindmapWriteResponder landPalace', () => {
     stop()
   })
 
-  it('没有画面时仍然落图（宫殿可以没有画面）', async () => {
+  it('still lands without artwork (a palace may have no image)', async () => {
     const { editor, store } = createRealEditor()
-    const first = editor.addChild('root', { label: '第一站' }).nodeId
+    const first = editor.addChild('root', { label: 'First station' }).nodeId
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
     const xml = serializePalaceNodeXml({
-      label: '无图宫殿',
+      label: 'Palace without image',
       imageUrl: '',
-      stations: [station(1, '第一站')],
+      stations: [station(1, 'First station')],
       sourceNodeIds: [first],
     })
 
@@ -731,7 +741,7 @@ describe('MindmapWriteResponder landPalace', () => {
     const state = store.getState()
     expect(state.assets).toHaveLength(0)
     expect(state.nodes.find((node) => node.type === 'palace')?.data).toMatchObject({
-      label: '无图宫殿',
+      label: 'Palace without image',
     })
     expect(respond).toHaveBeenCalledWith(expect.objectContaining({ ok: true }))
     stop()

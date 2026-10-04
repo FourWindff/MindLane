@@ -17,13 +17,13 @@ import { ToolCardList } from './ToolCardList'
 
 import '../styles/chat-message-list.css'
 
-const EMPTY_HINT = 'AI 助手可以生成思维导图、生成记忆宫殿'
+const EMPTY_HINT = 'The AI assistant can generate mindmaps and memory palaces'
 
 const QUICK_ACTIONS = [
-  { label: '生成思维导图', prompt: '请帮我生成一个思维导图' },
-  { label: '总结内容', prompt: '请总结当前思维导图的内容' },
-  { label: '头脑风暴', prompt: '请帮我进行头脑风暴，生成一些创意想法' },
-  { label: '优化结构', prompt: '请帮我优化当前思维导图的结构' },
+  { label: 'Generate mindmap', prompt: 'Generate a mindmap for me' },
+  { label: 'Summarize content', prompt: 'Summarize the current mindmap' },
+  { label: 'Brainstorm', prompt: 'Brainstorm some creative ideas for me' },
+  { label: 'Optimize structure', prompt: 'Optimize the structure of the current mindmap' },
 ]
 
 /**
@@ -102,19 +102,19 @@ export function ChatMessageList() {
     return (
       <div className="chat-message-list chat-message-list--session-mode" role="list">
         <div className="chat-session-list__header">
-          <span>历史对话</span>
+          <span>Chat history</span>
           <button
             type="button"
             className="chat-session-list__close"
             onClick={() => setShowSessionList(false)}
-            aria-label="关闭会话列表"
+            aria-label="Close session list"
           >
             ×
           </button>
         </div>
         <div className="chat-session-list__content">
           {sessions.length === 0 ? (
-            <div className="chat-session-list__empty">暂无历史对话</div>
+            <div className="chat-session-list__empty">No chat history yet</div>
           ) : (
             sessions.map((session) => (
               <SessionListItem
@@ -252,21 +252,21 @@ function SessionListItem({
       <div className="chat-session-item__info">
         <span className="chat-session-item__title">{session.title}</span>
         <span className="chat-session-item__meta">
-          {new Date(session.updatedAt).toLocaleString('zh-CN', {
+          {new Date(session.updatedAt).toLocaleString('en-US', {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
           })}
           {' · '}
-          {session.messageCount} 条消息
+          {session.messageCount} messages
         </span>
       </div>
       <button
         type="button"
         className="chat-session-item__delete"
         onClick={(e) => onDelete(session.id, e)}
-        aria-label="删除对话"
+        aria-label="Delete chat"
       >
         <Trash2 size={14} strokeWidth={2} />
       </button>

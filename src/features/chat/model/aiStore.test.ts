@@ -146,7 +146,7 @@ describe('aiStore per-file chat state', () => {
     await vi.waitFor(() => expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true))
     useAiStore.getState().registerStream('file-a', 'session-restored', 'stream-palace')
 
-    emit({ streamId: 'stream-palace', sessionId: 'session-restored', type: 'token', payload: '厅' })
+    emit({ streamId: 'stream-palace', sessionId: 'session-restored', type: 'token', payload: 'P' })
     expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('')
   })
 
@@ -529,7 +529,8 @@ describe('aiStore per-file chat state', () => {
       payload: { content: 'done' },
     })
 
-    // 主进程在发 end 前已完成会话持久化，重拉后新会话进入胶囊条。
+    // The main process persists the session before sending end, so the new
+    // session shows up in the capsule bar after the refresh.
     await vi.waitFor(() => expect(useAiStore.getState().allSessions).toHaveLength(1))
     expect(useAiStore.getState().allSessions[0]?.fileUuid).toBe('file-a')
   })
@@ -610,15 +611,15 @@ describe('turn-state display stripping and gating', () => {
 
   it('strips the trailing EDITOR_STATE block from user messages when a session is loaded for display', async () => {
     const stateBlock =
-      '\n<EDITOR_STATE file_uuid="file-a" file_path="/a.mindlane" file_title="A">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="旧节点"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
+      '\n<EDITOR_STATE file_uuid="file-a" file_path="/a.mindlane" file_title="A">\n<SELECTED_NODES count="1">\n  <node id="n1" type="text" label="Old node"/>\n</SELECTED_NODES>\n</EDITOR_STATE>'
     installApis({
       loadSession: async () => ({
         ok: true as const,
         data: {
           sessionId: 'session-restored',
           messages: [
-            { role: 'user', content: `请整理导图${stateBlock}` } satisfies ChatMessage,
-            { role: 'assistant', content: '好的' },
+            { role: 'user', content: `Organize the mindmap${stateBlock}` } satisfies ChatMessage,
+            { role: 'assistant', content: 'Sure' },
           ],
         },
       }),
@@ -632,8 +633,8 @@ describe('turn-state display stripping and gating', () => {
     await useAiStore.getState().loadSession('session-restored')
 
     const messages = useAiStore.getState().fileChats['file-a']?.chatMessages
-    expect(messages?.[0]).toEqual({ role: 'user', content: '请整理导图' })
-    expect(messages?.[1]).toEqual({ role: 'assistant', content: '好的' })
+    expect(messages?.[0]).toEqual({ role: 'user', content: 'Organize the mindmap' })
+    expect(messages?.[1]).toEqual({ role: 'assistant', content: 'Sure' })
     expect(JSON.stringify(messages)).not.toContain('<EDITOR_STATE')
   })
 
@@ -643,7 +644,7 @@ describe('turn-state display stripping and gating', () => {
         ok: true as const,
         data: {
           sessionId: 'session-restored',
-          messages: [{ role: 'user', content: '旧消息' } satisfies ChatMessage],
+          messages: [{ role: 'user', content: 'Old message' } satisfies ChatMessage],
         },
       }),
     })
@@ -656,7 +657,7 @@ describe('turn-state display stripping and gating', () => {
     await useAiStore.getState().loadSession('session-restored')
 
     expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
-      { role: 'user', content: '旧消息' },
+      { role: 'user', content: 'Old message' },
     ])
   })
 
@@ -669,7 +670,9 @@ describe('turn-state display stripping and gating', () => {
         ok: true as const,
         data: {
           sessionId: 'session-restored',
-          messages: [{ role: 'user', content: `恢复的消息${stateBlock}` } satisfies ChatMessage],
+          messages: [
+            { role: 'user', content: `Restored message${stateBlock}` } satisfies ChatMessage,
+          ],
         },
       }),
     })
@@ -680,7 +683,7 @@ describe('turn-state display stripping and gating', () => {
     await vi.waitFor(() => expect(useAiStore.getState().loadedFileChats['file-a']).toBe(true))
 
     expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
-      { role: 'user', content: '恢复的消息' },
+      { role: 'user', content: 'Restored message' },
     ])
   })
 
@@ -787,7 +790,7 @@ describe('deriveChatCapsuleEntries projection', () => {
     const entries = derive()
     const nonCurrent = entries.slice(1).map((e) => e.fileUuid)
 
-    // file-a 有两条会话，按最近一条 00:02 排序，仍排在 file-c（00:01）之前
+    // file-a has two sessions; its latest one (00:02) still sorts ahead of file-c (00:01)
     expect(entries[0]?.fileUuid).toBe('file-current')
     expect(nonCurrent).toEqual(['file-b', 'file-a', 'file-c'])
   })
@@ -887,9 +890,9 @@ describe('deriveChatCapsuleEntries projection', () => {
       fileChats: { 'file-a': createFileChatState('session-a') },
     })
 
-    useAiStore.getState().setInputDraft('请帮我生成一个思维导图')
+    useAiStore.getState().setInputDraft('Help me generate a mindmap')
 
-    expect(useAiStore.getState().inputDraft).toBe('请帮我生成一个思维导图')
+    expect(useAiStore.getState().inputDraft).toBe('Help me generate a mindmap')
   })
 })
 
@@ -948,7 +951,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'token',
-      payload: '我来读取导图',
+      payload: 'Let me read the mindmap',
     })
     const withTools = reduceStreamEvent(prepared, {
       streamId: 's',
@@ -972,7 +975,7 @@ describe('reduceStreamEvent', () => {
     expect(next.chatMessages).toEqual([
       {
         role: 'assistant',
-        content: '我来读取导图',
+        content: 'Let me read the mindmap',
         toolCalls: [{ name: 'readMindmap', args: {}, result: '', status: 'success' }],
       },
     ])
@@ -985,7 +988,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'token',
-      payload: '文本',
+      payload: 'text',
     })
     const started = reduceStreamEvent(prepared, {
       streamId: 's',
@@ -1390,11 +1393,11 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'end',
-      payload: { content: '（已停止生成）' },
+      payload: { content: '(Generation stopped)' },
     })
     expect(ended.chatMessages[0]).toEqual({
       role: 'assistant',
-      content: '（已停止生成）',
+      content: '(Generation stopped)',
       toolCalls: [{ name: 'generateMindmapFragment', args: {}, result: '', status: 'canceled' }],
     })
     expect(ended.toolCards).toEqual([])
@@ -1425,7 +1428,7 @@ describe('reduceStreamEvent', () => {
       streamId: 's',
       sessionId: 'session-a',
       type: 'end',
-      payload: { content: '（已停止生成）' },
+      payload: { content: '(Generation stopped)' },
     })
     expect(ended.chatMessages[0]?.toolCalls).toEqual([
       { name: 'readMindmap', args: {}, result: '', status: 'success' },

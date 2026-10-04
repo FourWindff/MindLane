@@ -10,7 +10,7 @@ import {
   reflowChildren,
 } from './mindmapTree'
 
-// registry 副作用注册 text 节点类型
+// registry side effect: registers the text node type
 import '@/features/mindmap/nodes/registry'
 
 type Tree = { nodes: Node[]; edges: Edge[] }
@@ -57,8 +57,8 @@ function sideOf(nodes: Node[], id: string): 'left' | 'right' {
   return node.position.x < root.position.x ? 'left' : 'right'
 }
 
-describe('collectDescendantIds 折叠隐藏集合', () => {
-  it('返回折叠节点的全部后代、不含折叠节点自身', () => {
+describe('collectDescendantIds collapse-hide set', () => {
+  it('returns every descendant of a collapsed node without the node itself', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const a = addChild(tree, 'root', 'a')
     tree = a
@@ -77,7 +77,7 @@ describe('collectDescendantIds 折叠隐藏集合', () => {
     expect(ids.size).toBe(3)
   })
 
-  it('叶子节点（无子节点）的后代集合为空', () => {
+  it('returns an empty descendant set for a leaf node (no children)', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const a = addChild(tree, 'root', 'a')
     tree = a
@@ -87,8 +87,8 @@ describe('collectDescendantIds 折叠隐藏集合', () => {
   })
 })
 
-describe('mindmap 布局左右分侧', () => {
-  it('新增子节点不改变已有节点的左右侧归属', () => {
+describe('mindmap layout left/right sides', () => {
+  it('adding a child leaves the existing nodes on their side', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const ids: string[] = []
     for (let i = 0; i < 4; i++) {
@@ -99,7 +99,7 @@ describe('mindmap 布局左右分侧', () => {
 
     const before = ids.map((id) => sideOf(tree.nodes, id))
 
-    // 连续追加两个节点，原有节点不应换侧
+    // Append two more nodes; the existing nodes must not switch sides
     tree = addChild(tree, 'root', 'n4')
     tree = addChild(tree, 'root', 'n5')
     const after = ids.map((id) => sideOf(tree.nodes, id))
@@ -107,7 +107,7 @@ describe('mindmap 布局左右分侧', () => {
     expect(after).toEqual(before)
   })
 
-  it('分侧结果写入 data.side 并与实际位置一致', () => {
+  it('writes the side to data.side and keeps it consistent with the actual position', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const ids: string[] = []
     for (let i = 0; i < 3; i++) {
@@ -122,7 +122,7 @@ describe('mindmap 布局左右分侧', () => {
     }
   })
 
-  it('左右两侧节点数量保持均衡（交替分配新节点）', () => {
+  it('keeps both sides balanced (new nodes alternate)', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     for (let i = 0; i < 6; i++) {
       tree = addChild(tree, 'root', `n${i}`)
@@ -135,7 +135,7 @@ describe('mindmap 布局左右分侧', () => {
     expect(lefts).toHaveLength(3)
   })
 
-  it('新增子节点不改变已有节点的 branchIndex（颜色保持稳定）', () => {
+  it('adding a child leaves the existing branchIndex untouched (colors stay stable)', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const ids: string[] = []
     for (let i = 0; i < 4; i++) {
@@ -148,7 +148,7 @@ describe('mindmap 布局左右分侧', () => {
       nodes.find((n) => n.id === id)!.data.branchIndex
 
     const before = ids.map((id) => branchIndexOf(tree.nodes, id))
-    expect(new Set(before).size).toBe(ids.length) // 各分支索引唯一
+    expect(new Set(before).size).toBe(ids.length) // Every branch index is unique
 
     tree = addChild(tree, 'root', 'n4')
     tree = addChild(tree, 'root', 'n5')
@@ -157,7 +157,7 @@ describe('mindmap 布局左右分侧', () => {
     expect(after).toEqual(before)
   })
 
-  it('logic 布局下新增子节点同样不改变已有节点的 branchIndex', () => {
+  it('adding a child under logic layout leaves the existing branchIndex untouched as well', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     const ids: string[] = []
     for (let i = 0; i < 3; i++) {
@@ -173,7 +173,7 @@ describe('mindmap 布局左右分侧', () => {
     expect(after).toEqual(before)
   })
 
-  it('logic 布局不受影响：所有子节点都在根节点右侧', () => {
+  it('logic layout is unaffected: every child sits to the right of the root node', () => {
     let tree: Tree = { nodes: createInitialNodes(), edges: createInitialEdges() }
     for (let i = 0; i < 4; i++) {
       tree = addChild(tree, 'root', `n${i}`, 'logic')
@@ -186,7 +186,7 @@ describe('mindmap 布局左右分侧', () => {
   })
 })
 
-describe('mindmap 布局根节点分侧折叠', () => {
+describe('mindmap layout root side collapse', () => {
   function reflow(tree: Tree): Node[] {
     return reflowChildren('root', tree.nodes, tree.edges, CHILD_OFFSET_X, CHILD_GAP_Y, 'mindmap')
   }

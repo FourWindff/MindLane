@@ -1,10 +1,10 @@
 import { HumanMessage } from '@langchain/core/messages'
 
 /**
- * 视觉定位提示词构造。
+ * Visual localization prompt builder.
  *
- * 由于该 prompt 需要嵌入图片 URL 给视觉模型，返回多模态 `HumanMessage` 数组，
- * 而非 `WorkflowPromptMessage`（后者只承载纯文本 role/content）。
+ * Because this prompt embeds an image URL for the vision model, it returns a multimodal
+ * `HumanMessage` array instead of `WorkflowPromptMessage` (which carries plain-text role/content only).
  */
 export function buildAnchorLocateMessages(input: {
   imageUrl: string
@@ -15,19 +15,19 @@ export function buildAnchorLocateMessages(input: {
     .join('\n')
 
   const prompt = [
-    '你是精确的图片视觉定位助手。请仔细查看这张图片，找到每个视觉锚点对应物体的精确中心位置。',
+    'You are a precise image visual-localization assistant. Look carefully at this image and find the exact center position of the object for each visual anchor.',
     '',
-    '定位规则：',
-    '1. 找到锚点描述的物体在图中的实际位置，给出其视觉中心的 x/y 归一化坐标（0 到 1 之间的小数，精确到小数点后两位）。',
-    '2. x 表示从左（0）到右（1），y 表示从上（0）到下（1）。',
-    '3. 每个坐标必须定位到该物体本身的视觉中心，不要估算偏移。',
-    '4. 任意两个锚点的坐标距离应不小于 0.08；如果两个物体确实紧挨，分别定位到各自物体的中心即可。',
-    '5. 如果某个锚点在图中不容易精确识别，给出最合理的位置估计，不要省略。',
+    'Localization rules:',
+    '1. Find the actual position of the object described by the anchor in the image, and give the x/y normalized coordinates of its visual center (a decimal between 0 and 1, precise to two decimal places).',
+    '2. x goes from left (0) to right (1); y goes from top (0) to bottom (1).',
+    '3. Each coordinate must point at the visual center of the object itself; do not estimate an offset.',
+    '4. The distance between any two anchor coordinates must be at least 0.08; if two objects really are adjacent, just localize each to its own center.',
+    '5. If an anchor is hard to identify precisely in the image, give the most reasonable position estimate; never omit it.',
     '',
-    '严格返回 JSON 数组，不要输出任何额外文字：',
+    'Return strictly a JSON array with no extra text:',
     '[{"order":1,"anchorVisual":"...","x":0.12,"y":0.34}, ...]',
     '',
-    '锚点列表：',
+    'Anchor list:',
     anchorList,
   ].join('\n')
 

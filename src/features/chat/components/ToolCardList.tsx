@@ -30,7 +30,7 @@ export interface ToolCardItem {
  */
 export function ToolCardList({ cards }: { cards: ToolCardItem[] }) {
   return (
-    <div className="chat-message-list__tool-cards" aria-label="工具调用记录">
+    <div className="chat-message-list__tool-cards" aria-label="Tool calls">
       {cards.map((card, i) => (
         <ToolCardRow
           key={`${card.name}-${i}`}

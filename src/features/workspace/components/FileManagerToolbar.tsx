@@ -26,20 +26,20 @@ export function FileManagerToolbar({
           className="btn file-manager__btn file-manager__btn--primary"
           onClick={onNewFile}
           disabled={busy || !workspacePath}
-          title="新建文件"
+          title="New file"
         >
           <FilePlus size={18} strokeWidth={1.5} />
-          <span>文件</span>
+          <span>File</span>
         </button>
         <button
           type="button"
           className="btn file-manager__btn"
           onClick={onNewFolder}
           disabled={busy || !workspacePath}
-          title="新建文件夹"
+          title="New folder"
         >
           <FolderPlus size={18} strokeWidth={1.5} />
-          <span>文件夹</span>
+          <span>Folder</span>
         </button>
       </div>
 
@@ -52,8 +52,8 @@ export function FileManagerToolbar({
           className="icon-btn icon-btn--md file-manager__icon-btn"
           onClick={onRefresh}
           disabled={busy || !workspacePath}
-          title="刷新"
-          aria-label="刷新"
+          title="Refresh"
+          aria-label="Refresh"
         >
           <RefreshCw size={22} strokeWidth={1.5} />
         </button>
@@ -62,8 +62,8 @@ export function FileManagerToolbar({
           className="icon-btn icon-btn--md file-manager__icon-btn"
           onClick={onSwitchWorkspace}
           disabled={busy}
-          title="切换仓库"
-          aria-label="切换仓库"
+          title="Switch repository"
+          aria-label="Switch repository"
         >
           <FolderInput size={22} strokeWidth={1.5} />
         </button>
@@ -76,8 +76,8 @@ export function FileManagerToolbar({
         type="button"
         className="icon-btn icon-btn--md file-manager__close-btn"
         onClick={onClose}
-        title="关闭"
-        aria-label="关闭"
+        title="Close"
+        aria-label="Close"
       >
         <X size={22} strokeWidth={1.5} />
       </button>

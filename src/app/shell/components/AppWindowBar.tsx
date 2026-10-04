@@ -17,8 +17,8 @@ export function AppWindowBar() {
             type="button"
             className="window-bar__control"
             onClick={() => void window.mindlane?.window.minimize()}
-            title="最小化"
-            aria-label="最小化"
+            title="Minimize"
+            aria-label="Minimize"
           >
             <Minus size={18} strokeWidth={1.7} />
           </button>
@@ -26,8 +26,8 @@ export function AppWindowBar() {
             type="button"
             className="window-bar__control"
             onClick={() => void window.mindlane?.window.toggleMaximize()}
-            title="最大化"
-            aria-label="最大化"
+            title="Maximize"
+            aria-label="Maximize"
           >
             <Square size={15} strokeWidth={1.7} />
           </button>
@@ -35,8 +35,8 @@ export function AppWindowBar() {
             type="button"
             className="window-bar__control window-bar__control--danger"
             onClick={() => void window.mindlane?.window.close()}
-            title="关闭"
-            aria-label="关闭"
+            title="Close"
+            aria-label="Close"
           >
             <X size={18} strokeWidth={1.7} />
           </button>

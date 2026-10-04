@@ -17,8 +17,8 @@ export function AppToolbar({ onOpenFileManager, fileManagerOpen, filePath }: Pro
         type="button"
         className={`app-toolbar__menu${fileManagerOpen ? ' app-toolbar__menu--active' : ''}`}
         onClick={onOpenFileManager}
-        title="打开文件管理器"
-        aria-label="打开文件管理器"
+        title="Open file manager"
+        aria-label="Open file manager"
       >
         <Menu size={18} strokeWidth={1.5} />
       </button>

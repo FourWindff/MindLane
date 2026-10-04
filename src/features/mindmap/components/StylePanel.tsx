@@ -21,21 +21,21 @@ export function StylePanel({
   const { structureType, visualVariant, colorScheme } = style
 
   return (
-    <div className="style-panel" role="dialog" aria-label="导图样式">
+    <div className="style-panel" role="dialog" aria-label="Mindmap style">
       <div className="style-panel__header">
-        <span className="style-panel__title">导图样式</span>
+        <span className="style-panel__title">Mindmap style</span>
         {onClose && (
           <button
             className="icon-btn icon-btn--xs style-panel__close"
             onClick={onClose}
-            aria-label="关闭样式面板"
+            aria-label="Close style panel"
           >
             ✕
           </button>
         )}
       </div>
 
-      {/* 标签切换：风格 + 配色两个 tab */}
+      {/* Tab switch: style + color tabs */}
       <div className="style-panel__tabs" role="tablist">
         <button
           role="tab"
@@ -44,7 +44,7 @@ export function StylePanel({
           onClick={() => setActiveTab('style')}
         >
           <Brush size={14} />
-          风格
+          Style
         </button>
         <button
           role="tab"
@@ -53,14 +53,14 @@ export function StylePanel({
           onClick={() => setActiveTab('color')}
         >
           <Palette size={14} />
-          配色
+          Color
         </button>
       </div>
 
-      {/* ── 风格面板：结构轴 + 视觉轴独立选择 ── */}
+      {/* ── Style panel: structure axis + visual axis chosen independently ── */}
       {activeTab === 'style' && (
         <div className="style-panel__section">
-          <div className="style-panel__group-label">结构</div>
+          <div className="style-panel__group-label">Structure</div>
           <div className="style-panel__style-grid">
             {STRUCTURE_TYPES.map((s) => (
               <StyleOptionButton
@@ -76,7 +76,7 @@ export function StylePanel({
           </div>
 
           <div className="style-panel__group-label" style={{ marginTop: 12 }}>
-            视觉样式
+            Visual style
           </div>
           <div className="style-panel__style-grid">
             {Object.values(VISUAL_VARIANTS).map((v) => (
@@ -94,7 +94,7 @@ export function StylePanel({
         </div>
       )}
 
-      {/* ── 配色方案 ── */}
+      {/* ── Color scheme ── */}
       {activeTab === 'color' && (
         <div className="style-panel__section style-panel__section--colors">
           {COLOR_SCHEMES.map((cs) => (
@@ -154,7 +154,7 @@ function ColorSwatch({ schemeId }: { schemeId: ColorSchemeId }) {
   )
 }
 
-// ─── 结构轴预览：只展示树形状（单向 vs 双向） ────────────────────────────────
+// ─── Structure axis preview: tree shape only (one-way vs two-way) ────────────────────
 
 function StructurePreview({ id, active }: { id: StructureType; active: boolean }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
@@ -220,7 +220,7 @@ function StructurePreview({ id, active }: { id: StructureType; active: boolean }
       </svg>
     )
   }
-  // logic：单向展开
+  // logic: expands one way only
   return (
     <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
       <rect
@@ -270,7 +270,7 @@ function StructurePreview({ id, active }: { id: StructureType; active: boolean }
   )
 }
 
-// ─── 视觉轴预览：只展示节点样式 + 边样式与连接方式 ──────────────────────────
+// ─── Visual axis preview: node style + edge style and connection only ───────────────
 
 function VariantPreview({ variant, active }: { variant: VisualVariant; active: boolean }) {
   const color = active ? 'var(--ml-accent)' : 'var(--ml-text-muted)'
@@ -299,7 +299,7 @@ function VariantPreview({ variant, active }: { variant: VisualVariant; active: b
           stroke={color}
           strokeWidth="1"
         />
-        {/* 树干渐变：源端粗、末端细的填充形状 */}
+        {/* Trunk gradient: filled shape, thick at the source and thin at the tip */}
         <path d="M20 16.5 L28 16 L36 17.3 L36 18.7 L28 19 L20 18.5 Z" fill={color} />
       </svg>
     )
@@ -309,17 +309,17 @@ function VariantPreview({ variant, active }: { variant: VisualVariant; active: b
       <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
         <rect x="2" y="13" width="18" height="10" rx="2" stroke={color} strokeWidth="1.3" />
         <rect x="42" y="13" width="18" height="10" rx="2" stroke={color} strokeWidth="1" />
-        {/* smooth-step 折线，连接侧边中点 */}
+        {/* smooth-step polyline connecting the side midpoints */}
         <path d="M20 18 L27 18 L27 18 L34 18" stroke={color} strokeWidth="1.5" fill="none" />
       </svg>
     )
   }
-  // minimal：下划线节点 + 直角折线连接下边框
+  // minimal: underlined nodes + right-angle polyline joining the bottom border
   return (
     <svg className="style-panel__preview" viewBox="0 0 64 36" fill="none">
       <line x1="2" y1="18" x2="20" y2="18" stroke={color} strokeWidth="1.5" />
       <line x1="42" y1="18" x2="62" y2="18" stroke={color} strokeWidth="1.5" />
-      {/* 边从根节点底部出发，横向连接后进入子节点底部 */}
+      {/* The edge leaves the root bottom, runs sideways, then enters the child bottom */}
       <path d="M11 18 L11 23 L51.5 23 L51.5 18" stroke={color} strokeWidth="1.2" fill="none" />
     </svg>
   )

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState, xmlEscape } from '../ipc.js'
 import type { ChatContext, MindmapReadRequest, MindmapReadResponse } from '../ipc.js'
 
-/** 最小上下文：文件身份 + 空选。 */
+/** Minimal context: file identity + empty selection. */
 function baseContext(overrides: Partial<ChatContext> = {}): ChatContext {
   return {
     fileUuid: 'file-uuid-1',
     filePath: '/workspace/demo.mindlane',
-    fileTitle: 'Demo 导图',
+    fileTitle: 'Demo mindmap',
     selectedNodes: [],
     ...overrides,
   }
@@ -19,7 +19,7 @@ describe('serializeTurnState', () => {
 
     expect(
       xml.startsWith(
-        `<${EDITOR_STATE_TAG} file_uuid="file-uuid-1" file_path="/workspace/demo.mindlane" file_title="Demo 导图">`,
+        `<${EDITOR_STATE_TAG} file_uuid="file-uuid-1" file_path="/workspace/demo.mindlane" file_title="Demo mindmap">`,
       ),
     ).toBe(true)
     expect(xml.endsWith(`</${EDITOR_STATE_TAG}>`)).toBe(true)
@@ -37,15 +37,15 @@ describe('serializeTurnState', () => {
     const xml = serializeTurnState(
       baseContext({
         selectedNodes: [
-          { id: 'n1', type: 'text', label: '节点一' },
-          { id: 'n2', type: 'palace', label: '宫殿' },
+          { id: 'n1', type: 'text', label: 'Node 1' },
+          { id: 'n2', type: 'palace', label: 'Palace' },
         ],
       }),
     )
 
     expect(xml).toContain('<SELECTED_NODES count="2">')
-    expect(xml).toContain('<node id="n1" type="text" content="节点一"/>')
-    expect(xml).toContain('<node id="n2" type="palace" content="宫殿"/>')
+    expect(xml).toContain('<node id="n1" type="text" content="Node 1"/>')
+    expect(xml).toContain('<node id="n2" type="palace" content="Palace"/>')
   })
 
   it('emits ATTACHED_DOCUMENT and LINKED_DOCUMENTS only when present', () => {
@@ -77,7 +77,7 @@ describe('serializeTurnState', () => {
     expect(withDocs).toContain(
       '<ATTACHED_DOCUMENT type="pdf" filename="paper.pdf" path="/docs/paper.pdf">',
     )
-    expect(withDocs).toContain('请根据此文档内容生成思维导图')
+    expect(withDocs).toContain('generate a mindmap based on this document')
     expect(withDocs).toContain('<LINKED_DOCUMENTS count="1">')
     expect(withDocs).toContain(
       '<document id="doc-2" type="markdown" filename="notes.md" text_cache_key="doc-2"/>',
@@ -105,7 +105,7 @@ describe('serializeTurnState', () => {
     expect(xml).toContain('file_title="A &amp; B &lt;tag&gt; &quot;quote&quot;"')
     expect(xml).toContain('content="x &lt; y &gt; z &amp; &quot;w&quot;"')
     expect(xml).toContain('path="/docs/a&amp;b.txt"')
-    // 原文中的 < > & " 不再以裸字符出现，结构不被破坏。
+    // The raw < > & " characters no longer appear bare, so the structure stays intact.
     expect(xml).not.toContain('content="x <')
     expect(xml).not.toContain('&"w"')
   })
@@ -117,43 +117,43 @@ describe('serializeTurnState', () => {
           {
             id: 'n3',
             type: 'text',
-            label: '选中',
+            label: 'Selected',
             chain: ['root', 'n1', 'n3'],
             children: [
-              { id: 'n4', type: 'text', label: '子节点' },
-              { id: 'n5', type: 'text', label: '另一个' },
+              { id: 'n4', type: 'text', label: 'Child node' },
+              { id: 'n5', type: 'text', label: 'Another' },
             ],
           },
         ],
       }),
     )
 
-    expect(xml).toContain('<node id="n3" type="text" content="选中" chain="root,n1,n3">')
-    expect(xml).toContain('<node id="n4" type="text" content="子节点"/>')
-    expect(xml).toContain('<node id="n5" type="text" content="另一个"/>')
+    expect(xml).toContain('<node id="n3" type="text" content="Selected" chain="root,n1,n3">')
+    expect(xml).toContain('<node id="n4" type="text" content="Child node"/>')
+    expect(xml).toContain('<node id="n5" type="text" content="Another"/>')
     expect(xml).toContain('</node>')
   })
 
   it('omits the chain attribute for root-level selections', () => {
     const xml = serializeTurnState(
       baseContext({
-        selectedNodes: [{ id: 'root', type: 'text', label: '中心', chain: ['root'] }],
+        selectedNodes: [{ id: 'root', type: 'text', label: 'Central Topic', chain: ['root'] }],
       }),
     )
 
     expect(xml).not.toContain('chain=')
-    expect(xml).toContain('<node id="root" type="text" content="中心"/>')
+    expect(xml).toContain('<node id="root" type="text" content="Central Topic"/>')
   })
 
   it('contains no mindmap tree: no summary text, no nodes beyond the selected list', () => {
     const xml = serializeTurnState(
-      baseContext({ selectedNodes: [{ id: 'n1', type: 'text', label: '选中' }] }),
+      baseContext({ selectedNodes: [{ id: 'n1', type: 'text', label: 'Selected' }] }),
     )
 
     expect(xml).not.toContain('mindmapSummary')
     expect(xml).not.toContain('getContextSummary')
     expect(xml).not.toContain('<MINDMAP')
-    // 导图树节点（root 等）不会出现，只有 SELECTED_NODES 里的选中节点。
+    // Mindmap tree nodes (root etc.) never appear: only the selected nodes inside SELECTED_NODES.
     expect(xml).not.toContain('root (id:')
   })
 
@@ -164,14 +164,14 @@ describe('serializeTurnState', () => {
 
 describe('stripTurnState', () => {
   it('round-trips a normal message: serialize then strip restores the question', () => {
-    const question = '请帮我整理这个导图'
+    const question = 'Please help me organize this mindmap'
     const message = `${question}\n${serializeTurnState(baseContext())}`
 
     expect(stripTurnState(message)).toBe(question)
   })
 
   it('round-trips empty selection, attachments, linked documents and special-char labels', () => {
-    const question = '问题'
+    const question = 'Question'
     const context = baseContext({
       fileTitle: 'A < B & "C"',
       selectedNodes: [
@@ -200,17 +200,19 @@ describe('stripTurnState', () => {
   })
 
   it('is a no-op on text without a trailing block', () => {
-    expect(stripTurnState('普通消息')).toBe('普通消息')
+    expect(stripTurnState('Plain message')).toBe('Plain message')
     expect(stripTurnState('')).toBe('')
-    // 中间出现标签但末尾无块：不触碰。
-    expect(stripTurnState('提到 <EDITOR_STATE> 这个词')).toBe('提到 <EDITOR_STATE> 这个词')
-    expect(stripTurnState('<EDITOR_STATE file_uuid="x"></EDITOR_STATE> 后面还有字')).toBe(
-      '<EDITOR_STATE file_uuid="x"></EDITOR_STATE> 后面还有字',
+    // A tag appears in the middle but there is no block at the end: left untouched.
+    expect(stripTurnState('mentions <EDITOR_STATE> as a word')).toBe(
+      'mentions <EDITOR_STATE> as a word',
+    )
+    expect(stripTurnState('<EDITOR_STATE file_uuid="x"></EDITOR_STATE> and more text after')).toBe(
+      '<EDITOR_STATE file_uuid="x"></EDITOR_STATE> and more text after',
     )
   })
 
   it('removes only the trailing block and never touches interior content', () => {
-    const interior = '开头 <EDITOR_STATE>中间</EDITOR_STATE> 继续'
+    const interior = 'Start <EDITOR_STATE>middle</EDITOR_STATE> end'
     const message = `${interior}\n${serializeTurnState(baseContext())}`
 
     expect(stripTurnState(message)).toBe(interior)
@@ -222,7 +224,7 @@ describe('stripTurnState', () => {
   })
 
   it('does not strip a block that is not anchored at the very end', () => {
-    const text = `问题\n${serializeTurnState(baseContext())}\n追问`
+    const text = `Question\n${serializeTurnState(baseContext())}\nFollow-up`
     expect(stripTurnState(text)).toBe(text)
   })
 })
@@ -230,11 +232,11 @@ describe('stripTurnState', () => {
 describe('MindmapRead bridge types', () => {
   it('correlates request and response by requestId', () => {
     const request: MindmapReadRequest = { requestId: 'req-1', fileUuid: 'file-a' }
-    const okResponse: MindmapReadResponse = { requestId: 'req-1', ok: true, summary: '树' }
+    const okResponse: MindmapReadResponse = { requestId: 'req-1', ok: true, summary: 'Tree' }
     const errorResponse: MindmapReadResponse = {
       requestId: 'req-1',
       ok: false,
-      error: '文件未打开',
+      error: 'File not open',
     }
 
     expect(request.requestId).toBe(okResponse.requestId)

@@ -35,13 +35,13 @@ function buildLocatedRoute(
   return enforceMinDistance(raw)
 }
 
-// ===== Vision Agent 核心逻辑 =====
+// ===== Vision Agent core logic =====
 
 function parseJsonArray(text: string): unknown[] {
   const match = text.match(/\[[\s\S]*\]/)
-  if (!match) throw new Error('未找到 JSON 数组')
+  if (!match) throw new Error('No JSON array found')
   const parsed = JSON.parse(match[0]) as unknown
-  if (!Array.isArray(parsed)) throw new Error('返回内容不是 JSON 数组')
+  if (!Array.isArray(parsed)) throw new Error('Response content is not a JSON array')
   return parsed
 }
 
@@ -107,22 +107,22 @@ function normalizeDetectedAnchors(
 }
 
 /**
- * VisionAgent - 视觉定位智能体
+ * VisionAgent - visual localization agent.
  *
- * 架构职责：
- * 1. 在生成的记忆宫殿图像中定位锚点位置
- * 2. 应用标准布局作为回退方案
- * 3. 生成记忆路线总结
+ * Architectural responsibilities:
+ * 1. Locate anchors in the generated memory palace image.
+ * 2. Apply the canonical layout as a fallback.
+ * 3. Generate the memory route summary.
  *
- * 无状态设计：
- * - 不涉及持久化记忆访问
- * - 所有输入通过 state.palace 和 state.imageUrls 传递
- * - 输出 memoryRoute 和 response 总结
+ * Stateless design:
+ * - No persistent memory access.
+ * - All input travels through state.palace and state.imageUrls.
+ * - Outputs memoryRoute and the response summary.
  */
 export class AnchorAgent extends PalaceAgent {
   /**
-   * 视觉定位：在图片中定位锚点位置
-   * 作为 Vision Agent 的核心业务能力，与 Provider 解耦
+   * Visual localization: locate anchors inside an image.
+   * The core capability of Vision Agent, decoupled from the provider.
    */
   private async locateAnchors(input: {
     imageUrl: string
@@ -132,7 +132,7 @@ export class AnchorAgent extends PalaceAgent {
       throw new Error('No vision model configured')
     }
     if (!input.imageUrl.trim()) {
-      throw new Error('缺少图片 URL')
+      throw new Error('Missing image URL')
     }
     if (input.anchors.length === 0) {
       return []
@@ -147,7 +147,7 @@ export class AnchorAgent extends PalaceAgent {
 
     const content = messageContentToString(response.content).trim()
     if (!content) {
-      throw new Error('视觉模型未返回内容')
+      throw new Error('The vision model returned no content')
     }
 
     const parsed = parseJsonArray(content)
@@ -182,7 +182,7 @@ export class AnchorAgent extends PalaceAgent {
       } catch (err) {
         logger
           .withContext('AnchorAgent')
-          .warn('locateAnchors 失败，降级到标准布局:\n', formatAgentError(err))
+          .warn('locateAnchors failed, falling back to canonical layout:\n', formatAgentError(err))
         memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
       }
     } else {
@@ -208,7 +208,7 @@ export class AnchorAgent extends PalaceAgent {
     } catch (err) {
       logger
         .withContext('AnchorAgent')
-        .warn('总结生成失败，使用 fallback 摘要:\n', formatAgentError(err))
+        .warn('Summary generation failed, using the fallback summary:\n', formatAgentError(err))
       summary = buildFallbackSummary(memoryRoute, hasImage)
     }
 

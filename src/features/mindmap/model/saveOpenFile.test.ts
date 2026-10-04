@@ -11,7 +11,7 @@ function createDirtyInstance(filePath: string | null): OpenFile {
   } else {
     instance.newFile('B')
   }
-  instance.editor.addChild('root', { label: '后台新增节点' })
+  instance.editor.addChild('root', { label: 'Node added in the background' })
   return instance
 }
 
@@ -37,7 +37,9 @@ describe('saveOpenFile', () => {
       data: expect.objectContaining({
         mindmap: expect.objectContaining({
           nodes: expect.arrayContaining([
-            expect.objectContaining({ data: expect.objectContaining({ label: '后台新增节点' }) }),
+            expect.objectContaining({
+              data: expect.objectContaining({ label: 'Node added in the background' }),
+            }),
           ]),
         }),
       }),
@@ -48,7 +50,7 @@ describe('saveOpenFile', () => {
 
   it('save payload is legal XML that roundtrips back to the same structure', async () => {
     const instance = createDirtyInstance('/b.mindlane')
-    instance.editor.addChild('root', { label: '子 & <特殊>' })
+    instance.editor.addChild('root', { label: 'Child & <special>' })
     let savedPayload: { filePath: string; data: unknown } | null = null
     const save = vi.fn((payload: { filePath: string; data: unknown }) => {
       savedPayload = payload
@@ -58,7 +60,7 @@ describe('saveOpenFile', () => {
 
     await saveOpenFile(instance.store, { syncAfterFileSaved })
 
-    // 主进程序列化端产物必须是合法 XML，读回 roundtrip 一致
+    // The payload serialized on the main-process side must be legal XML that roundtrips back
     const file = savedPayload!.data as Parameters<typeof serializeMindLaneFile>[0]
     const { serializeMindLaneFile } = await import('@contracts/mindmapXml')
     const xml = serializeMindLaneFile(file)
@@ -67,8 +69,8 @@ describe('saveOpenFile', () => {
     expect(parsed.metadata.title).toBe('B')
     expect(parsed.mindmap.nodes).toHaveLength(3)
     const labels = parsed.mindmap.nodes.map((n) => (n.data as { label: string }).label)
-    expect(labels).toEqual(expect.arrayContaining(['子 & <特殊>']))
-    // 保存守卫语义不变：nodes/edges/documentRefs 引用相等才 markClean
+    expect(labels).toEqual(expect.arrayContaining(['Child & <special>']))
+    // Save-guard semantics unchanged: markClean only when nodes/edges/documentRefs are reference-equal
     expect(instance.store.getState().dirty).toBe(false)
   })
 
@@ -84,7 +86,7 @@ describe('saveOpenFile', () => {
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
     const saving = saveOpenFile(instance.store, { syncAfterFileSaved })
-    instance.editor.addChild('root', { label: '保存期间的修改' })
+    instance.editor.addChild('root', { label: 'Changed while saving' })
     finishSave?.({ ok: true, data: { filePath: '/b.mindlane' } })
     await saving
 
@@ -119,13 +121,13 @@ describe('saveOpenFile', () => {
 
   it('routes IPC failures to onError and keeps the instance dirty', async () => {
     const instance = createDirtyInstance('/b.mindlane')
-    const save = vi.fn().mockResolvedValue({ ok: false, error: '写入失败' })
+    const save = vi.fn().mockResolvedValue({ ok: false, error: 'Write failed' })
     const onError = vi.fn()
     vi.stubGlobal('window', { mindlane: { file: { save } } })
 
     await expect(saveOpenFile(instance.store, { syncAfterFileSaved, onError })).resolves.toBe(false)
 
-    expect(onError).toHaveBeenCalledWith('写入失败')
+    expect(onError).toHaveBeenCalledWith('Write failed')
     expect(instance.store.getState().dirty).toBe(true)
     expect(syncAfterFileSaved).not.toHaveBeenCalled()
   })

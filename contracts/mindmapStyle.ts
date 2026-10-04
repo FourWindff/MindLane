@@ -7,7 +7,7 @@
 export type StructureType = 'logic' | 'mindmap'
 export type VisualVariant = 'card' | 'outline' | 'minimal'
 
-/** 配色方案 */
+/** Color scheme */
 export type ColorSchemeId = 'default' | 'rainbow' | 'warm' | 'ocean' | 'forest' | 'sunset' | 'night'
 
 export interface MindmapStyleState {

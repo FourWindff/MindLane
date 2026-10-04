@@ -17,7 +17,7 @@ function makeNodes(
 
 describe('serializeMindLaneFile', () => {
   it('produces a single-root document with all four sections', () => {
-    const file = createEmptyFile('测试标题')
+    const file = createEmptyFile('Test title')
     const xml = serializeMindLaneFile(file)
 
     expect(xml.startsWith('<mindlane version="1.0">')).toBe(true)
@@ -26,13 +26,13 @@ describe('serializeMindLaneFile', () => {
     expect(xml).toContain('<mindmap>')
     expect(xml).toContain('<assets />')
     expect(xml).toContain('<documents />')
-    expect(xml).toContain('<node id="root" type="text" content="中心主题" />')
-    // 版本号只放根元素
+    expect(xml).toContain('<node id="root" type="text" content="Central Topic" />')
+    // The version sits only on the root element
     expect(xml.match(/version=/g)).toHaveLength(1)
   })
 
   it('does not serialize positions, edges or layout products', () => {
-    const file = createEmptyFile('测试')
+    const file = createEmptyFile('Test')
     file.mindmap.nodes[0]!.position = { x: 42, y: 43 }
     ;(file.mindmap.nodes[0]!.data as Record<string, unknown>).depth = 5
     ;(file.mindmap.nodes[0]!.data as Record<string, unknown>).branchIndex = 3
@@ -49,7 +49,7 @@ describe('serializeMindLaneFile', () => {
   })
 
   it('escapes special characters in content and title', () => {
-    const file = createEmptyFile('标题 & "引号"')
+    const file = createEmptyFile('Title & "quotes"')
     file.metadata.title = 'a < b > c & "d" \'e\''
     ;(file.mindmap.nodes[0]!.data as { label: string }).label = 'x < y & z "q"'
     const xml = serializeMindLaneFile(file)
@@ -58,7 +58,7 @@ describe('serializeMindLaneFile', () => {
   })
 
   it('serializes assets and documents sections', () => {
-    const file = createEmptyFile('测试')
+    const file = createEmptyFile('Test')
     file.assets = [{ id: 'a1', mime: 'image/png', sha256: 'deadbeef', data: 'iVBORw0KGgo=' }]
     file.documents = [
       {
@@ -78,12 +78,12 @@ describe('serializeMindLaneFile', () => {
   })
 
   it('roundtrips through deserializeMindLaneFile byte-identically', async () => {
-    const file = createEmptyFile('产品规划')
+    const file = createEmptyFile('Product plan')
     const nodes = makeNodes(
-      { id: 'root', type: 'text', label: '中心主题' },
-      { id: 'a1', type: 'text', label: '分支A' },
-      { id: 'a2', type: 'text', label: '子节点 & 特殊 <字符>' },
-      { id: 'b1', type: 'text', label: '分支B' },
+      { id: 'root', type: 'text', label: 'Central Topic' },
+      { id: 'a1', type: 'text', label: 'Branch A' },
+      { id: 'a2', type: 'text', label: 'Child node & special <chars>' },
+      { id: 'b1', type: 'text', label: 'Branch B' },
     )
     const edges: MindmapXmlEdge[] = [
       { id: 'e-r-a1', source: 'root', target: 'a1', type: 'mindmap' },
@@ -122,12 +122,12 @@ describe('serializeMindLaneFile', () => {
     expect(parsed.assets).toEqual(file.assets)
     expect(parsed.documents).toEqual(file.documents)
 
-    // 结构 roundtrip：标签/嵌套/collapsed/转义
+    // Structural roundtrip: tags/nesting/collapsed/escaping
     const labels = new Map(
       parsed.mindmap.nodes.map((n) => [n.id, (n.data as { label: string }).label]),
     )
-    expect(labels.get('root')).toBe('中心主题')
-    expect(labels.get('a2')).toBe('子节点 & 特殊 <字符>')
+    expect(labels.get('root')).toBe('Central Topic')
+    expect(labels.get('a2')).toBe('Child node & special <chars>')
     expect(
       (parsed.mindmap.nodes.find((n) => n.id === 'a1')!.data as { collapsed?: boolean }).collapsed,
     ).toBe(true)
@@ -138,13 +138,13 @@ describe('serializeMindLaneFile', () => {
     expect(rootData.leftCollapsed).toBe(true)
     expect(rootData.rightCollapsed).toBe(true)
 
-    // 同一输入 → 同一输出（确定性）
+    // Same input → same output (deterministic)
     const parsedBack = await deserializeMindLaneFile(xml1)
     expect(serializeMindLaneFile(parsedBack)).toBe(xml1)
   })
 
   it('serializes palace nodes with stations and asset reference', async () => {
-    const file = createEmptyFile('测试')
+    const file = createEmptyFile('Test')
     file.mindmap.nodes = [
       {
         id: 'root',
@@ -157,15 +157,15 @@ describe('serializeMindLaneFile', () => {
         type: 'palace',
         position: { x: 0, y: 0 },
         data: {
-          label: '宫殿',
+          label: 'Palace',
           assetId: 'a1',
           imageUrl: '',
           sourceNodeIds: ['root'],
           stations: [
             {
               order: 1,
-              content: '第一站',
-              anchorVisual: '灯塔',
+              content: 'First stop',
+              anchorVisual: 'Lighthouse',
               x: 10,
               y: 20,
               linkedNodeId: 'root',
@@ -177,29 +177,29 @@ describe('serializeMindLaneFile', () => {
     file.mindmap.edges = [{ id: 'e-r-p1', source: 'root', target: 'p1', type: 'mindmap' }]
     const xml = serializeMindLaneFile(file)
     expect(xml).toContain(
-      '<node id="p1" type="palace" content="宫殿" asset="a1" sourceNodeIds="root">',
+      '<node id="p1" type="palace" content="Palace" asset="a1" sourceNodeIds="root">',
     )
     expect(xml).toContain(
-      '<station order="1" x="10" y="20" linkedNodeId="root" anchorVisual="灯塔">第一站</station>',
+      '<station order="1" x="10" y="20" linkedNodeId="root" anchorVisual="Lighthouse">First stop</station>',
     )
     expect(xml).not.toContain('imageUrl')
   })
 
   it('serializes image nodes with asset ref and no src/imageUrl', async () => {
-    const file = createEmptyFile('测试')
+    const file = createEmptyFile('Test')
     file.mindmap.nodes = [
       { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'root' } },
       {
         id: 'i1',
         type: 'image',
         position: { x: 0, y: 0 },
-        data: { assetId: 'a1', alt: '架构图', width: 400, height: 300 },
+        data: { assetId: 'a1', alt: 'Architecture diagram', width: 400, height: 300 },
       },
     ]
     file.mindmap.edges = [{ id: 'e-r-i1', source: 'root', target: 'i1', type: 'mindmap' }]
     const xml = serializeMindLaneFile(file)
     expect(xml).toContain(
-      '<node id="i1" type="image" asset="a1" alt="架构图" width="400" height="300" />',
+      '<node id="i1" type="image" asset="a1" alt="Architecture diagram" width="400" height="300" />',
     )
     expect(xml).not.toContain('src=')
     expect(xml).not.toContain('imageUrl')
@@ -254,10 +254,10 @@ describe('serializeTreeFragment', () => {
 
 describe('serializeMindmapSection', () => {
   const nodes = makeNodes(
-    { id: 'root', type: 'text', label: '中心' },
-    { id: 'n1', type: 'text', label: '技术' },
-    { id: 'n2', type: 'text', label: '设计' },
-    { id: 'n3', type: 'text', label: '前端框架' },
+    { id: 'root', type: 'text', label: 'Center' },
+    { id: 'n1', type: 'text', label: 'Tech' },
+    { id: 'n2', type: 'text', label: 'Design' },
+    { id: 'n3', type: 'text', label: 'Frontend framework' },
   )
   const edges: MindmapXmlEdge[] = [
     { id: 'e1', source: 'root', target: 'n1', type: 'mindmap' },
@@ -284,7 +284,7 @@ describe('serializeMindmapSection', () => {
   })
 
   it('filters by textContains', () => {
-    const xml = serializeMindmapSection(nodes, edges, { textContains: '前端' })
+    const xml = serializeMindmapSection(nodes, edges, { textContains: 'Frontend' })
     expect(xml).toContain('id="n3"')
     expect(xml).not.toContain('id="n2"')
   })
@@ -301,7 +301,7 @@ describe('visual sibling order (edge order may diverge)', () => {
   // edge array order: [root->a, root->b, root->above]; visual (y) order: a < above < b.
   // Simulates addSibling(b, 'above') where the new edge is appended last.
   const nodes: MindmapXmlNode[] = [
-    { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: '中心' } },
+    { id: 'root', type: 'text', position: { x: 0, y: 0 }, data: { label: 'Center' } },
     { id: 'a', type: 'text', position: { x: 200, y: 0 }, data: { label: 'a' } },
     { id: 'above', type: 'text', position: { x: 200, y: 50 }, data: { label: 'above' } },
     { id: 'b', type: 'text', position: { x: 200, y: 100 }, data: { label: 'b' } },
@@ -325,7 +325,7 @@ describe('visual sibling order (edge order may diverge)', () => {
   })
 
   it('save -> load round-trip keeps visual order (position is not persisted)', async () => {
-    const file = createEmptyFile('测试')
+    const file = createEmptyFile('Test')
     file.mindmap.nodes = nodes as unknown as MindLaneFile['mindmap']['nodes']
     file.mindmap.edges = edges as unknown as MindLaneFile['mindmap']['edges']
     const xml = serializeMindLaneFile(file)

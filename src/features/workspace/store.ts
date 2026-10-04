@@ -109,7 +109,7 @@ async function createUniqueWorkspaceFile(
   preferredName: string,
   data: MindLaneFile,
 ): Promise<{ ok: true; data: { filePath: string; data: unknown } } | { ok: false; error: string }> {
-  const baseName = preferredName.trim() || '未命名'
+  const baseName = preferredName.trim() || 'Untitled'
   for (let index = 0; index < 100; index += 1) {
     const candidateName = index === 0 ? baseName : `${baseName}-${index + 1}`
     const result = await window.mindlane?.workspace.createFile({
@@ -120,12 +120,15 @@ async function createUniqueWorkspaceFile(
     if (result?.ok) {
       return { ok: true, data: { filePath: result.data.filePath, data: result.data.data } }
     }
-    if (result?.error !== '文件已存在') {
-      return { ok: false, error: result?.error ?? '创建文件失败' }
+    if (result?.error !== 'File already exists') {
+      return { ok: false, error: result?.error ?? 'Create failed' }
     }
   }
 
-  return { ok: false, error: '自动命名失败，请手动整理工作区中的重名文件' }
+  return {
+    ok: false,
+    error: 'Automatic naming failed; clean up the duplicate file names in the workspace manually',
+  }
 }
 
 export async function saveCurrentDocumentSilently(): Promise<boolean> {
@@ -146,7 +149,9 @@ export async function saveCurrentDocumentSilently(): Promise<boolean> {
 
   const workspacePath = workspaceState.workspacePath
   if (!workspacePath) {
-    useWorkspaceStore.setState({ lastError: '当前文件尚未保存，且没有可用工作区用于自动保存' })
+    useWorkspaceStore.setState({
+      lastError: 'The current file is not saved yet and no workspace is available for auto-save',
+    })
     return false
   }
 
@@ -182,7 +187,7 @@ async function applyWorkspaceSession(
 ): Promise<boolean> {
   if (!result?.ok) {
     const message = result?.error ?? options.fallbackError
-    if (message && !(options.ignoreCancel && message === '已取消')) {
+    if (message && !(options.ignoreCancel && message === 'Canceled')) {
       useWorkspaceStore.setState({ lastError: message })
     }
     return false
@@ -277,7 +282,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const result = await window.mindlane?.workspace.switchDirectory({ workspacePath })
-      return applyWorkspaceSession(result, { fallbackError: '切换仓库失败' })
+      return applyWorkspaceSession(result, { fallbackError: 'Switch failed' })
     } finally {
       set({ busy: false })
     }
@@ -295,7 +300,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     try {
       const result = await window.mindlane?.workspace.openFilePath({ filePath })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '打开文件失败' })
+        set({ lastError: result?.error ?? 'Open failed' })
         return false
       }
 
@@ -309,7 +314,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   createMindLaneFile: async (name, parentPath, options) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
-      set({ lastError: '请先打开工作区' })
+      set({ lastError: 'Open a workspace first' })
       return false
     }
     if (!(await saveCurrentDocumentSilently())) {
@@ -321,7 +326,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     set({ busy: true, lastError: null })
     try {
       const data = createEmptyFile(name.trim())
-      // uniqueName: an existing name yields `名字-2` instead of a failed create
+      // uniqueName: an existing name yields `name-2` instead of a failed create
       // (the entry conversation derives the name from user input and must land).
       const result = options?.uniqueName
         ? await createUniqueWorkspaceFile(targetDir, name, data)
@@ -331,7 +336,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
             data,
           })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '新建文件失败' })
+        set({ lastError: result?.error ?? 'Create failed' })
         return false
       }
 
@@ -415,7 +420,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   createSubfolder: async (parentPath: string, name: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
-      set({ lastError: '请先打开工作区' })
+      set({ lastError: 'Open a workspace first' })
       return false
     }
 
@@ -427,7 +432,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath,
       })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '创建文件夹失败' })
+        set({ lastError: result?.error ?? 'Create folder failed' })
         return false
       }
       const tree = await listWorkspaceTree(workspacePath)
@@ -441,7 +446,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   deleteItem: async (targetPath: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
-      set({ lastError: '请先打开工作区' })
+      set({ lastError: 'Open a workspace first' })
       return false
     }
 
@@ -452,7 +457,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath,
       })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '删除失败' })
+        set({ lastError: result?.error ?? 'Delete failed' })
         return false
       }
 
@@ -476,7 +481,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   renameItem: async (oldPath: string, newName: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
-      set({ lastError: '请先打开工作区' })
+      set({ lastError: 'Open a workspace first' })
       return null
     }
 
@@ -488,7 +493,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath,
       })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '重命名失败' })
+        set({ lastError: result?.error ?? 'Rename failed' })
         return null
       }
 
@@ -509,7 +514,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   moveItem: async (sourcePath: string, targetDirPath: string) => {
     const workspacePath = get().workspacePath
     if (!workspacePath) {
-      set({ lastError: '请先打开工作区' })
+      set({ lastError: 'Open a workspace first' })
       return null
     }
 
@@ -521,7 +526,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
         workspacePath,
       })
       if (!result?.ok) {
-        set({ lastError: result?.error ?? '移动失败' })
+        set({ lastError: result?.error ?? 'Move failed' })
         return null
       }
 

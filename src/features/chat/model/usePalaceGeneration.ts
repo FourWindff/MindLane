@@ -9,7 +9,7 @@ import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import type { MindmapSelectedTopic } from '@/features/mindmap/hooks/useMindmapView'
 
 /**
- * Manual palace generation (CONTEXT.md「触发面」): the user's gesture starts one
+ * Manual palace generation (CONTEXT.md "trigger surface"): the user's gesture starts one
  * ephemeral graph run (see palaceRun.ts).
  *
  * The orchestration — turn context, placeholder, run start — lives in chat; the
@@ -28,18 +28,20 @@ export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void 
 
       const mindlane = typeof window !== 'undefined' ? window.mindlane : undefined
       if (!mindlane) {
-        reportRendererError('IPC 通道不可用，请确认 Electron 环境')
+        reportRendererError('IPC channel unavailable; make sure you are running in Electron')
         return
       }
 
       if (!chatReady) {
-        reportRendererError('请先在右侧「设置」面板中配置 API Key 并选择模型')
+        reportRendererError(
+          'Configure an API Key and model in the Settings panel on the right first',
+        )
         return
       }
 
       const editor = openFileRegistry.getActive()?.editor
       if (!editor) {
-        reportRendererError('当前没有打开的文件，无法生成记忆宫殿')
+        reportRendererError('No file is open, cannot generate a memory palace')
         return
       }
 
@@ -81,7 +83,7 @@ export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void 
       }
       if (!started.ok) {
         rollback()
-        reportRendererError(`宫殿生成启动失败：${started.error}`)
+        reportRendererError(`Failed to start palace generation: ${started.error}`)
         settle()
       }
     },

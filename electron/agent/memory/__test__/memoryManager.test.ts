@@ -23,18 +23,18 @@ describe('MemoryManager', () => {
   })
 
   it('writeMemory creates MEMORY.md', async () => {
-    await manager.writeMemory('用户偏好模块化')
-    expect(await manager.loadMemory()).toBe('用户偏好模块化\n')
+    await manager.writeMemory('The user prefers modularity')
+    expect(await manager.loadMemory()).toBe('The user prefers modularity\n')
     const content = await fs.promises.readFile(
       path.join(tempDir, 'mindlanememory', 'MEMORY.md'),
       'utf-8',
     )
-    expect(content).toBe('用户偏好模块化\n')
+    expect(content).toBe('The user prefers modularity\n')
   })
 
   it('writeMemory overwrites the full file', async () => {
-    await manager.writeMemory('事实一\n事实二')
-    await manager.writeMemory('事实一\n合并后的事实')
-    expect(await manager.loadMemory()).toBe('事实一\n合并后的事实\n')
+    await manager.writeMemory('Fact one\nFact two')
+    await manager.writeMemory('Fact one\nMerged fact')
+    expect(await manager.loadMemory()).toBe('Fact one\nMerged fact\n')
   })
 })

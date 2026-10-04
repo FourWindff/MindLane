@@ -8,7 +8,7 @@ import { COLOR_SCHEMES } from '@/features/mindmap/theme/presets'
 
 function renderStylePanel(): string {
   const instance = new OpenFile('/test/path.mindlane')
-  instance.newFile('测试')
+  instance.newFile('Test file')
   instance.store
     .getState()
     .setStyle({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })

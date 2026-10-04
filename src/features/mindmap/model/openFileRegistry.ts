@@ -5,11 +5,11 @@ const DEFAULT_KEY = '__default__'
 type Listener = () => void
 
 /**
- * 管理工作区中所有打开文件的 OpenFile。
- * - 同一文件多次打开返回同一实例。
- * - 切换活动文件不会释放之前的实例。
- * - 关闭文件或切换工作区时调用 release 释放实例。
- * - 没有任何文件打开时提供一个默认实例，保证 UI 始终有可用 store。
+ * Manages the OpenFile of every file open in the workspace.
+ * - Opening the same file twice returns the same instance.
+ * - Switching the active file never releases the previous instance.
+ * - Closing a file or switching workspace calls release to drop the instance.
+ * - With no file open it provides a default instance so the UI always has a usable store.
  */
 export class OpenFileRegistry {
   private instances = new Map<string, OpenFile>()

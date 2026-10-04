@@ -43,14 +43,20 @@ export class RendererRequester<TReq extends RequesterRequest, TRes extends Reque
   request<T>(buildRequest: (requestId: string) => Omit<TReq, 'requestId'>): Promise<T> {
     const window = this.getWindow()
     if (!window || window.isDestroyed()) {
-      return Promise.reject(new Error(`编辑器不可用（窗口已关闭），无法${this.verb}`))
+      return Promise.reject(
+        new Error(
+          `Editor is unavailable (the window is closed); cannot ${this.verb.toLowerCase()}`,
+        ),
+      )
     }
     const requestId = crypto.randomUUID()
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId)
         reject(
-          new Error(`${this.verb}超时（${this.timeoutMs / 1000}s 内未收到渲染层${this.ackNoun}）`),
+          new Error(
+            `${this.verb} timed out (no ${this.ackNoun} from the renderer within ${this.timeoutMs / 1000}s)`,
+          ),
         )
       }, this.timeoutMs)
       this.pending.set(requestId, {

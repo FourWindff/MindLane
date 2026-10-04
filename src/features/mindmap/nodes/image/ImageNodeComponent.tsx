@@ -50,8 +50,8 @@ function ImageNodeInner({ id, data: rawData, selected }: NodeProps) {
           draggable={false}
         />
       ) : (
-        <div className="image-node__missing" title={`缺少图片资源（asset=${data.assetId}）`}>
-          🖼 图片缺失
+        <div className="image-node__missing" title={`Missing image asset (asset=${data.assetId})`}>
+          🖼 Image missing
         </div>
       )}
     </div>

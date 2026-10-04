@@ -3,12 +3,12 @@ import { DEFAULT_SETTINGS } from '../fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from '../fs/workspace.js'
 import type { FileSystemService } from '../fs/index.js'
 
-/** 无用户痕迹的默认工作区：从未打开过文件，视为可安全迁移旧版全局 key。 */
+/** Default workspace with no user traces: no file was ever opened, so migrating the legacy global keys is safe. */
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
   return state.lastOpenedFilePath === null
 }
 
-/** 已执行过会话文件索引 prune 的 workspace（进程内只跑一次，避免每次 getSession 都写盘）。 */
+/** Workspaces whose session file index has already been pruned (once per process, so getSession does not write to disk every time). */
 const prunedFileUuidPathWorkspaces = new Set<string>()
 
 export async function getWorkspaceSessionForService(service: FileSystemService) {
@@ -45,10 +45,11 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
       }
     }
 
-    // 恢复时 prune 一次会话文件索引，剔除路径已不存在的失效条目。
-    // 只在每个 workspace 首次恢复时执行：运行中的 getSession 会被
-    // 频繁调用（每次切文件），重复 prune 会写盘且可能与改名/移动的
-    // 映射更新竞态，把尚未回填的新路径误删。
+    // Prune the session file index once on restore, dropping entries whose path no longer exists.
+    // Runs only on the first restore of each workspace: getSession is called frequently
+    // while running (on every file switch), and repeated pruning would write to disk and could
+    // race with rename/move mapping updates, wrongly deleting a new path that has not been
+    // written back yet.
     if (!prunedFileUuidPathWorkspaces.has(workspacePath)) {
       await service.workspace.pruneFileUuidPaths(workspacePath)
       prunedFileUuidPathWorkspaces.add(workspacePath)

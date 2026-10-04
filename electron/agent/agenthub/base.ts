@@ -2,15 +2,15 @@ import type { LLMProvider } from '../providers/index.js'
 import type { MainGraphStateType, PalaceSubgraphStateType } from '../state.js'
 
 /**
- * Agent 基类 - 所有 Agent 的抽象基类
+ * Agent base class - the abstract base for every agent.
  *
- * 架构原则：
- * - 只有 MindLaneAgent 拥有记忆、上下文管理、工具绑定
- * - 其他 Agent (Analyze, ImageGen, Vision) 不涉及持久化记忆
- * - 所有 Agent 通过统一的 invoke(state) 接口执行任务
- * - MindLaneAgent 自行声明 route(state) 路由方法（基类不声明，也不调用）
+ * Architectural principles:
+ * - Only MindLaneAgent owns memory, context management, and tool binding.
+ * - Other agents (Analyze, ImageGen, Vision) do not touch persistent memory.
+ * - Every agent performs its task through the unified invoke(state) interface.
+ * - MindLaneAgent declares its own route(state) method (the base declares and calls nothing).
  *
- * 状态类型对应：
+ * State types:
  * - MindLaneAgent: MainGraphStateType
  * - Analyze/ImageGen/Vision: PalaceSubgraphStateType
  */
@@ -18,16 +18,16 @@ export abstract class BaseAgent {
   constructor(protected provider: LLMProvider) {}
 
   /**
-   * 执行 Agent 的主要逻辑
-   * @param state - 当前 Agent 状态
-   * @returns 部分状态更新
+   * Run the agent's main logic.
+   * @param state - Current agent state
+   * @returns Partial state update
    */
   abstract invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>>
 }
 
 /**
- * Palace 子图 Agent 基类
- * 用于 Analyze, ImageGen, Vision 等 Palace 子图中的 Agent
+ * Base class for palace-subgraph agents.
+ * Used by agents in the palace subgraph such as Analyze, ImageGen, and Vision.
  */
 export abstract class PalaceAgent {
   constructor(protected provider: LLMProvider) {}

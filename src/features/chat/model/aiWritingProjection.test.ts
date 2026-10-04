@@ -64,7 +64,7 @@ function installStreamApi() {
 function activateFile(fileUuid: string) {
   const key = `test-${fileUuid}`
   const instance = openFileRegistry.getOrCreate(key)
-  const file = createEmptyFile('Test 导图')
+  const file = createEmptyFile('Test mindmap')
   file.metadata.fileUuid = fileUuid
   instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
   openFileRegistry.setActive(key)
@@ -122,7 +122,7 @@ describe('AI writing projection', () => {
       streamId: 'stream-1',
       sessionId: 'session-a',
       type: 'end',
-      payload: { content: '好' },
+      payload: { content: 'ok' },
     })
     expect(instance.isAiWriting()).toBe(false)
   })

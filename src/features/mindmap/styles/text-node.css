@@ -86,7 +86,7 @@
   opacity: 1;
 }
 
-/* 双向布局：根节点左侧分支的收起按钮镜像到节点左侧 */
+/* Bilateral layout: the collapse button for the root's left branch mirrors to the node's left side */
 .text-node__collapse-btn--left {
   left: -18px;
   right: auto;

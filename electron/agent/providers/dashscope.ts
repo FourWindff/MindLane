@@ -38,16 +38,16 @@ function errMsg(body: unknown, fallback: string): string {
   return fallback
 }
 
-// 单次 fetch 调用的超时，避免被卡死（HTTP 30s）
+// Timeout for a single fetch call, so a request can never hang (HTTP 30s)
 const HTTP_TIMEOUT_MS = 30_000
-// 整个 generateImage（包含 60 次轮询）的总超时
+// Overall timeout for the whole generateImage call (including 60 polls)
 const TOTAL_TIMEOUT_MS = 120_000
 const POLL_INTERVAL_MS = 1500
 const POLL_MAX_TIMES = 60
 
 export class DashScopeProvider extends LLMProvider {
   static readonly id = 'dashscope'
-  static readonly displayName = '通义千问 (百炼)'
+  static readonly displayName = 'Qwen (Model Studio)'
   static readonly capabilities: ProviderCapability[] = [
     ProviderCapability.Chat,
     ProviderCapability.Vision,
@@ -69,7 +69,7 @@ export class DashScopeProvider extends LLMProvider {
     baseUrl?: string
   }) {
     const key = config.apiKey.trim()
-    if (!key) throw new Error('未填写 API Key')
+    if (!key) throw new Error('API Key is missing')
 
     const baseURL = config.baseUrl?.trim() || DASHSCOPE_COMPAT_BASE
     const chatModelId = config.chatModel.trim()
@@ -102,10 +102,10 @@ export class DashScopeProvider extends LLMProvider {
   }): Promise<{ urls: string[] }> {
     const prompt = input.prompt.trim()
     if (!prompt) {
-      throw new Error('请输入画面描述')
+      throw new Error('Please enter an image description')
     }
 
-    // 用总超时给整个流程兜底，轮询 sleep / fetch 都可被该 signal 中断。
+    // The total timeout guards the whole flow; both the poll sleeps and the fetches can be interrupted by it.
     return withTimeout(
       async (totalSignal) => {
         const createData = await withRetry(() =>
@@ -131,7 +131,7 @@ export class DashScopeProvider extends LLMProvider {
               })
               const data = (await res.json().catch(() => null)) as TaskBody | null
               if (!res.ok) {
-                throw new Error(errMsg(data, `创建任务失败 HTTP ${res.status}`))
+                throw new Error(errMsg(data, `failed to create task: HTTP ${res.status}`))
               }
               return data
             },
@@ -142,12 +142,12 @@ export class DashScopeProvider extends LLMProvider {
 
         const taskId = createData?.output?.task_id
         if (typeof taskId !== 'string') {
-          throw new Error(errMsg(createData, '未返回 task_id'))
+          throw new Error(errMsg(createData, 'no task_id returned'))
         }
 
         const taskUrl = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
         for (let i = 0; i < POLL_MAX_TIMES; i++) {
-          // 可被中断的 sleep（轮询间隔不可取消会让停止请求卡住）
+          // Interruptible sleep (a poll interval that cannot be canceled would hang stop requests)
           await sleep(POLL_INTERVAL_MS, undefined, { signal: totalSignal })
 
           const pollData = await withRetry(() =>
@@ -159,7 +159,7 @@ export class DashScopeProvider extends LLMProvider {
                 })
                 const data = (await res.json().catch(() => null)) as TaskBody | null
                 if (!res.ok) {
-                  throw new Error(errMsg(data, `查询任务失败 HTTP ${res.status}`))
+                  throw new Error(errMsg(data, `failed to query task: HTTP ${res.status}`))
                 }
                 return data
               },
@@ -174,7 +174,7 @@ export class DashScopeProvider extends LLMProvider {
               .map((item) => item?.url)
               .filter((url): url is string => typeof url === 'string' && url.length > 0)
             if (urls.length === 0) {
-              throw new Error('任务成功但未返回图片 URL')
+              throw new Error('task succeeded but returned no image URL')
             }
             return { urls }
           }
@@ -184,16 +184,16 @@ export class DashScopeProvider extends LLMProvider {
                 pollData?.output?.message ??
                   pollData?.message ??
                   pollData?.output?.code ??
-                  '文生图失败',
+                  'text-to-image failed',
               ),
             )
           }
         }
 
-        throw new Error('文生图超时，请稍后重试')
+        throw new Error('text-to-image timed out, please try again later')
       },
       TOTAL_TIMEOUT_MS,
-      { timeoutMessage: '文生图超时，请稍后重试' },
+      { timeoutMessage: 'text-to-image timed out, please try again later' },
     )
   }
 }

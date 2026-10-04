@@ -10,7 +10,7 @@ export enum ProviderCapability {
 
 class UnsupportedCapabilityError extends Error {
   constructor(capability: string) {
-    super(`当前 provider 不支持 ${capability} 能力`)
+    super(`the current provider does not support the ${capability} capability`)
     this.name = 'UnsupportedCapabilityError'
   }
 }
@@ -29,19 +29,20 @@ export type DetectedAnchor = {
 
 export abstract class LLMProvider {
   /**
-   * Provider 目录与能力的**单一声明源**（静态）：registry 注册与实例 getter
-   * 都从这里读，不再在注册处重复维护第二份 defaultModels/capabilities。
+   * Single static source of truth for the provider catalog and capabilities:
+   * both the registry registration and the instance getters read from here, so
+   * defaultModels/capabilities are no longer duplicated at the registration site.
    */
   static readonly id: string = ''
   static readonly displayName: string = ''
   static readonly capabilities: readonly ProviderCapability[] = []
   static readonly defaultModels: readonly ModelOption[] = []
 
-  /** 聊天模型：单模型档位，不区分"聊天/推理"模型（见 ADR-0014 附注） */
+  /** Chat model: a single model slot, with no separate "chat/reasoning" models (see the ADR-0014 note) */
   readonly model: BaseChatModel
-  /** 视觉模型槽位（如 DashScope 的 qwen-vl-max）；无视觉能力的 provider 为 undefined */
+  /** Vision model slot (e.g. DashScope's qwen-vl-max); undefined for providers without vision capability */
   readonly visionModel: BaseChatModel | undefined
-  /** 当前所选模型 id，用于在 models 目录中查 contextWindow */
+  /** Currently selected model id, used to look up contextWindow in the models catalog */
   protected readonly modelId: string
 
   constructor(model: BaseChatModel, visionModel?: BaseChatModel, modelId?: string) {
@@ -121,7 +122,7 @@ export async function urlToDataUrl(remoteUrl: string): Promise<string> {
 
   const res = await fetch(remoteUrl)
   if (!res.ok) {
-    throw new Error(`下载图片失败：HTTP ${res.status}`)
+    throw new Error(`failed to download image: HTTP ${res.status}`)
   }
   const buffer = Buffer.from(await res.arrayBuffer())
   const mime = guessMime(remoteUrl, res.headers.get('content-type'))

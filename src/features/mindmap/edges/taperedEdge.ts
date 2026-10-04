@@ -24,7 +24,7 @@ function cubicPoint(
   return { x: a * x0 + b * c1x + c * c2x + d * x3, y: a * y0 + b * c1y + c * c2y + d * y3 }
 }
 
-// 把贝塞尔曲线采样成“树干”：源端粗、目标端细的填充多边形（与 getBezierPath 用同一控制点）。
+// Sample the bezier curve into a "trunk": a filled polygon that is thick at the source and thin at the target (using the same control points as getBezierPath).
 export function buildTaperedPath(
   { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition }: EdgeGeometry,
   curvature: number,

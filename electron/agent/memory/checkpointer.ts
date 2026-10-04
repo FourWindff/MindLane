@@ -98,7 +98,7 @@ export function checkpointMessagesToSessionMessages(messages: BaseMessage[]): Ch
 export class CheckpointerManager {
   private saver: SqliteSaver | null = null
 
-  /** 初始化并指定数据库文件路径（与 SessionManager 共用同一文件） */
+  /** Initialize with the database file path (shared with SessionManager). */
   async initWithDbPath(dbPath: string): Promise<void> {
     const dir = path.dirname(dbPath)
     await fs.promises.mkdir(dir, { recursive: true })
@@ -115,7 +115,7 @@ export class CheckpointerManager {
   }
 
   /**
-   * 关闭数据库连接（Windows 上未关闭的连接会阻塞删除数据库文件）
+   * Close the database connection (an open connection blocks deleting the database file on Windows).
    */
   close(): void {
     this.saver?.db.close()

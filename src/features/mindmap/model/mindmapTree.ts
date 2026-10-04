@@ -26,7 +26,7 @@ export function createInitialNodes(): Node[] {
       id: 'root',
       type: 'text',
       position: { x: 0, y: 0 },
-      data: { label: '中心主题', depth: 0, branchIndex: -1 },
+      data: { label: 'Central Topic', depth: 0, branchIndex: -1 },
     },
   ]
 }
@@ -56,8 +56,9 @@ export function collectSubtreeIds(edges: Edge[], rootId: string): Set<string> {
 }
 
 /**
- * 收集一棵子树的全部后代 id（不含 rootId 自身）。
- * 折叠渲染时用于隐藏折叠节点的所有子孙节点，折叠节点自身保持可见（展开按钮仍在）。
+ * Collect every descendant id of a subtree (excluding rootId itself).
+ * Used when rendering a collapsed node to hide all of its descendants while the collapsed
+ * node itself stays visible (its expand button remains).
  */
 export function collectDescendantIds(edges: Edge[], rootId: string): Set<string> {
   const ids = collectSubtreeIds(edges, rootId)
@@ -93,31 +94,31 @@ function nodeWidth(nodeId: string, nodes: Node[]): number {
 function subtreeHeight(nodeId: string, edges: Edge[], nodes: Node[], gapY: number): number {
   const selfH = nodeHeight(nodeId, nodes)
   const childIds = getChildIds(edges, nodeId)
-  // 折叠节点按叶子处理（PRD 04）：子树不参与尺寸计算，展开时重新布局
+  // A collapsed node counts as a leaf (PRD 04): its subtree is left out of sizing and reflows on expand
   if (childIds.length === 0 || isNodeCollapsed(nodes, nodeId)) return selfH
   const childHeights = childIds.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
   const childrenTotal = childHeights.reduce((sum, h) => sum + h, 0) + (childIds.length - 1) * gapY
   return Math.max(selfH, childrenTotal)
 }
 
-/** 节点是否处于折叠状态（通用展示属性，缺省展开）。 */
+/** Whether a node is collapsed (a generic display property; expanded by default). */
 function isNodeCollapsed(nodes: Node[], nodeId: string): boolean {
   return nodes.find((n) => n.id === nodeId)?.data?.collapsed === true
 }
 
-// ─── 逻辑图布局（从左向右） ────────────────────────────────────────────────────
+// ─── Logic layout (left to right) ────────────────────────────────────────────────────
 
 interface MindmapNodeMeta {
   depth: number
   branchIndex: number
-  /** 思维导图布局中节点所在的一侧；logic 布局不写入（保留原值）。 */
+  /** Which side the node sits on in mindmap layout; logic layout does not write it (the old value is kept). */
   side?: 'left' | 'right'
 }
 
 /**
- * 为根节点的直接子节点分配稳定的 branchIndex（决定分支颜色）。
- * 已有 data.branchIndex 的节点保持不变；新节点取当前最大值 +1。
- * 这样新增/删除节点不会让其余分支的颜色移位。
+ * Assign a stable branchIndex to the root's direct children (it decides the branch color).
+ * Nodes that already carry data.branchIndex keep it; a new node takes the current max +1.
+ * Adding or deleting nodes therefore never shifts the colors of the other branches.
  */
 function assignStableBranchIndexes(childIds: string[], nodes: Node[]): Map<string, number> {
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
@@ -197,7 +198,7 @@ function layoutLogicSubtree(
   })
 }
 
-// ─── 思维导图双向布局 ──────────────────────────────────────────────────────────
+// ─── Bilateral mindmap layout ──────────────────────────────────────────────────────────
 
 function layoutMindmapSide(
   nodeId: string,
@@ -288,8 +289,9 @@ function layoutMindmap(
   // Root whole-map collapse: only the root stays (its position/handles are set above)
   if (rootData.collapsed === true) return
 
-  // 分侧持久化在 data.side 中，重新布局时保持不变，避免新增节点导致左右洗牌。
-  // 未分侧的新节点分到数量较少的一侧（平局归右），全新导图效果即左右交替。
+  // The side is persisted in data.side and survives a reflow, so adding nodes never
+  // reshuffles left and right. A new node with no side goes to the smaller side (ties go
+  // right), which makes a brand-new mindmap alternate left/right.
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
   const sideOf = new Map<string, 'left' | 'right'>()
   for (const cid of children) {
@@ -366,11 +368,12 @@ function layoutMindmap(
   }
 }
 
-// ─── 公开 API ──────────────────────────────────────────────────────────────────
+// ─── Public API ──────────────────────────────────────────────────────────────────
 
 /**
- * 对整棵树执行布局，返回更新了 position / sourcePosition / targetPosition / data.depth / data.branchIndex 的节点数组。
- * structureType 默认为 'logic'。
+ * Lay out the whole tree and return the node array with position / sourcePosition /
+ * targetPosition / data.depth / data.branchIndex updated.
+ * structureType defaults to 'logic'.
  */
 export function reflowChildren(
   parentId: string,
@@ -424,7 +427,8 @@ export function reflowChildren(
               ...node.data,
               depth: meta.depth,
               branchIndex: meta.branchIndex,
-              // logic 布局的 meta 不带 side，保留节点原有分侧，切回 mindmap 时仍稳定
+              // Logic-layout meta carries no side, so the node keeps its existing side and stays
+              // stable when switching back to mindmap
               ...(meta.side ? { side: meta.side } : {}),
             },
           }

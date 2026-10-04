@@ -5,10 +5,10 @@ import { MindmapXmlError } from './types'
 describe('parseXmlFragment', () => {
   it('parses nested nodes with minted ids and derived edges', async () => {
     const result = await parseXmlFragment(
-      `<node type="text" content="中心主题">
-         <node type="text" content="分支A" />
-         <node type="text" content="分支B" collapsed="true">
-           <node type="text" content="叶子" />
+      `<node type="text" content="Central Topic">
+         <node type="text" content="Branch A" />
+         <node type="text" content="Branch B" collapsed="true">
+           <node type="text" content="Leaf" />
          </node>
        </node>`,
     )
@@ -19,10 +19,10 @@ describe('parseXmlFragment', () => {
 
     const root = result.nodes[0]!
     expect(root.type).toBe('text')
-    expect((root.data as { label: string }).label).toBe('中心主题')
+    expect((root.data as { label: string }).label).toBe('Central Topic')
     expect(result.nodes[0]!.id).toMatch(/^[A-Za-z0-9_-]{8}$/)
 
-    // 边由嵌套派生
+    // Edges are derived from nesting
     const labels = new Map(result.nodes.map((n) => [n.id, (n.data as { label: string }).label]))
     const childrenOf = new Map<string, string[]>()
     for (const e of result.edges) {
@@ -31,10 +31,10 @@ describe('parseXmlFragment', () => {
       childrenOf.set(e.source, list)
     }
     const rootChildren = (childrenOf.get(result.nodes[0]!.id) ?? []).map((id) => labels.get(id))
-    expect(rootChildren).toEqual(['分支A', '分支B'])
+    expect(rootChildren).toEqual(['Branch A', 'Branch B'])
 
-    // collapsed 保留
-    const branchB = result.nodes.find((n) => (n.data as { label: string }).label === '分支B')!
+    // collapsed is preserved
+    const branchB = result.nodes.find((n) => (n.data as { label: string }).label === 'Branch B')!
     expect((branchB.data as { collapsed?: boolean }).collapsed).toBe(true)
   })
 
@@ -57,7 +57,7 @@ describe('parseXmlFragment', () => {
 
   it('parses image nodes with asset reference', async () => {
     const result = await parseXmlFragment(
-      `<node type="image" asset="a1" alt="架构图" width="400" height="300" />`,
+      `<node type="image" asset="a1" alt="Architecture diagram" width="400" height="300" />`,
     )
     const node = result.nodes[0]!
     expect(node.type).toBe('image')
@@ -68,8 +68,8 @@ describe('parseXmlFragment', () => {
 
   it('parses palace nodes with stations', async () => {
     const result = await parseXmlFragment(
-      `<node type="palace" content="宫殿" asset="a1" sourceNodeIds="n1,n2">
-         <station order="1" x="10" y="20" linkedNodeId="n1" anchorVisual="灯塔">记忆内容</station>
+      `<node type="palace" content="Palace" asset="a1" sourceNodeIds="n1,n2">
+         <station order="1" x="10" y="20" linkedNodeId="n1" anchorVisual="Lighthouse">memory content</station>
        </node>`,
     )
     const data = result.nodes[0]!.data as {
@@ -78,11 +78,15 @@ describe('parseXmlFragment', () => {
       sourceNodeIds: string[]
       stations: Array<{ order: number; content: string; linkedNodeId: string }>
     }
-    expect(data.label).toBe('宫殿')
+    expect(data.label).toBe('Palace')
     expect(data.assetId).toBe('a1')
     expect(data.sourceNodeIds).toEqual(['n1', 'n2'])
     expect(data.stations).toHaveLength(1)
-    expect(data.stations[0]).toMatchObject({ order: 1, content: '记忆内容', linkedNodeId: 'n1' })
+    expect(data.stations[0]).toMatchObject({
+      order: 1,
+      content: 'memory content',
+      linkedNodeId: 'n1',
+    })
   })
 
   describe('error mapping (no bare throws)', () => {
@@ -144,25 +148,25 @@ describe('deserializeMindLaneFile', () => {
   const fullXml = `<mindlane version="1.0">
   <metadata>
     <fileUuid>bb29af86-1ae4-4e53-ac4a-9d23113b123e</fileUuid>
-    <title>产品规划</title>
+    <title>Product plan</title>
     <createdAt>2026-08-07T03:31:41.477Z</createdAt>
     <updatedAt>2026-08-16T15:08:22.553Z</updatedAt>
     <viewport x="10" y="-5" zoom="0.8" />
     <style structureType="mindmap" visualVariant="card" colorScheme="rainbow" />
   </metadata>
   <mindmap>
-    <node id="root" type="text" content="中心主题">
-      <node id="aherncoskp" type="text" content="父节点" collapsed="true">
-        <node id="eu_sdpop" type="text" content="子节点1" />
+    <node id="root" type="text" content="Central Topic">
+      <node id="aherncoskp" type="text" content="Parent node" collapsed="true">
+        <node id="eu_sdpop" type="text" content="Child node 1" />
       </node>
-      <node id="123asd23" type="image" asset="a1" alt="架构图" width="400" height="300" />
+      <node id="123asd23" type="image" asset="a1" alt="Architecture diagram" width="400" height="300" />
     </node>
   </mindmap>
   <assets>
     <asset id="a1" mime="image/png" sha256="d2c…">iVBORw0KGgo=</asset>
   </assets>
   <documents>
-    <document id="d1" type="pdf" source="/tmp/a.pdf" filename="指南.pdf" importedAt="2026-08-07T03:31:41.477Z" pageCount="3" sha256="abc" />
+    <document id="d1" type="pdf" source="/tmp/a.pdf" filename="Guide.pdf" importedAt="2026-08-07T03:31:41.477Z" pageCount="3" sha256="abc" />
   </documents>
 </mindlane>`
 
@@ -172,7 +176,7 @@ describe('deserializeMindLaneFile', () => {
     expect(file.version).toBe('1.0')
     expect(file.metadata).toMatchObject({
       fileUuid: 'bb29af86-1ae4-4e53-ac4a-9d23113b123e',
-      title: '产品规划',
+      title: 'Product plan',
       createdAt: '2026-08-07T03:31:41.477Z',
     })
     expect(file.mindmap.viewport).toEqual({ x: 10, y: -5, zoom: 0.8 })

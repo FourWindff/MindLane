@@ -40,14 +40,14 @@ export function SettingsModal({ open, onClose, fileActions }: Props) {
       <div className="settings-modal__header">
         <div className="settings-modal__header-brand">
           <h2 id="settings-modal-title" className="settings-modal__title">
-            设置
+            Settings
           </h2>
         </div>
         <button
           type="button"
           className="icon-btn icon-btn--sm settings-modal__close"
           onClick={onClose}
-          aria-label="关闭"
+          aria-label="Close"
         >
           <X size={18} strokeWidth={2} />
         </button>

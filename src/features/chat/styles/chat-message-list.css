@@ -152,7 +152,7 @@
   background: rgba(0, 0, 0, 0.08);
 }
 
-/* 子图卡片：可展开，运行中显示逐阶段进度、完成后自动折叠为单行 */
+/* Subgraph cards: expandable; show per-stage progress while running, auto-collapse to one line when done */
 .chat-message-list__tool-card--subgraph {
   flex-direction: column;
   align-items: stretch;

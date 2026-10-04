@@ -75,7 +75,7 @@ describe('MindmapHistory', () => {
     ]
     for (const tx of txs) history.record(tx)
 
-    // 最旧的 '1' 应被丢弃
+    // The oldest '1' should be dropped
     expect(history.undo()).toEqual(txs[3]!.before)
     expect(history.undo()).toEqual(txs[2]!.before)
     expect(history.undo()).toEqual(txs[1]!.before)
@@ -92,10 +92,10 @@ describe('MindmapHistory', () => {
     ]
     for (const tx of txs) history.record(tx)
 
-    // 全部撤销以填满 redo 栈
+    // Undo everything to fill the redo stack
     for (let i = 0; i < 4; i += 1) history.undo()
 
-    // redo 栈也应被限制为 3，最旧的 '1' 被丢弃
+    // The redo stack is capped at 3 as well; the oldest '1' is dropped
     expect(history.redo()?.id).toBe('2')
     expect(history.redo()?.id).toBe('3')
     expect(history.redo()?.id).toBe('4')

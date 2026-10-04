@@ -4,14 +4,16 @@ import { LLMProvider, ProviderCapability, type ModelOption } from './base.js'
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
 
 /**
- * DeepSeek V4（chatDeepSeek 模式）
+ * DeepSeek V4 (chatDeepSeek mode)
  *
- * 官方 API 思考模式**默认开启**，且思考模式下绑定工具的后续请求必须完整回传
- * reasoning_content，否则返回 400——langchain 的 ChatOpenAI 只捕获不回传，
- * 主 agent 的工具循环会踩坑。因此这里显式 `thinking: {type: 'disabled'}`，
- * 以非思考模式接入（即旧 `deepseek-chat` 模型名的继承者，该别名已于 2026-07-24
- * 停用）。思考模式接入（Anthropic 端点 + ChatAnthropic 的 thinking 块回传）的
- * 取舍与后续路径见 ADR-0014。
+ * The official API has thinking mode **enabled by default**, and in thinking mode
+ * any follow-up request that binds tools must send reasoning_content back in full,
+ * otherwise it returns 400 — langchain's ChatOpenAI only captures it and never
+ * sends it back, which trips up the main agent's tool loop. So we explicitly set
+ * `thinking: {type: 'disabled'}` and connect in non-thinking mode (i.e. the
+ * successor of the old `deepseek-chat` model name; that alias was retired on
+ * 2026-07-24). See ADR-0014 for the trade-offs of thinking-mode access (Anthropic
+ * endpoint + ChatAnthropic's thinking block round-trip) and the follow-up path.
  */
 export class DeepSeekProvider extends LLMProvider {
   static readonly id = 'deepseek'
@@ -24,7 +26,7 @@ export class DeepSeekProvider extends LLMProvider {
 
   constructor(config: { apiKey: string; chatModel: string; baseUrl?: string }) {
     const key = config.apiKey.trim()
-    if (!key) throw new Error('未填写 API Key')
+    if (!key) throw new Error('API Key is missing')
 
     const baseURL = config.baseUrl?.trim() || DEEPSEEK_BASE_URL
     const chatModelId = config.chatModel.trim()
@@ -37,7 +39,7 @@ export class DeepSeekProvider extends LLMProvider {
         timeout: 60_000,
         maxRetries: 1,
         configuration: { baseURL },
-        // 思考模式默认开启；chatDeepSeek = 显式关闭（见类注释与 ADR-0014）
+        // Thinking mode is on by default; chatDeepSeek = explicitly disabled (see the class comment and ADR-0014)
         modelKwargs: { thinking: { type: 'disabled' } },
       }),
       undefined,

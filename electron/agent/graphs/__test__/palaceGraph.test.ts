@@ -46,11 +46,16 @@ function createStageProvider(): LLMProvider {
   }
   provider.model.invoke = vi.fn(async () => ({
     content: JSON.stringify({
-      theme: '测试宫殿',
-      scene_brief: '一间测试大厅',
+      theme: 'Test Palace',
+      scene_brief: 'A test hall',
       route_style: 'arc',
       stations: [
-        { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
+        {
+          order: 1,
+          content: 'First station',
+          anchor_visual: 'A giant bronze bell',
+          linked_node_id: 'n1',
+        },
       ],
     }),
   }))
@@ -61,13 +66,13 @@ function createStageProvider(): LLMProvider {
 }
 
 describe('buildPalaceSubgraph', () => {
-  it('包含 normalizeImages 节点', () => {
+  it('includes the normalizeImages node', () => {
     const graph = buildPalaceSubgraph({ provider: createMockProvider() })
 
     expect(Object.keys(graph.nodes)).toContain('normalizeImages')
   })
 
-  it('imageGen 之后是 normalizeImages，再之后是 vision', () => {
+  it('routes imageGen -> normalizeImages -> vision', () => {
     const graph = buildPalaceSubgraph({ provider: createMockProvider() })
 
     const edges = Array.from(graph.edges as unknown as Array<[string, string]>)
@@ -87,7 +92,7 @@ describe('buildPalaceSubgraph', () => {
         // Selected nodes take the analyze path that returns one JSON plan.
         context: {
           fileUuid: 'file-a',
-          selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+          selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
         } satisfies ChatContext,
         // A previous subgraph run's trace must be reset, not appended to.
         palaceToolSteps: [{ step: 'extracting' }],
@@ -117,11 +122,16 @@ describe('buildPalaceSubgraph', () => {
       .fn()
       .mockResolvedValueOnce({
         content: JSON.stringify({
-          theme: '测试宫殿',
-          scene_brief: '一间测试大厅',
+          theme: 'Test Palace',
+          scene_brief: 'A test hall',
           route_style: 'arc',
           stations: [
-            { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
+            {
+              order: 1,
+              content: 'First station',
+              anchor_visual: 'A giant bronze bell',
+              linked_node_id: 'n1',
+            },
           ],
         }),
       })
@@ -139,7 +149,7 @@ describe('buildPalaceSubgraph', () => {
         artworkStyle: 'vector',
         context: {
           fileUuid: 'file-a',
-          selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+          selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
         } satisfies ChatContext,
       },
       { streamMode: ['custom', 'values'] },
@@ -163,9 +173,14 @@ describe('buildPalaceSubgraph', () => {
       .fn()
       .mockResolvedValueOnce({
         content: JSON.stringify({
-          theme: '测试宫殿',
+          theme: 'Test Palace',
           stations: [
-            { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
+            {
+              order: 1,
+              content: 'First station',
+              anchor_visual: 'A giant bronze bell',
+              linked_node_id: 'n1',
+            },
           ],
         }),
       })
@@ -180,7 +195,7 @@ describe('buildPalaceSubgraph', () => {
       artworkStyle: 'vector',
       context: {
         fileUuid: 'file-a',
-        selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+        selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
       } satisfies ChatContext,
     })
 
@@ -197,9 +212,14 @@ describe('buildPalaceSubgraph', () => {
       .fn()
       .mockResolvedValueOnce({
         content: JSON.stringify({
-          theme: '测试宫殿',
+          theme: 'Test Palace',
           stations: [
-            { order: 1, content: '第一站', anchor_visual: '巨大的铜钟', linked_node_id: 'n1' },
+            {
+              order: 1,
+              content: 'First station',
+              anchor_visual: 'A giant bronze bell',
+              linked_node_id: 'n1',
+            },
           ],
         }),
       })
@@ -216,7 +236,7 @@ describe('buildPalaceSubgraph', () => {
         artworkStyle: 'vector',
         context: {
           fileUuid: 'file-a',
-          selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+          selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
         } satisfies ChatContext,
       })
 
@@ -232,18 +252,18 @@ describe('buildPalaceSubgraph', () => {
     expect(resolveArtworkStyle('vector', new Set())).toBe('vector')
   })
 
-  it('无输入时以 palaceError 结束，不再调用模型', async () => {
+  it('ends with palaceError and calls no model when there is no input', async () => {
     const provider = createMockProvider()
 
     const result = await buildPalaceSubgraph({ provider })
       .compile()
       .invoke({ messages: [], artworkStyle: 'vector', context: null })
 
-    expect(result.palaceError).toContain('请提供记忆宫殿的输入内容')
+    expect(result.palaceError).toContain('Provide input content for the memory palace')
     expect(provider.model.invoke).not.toHaveBeenCalled()
   })
 
-  it('close-out ToolMessage 携带调用信息、落图请求与阶段轨迹', async () => {
+  it('close-out ToolMessage carries the call info, landing request and stage trace', async () => {
     const provider = createStageProvider()
     // A data URL keeps the run off the network and mirrors the persisted shape
     // (CONTEXT: palace imageUrl is always a data URL).
@@ -264,7 +284,7 @@ describe('buildPalaceSubgraph', () => {
       palaceToolName: GENERATE_PALACE_TOOL,
       context: {
         fileUuid: 'file-a',
-        selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+        selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
       } satisfies ChatContext,
     })
 
@@ -292,12 +312,12 @@ describe('buildPalaceSubgraph', () => {
     expect(JSON.parse(String(toolMessage.content))).toEqual({
       ok: true,
       landed: true,
-      label: '测试宫殿',
+      label: 'Test Palace',
       stations: [
         {
           order: 1,
-          content: '第一站',
-          anchorVisual: '巨大的铜钟',
+          content: 'First station',
+          anchorVisual: 'A giant bronze bell',
           association: '',
           x: 0.25,
           y: 0.4,
@@ -313,9 +333,9 @@ describe('buildPalaceSubgraph', () => {
     ])
   })
 
-  it('落图请求失败时把原因写进 ToolMessage 与落地错误通道', async () => {
+  it('writes the reason into the ToolMessage and the landing error channel when the landing request fails', async () => {
     const provider = createStageProvider()
-    const writeProxy = vi.fn(async () => ({ ok: false, error: '该文件未打开，无法落盘' }))
+    const writeProxy = vi.fn(async () => ({ ok: false, error: 'File is not open, cannot land' }))
     const graph = buildPalaceSubgraph({
       provider: provider as unknown as LLMProvider,
       writeProxy,
@@ -328,19 +348,19 @@ describe('buildPalaceSubgraph', () => {
       palaceToolName: GENERATE_PALACE_TOOL,
       context: {
         fileUuid: 'file-a',
-        selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+        selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
       } satisfies ChatContext,
     })
 
-    expect(result.palaceLandingError).toBe('该文件未打开，无法落盘')
+    expect(result.palaceLandingError).toBe('File is not open, cannot land')
     const toolMessage = result.messages[0] as ToolMessage
     expect(JSON.parse(String(toolMessage.content))).toEqual({
       ok: false,
-      error: '宫殿已生成，但落图失败：该文件未打开，无法落盘',
+      error: 'Memory palace generated, but landing failed: File is not open, cannot land',
     })
   })
 
-  it('close-out ToolMessage 在失败路径上写错误 payload 并回退到默认工具名', async () => {
+  it('close-out ToolMessage writes the error payload on the failure path and falls back to the default tool name', async () => {
     const provider = createMockProvider()
 
     const result = await buildPalaceSubgraph({ provider })
@@ -353,12 +373,12 @@ describe('buildPalaceSubgraph', () => {
     expect(toolMessage.name).toBe(GENERATE_PALACE_TOOL)
     expect(JSON.parse(String(toolMessage.content))).toEqual({
       ok: false,
-      error: '请提供记忆宫殿的输入内容。',
+      error: 'Provide input content for the memory palace.',
     })
     expect(toolMessage.additional_kwargs.toolSteps).toBeUndefined()
   })
 
-  it('新一轮开始时清掉上一轮的 palaceResponse：失败时不会把旧答复当成本轮答复', async () => {
+  it('clears the previous run palaceResponse at the start of a new run: a failure never reports the old response', async () => {
     const provider = createMockProvider() as unknown as {
       model: { invoke: ReturnType<typeof vi.fn> }
     }
@@ -373,9 +393,9 @@ describe('buildPalaceSubgraph', () => {
         artworkStyle: 'vector',
         context: {
           fileUuid: 'file-a',
-          selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+          selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
         } satisfies ChatContext,
-        palaceResponse: '上一轮已生成的记忆宫殿摘要',
+        palaceResponse: 'Summary of the memory palace generated in the previous run',
       })
 
     expect(result.palaceError).toContain('plan failed')

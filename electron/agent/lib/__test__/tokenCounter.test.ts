@@ -12,13 +12,15 @@ describe('estimateTokenCount', () => {
   })
 
   it('counts Chinese text far more accurately than length/3', () => {
-    const text = '这是一个中文测试句子，用来验证token计数。'
+    // Chinese sample, escaped so the file itself stays ASCII: "This is a Chinese test sentence, used to verify token counting."
+    const text =
+      '\u8fd9\u662f\u4e00\u4e2a\u4e2d\u6587\u6d4b\u8bd5\u53e5\u5b50\uff0c\u7528\u6765\u9a8c\u8bc1token\u8ba1\u6570\u3002'
     const count = estimateTokenCount(text)
     const roughEstimate = Math.ceil(text.length / 3)
-    // cl100k_base: 中文约 0.7-1 tokens/字符，仍优于 length/3 粗估
+    // cl100k_base: Chinese is roughly 0.7-1 tokens/char, still better than the crude length/3 estimate
     expect(count).toBeGreaterThan(text.length * 0.5)
     expect(count).toBeLessThan(text.length * 3)
-    // 旧估算（length/3）会严重低估
+    // The old estimate (length/3) undercounts badly
     expect(count).toBeGreaterThan(roughEstimate * 1.5)
   })
 
@@ -31,8 +33,8 @@ describe('estimateMessageTokens', () => {
   it('sums tokens across multiple messages', () => {
     const messages = [
       new HumanMessage('Hello'),
-      new AIMessage('你好世界'),
-      new SystemMessage('System prompt'),
+      new AIMessage('Hello world'),
+      new SystemMessage('You are a system prompt'),
     ]
     const count = estimateMessageTokens(messages)
     expect(count).toBeGreaterThan(5)
@@ -40,8 +42,8 @@ describe('estimateMessageTokens', () => {
   })
 
   it('ignores non-text blocks in multimodal content', () => {
-    // image_url block 没有 `text` 字段，应被 messageContentToString 过滤掉，
-    // 否则 base64 url 会被全文 encode，token 数会爆炸。
+    // The image_url block has no `text` field, so messageContentToString drops it;
+    // otherwise the base64 url would be encoded in full and the token count would explode.
     const textOnly = [new HumanMessage('Look at this')]
     const multimodal = [
       new HumanMessage({

@@ -23,21 +23,21 @@ export interface OpenFileState {
   fileCreatedAt: string
   workspacePath: string | null
   viewport: Viewport
-  /** 内嵌图片资源（assets 节），sha256 内容去重 */
+  /** Embedded image assets (the assets section), deduplicated by sha256 content */
   assets: MindLaneAsset[]
   documentRefs: DocumentRef[]
   style: MindmapStyleState
   canUndo: boolean
   canRedo: boolean
 
-  /** @internal 仅供 MindmapEditor 写入；外部代码应通过 Editor 修改结构。 */
+  /** @internal Written only by MindmapEditor; outside code should change the structure through the Editor. */
   setNodes: (nodes: Node[] | ((prev: Node[]) => Node[])) => void
-  /** @internal 仅供 MindmapEditor 写入；外部代码应通过 Editor 修改结构。 */
+  /** @internal Written only by MindmapEditor; outside code should change the structure through the Editor. */
   setEdges: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void
 
-  /** @internal 仅供 MindmapEditor 调用；用于无脏标记的临时 UI 更新。 */
+  /** @internal Called only by MindmapEditor; transient UI updates that must not set the dirty flag. */
   setNodesTransient: (nodes: Node[] | ((prev: Node[]) => Node[])) => void
-  /** @internal 仅供 MindmapEditor 调用；用于无脏标记的临时 UI 更新。 */
+  /** @internal Called only by MindmapEditor; transient UI updates that must not set the dirty flag. */
   setEdgesTransient: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void
 
   markClean: () => void
@@ -45,11 +45,11 @@ export interface OpenFileState {
   /** Rename the document title (metadata.title); marking dirty lets autosave persist it. */
   setFileTitle: (title: string) => void
   setViewport: (viewport: Viewport) => void
-  /** 添加内嵌图片资源；sha256 相同则复用已有 asset，返回实际使用的 asset id。 */
+  /** Add an embedded image asset; an identical sha256 reuses the existing asset. Returns the asset id actually used. */
   addAsset: (asset: MindLaneAsset) => string
-  /** 更新当前文档样式（合并），并标记文档为待保存。 */
+  /** Update the current document style (merge) and mark the document dirty. */
   setStyle: (partial: Partial<MindmapStyleState>) => void
-  /** @internal 由 MindmapEditor 调用以同步历史可用状态。 */
+  /** @internal Called by MindmapEditor to sync undo/redo availability. */
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void
 
   loadFile: (filePath: string, data: MindLaneFile, workspacePath: string | null) => void
@@ -140,7 +140,8 @@ export function createMindmapStore(): MindmapStore {
         ...n,
         data: n.data,
       }))
-      // 打开时丢弃 position（文件不存位置），由确定性布局算法重算并缓存于内存实例
+      // Discard position on open (files do not store positions); the deterministic layout
+      // recomputes it and caches it in the in-memory instance
       const style = data.mindmap.style
         ? { ...DEFAULT_STYLE, ...data.mindmap.style }
         : { ...DEFAULT_STYLE }

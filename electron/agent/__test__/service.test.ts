@@ -6,12 +6,13 @@ import { HumanMessage } from '@langchain/core/messages'
 import { initAgentServices, type AgentServices } from '../service.js'
 
 /**
- * 装配接缝：只测外部行为（服务齐全、目录创建、sessionManager 读写、
- * checkpointer adapter 就绪），不断言内部字段或调用顺序。
- * sessionManager ↔ checkpointer 接线的深层行为由既有
- * consolidator.integration.test.ts 覆盖，不在本接缝重复。
+ * Assembly seam: only external behavior is tested (services present, directories
+ * created, sessionManager read/write, checkpointer adapter ready), with no assertions
+ * on internal fields or call order. The deep behaviour of the
+ * sessionManager ↔ checkpointer wiring is covered by the existing
+ * consolidator.integration.test.ts and is not repeated at this seam.
  */
-describe('initAgentServices 装配', () => {
+describe('initAgentServices assembly', () => {
   let tmpDir: string
   let services: AgentServices
 
@@ -26,7 +27,7 @@ describe('initAgentServices 装配', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('装配出 5 个全非可选服务', () => {
+  it('assembles 5 non-optional services', () => {
     expect(services.sessionManager).toBeDefined()
     expect(services.checkpointer).toBeDefined()
     expect(services.memoryManager).toBeDefined()
@@ -34,24 +35,24 @@ describe('initAgentServices 装配', () => {
     expect(services.editLogStore).toBeDefined()
   })
 
-  it('创建 memory 目录', () => {
+  it('creates the memory directory', () => {
     expect(fs.existsSync(path.join(tmpDir, 'memory'))).toBe(true)
     expect(fs.statSync(path.join(tmpDir, 'memory')).isDirectory()).toBe(true)
   })
 
-  it('sessionManager 可用：runInWorkspace 内读写往返', async () => {
+  it('sessionManager works: read/write round-trip inside runInWorkspace', async () => {
     const sessionId = 'session-assembly'
     await services.sessionManager.runInWorkspace('workspace-uuid-assembly', () =>
-      services.sessionManager.saveMessage(sessionId, new HumanMessage('你好'), 'file-uuid-a'),
+      services.sessionManager.saveMessage(sessionId, new HumanMessage('hello'), 'file-uuid-a'),
     )
     const messages = await services.sessionManager.runInWorkspace('workspace-uuid-assembly', () =>
       services.sessionManager.loadSessionMessages(sessionId),
     )
     expect(messages).toHaveLength(1)
-    expect(messages[0]).toMatchObject({ role: 'user', content: '你好' })
+    expect(messages[0]).toMatchObject({ role: 'user', content: 'hello' })
   })
 
-  it('checkpointer adapter 就绪', () => {
+  it('checkpointer adapter is ready', () => {
     expect(services.checkpointer.getAdapter()).toBeDefined()
   })
 })

@@ -1,16 +1,17 @@
 /**
- * Agent 层集中配置
+ * Central agent-layer configuration
  *
- * 把 orchestrator / memory / palace 等模块原本散落的"魔法数字"集中到此文件，
- * 便于统一调优、避免重复声明。各 provider 的 temperature / timeout 等
- * 属于构造参数（由用户设置注入），不纳入此处。
+ * Collects the "magic numbers" that used to be scattered across the
+ * orchestrator / memory / palace modules so they can be tuned in one place and
+ * not declared twice. Provider-specific temperature / timeout values are
+ * constructor arguments (injected from user settings) and stay out of here.
  */
 
 /**
- * Agent 调度与上下文压缩相关阈值
+ * Thresholds for agent scheduling and context compaction
  *
- * - recursionLimit: LangGraph `StateGraph` 单次 invoke/stream 允许的最大超步数
- *   （防止 supervisor ↔ tools 无限循环），单位：步数。
+ * - recursionLimit: max super-steps a single LangGraph `StateGraph` invoke/stream may take
+ *   (prevents a supervisor ↔ tools infinite loop), in steps.
  *   Shared budget: the subgraphs are mounted as main-graph nodes, so
  *   their internal super-steps count against this one limit (measured: only a nested
  *   `.invoke()` gets its own budget), which therefore has to cover compaction + supervisor
@@ -19,21 +20,25 @@
  *   9 → 17, 40 → 33, i.e. ~+0.65 per batch (4 batches per leaf wave, then merge rounds).
  *   300 covers ~500 batches (~13M chars at a 32k window, far beyond a real document) and
  *   still acts as a hard stop for a runaway loop.
- * - maxCompletionTokens: 为模型响应预留的 token 数（输入预算的固定扣减项，与窗口大小无关）。
- * - consolidationTriggerTokens: 压缩触发阈值（**策略值**）：会话长到这一步就滚动摘要，
- *   实际触发点取它与输入预算的较小者——小窗口模型在自己的容量处触发，大窗口模型
- *   保持固定的摘要与记忆提取节奏（不随窗口放大）。
- * - contextCompactRecentMessages: 压缩时保留的最近消息条数（滚动摘要尾部窗口，
- *   也用作调用前超限时的非 LLM 裁剪重试窗口）。
- * - consolidationRatio: 归档目标占输入预算的比例。
- * - consolidationSafetyBuffer: 归档时预留的安全缓冲 token 数。
- * - maxContextMessages: 归档后进入 LLM 的最大消息条数。
- * - maxMessagesBeforeTokenCheck: 触发精确 token 估算的消息数量阈值。
- * - maxConsolidationRounds: 单次调用最多执行归档轮数。
- * - toolResultOffloadChars: 工具结果字符数超过此阈值时转存到磁盘，单位：字符。
- * - toolResultMaxChars: 工具结果最大允许字符数，超过则硬截断，单位：字符。
- * - toolResultSummaryChars: 转存后返回给模型的摘要长度，单位：字符。
- * - toolResultOffloadDirName: 转存目录名，位于 userData 下。
+ * - maxCompletionTokens: tokens reserved for the model response (a fixed deduction from the input
+ *   budget, independent of window size).
+ * - consolidationTriggerTokens: compaction trigger threshold (**policy value**): once the
+ *   conversation grows to this point, roll the summary over. The actual trigger point is the
+ *   smaller of this and the input budget — small-window models trigger at their own capacity,
+ *   large-window models keep a fixed summarization and memory-extraction cadence (not scaled
+ *   with the window).
+ * - contextCompactRecentMessages: number of recent messages kept during compaction (the tail
+ *   window of the rolling summary, also used as the non-LLM trimming retry window when a call
+ *   exceeds the limit).
+ * - consolidationRatio: share of the input budget targeted for archiving.
+ * - consolidationSafetyBuffer: safety buffer in tokens reserved when archiving.
+ * - maxContextMessages: max messages entering the LLM after archiving.
+ * - maxMessagesBeforeTokenCheck: message-count threshold that triggers exact token estimation.
+ * - maxConsolidationRounds: max archive rounds per call.
+ * - toolResultOffloadChars: tool results above this character count are offloaded to disk, in chars.
+ * - toolResultMaxChars: max allowed characters for a tool result; longer results are hard-truncated, in chars.
+ * - toolResultSummaryChars: length of the summary returned to the model after offloading, in chars.
+ * - toolResultOffloadDirName: offload directory name, located under userData.
  */
 export const AGENT_LIMITS = {
   recursionLimit: 300,
@@ -52,12 +57,13 @@ export const AGENT_LIMITS = {
 } as const
 
 /**
- * 记忆宫殿（Memory Palace）坐标布局参数
+ * Memory palace coordinate-layout parameters
  *
- * - coordPad: 标准化坐标系（0~1）下相对画面边缘保留的最小内边距，
- *   单位：归一化坐标分量。
- * - minDistance: 两个锚点之间允许的最小欧氏距离，单位：归一化坐标分量；
- *   小于此距离时由 `enforceMinDistance` 互相推开。
+ * - coordPad: minimum padding kept from the frame edges in the normalized
+ *   coordinate system (0~1), in normalized coordinate units.
+ * - minDistance: minimum allowed Euclidean distance between two anchors, in
+ *   normalized coordinate units; pairs closer than this are pushed apart by
+ *   `enforceMinDistance`.
  */
 export const PALACE_LAYOUT = {
   coordPad: 0.05,

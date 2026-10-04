@@ -35,7 +35,7 @@ export class EditLogStore {
   /** An empty uuid would silently share one bucket across workspaces. */
   private assertWorkspaceUuid(workspaceUuid: string): void {
     if (!workspaceUuid) {
-      throw new Error('[EditLogStore] 缺少工作区 UUID（workspaceUuid 为空）')
+      throw new Error('[EditLogStore] missing workspace UUID (workspaceUuid is empty)')
     }
   }
 

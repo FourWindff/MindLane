@@ -7,10 +7,10 @@ import type { LoopbackOAuthProvider } from './oauth.js'
 import type { McpClientLike, McpServerDefinition } from './types.js'
 
 /**
- * 生产环境的 client 工厂：按 catalog 定义构建 MultiServerMCPClient。
- * automaticSSEFallback 关闭——避免 401 时 SSE 回退触发第二次浏览器授权。
- * 本机回环 https 端点（如 Obsidian Local REST API 加密端口 27124）用自签证书，
- * 走裸 SDK client + 仅限该 transport 的放宽 TLS 校验，不做全局降级。
+ * Production client factory: builds a MultiServerMCPClient from a catalog definition.
+ * automaticSSEFallback is off - avoids the SSE fallback on a 401 triggering a second browser authorization.
+ * Local loopback https endpoints (e.g. the Obsidian Local REST API encrypted port 27124) use self-signed certificates,
+ * so they go through a bare SDK client with relaxed TLS verification scoped to that transport only, without a global downgrade.
  */
 export const createMcpClient = (
   serverDef: McpServerDefinition,

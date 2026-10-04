@@ -1,18 +1,19 @@
 /**
- * asset 工具：data URL ↔ MindLaneAsset（sha256 去重键）。
- * 图片在插入/生成时即转 base64 内嵌（PRD 4.1）；文件因此自包含。
+ * asset helpers: data URL ↔ MindLaneAsset (sha256 as the dedup key).
+ * Images are converted to embedded base64 at insert/generation time (PRD 4.1),
+ * so files are self-contained.
  */
 
 import type { MindLaneAsset } from './types.js'
 
-/** 解析 data URL → { mime, data(base64) }；非 data URL 返回 null。 */
+/** Parse a data URL → { mime, data(base64) }; returns null for a non-data URL. */
 export function parseDataUrl(dataUrl: string): { mime: string; data: string } | null {
   const match = /^data:([^;,]*)(;base64)?,(.*)$/s.exec(dataUrl)
   if (!match) return null
   return { mime: match[1] || 'image/png', data: match[3] ?? '' }
 }
 
-/** sha256 hex（渲染层 crypto.subtle / 主进程 node:crypto）。 */
+/** sha256 hex (renderer crypto.subtle / main-process node:crypto). */
 async function sha256Hex(data: string): Promise<string> {
   const globalNode = globalThis as { require?: (id: string) => unknown }
   if (typeof globalNode.require === 'function') {
@@ -29,10 +30,10 @@ async function sha256Hex(data: string): Promise<string> {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')
   }
-  throw new Error('当前环境不支持 sha256')
+  throw new Error('sha256 is not supported in this environment')
 }
 
-/** 从 data URL 构建 asset（id 由调用方决定/去重）。 */
+/** Build an asset from a data URL (the caller decides/dedupes the id). */
 export async function assetFromDataUrl(dataUrl: string): Promise<MindLaneAsset | null> {
   const parsed = parseDataUrl(dataUrl)
   if (!parsed) return null
@@ -44,7 +45,7 @@ export async function assetFromDataUrl(dataUrl: string): Promise<MindLaneAsset |
   }
 }
 
-/** 渲染层 DataURL：把 asset 拼回 `<img src>` 可用形式。 */
+/** Renderer DataURL: reassemble the asset into a form usable by `<img src>`. */
 export function assetToDataUrl(asset: Pick<MindLaneAsset, 'mime' | 'data'>): string {
   return `data:${asset.mime};base64,${asset.data}`
 }

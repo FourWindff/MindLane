@@ -118,9 +118,13 @@ describe('workspace identity in the run context', () => {
   })
 
   it('requireWorkspaceUuid fails loudly without a workspace in the run context', () => {
-    expect(() => requireWorkspaceUuid('记忆提取')).toThrow(/记忆提取缺少工作区上下文/)
+    expect(() => requireWorkspaceUuid('memory extraction')).toThrow(
+      /memory extraction is missing the workspace context/,
+    )
     expect(() =>
-      runWithRunContext({ streamId: 'stream-wiring' }, () => requireWorkspaceUuid('记忆提取')),
-    ).toThrow(/缺少工作区上下文/)
+      runWithRunContext({ streamId: 'stream-wiring' }, () =>
+        requireWorkspaceUuid('memory extraction'),
+      ),
+    ).toThrow(/workspace context/)
   })
 })

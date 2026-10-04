@@ -11,7 +11,7 @@ export type TextNodeData = {
   palaceId?: string
   pageRange?: string
   summary?: string
-  /** 通用折叠属性：折叠该节点后的整棵子树；缺省展开，只影响展示 */
+  /** Generic collapse flag: collapses the whole subtree after this node; expanded by default, display-only */
   collapsed?: boolean
   /** Root-only, bilateral layout: collapse the root's left branch (direct left children and their subtrees); expanded by default */
   leftCollapsed?: boolean
@@ -29,17 +29,17 @@ export type TextNodeData = {
   glideFrom?: { x: number; y: number }
   editing?: boolean
   processing?: boolean
-  /** 节点在树中的深度：0=根节点，1=根的直接子节点，以此类推。由布局算法写入。 */
+  /** Depth of the node in the tree: 0=root node, 1=root's direct child, and so on. Written by the layout algorithm. */
   depth?: number
-  /** 所属分支的索引（从根节点第几个子节点的子树中继承）。根节点为 -1。由布局算法写入。 */
+  /** Index of the owning branch (inherited from the subtree of the root's n-th child). -1 for the root node. Written by the layout algorithm. */
   branchIndex?: number
-  /** 思维导图布局中节点所在的一侧。由布局算法写入并持久化，保证重新布局时分侧稳定。 */
+  /** Side the node sits on in the mindmap layout. Written by the layout algorithm and persisted so re-layout keeps sides stable. */
   side?: 'left' | 'right'
 }
 
-/** 图片节点数据：经 asset 引用内嵌图片（禁用外部 URL）。 */
+/** Image node data: references an embedded image via asset (external URLs are disabled). */
 export type ImageNodeData = {
-  /** <assets> 节中的资源 id */
+  /** Asset id in the <assets> section */
   assetId: string
   alt?: string
   width?: number
@@ -47,7 +47,7 @@ export type ImageNodeData = {
   collapsed?: boolean
   justAdded?: boolean
   exiting?: boolean
-  /** 布局产物（不落盘，打开时重算） */
+  /** Layout product (not persisted; recomputed on open) */
   depth?: number
   branchIndex?: number
   side?: 'left' | 'right'
@@ -55,7 +55,7 @@ export type ImageNodeData = {
 
 export type PalaceNodeData = {
   label: string
-  /** 内嵌图片资源 id（<assets> 节）；迁移期下载失败的旧文件保留 imageUrl */
+  /** Embedded image asset id (<assets> section); old files whose download failed keep imageUrl during migration */
   assetId?: string
   imageUrl: string
   stations: PalaceStation[]
@@ -64,7 +64,7 @@ export type PalaceNodeData = {
   generating?: boolean
   /** Live manual-run stage label (transient, never persisted). */
   runStage?: string
-  /** Manual run stopped or failed: the node keeps its placeholder and offers 继续. */
+  /** Manual run stopped or failed: the node keeps its placeholder and offers Resume. */
   runStopped?: boolean
 }
 

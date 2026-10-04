@@ -9,9 +9,10 @@ import type { HandlerContext } from './context.js'
 const mcpLog = logger.withContext('mcp')
 
 /**
- * MCP 用户态记录的是用户的授权意图，只持久化 connected / disconnected。
- * connecting / failed 是会话内瞬态——若把 failed 落盘，一次临时故障会把
- * server 永久移出启动重连集合（凭据其实还在）。
+ * MCP user state records the user's authorization intent and only persists
+ * connected / disconnected. connecting / failed are session transients - if
+ * failed were persisted, one temporary failure would permanently remove the
+ * server from the startup reconnect set (the credentials are still there).
  */
 export async function persistMcpStatus(
   fsService: FileSystemService,
@@ -38,11 +39,11 @@ export async function persistMcpStatus(
 export function registerMcpHandlers(ctx: HandlerContext): void {
   ipcMain.handle(IPC.McpConnect, async (_e, payload: McpConnectPayload) => {
     const manager = ctx.getMcpManager()
-    if (!manager) return { ok: false, error: 'MCP 模块未初始化' }
+    if (!manager) return { ok: false, error: 'MCP module is not initialized' }
     try {
       const status = await manager.connect(payload.serverId, payload.credentials)
       if (status.state !== 'connected') {
-        return { ok: false, error: status.error ?? '连接失败' }
+        return { ok: false, error: status.error ?? 'Connection failed' }
       }
       return { ok: true }
     } catch (err) {
@@ -52,7 +53,7 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(IPC.McpDisconnect, async (_e, payload: { serverId: string }) => {
     const manager = ctx.getMcpManager()
-    if (!manager) return { ok: false, error: 'MCP 模块未初始化' }
+    if (!manager) return { ok: false, error: 'MCP module is not initialized' }
     await manager.disconnect(payload.serverId)
     return { ok: true }
   })
@@ -63,17 +64,17 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(IPC.McpGetCredentials, async (_e, payload: { serverId: string }) => {
     const manager = ctx.getMcpManager()
-    if (!manager) return { ok: false, error: 'MCP 模块未初始化' }
+    if (!manager) return { ok: false, error: 'MCP module is not initialized' }
     return { ok: true, data: manager.getSecrets(payload.serverId) }
   })
 
   ipcMain.handle(IPC.McpAuthorizeUat, async (_e, payload: McpAuthorizeUatPayload) => {
     try {
       if (payload.serverId !== 'feishu') {
-        return { ok: false, error: '该 server 不支持 UAT 一键授权' }
+        return { ok: false, error: 'This server does not support one-click UAT authorization' }
       }
       if (!payload.appId?.trim() || !payload.appSecret?.trim()) {
-        return { ok: false, error: '请先填写 App ID 与 App Secret 再获取 UAT' }
+        return { ok: false, error: 'Fill in the App ID and App Secret before requesting the UAT' }
       }
       const appId = payload.appId.trim()
       const appSecret = payload.appSecret.trim()
@@ -85,7 +86,7 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
           mcpLog.info('authorize-uat: opened browser, waiting callback')
           void shell.openExternal(url)
         },
-        // 回调后每一步都打日志，便于定位卡在哪一帧
+        // Log every step after the callback to locate where it gets stuck
         exchange: async (a, s, code) => {
           mcpLog.info('authorize-uat: callback received, exchanging token')
           const r = await exchangeFeishuUat(a, s, code)
@@ -94,7 +95,7 @@ export function registerMcpHandlers(ctx: HandlerContext): void {
         },
         timeoutMs: 3 * 60_000,
       })
-      // 持久化 refresh_token 与过期时间，供 createAuthHeaders 连接时自动续期
+      // Persist refresh_token and its expiry so createAuthHeaders can auto-renew when connecting
       ctx.getMcpManager()?.persistSecrets('feishu', {
         uat: result.uat,
         refreshToken: result.refreshToken,

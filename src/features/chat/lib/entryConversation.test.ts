@@ -51,28 +51,28 @@ function installBridge() {
 const PDF: DocumentRef = {
   id: 'doc-1',
   type: 'pdf',
-  source: '/报告.pdf',
-  filename: '报告.pdf',
+  source: '/report.pdf',
+  filename: 'report.pdf',
   importedAt: '2026-01-01T00:00:00.000Z',
 }
 
 describe('entryFileTitle', () => {
   it('takes the first input line for text-only sends', () => {
-    expect(entryFileTitle('  第一行标题\n第二行内容', null)).toBe('第一行标题')
+    expect(entryFileTitle('  First line title\nSecond line', null)).toBe('First line title')
   })
 
   it('takes the attachment name (without extension) when a document is attached', () => {
-    expect(entryFileTitle('随便写点什么', PDF)).toBe('报告')
+    expect(entryFileTitle('some loose text', PDF)).toBe('report')
     // A link's display name (host + pathname) has no strippable extension; its slashes are illegal name chars.
-    expect(entryFileTitle('随便写点什么', { ...PDF, type: 'url', filename: 'example.com/a' })).toBe(
-      'example.com a',
-    )
+    expect(
+      entryFileTitle('some loose text', { ...PDF, type: 'url', filename: 'example.com/a' }),
+    ).toBe('example.com a')
   })
 
   it('keeps the title usable as a file name', () => {
     expect(entryFileTitle('a/b:c*d?e"f<g>h|i', null)).toBe('a b c d e f g h i')
     expect(entryFileTitle('x'.repeat(500), null).length).toBeLessThanOrEqual(60)
-    expect(entryFileTitle('   ', null)).toBe('未命名')
+    expect(entryFileTitle('   ', null)).toBe('Untitled')
   })
 })
 
@@ -103,86 +103,89 @@ describe('entry conversation file lifecycle', () => {
   it('creates and opens the file (editor ready) under the derived title', async () => {
     const { createFile } = installBridge()
 
-    const entry = await createEntryFile('帮我整理一份学习计划', null)
+    const entry = await createEntryFile('Plan my study schedule', null)
 
     expect(createFile).toHaveBeenCalledWith(
-      expect.objectContaining({ workspacePath: '/workspace', name: '帮我整理一份学习计划' }),
+      expect.objectContaining({ workspacePath: '/workspace', name: 'Plan my study schedule' }),
     )
     const active = openFileRegistry.getActiveFile()
     expect(entry).toEqual({ fileUuid: active?.fileUuid, filePath: active?.filePath })
-    expect(active?.filePath).toBe('/workspace/帮我整理一份学习计划.mindlane')
+    expect(active?.filePath).toBe('/workspace/Plan my study schedule.mindlane')
   })
 
   it('numbers the file when the derived title is already taken', async () => {
     const { createFile } = installBridge()
-    createFile.mockResolvedValueOnce({ ok: false as const, error: '文件已存在' })
+    createFile.mockResolvedValueOnce({ ok: false as const, error: 'File already exists' })
 
-    const entry = await createEntryFile('第一季度复盘', null)
+    const entry = await createEntryFile('Q1 retrospective', null)
 
-    expect(createFile).toHaveBeenNthCalledWith(1, expect.objectContaining({ name: '第一季度复盘' }))
+    expect(createFile).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ name: 'Q1 retrospective' }),
+    )
     expect(createFile).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ name: '第一季度复盘-2' }),
+      expect.objectContaining({ name: 'Q1 retrospective-2' }),
     )
-    expect(entry?.filePath).toBe('/workspace/第一季度复盘-2.mindlane')
+    expect(entry?.filePath).toBe('/workspace/Q1 retrospective-2.mindlane')
   })
 
   it('backfills the generated map title onto the file created by the entry turn', async () => {
     const { renameItem } = installBridge()
-    await createEntryFile('先起个占位标题', null)
+    await createEntryFile('Placeholder title to start', null)
     const fileUuid = openFileRegistry.getActiveFile()!.fileUuid
 
-    backfillEntryFileTitle(fileUuid, 'Ruby 学习路线')
+    backfillEntryFileTitle(fileUuid, 'Ruby learning path')
 
     expect(renameItem).toHaveBeenCalledWith({
-      oldPath: '/workspace/先起个占位标题.mindlane',
-      newName: 'Ruby 学习路线',
+      oldPath: '/workspace/Placeholder title to start.mindlane',
+      newName: 'Ruby learning path',
       workspacePath: '/workspace',
     })
     expect(openFileRegistry.getByFileUuid(fileUuid)!.store.getState().fileTitle).toBe(
-      'Ruby 学习路线',
+      'Ruby learning path',
     )
   })
 
   it('keeps the backfill available while the entry file is not open', async () => {
     const { renameItem } = installBridge()
-    await createEntryFile('先起个占位标题', null)
+    await createEntryFile('Placeholder title to start', null)
     const closed = openFileRegistry.getActiveFile()!
     resetRegistry()
 
-    backfillEntryFileTitle(closed.fileUuid, 'Ruby 学习路线')
+    backfillEntryFileTitle(closed.fileUuid, 'Ruby learning path')
     expect(renameItem).not.toHaveBeenCalled()
 
     const reopened = openFileRegistry.getOrCreate(closed.filePath)
-    reopened.load(closed.filePath, createEmptyFile('先起个占位标题'), '/workspace')
+    reopened.load(closed.filePath, createEmptyFile('Placeholder title to start'), '/workspace')
     reopened.store.setState({ fileUuid: closed.fileUuid })
-    backfillEntryFileTitle(closed.fileUuid, 'Ruby 学习路线')
+    backfillEntryFileTitle(closed.fileUuid, 'Ruby learning path')
 
     expect(renameItem).toHaveBeenCalledTimes(1)
   })
 
   it('never renames a file the entry turn did not create', async () => {
     const { renameItem } = installBridge()
-    const instance = openFileRegistry.getOrCreate('/workspace/用户自己的文件.mindlane')
+    const instance = openFileRegistry.getOrCreate('/workspace/user-owned-file.mindlane')
     instance.load(
-      '/workspace/用户自己的文件.mindlane',
+      '/workspace/user-owned-file.mindlane',
       {
         ...instance.store.getState().toMindLaneFile(),
         metadata: {
           ...instance.store.getState().toMindLaneFile().metadata,
           fileUuid: 'user-file-uuid',
-          title: '用户自己的文件',
+          title: 'User-owned file',
         },
       },
       '/workspace',
     )
-    openFileRegistry.setActive('/workspace/用户自己的文件.mindlane')
+    openFileRegistry.setActive('/workspace/user-owned-file.mindlane')
 
-    backfillEntryFileTitle('user-file-uuid', 'AI 起的名字')
+    backfillEntryFileTitle('user-file-uuid', 'AI-generated name')
 
     expect(renameItem).not.toHaveBeenCalled()
     expect(openFileRegistry.getByFileUuid('user-file-uuid')!.store.getState().fileTitle).toBe(
-      '用户自己的文件',
+      'User-owned file',
     )
   })
 })

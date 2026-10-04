@@ -12,9 +12,9 @@ export interface ContextNodeInfo {
   id: string
   type: 'text' | 'palace'
   label: string
-  /** 根节点链（root → … → 本节点，compact 轮次状态用） */
+  /** Root chain (root → … → this node; used by compact turn state) */
   chain?: string[]
-  /** 直接子节点（compact 子树，深度 1） */
+  /** Direct children (compact subtree, depth 1) */
   children?: ContextNodeInfo[]
   extra?: Record<string, unknown>
 }
@@ -36,7 +36,7 @@ export interface ChatContext {
   linkedDocuments?: DocumentRef[]
 }
 
-/** 读导图查询参数（PRD 6.2：树查询，非行寻址）。 */
+/** Mindmap read query parameters (PRD 6.2: tree query, not row addressing). */
 export interface MindmapReadQuery {
   scope?: 'whole' | 'subtree'
   subtreeId?: string
@@ -45,18 +45,18 @@ export interface MindmapReadQuery {
   maxDepth?: number
 }
 
-/** 主进程 → 渲染层：按需读导图请求（requestId 关联并发 runner）。 */
+/** Main process → renderer: on-demand mindmap read request (requestId correlates concurrent runners). */
 export interface MindmapReadRequest {
   requestId: string
   fileUuid: string
   query?: MindmapReadQuery
 }
 
-/** 渲染层 → 主进程：读导图应答。 */
+/** Renderer → main process: mindmap read response. */
 export type MindmapReadResponse =
   { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
 
-/** 每个写动作的参数形状（IPC 边界仍为 Record<string,unknown>，渲染层按此解析）。 */
+/** Argument shape of each write action (the IPC boundary stays Record<string,unknown>; the renderer parses per this shape). */
 export interface WriteActionArgs {
   insertXmlFragment: {
     xml: string
@@ -67,17 +67,17 @@ export interface WriteActionArgs {
   moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
   deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
   /**
-   * Palace landing (CONTEXT.md「确定性落图」): code serializes the subgraph
+   * Palace landing (CONTEXT.md "deterministic landing"): code serializes the subgraph
    * payload to a palace XML fragment and both trigger surfaces land through
    * this one action — the model never repeats the image data URL.
    */
   landPalace: { xml: string }
 }
 
-/** 写动作名 = 参数形状映射的键位（动作名单与参数形状收敛到同一处声明，不再手抄词表）。 */
+/** Write action name = key of the argument-shape map (the action list and argument shapes are declared in one place, no hand-copied vocabulary). */
 export type WriteAction = keyof WriteActionArgs
 
-/** 主进程 → 渲染层：落盘请求（requestId 关联，复用 mindmap-read 通道模式）。 */
+/** Main process → renderer: persist request (requestId-correlated, reusing the mindmap-read channel pattern). */
 export interface MindmapWriteRequest {
   requestId: string
   fileUuid: string
@@ -85,7 +85,7 @@ export interface MindmapWriteRequest {
   args: Record<string, unknown>
 }
 
-/** 渲染层 → 主进程：落盘应答（{ok, action, data} 或错误；未知 requestId 为 no-op）。 */
+/** Renderer → main process: persist response ({ok, action, data} or error; an unknown requestId is a no-op). */
 export type MindmapWriteResponse =
   | { requestId: string; ok: true; action: string; data: unknown }
   | { requestId: string; ok: false; error: string }
@@ -160,7 +160,7 @@ export type ChatStreamEvent =
   | { streamId: string; sessionId: string; type: 'error'; payload: string }
 
 /**
- * Ephemeral run marker (CONTEXT.md「临时运行」): the manual palace generation.
+ * Ephemeral run marker (CONTEXT.md "ephemeral run"): the manual palace generation.
  * The run lives on a private checkpoint thread, writes no session record and
  * still emits stream events; `runEntry` picks the graph's edge out of START.
  */

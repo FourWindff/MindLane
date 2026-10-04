@@ -160,11 +160,13 @@ describe('MainGraphState', () => {
         expect(state.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
         expect(state.palaceInputText).toBe(' palace text')
         expect(state.imageUrls).toEqual([])
-        // 宫殿子图的私有键：主图未声明就会被静默丢弃
-        expect(state.imagePrompt).toBe('宫殿画面提示词')
+        // Palace subgraph private keys: undeclared on the main graph, they are silently dropped
+        expect(state.imagePrompt).toBe('palace image prompt')
         expect(state.imageError).toBeUndefined()
-        expect(state.memoryItems).toEqual([{ order: 1, content: '记忆项' }])
-        expect(state.detectedCoords).toEqual([{ order: 1, anchorVisual: '铜钟', x: 0.5, y: 0.5 }])
+        expect(state.memoryItems).toEqual([{ order: 1, content: 'memory item' }])
+        expect(state.detectedCoords).toEqual([
+          { order: 1, anchorVisual: 'bronze bell', x: 0.5, y: 0.5 },
+        ])
         return {}
       })
       .addEdge('__start__', 'test')
@@ -185,12 +187,12 @@ describe('MainGraphState', () => {
       documentRef: null,
       palaceInputText: ' palace text',
       palaceInputNodes: [],
-      memoryItems: [{ order: 1, content: '记忆项' }],
+      memoryItems: [{ order: 1, content: 'memory item' }],
       palace: null,
-      imagePrompt: '宫殿画面提示词',
+      imagePrompt: 'palace image prompt',
       imageUrls: [],
       imageError: undefined,
-      detectedCoords: [{ order: 1, anchorVisual: '铜钟', x: 0.5, y: 0.5 }],
+      detectedCoords: [{ order: 1, anchorVisual: 'bronze bell', x: 0.5, y: 0.5 }],
       memoryRoute: [],
     })
   })
@@ -228,8 +230,8 @@ describe('MainGraphState', () => {
   })
 })
 
-describe('子图通道与主图通道', () => {
-  it('主图声明了两个子图的每一个通道：主图未声明的键跨图时被静默丢弃', () => {
+describe('Subgraph channels and main graph channels', () => {
+  it('the main graph declares every channel of both subgraphs: keys the main graph does not declare are silently dropped when crossing graphs', () => {
     const mainKeys = Object.keys(MainGraphState.spec)
 
     for (const subgraph of [MindmapSubgraphState, PalaceSubgraphState]) {
@@ -237,7 +239,7 @@ describe('子图通道与主图通道', () => {
     }
   })
 
-  it('两个子图除轮次通道外没有共用键：同一个键被两图写就是静默覆盖', () => {
+  it('the two subgraphs share no keys except the turn channels: the same key written by both graphs is a silent overwrite', () => {
     const sharedKeys = Object.keys(MindmapSubgraphState.spec).filter(
       (key) => key in PalaceSubgraphState.spec,
     )
@@ -245,9 +247,9 @@ describe('子图通道与主图通道', () => {
     expect(sharedKeys.sort()).toEqual(['context', 'messages'])
   })
 
-  it('子图写入的私有键跨图后仍读得到（防再次静默丢弃）', async () => {
+  it('private keys written by a subgraph are still readable after crossing graphs (guards against another silent drop)', async () => {
     const palaceSubgraph = new StateGraph(PalaceSubgraphState)
-      .addNode('writeImagePrompt', async () => ({ imagePrompt: '一座钟楼大厅' }))
+      .addNode('writeImagePrompt', async () => ({ imagePrompt: 'a clock-tower hall' }))
       .addEdge('__start__', 'writeImagePrompt')
       .addEdge('writeImagePrompt', '__end__')
       .compile()
@@ -268,6 +270,6 @@ describe('子图通道与主图通道', () => {
 
     await mainGraph.invoke({ messages: [], context: null })
 
-    expect(seenInMainGraph).toBe('一座钟楼大厅')
+    expect(seenInMainGraph).toBe('a clock-tower hall')
   })
 })

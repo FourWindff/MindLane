@@ -15,19 +15,20 @@ import type {
 import type { RendererRequester } from '../rendererRequester.js'
 
 /**
- * 所有 handler 模块共享的依赖载体。模块内部不构造任何服务——
- * 一律经此上下文取用 main.ts 装配好的依赖与跨服务接线。
+ * The dependency carrier shared by all handler modules. Modules construct no services
+ * themselves - they take the dependencies assembled by main.ts and the cross-service
+ * wiring from this context.
  */
 export interface HandlerContext {
   fsService: FileSystemService
-  /** 可空窄字段：AI 服务装配失败时为 null，消费方在就绪门控后自行防御。 */
+  /** Nullable narrow field: null when AI service assembly fails; consumers defend themselves after the readiness gate. */
   sessionManager: SessionManager | null
-  /** 可空窄字段：AI 服务装配失败时为 null。 */
+  /** Nullable narrow field: null when AI service assembly fails. */
   editLogStore: EditLogStore | null
   getWindow: () => BrowserWindow | null
-  /** 主进程 → 渲染层读导图请求器（requestId 关联 + 超时），装配时创建。 */
+  /** Main process -> renderer mindmap read requester (requestId correlation + timeout), created at assembly time. */
   mindmapReadRequester: RendererRequester<MindmapReadRequest, MindmapReadResponse>
-  /** 主进程 → 渲染层落盘请求器（requestId 关联 + 超时），装配时创建。 */
+  /** Main process -> renderer save-to-disk requester (requestId correlation + timeout), created at assembly time. */
   mindmapWriteRequester: RendererRequester<MindmapWriteRequest, MindmapWriteResponse>
   getStreamManager: () => StreamManager | null
   getMcpManager: () => McpManager | null

@@ -1,9 +1,10 @@
 /**
- * 反序列化端（reader）：XML → 树节点数组 / 规范化文件模型。
+ * Deserializer side (reader): XML → tree node array / normalized file model.
  *
- * - `parseXmlFragment`：AI 片段面，容错 HTML parser；多根片段返回多个 rootIds；
- *   畸形输入一律映射错误码（PRD 5.4），绝不裸抛。
- * - `deserializeMindLaneFile`：文件面，严格 XML parser。
+ * - `parseXmlFragment`: AI fragment surface, tolerant HTML parser; multi-root
+ *   fragments return multiple rootIds; malformed input is always mapped to an
+ *   error code (PRD 5.4), never thrown bare.
+ * - `deserializeMindLaneFile`: file surface, strict XML parser.
  */
 
 import type { MindLaneFile, MindLaneNode } from '../fileFormat.js'
@@ -28,19 +29,19 @@ import {
 import type { DomElementLike } from './dom.js'
 import { newId } from '../ids.js'
 
-/** 片段解析产物（insertFromXml 复用布局/聚合/历史）。 */
+/** Fragment parse result (insertFromXml reuses it for layout/aggregation/history). */
 export interface ParsedFragment {
   nodes: MindmapXmlNode[]
   edges: MindmapXmlEdge[]
-  /** 子树根节点 ID 列表（单根 1 个，多根多个） */
+  /** Subtree root node id list (one for a single root, several for multiple roots) */
   rootIds: string[]
 }
 
-/** 把 DOM 元素折叠为解析器无关的视图。 */
+/** Fold a DOM element into a parser-agnostic view. */
 function elementView(el: DomElementLike): XmlElementLike {
   const attrs: Record<string, string> = {}
   for (const attr of Array.from(el.attributes)) {
-    // HTML parser 会把属性名小写化；保留原名 + 小写键双索引，读取时大小写不敏感
+    // The HTML parser lowercases attribute names; keep both the original name and a lowercase key so reads are case-insensitive
     attrs[attr.name] = unescapeXml(attr.value)
     if (attr.name !== attr.name.toLowerCase()) {
       attrs[attr.name.toLowerCase()] = attrs[attr.name]
@@ -63,21 +64,29 @@ function isNodeElement(el: DomElementLike): boolean {
 }
 
 /**
- * 校验片段节点集合：重复 id、触碰 root 锚点。
- * 纯树校验（多父/环）：嵌套解析天然无环；重复 id 会制造多父/歧义 → tree_invalid。
- * `allowRoot`：文件面解析允许根锚点 `root`（片段面禁止 AI 触碰）。
+ * Validate a fragment's node set: duplicate ids, touching the root anchor.
+ * Pure-tree validation (multiple parents/cycles): nested parsing is acyclic by
+ * construction; a duplicate id creates multiple parents/ambiguity → tree_invalid.
+ * `allowRoot`: file-surface parsing allows the root anchor `root` (the fragment
+ * surface forbids the AI from touching it).
  */
 function assertFragmentTreeValid(seenIds: Set<string>, id: string, allowRoot = false): void {
   if (id === 'root' && !allowRoot) {
-    throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可被创建/移动/删除')
+    throw new MindmapXmlError(
+      'tree_invalid',
+      'root is the mindmap anchor and cannot be created/moved/deleted',
+    )
   }
   if (seenIds.has(id)) {
-    throw new MindmapXmlError('tree_invalid', `片段中出现重复节点 id「${id}」（纯树不允许多父/环）`)
+    throw new MindmapXmlError(
+      'tree_invalid',
+      `Duplicate node id "${id}" in the fragment (a pure tree allows no multiple parents/cycles)`,
+    )
   }
   seenIds.add(id)
 }
 
-/** 从单个 <node> 元素递归构建节点 + 边。 */
+/** Recursively build a node + its edges from a single <node> element. */
 function nodeFromElement(
   el: DomElementLike,
   seenIds: Set<string>,
@@ -89,17 +98,20 @@ function nodeFromElement(
 
   const type = attrOf(attrs, 'type')
   if (!type) {
-    throw new MindmapXmlError('invalid_type', '<node> 缺少必填的 type 属性')
+    throw new MindmapXmlError('invalid_type', '<node> is missing the required type attribute')
   }
   const descriptor = xmlNodeTypeRegistry.get(type)
   if (!descriptor) {
-    throw new MindmapXmlError('invalid_type', `未知节点类型「${type}」，请使用注册表中的类型`)
+    throw new MindmapXmlError(
+      'invalid_type',
+      `Unknown node type "${type}"; use a type from the registry`,
+    )
   }
 
   const id = attrOf(attrs, 'id') !== undefined ? attrOf(attrs, 'id')! : newId()
   assertFragmentTreeValid(seenIds, id, allowRoot)
 
-  // 类型专属子元素（station 等）与树子节点（<node>）分离
+  // Type-specific child elements (station etc.) are separated from tree children (<node>)
   const typeElements = elements.filter((e) => e.tag !== NODE_TAG)
   const data = descriptor.read({ attrs, elements: typeElements })
 
@@ -107,11 +119,11 @@ function nodeFromElement(
   if (attrOf(attrs, 'leftCollapsed') === 'true') data.leftCollapsed = true
   if (attrOf(attrs, 'rightCollapsed') === 'true') data.rightCollapsed = true
 
-  // image 节点必须引用 asset（外部 URL 禁用）
+  // Image nodes must reference an asset (external URLs are disabled)
   if (type === 'image' && !attrOf(attrs, 'asset')) {
     throw new MindmapXmlError(
       'asset_not_found',
-      'image 节点必须引用 asset 属性（图片内嵌在 <assets> 节）',
+      'image nodes must reference the asset attribute (images are embedded in the <assets> section)',
     )
   }
 
@@ -139,7 +151,7 @@ function nodeFromElement(
   return { node, edges }
 }
 
-/** 把一组候选元素中的 <node> 顶层元素解析为节点/边（片段面与文件面共用）。 */
+/** Parse the top-level <node> elements among the candidates into nodes/edges (shared by the fragment and file surfaces). */
 function collectNodes(
   candidates: Iterable<DomElementLike>,
   allowRoot: boolean,
@@ -159,7 +171,7 @@ function collectNodes(
   return { nodes, edges, rootIds }
 }
 
-/** 展开 `__children` 中间态为平铺 nodes（父先于子）。 */
+/** Flatten the `__children` intermediate state into flat nodes (parent before child). */
 function flattenChildren(nodes: MindmapXmlNode[]): MindmapXmlNode[] {
   const flat: MindmapXmlNode[] = []
   const visit = (n: MindmapXmlNode) => {
@@ -173,20 +185,20 @@ function flattenChildren(nodes: MindmapXmlNode[]): MindmapXmlNode[] {
 }
 
 /**
- * 解析 AI 的 XML 片段（容错 HTML parser）。
+ * Parse an AI XML fragment (tolerant HTML parser).
  *
- * 错误码：empty_xml / text_unescaped / xml_parse_error / invalid_type / tree_invalid / asset_not_found。
- * 校验不产生部分结果——任一节点失败整体抛错。
+ * Error codes: empty_xml / text_unescaped / xml_parse_error / invalid_type / tree_invalid / asset_not_found.
+ * Validation never yields partial results — any failing node throws for the whole input.
  */
 export async function parseXmlFragment(xml: string): Promise<ParsedFragment> {
   const trimmed = xml.trim()
   if (!trimmed) {
-    throw new MindmapXmlError('empty_xml', 'XML 片段为空，未产出任何节点')
+    throw new MindmapXmlError('empty_xml', 'XML fragment is empty; no nodes produced')
   }
 
   const unescaped = findUnescapedInAttrValues(trimmed)
   if (unescaped) {
-    throw new MindmapXmlError('text_unescaped', `文本残留未转义字符：${unescaped}`)
+    throw new MindmapXmlError('text_unescaped', `Unescaped characters remain in text: ${unescaped}`)
   }
 
   const normalized = normalizeSelfClosingTags(trimmed)
@@ -194,13 +206,13 @@ export async function parseXmlFragment(xml: string): Promise<ParsedFragment> {
 
   const { nodes, edges, rootIds } = collectNodes(topLevelElements(doc), false)
   if (nodes.length === 0) {
-    throw new MindmapXmlError('empty_xml', 'XML 片段中未找到任何 <node> 元素')
+    throw new MindmapXmlError('empty_xml', 'No <node> element found in the XML fragment')
   }
 
   return { nodes: flattenChildren(nodes), edges, rootIds }
 }
 
-// ─── 文件面 ──────────────────────────────────────────────────────────────────
+// ─── File surface ──────────────────────────────────────────────────────────────────
 
 function sectionElement(doc: ParsedDocumentLike, tag: string): DomElementLike | undefined {
   return Array.from(doc.documentElement.children).find((el) => el.tagName.toLowerCase() === tag)
@@ -223,7 +235,7 @@ function childElements(el: DomElementLike, tag: string): DomElementLike[] {
 function parseMetadata(el: DomElementLike | undefined, fileUuid: string): MindLaneFile['metadata'] {
   const metadata: MindLaneFile['metadata'] = {
     fileUuid,
-    title: '未命名',
+    title: 'Untitled',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }
@@ -291,7 +303,7 @@ function parseDocument(el: DomElementLike): MindLaneFile['documents'][number] {
   return doc
 }
 
-/** 解析 mindmap 节（严格：恰好一棵树，根节点固定 id="root"）。 */
+/** Parse the mindmap section (strict: exactly one tree, root node fixed to id="root"). */
 function parseMindmapSection(el: DomElementLike | undefined): {
   nodes: MindLaneNode[]
   edges: MindmapXmlEdge[]
@@ -300,22 +312,22 @@ function parseMindmapSection(el: DomElementLike | undefined): {
   const { nodes, edges, rootIds } = collectNodes(Array.from(el.children), true)
 
   if (nodes.length === 0) {
-    throw new MindmapXmlError('empty_xml', 'mindmap 节为空：没有根节点')
+    throw new MindmapXmlError('empty_xml', 'mindmap section is empty: no root node')
   }
   if (rootIds.length > 1) {
     throw new MindmapXmlError(
       'tree_invalid',
-      `mindmap 节有多个根节点（${rootIds.join(', ')}），文件必须恰好一棵树`,
+      `mindmap section has multiple root nodes (${rootIds.join(', ')}); a file must be exactly one tree`,
     )
   }
   if (rootIds[0] !== 'root') {
     throw new MindmapXmlError(
       'tree_invalid',
-      `mindmap 节根节点必须是 id="root"（实际为「${rootIds[0]}」）`,
+      `mindmap section root node must be id="root" (actual: "${rootIds[0]}")`,
     )
   }
 
-  // 展开 __children 中间态
+  // Flatten the __children intermediate state
   const flat = flattenChildren(nodes)
 
   return {
@@ -338,27 +350,28 @@ function parseMindmapSection(el: DomElementLike | undefined): {
 }
 
 /**
- * 反序列化完整 XML 文件（严格模式）。文件由编辑器生成，畸形输入映射错误码。
- * 位置信息不落盘 → 全部置 {0,0}，打开时由布局算法重算（调用方负责）。
+ * Deserialize a complete XML file (strict mode). Files are produced by the
+ * editor; malformed input maps to error codes. Positions are not persisted →
+ * all set to {0,0}; the layout algorithm recomputes them on open (caller's job).
  */
 export async function deserializeMindLaneFile(xml: string): Promise<MindLaneFile> {
   const trimmed = xml.trim()
   if (!trimmed) {
-    throw new MindmapXmlError('empty_xml', '文件内容为空')
+    throw new MindmapXmlError('empty_xml', 'File content is empty')
   }
   const doc = await parseXmlStrict(normalizeSelfClosingTags(trimmed))
   const root = doc.documentElement
   if (root.tagName.toLowerCase() !== MINDLANE_ROOT_TAG) {
     throw new MindmapXmlError(
       'xml_parse_error',
-      `根元素必须是 <${MINDLANE_ROOT_TAG}>（实际为 <${root.tagName}>）`,
+      `Root element must be <${MINDLANE_ROOT_TAG}> (actual: <${root.tagName}>)`,
     )
   }
   const version = root.getAttribute('version')
   if (version !== MINDLANE_XML_VERSION) {
     throw new MindmapXmlError(
       'xml_parse_error',
-      `不支持的版本「${version ?? '(缺失)'}」，仅支持 ${MINDLANE_XML_VERSION}`,
+      `Unsupported version "${version ?? '(missing)'}"; only ${MINDLANE_XML_VERSION} is supported`,
     )
   }
 

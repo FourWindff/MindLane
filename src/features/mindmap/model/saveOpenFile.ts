@@ -7,7 +7,7 @@ interface SaveOpenFileOptions {
 }
 
 function formatError(error: unknown): string {
-  return `保存失败：${error instanceof Error ? error.message : String(error)}`
+  return `Save failed: ${error instanceof Error ? error.message : String(error)}`
 }
 
 /**
@@ -27,7 +27,7 @@ export async function saveOpenFile(
   const state = store.getState()
   if (!state.hasDocumentOpen || !state.dirty) return true
   if (!state.filePath) {
-    onError('导图尚未关联文件，无法保存')
+    onError('The mindmap is not linked to a file yet, cannot save')
     return false
   }
 
@@ -42,7 +42,7 @@ export async function saveOpenFile(
       data: state.toMindLaneFile(),
     })
     if (!result?.ok) {
-      onError(result?.error ?? '保存失败')
+      onError(result?.error ?? 'Save failed')
       return false
     }
     const latest = store.getState()

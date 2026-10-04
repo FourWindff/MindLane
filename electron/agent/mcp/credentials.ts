@@ -6,24 +6,24 @@ import type {
 } from '@modelcontextprotocol/sdk/shared/auth.js'
 import { logger } from '../../shared/logger.js'
 
-/** 凭据加解密接口；生产环境由 Electron safeStorage 实现，测试中可注入简易实现 */
+/** Credential encryption interface; implemented by Electron safeStorage in production, a simple implementation can be injected in tests */
 export interface McpCredentialCrypto {
   encrypt(plainText: string): string
   decrypt(cipherText: string): string
 }
 
 interface McpStoredCredentials {
-  /** DCR 动态注册拿到的 client 凭据（必须持久化，重复注册会使既有授权成为孤儿） */
+  /** Client credentials obtained through DCR dynamic registration (must be persisted; re-registering orphans the existing authorization) */
   clientInformation?: OAuthClientInformationMixed
   tokens?: OAuthTokens
-  /** 非 OAuth 连接凭据（MCP 连接凭据）：表单填写的密钥，加密存于 userData 独立文件，不进 settings.json */
+  /** Non-OAuth connection credentials (MCP connection credentials): keys entered in the form, stored encrypted in a separate file under userData, never in settings.json */
   secrets?: Record<string, string>
 }
 
 /**
- * 单个 MCP server 的凭据存储。
- * 内容（DCR client 凭据 + OAuth tokens）经 crypto 加密后存为 userData 下的独立文件；
- * crypto 缺失（safeStorage 不可用）时退化为纯内存并警告，不落盘。
+ * Credential store for a single MCP server.
+ * The contents (DCR client credentials + OAuth tokens) are encrypted by crypto and stored as a separate file under userData;
+ * when crypto is missing (safeStorage unavailable) it degrades to memory-only with a warning and never touches disk.
  */
 export class McpCredentialStore {
   private memory: McpStoredCredentials | null = null
@@ -78,14 +78,14 @@ export class McpCredentialStore {
       if (!this.warnLogged) {
         this.warnLogged = true
         logger.warn(
-          '[mcp] safeStorage 不可用，%s 的凭据仅保存在内存中，重启后需要重新授权',
+          '[mcp] safeStorage unavailable, credentials for %s are kept in memory only and must be re-authorized after a restart',
           path.basename(this.filePath),
         )
       }
       return
     }
     try {
-      // 与 fs/atomicWrite 同义的同步版本：先写临时文件再 rename，避免读者看到半截文件
+      // Synchronous counterpart of fs/atomicWrite: write a temp file then rename, so readers never see a half-written file
       fs.mkdirSync(path.dirname(this.filePath), { recursive: true })
       const tmpPath = `${this.filePath}.tmp.${process.pid}`
       fs.writeFileSync(tmpPath, this.crypto.encrypt(JSON.stringify(next)), {

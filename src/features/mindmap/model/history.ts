@@ -3,11 +3,13 @@ import type { MindmapSnapshot, MindmapTransaction } from './types'
 const DEFAULT_MAX_SIZE = 10
 
 /**
- * 管理单文件导图的历史栈。撤销栈与重做栈各自最多保留 `maxSize` 条记录。
+ * Manages the history stacks of one open mindmap file. The undo and redo stacks each
+ * keep at most `maxSize` entries.
  *
- * 采用“命令 + 执行前快照”模型：
- * - `undo` 返回最新事务的 `before` 快照。
- * - `redo` 仅将事务移回撤销栈；调用方需要重新执行 `commands` 以获得确定性的新布局。
+ * Uses a "commands + pre-execution snapshot" model:
+ * - `undo` returns the `before` snapshot of the newest transaction.
+ * - `redo` only moves the transaction back to the undo stack; the caller re-runs
+ *   `commands` to get a deterministic new layout.
  */
 export class MindmapHistory {
   private undoStack: MindmapTransaction[] = []

@@ -2,11 +2,11 @@ import type { IpcResult } from './types.js'
 
 /**
  * Error half of an `IpcResult`. `prefix` keeps the operation context some
- * callers report (`读取失败：…`).
+ * callers report (`Read failed: …`).
  */
 export function fail(error: unknown, prefix?: string): IpcResult<never> {
   const message = error instanceof Error ? error.message : String(error)
-  return { ok: false, error: prefix ? `${prefix}：${message}` : message }
+  return { ok: false, error: prefix ? `${prefix}: ${message}` : message }
 }
 
 /** Run `action` and wrap its value or thrown error into an `IpcResult`. */

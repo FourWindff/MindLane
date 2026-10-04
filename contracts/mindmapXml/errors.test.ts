@@ -3,8 +3,8 @@ import { formatXmlError, MindmapXmlError } from './index.js'
 
 describe('formatXmlError', () => {
   it('formats MindmapXmlError as [code] message', () => {
-    const err = new MindmapXmlError('block_not_found', '定位节点「n1」不存在')
-    expect(formatXmlError(err)).toBe('[block_not_found] 定位节点「n1」不存在')
+    const err = new MindmapXmlError('block_not_found', 'Target node "n1" not found')
+    expect(formatXmlError(err)).toBe('[block_not_found] Target node "n1" not found')
   })
 
   it('falls back to a plain error message for non-XML errors', () => {

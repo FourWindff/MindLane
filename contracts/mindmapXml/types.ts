@@ -1,11 +1,13 @@
 /**
- * mindmapXml 协议模块的类型与错误契约（PRD 5.x）。
+ * Type and error contracts of the mindmapXml protocol module (PRD 5.x).
  *
- * XML 同时是存储面、AI 上下文面、工具参数面；本模块是解析/序列化/校验的唯一边界。
- * 错误码见 PRD 5.4 表格，工具结果直接回传给 AI，提示词附恢复策略。
+ * XML is simultaneously the storage surface, the AI context surface and the
+ * tool-argument surface; this module is the single boundary for
+ * parse/serialize/validate. Error codes are in the PRD 5.4 table; tool results
+ * go straight back to the AI and the prompt carries the recovery strategy.
  */
 
-/** 解析/校验错误码（PRD 5.4）。 */
+/** Parse/validation error codes (PRD 5.4). */
 type MindmapXmlErrorCode =
   | 'xml_parse_error'
   | 'empty_xml'
@@ -17,23 +19,24 @@ type MindmapXmlErrorCode =
 
 export const MINDLANE_XML_VERSION = '1.0'
 
-/** 根标签名（大小写不敏感解析）。 */
+/** Root tag name (parsed case-insensitively). */
 export const MINDLANE_ROOT_TAG = 'mindlane'
 
-/** 树节点标签名（AI 片段/文件 mindmap 节共用）。 */
+/** Tree node tag name (shared by AI fragments and the file's mindmap section). */
 export const NODE_TAG = 'node'
 
-/** 内嵌图片资源（base64 数据，无 data: 前缀）。 */
+/** Embedded image asset (base64 data, no data: prefix). */
 export interface MindLaneAsset {
   id: string
   mime: string
   sha256: string
-  /** base64 编码的图片数据 */
+  /** base64-encoded image data */
   data: string
 }
 
 /**
- * 解析/校验失败异常。所有畸形输入经此异常映射为错误码，绝不裸抛。
+ * Parse/validation failure exception. All malformed input maps to an error code
+ * through this exception, never thrown bare.
  */
 export class MindmapXmlError extends Error {
   readonly code: MindmapXmlErrorCode
@@ -46,16 +49,16 @@ export class MindmapXmlError extends Error {
 }
 
 /**
- * 解析器无关的最小元素视图，供节点注册表的类型专属 reader 使用
- * （避免把具体 DOM 实现泄漏进注册表）。
+ * Minimal parser-agnostic element view for the node registry's type-specific
+ * readers (keeps the concrete DOM implementation out of the registry).
  */
 export interface XmlElementLike {
-  /** 标签名（小写） */
+  /** Tag name (lowercase) */
   tag: string
   attrs: Record<string, string>
-  /** 直接文本内容（去空白） */
+  /** Direct text content (trimmed) */
   text: string
-  /** 类型专属子元素（不含 <node> 树子节点） */
+  /** Type-specific child elements (excluding <node> tree children) */
   elements: XmlElementLike[]
 }
 

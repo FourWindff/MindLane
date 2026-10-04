@@ -2,60 +2,60 @@ import type { StructuredToolInterface } from '@langchain/core/tools'
 import type { McpCredentialStore } from './credentials.js'
 import type { LoopbackOAuthProvider } from './oauth.js'
 
-/** MCP server 的连接状态（MCP 用户态，持久化到 settings.json） */
+/** MCP server connection state (MCP user state, persisted to settings.json) */
 type McpConnectionState = 'disconnected' | 'connecting' | 'connected' | 'failed'
 
-/** settings.json 中每个 server 的用户态条目：只有连接状态与非敏感展示信息 */
+/** Per-server user state entry in settings.json: only the connection state and non-sensitive display info */
 export interface McpServerUserState {
   state: McpConnectionState
   workspaceName?: string
 }
 
-/** 单个 server 的运行时状态（含错误信息，供 UI 展示） */
+/** Runtime status of a single server (includes the error message shown in the UI) */
 export interface McpServerStatus {
   state: McpConnectionState
   workspaceName?: string
   error?: string
 }
 
-/** 非 OAuth server 连接表单的字段元数据；渲染层据此画表单，主进程按定义校验 */
+/** Field metadata of the non-OAuth server connection form; the renderer draws the form from it and the main process validates against the definition */
 export interface McpCredentialField {
-  /** 表单字段 id（同时是凭据存储 secrets 中的键） */
+  /** Form field id (also the key in the credential store's secrets) */
   id: string
-  /** 表单中的展示标签 */
+  /** Display label in the form */
   label: string
-  /** 必填字段；缺失时连接直接失败，不发起请求 */
+  /** Required field; when missing, the connection fails outright without sending a request */
   required?: boolean
-  /** 敏感字段：渲染为密码输入框，明文只经凭据存储加密落盘 */
+  /** Sensitive field: rendered as a password input; plaintext only reaches disk encrypted by the credential store */
   secret?: boolean
 }
 
-/** 合并 catalog 元数据后的完整状态，供 mcp:status 返回给渲染层 */
+/** Full status merged with catalog metadata, returned to the renderer by mcp:status */
 export interface McpServerStatusInfo extends McpServerStatus {
   id: string
   displayName: string
   description: string
-  /** 非 OAuth server 的连接表单字段元数据（OAuth server 省略） */
+  /** Connection form field metadata for non-OAuth servers (omitted for OAuth servers) */
   credentialFields?: McpCredentialField[]
-  /** 失败指引文案（如“打开 Obsidian 并启用 Local REST API 插件”） */
+  /** Failure hint copy (e.g. "open Obsidian and enable the Local REST API plugin") */
   failureHint?: string
 }
 
-/** 传给 server 授权工厂的上下文 */
+/** Context passed to a server's authorization factory */
 interface McpAuthContext {
   credentialStore: McpCredentialStore
-  /** loopback 回调地址（交互式授权时由临时 HTTP 服务决定端口） */
+  /** Loopback callback URL (for interactive authorization the temporary HTTP server picks the port) */
   redirectUrl: string
-  /** 是否允许打开浏览器（启动时的静默重连为 false） */
+  /** Whether opening a browser is allowed (false for the silent reconnect at startup) */
   interactive: boolean
   openBrowser: (url: string) => void
 }
 
-/** MCP catalog 条目：新增 server = 在 servers/ 下新增一个定义 */
+/** MCP catalog entry: adding a server = adding one definition under servers/ */
 export interface McpServerDefinition {
   id: string
   displayName: string
-  /** 设置面板中展示的一句话说明 */
+  /** One-line description shown in the settings panel */
   description: string
   transport: 'stdio' | 'http' | 'sse'
   connection: {
@@ -65,26 +65,26 @@ export interface McpServerDefinition {
     env?: Record<string, string>
   }
   /**
-   * OAuth 模式授权工厂；与 createAuthHeaders 互斥，定义内二选一。
-   * 设置面板对这种 server 走浏览器授权交互。
+   * OAuth-mode authorization factory; mutually exclusive with createAuthHeaders, choose one per definition.
+   * The settings panel uses the browser authorization flow for such servers.
    */
   createAuthProvider?: (ctx: McpAuthContext) => LoopbackOAuthProvider
   /**
-   * 非 OAuth 模式：从凭据存储解析要注入 HTTP 请求头的键值对（如 Authorization: Bearer）；
-   * 与 createAuthProvider 互斥。设置面板对这种 server 走凭据表单交互。
+   * Non-OAuth mode: resolves the key/value pairs to inject as HTTP headers from the credential store (e.g. Authorization: Bearer);
+   * mutually exclusive with createAuthProvider. The settings panel uses the credential form flow for such servers.
    */
   createAuthHeaders?: (store: McpCredentialStore) => Promise<Record<string, string>>
-  /** 连接表单字段元数据（非 OAuth server 声明；渲染层据元数据画表单） */
+  /** Connection form field metadata (declared by non-OAuth servers; the renderer draws the form from the metadata) */
   credentialFields?: McpCredentialField[]
-  /** 失败指引文案；连接失败时追加到错误信息 */
+  /** Failure hint copy; appended to the error message when a connection fails */
   failureHint?: string
-  /** 注册进 ToolRegistry 之前剔除的工具名（如 Obsidian 的破坏性工具） */
+  /** Tool names removed before registering into ToolRegistry (e.g. Obsidian's destructive tools) */
   excludeTools?: string[]
-  /** 连接成功后从 server 工具集中拉取展示信息（如 workspace 名）；失败应返回 undefined */
+  /** After a successful connection, pulls display info (e.g. the workspace name) from the server's tool set; should return undefined on failure */
   fetchWorkspaceName?: (tools: StructuredToolInterface[]) => Promise<string | undefined>
 }
 
-/** McpManager 依赖的最小 client 接口（唯一测试接缝的返回类型） */
+/** Minimal client interface McpManager depends on (return type of the single test seam) */
 export interface McpClientLike {
   getTools(): Promise<StructuredToolInterface[]>
   close(): Promise<void>

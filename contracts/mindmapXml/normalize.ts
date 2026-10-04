@@ -1,13 +1,16 @@
 /**
- * HTML 解析器容错预处理：自闭合标签展开 + 文本残留裸 `<` 检测。
+ * Tolerant-HTML-parser preprocessing: self-closing tag expansion + raw `<`
+ * detection in text.
  *
- * 容错 HTML parser（浏览器 DOMParser('text/html') / 主进程 linkedom）会把自定义
- * 标签的 `/>` 当作普通属性字符——`<node id="a" />` 被吞成 `<node id="a">`，
- * 后续兄弟节点全部变成它的子树。因此解析 AI 片段前先归一：非 void 标签的自闭合
- * 一律展开为开闭配对（已实测 linkedom 与浏览器行为一致）。
+ * Tolerant HTML parsers (browser DOMParser('text/html') / main-process linkedom)
+ * treat a custom tag's `/>` as ordinary attribute characters — `<node id="a" />`
+ * gets swallowed into `<node id="a">` and every following sibling becomes its
+ * subtree. So before parsing an AI fragment, normalize: every self-closing
+ * non-void tag expands to an open/close pair (verified to match linkedom and
+ * browser behavior).
  */
 
-/** HTML void 元素：它们可以合法自闭合，不展开。 */
+/** HTML void elements: they may legitimately self-close and are not expanded. */
 const VOID_TAGS = new Set([
   'area',
   'base',
@@ -28,8 +31,9 @@ const VOID_TAGS = new Set([
 const SELF_CLOSING_RE = /<([A-Za-z][A-Za-z0-9_-]*)((?:"[^"]*"|'[^']*'|[^"'>])*?)\s*\/\s*>/g
 
 /**
- * 把非 void 标签的自闭合形式 `<tag … />` 展开为 `<tag …></tag>`。
- * 不触碰注释/CDATA/处理指令（它们不以 `<字母` 开头）。
+ * Expand a self-closing non-void tag `<tag … />` into `<tag …></tag>`.
+ * Comments/CDATA/processing instructions are untouched (they do not start with
+ * `<letter`).
  */
 export function normalizeSelfClosingTags(xml: string): string {
   return xml.replace(SELF_CLOSING_RE, (match, tag: string, attrs: string) => {
@@ -44,11 +48,12 @@ const ATTR_VALUE_RE = /(?:^|\s)([A-Za-z_:][\w:.-]*)\s*=\s*("([^"]*)"|'([^']*)')/
 const VALID_ENTITY_RE = /^&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/
 
 /**
- * 检测属性值中的裸 `<` 或 `&`（AI 常见陷阱：`content="a<b"` 未转义）。
- * 容错 HTML parser 会把裸 `<` 当作新标签吞掉内容，解析不报错——
- * 必须在原始文本上做残留检测，命中即返回 `text_unescaped` 错误码。
+ * Detect a raw `<` or `&` inside attribute values (a common AI trap: an
+ * unescaped `content="a<b"`). A tolerant HTML parser swallows the content as a
+ * new tag and reports no parse error — so raw text must be checked, and a hit
+ * returns the `text_unescaped` error code instead of a parse failure.
  *
- * @returns 命中时返回未转义片段的位置描述，否则 null。
+ * @returns A location description of the unescaped fragment on a hit, else null.
  */
 export function findUnescapedInAttrValues(xml: string): string | null {
   let match: RegExpExecArray | null
@@ -57,9 +62,9 @@ export function findUnescapedInAttrValues(xml: string): string | null {
     const value = match[3] ?? match[4] ?? ''
     for (let i = 0; i < value.length; i++) {
       const ch = value[i]!
-      if (ch === '<') return `属性值含未转义的 '<'（片段 ${match[1]}）`
+      if (ch === '<') return `Attribute value contains an unescaped '<' (fragment ${match[1]})`
       if (ch === '&' && !VALID_ENTITY_RE.test(value.slice(i))) {
-        return `属性值含未转义的 '&'（片段 ${match[1]}）`
+        return `Attribute value contains an unescaped '&' (fragment ${match[1]})`
       }
     }
   }
@@ -67,11 +72,13 @@ export function findUnescapedInAttrValues(xml: string): string | null {
 }
 
 /**
- * 标签配对的结构完整性检查（引号感知、跳过注释/CDATA/处理指令）。
+ * Structural integrity check for tag pairing (quote-aware; skips
+ * comments/CDATA/processing instructions).
  *
- * linkedom 的 XML 模式对畸形输入不报错（不产生 parsererror），浏览器 HTML 模式
- * 也从不报错；为了让 `xml_parse_error` 错误码跨环境确定，必须在原始文本上做一次
- * 轻量级检查：开闭标签必须配对、属性引号必须闭合。
+ * linkedom's XML mode reports no malformed input (it yields no parsererror) and
+ * the browser HTML mode never errors either; to make the `xml_parse_error` code
+ * deterministic across environments, the raw text gets one lightweight check:
+ * open/close tags must pair and attribute quotes must be closed.
  */
 export function checkXmlWellFormed(xml: string): string | null {
   const stack: string[] = []
@@ -89,29 +96,29 @@ export function checkXmlWellFormed(xml: string): string | null {
     const lt = xml.indexOf('<', i)
     if (lt < 0) break
 
-    // 注释 / CDATA / 处理指令：跳到对应结束符
+    // Comment / CDATA / processing instruction: skip to the matching terminator
     if (xml.startsWith('<!--', lt)) {
-      if (!skipUntil('-->')) return '未闭合的注释'
+      if (!skipUntil('-->')) return 'Unclosed comment'
       continue
     }
     if (xml.startsWith('<![CDATA[', lt)) {
-      if (!skipUntil(']]>')) return '未闭合的 CDATA'
+      if (!skipUntil(']]>')) return 'Unclosed CDATA'
       continue
     }
     if (xml.startsWith('<?', lt)) {
-      if (!skipUntil('?>')) return '未闭合的处理指令'
+      if (!skipUntil('?>')) return 'Unclosed processing instruction'
       continue
     }
 
-    // 标签：找到名称
+    // Tag: find the name
     const nameMatch = /^<\/?([A-Za-z][A-Za-z0-9_.:-]*)/.exec(xml.slice(lt))
     if (!nameMatch) {
-      return `位置 ${lt} 存在无法识别的 '<'`
+      return `Unrecognized '<' at position ${lt}`
     }
     const isClose = xml[lt + 1] === '/'
     const name = nameMatch[1]!
 
-    // 引号感知地扫描到标签结束 '>'
+    // Quote-aware scan to the end of the tag '>'
     let j = lt + nameMatch[0].length
     let quote: string | null = null
     for (; j < n; j++) {
@@ -126,14 +133,14 @@ export function checkXmlWellFormed(xml: string): string | null {
       }
       if (ch === '>') break
     }
-    if (j >= n) return `标签 <${name}> 未闭合`
+    if (j >= n) return `Tag <${name}> is not closed`
     const tagBody = xml.slice(lt + nameMatch[0].length, j)
     const selfClosing = /\/\s*$/.test(tagBody)
 
     if (isClose) {
       const open = stack.pop()
       if (open !== name) {
-        return open ? `标签不配对：</${name}> 闭合了 <${open}>` : `多余的闭合标签 </${name}>`
+        return open ? `Tag mismatch: </${name}> closes <${open}>` : `Stray closing tag </${name}>`
       }
     } else if (!selfClosing) {
       stack.push(name)
@@ -142,7 +149,7 @@ export function checkXmlWellFormed(xml: string): string | null {
   }
 
   if (stack.length > 0) {
-    return `标签 <${stack[stack.length - 1]}> 未闭合`
+    return `Tag <${stack[stack.length - 1]}> is not closed`
   }
   return null
 }

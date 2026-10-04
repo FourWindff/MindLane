@@ -3,13 +3,16 @@ import { serializeMindmapSection } from '@contracts/mindmapXml'
 import type { MindmapReadQuery, MindmapReadRequest } from '@contracts/ipc'
 
 /**
- * 渲染层读导图应答器：应用启动时注册一次。
+ * Renderer-side mindmap read responder: registered once at app start-up.
  *
- * 主进程经反向通道发来请求（requestId + fileUuid + 查询参数），这里按 fileUuid
- * 取对应编辑器，现场以**编辑器活状态**序列化 mindmap 节 XML 回包（不读磁盘）；
- * 只暴露 mindmap 节（metadata/assets/documents 不进 AI 上下文）。文件未打开时
- * 明确报错而非挂起。并发 runner 各自携带自己的 fileUuid 与 requestId，
- * 多文件同时生成互不干扰。
+ * The main process sends requests over the reverse channel (requestId + fileUuid
+ * + query); this responder resolves the matching editor by fileUuid and replies
+ * with the mindmap section XML serialized from the **editor's live state**
+ * (never read from disk); only the mindmap section is exposed (metadata, assets
+ * and documents stay out of the AI context). When the file is not open it fails
+ * explicitly instead of hanging. Concurrent runners each carry their own
+ * fileUuid and requestId, so simultaneous generation across files never
+ * interferes.
  */
 export function connectMindmapReadResponder(): () => void {
   const api = window.mindlane?.ai
@@ -30,7 +33,7 @@ async function respondMindmapRead(request: MindmapReadRequest): Promise<void> {
     await api.respondMindmapRead({
       requestId: request.requestId,
       ok: false,
-      error: '该文件未打开，无法读取导图',
+      error: 'This file is not open, cannot read the mindmap',
     })
     return
   }
@@ -40,7 +43,7 @@ async function respondMindmapRead(request: MindmapReadRequest): Promise<void> {
     await api.respondMindmapRead({
       requestId: request.requestId,
       ok: false,
-      error: '该文件未打开，无法读取导图',
+      error: 'This file is not open, cannot read the mindmap',
     })
     return
   }

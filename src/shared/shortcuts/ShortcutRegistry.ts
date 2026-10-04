@@ -2,8 +2,9 @@ import { eventComboFromCode, isTypingTarget } from './matchKeydown'
 import type { ShortcutRegistration } from './types'
 
 /**
- * 应用级快捷键注册表：与 React 无关的模块级单例（单窗口单 React root）。
- * 同一 `id` 再次 register 会覆盖旧条目；首次注册时懒挂一次 document 监听（capture）。
+ * App-level shortcut registry: a module-level singleton with no React dependency (single window,
+ * single React root). Registering the same `id` again replaces the old entry; the first
+ * registration lazily attaches one document listener (capture).
  */
 const entries: ShortcutRegistration[] = []
 const listeners = new Set<() => void>()
@@ -35,7 +36,7 @@ function ensureKeyboard(): void {
   )
 }
 
-/** 注册或覆盖快捷键，返回取消注册函数。 */
+/** Register or replace a shortcut, returning an unregister function. */
 function register(entry: ShortcutRegistration): () => void {
   ensureKeyboard()
   removeById(entry.id)
@@ -49,7 +50,7 @@ function register(entry: ShortcutRegistration): () => void {
   }
 }
 
-/** 处理一次键盘事件；若已消费返回 true（已 preventDefault/stopPropagation）。 */
+/** Handle one keyboard event; returns true if consumed (preventDefault/stopPropagation already called). */
 function dispatch(e: KeyboardEvent): boolean {
   if (e.repeat) return false
   const typing = isTypingTarget(e.target)
@@ -71,7 +72,7 @@ function dispatch(e: KeyboardEvent): boolean {
 }
 
 export const shortcutRegistry = {
-  /** 供 `useSyncExternalStore` 订阅注册变化（帮助面板） */
+  /** For `useSyncExternalStore` to subscribe to registration changes (help panel) */
   subscribe(onChange: () => void): () => void {
     listeners.add(onChange)
     return () => {
@@ -79,7 +80,7 @@ export const shortcutRegistry = {
     }
   },
 
-  /** 当前已注册列表快照（引用仅在变更时更新） */
+  /** Snapshot of the current registrations (reference only changes on changes) */
   getSnapshot(): readonly ShortcutRegistration[] {
     return snapshot
   },

@@ -23,9 +23,9 @@ interface EdgeGeometryParams {
   sourceNode?: EdgeNodeLike
   targetNode?: EdgeNodeLike
   fallback: EdgeGeometry
-  /** 边连接节点的位置：side=侧边中点；bottom=下边框 */
+  /** Where the edge connects to the node: side=middle of the side; bottom=bottom border */
   connect?: ConnectPosition
-  /** bottom 模式下边的描边宽度，用于让边线与节点下边框对齐（居中） */
+  /** Edge stroke width in bottom mode, used to center the edge line on the node's bottom border */
   strokeWidth?: number
 }
 
@@ -37,7 +37,7 @@ function resolveHandleX(node: EdgeNodeLike, handlePosition: Position): number {
     case Position.Right:
       return node.position.x + width
     default:
-      // Top / Bottom：从节点水平中心出线
+      // Top / Bottom: leave from the node's horizontal center
       return nodeCenterX(node)
   }
 }
@@ -65,14 +65,16 @@ export function resolveEdgeGeometry({
   connect = 'side',
   strokeWidth = 0,
 }: EdgeGeometryParams): EdgeGeometry {
-  // bottom：边从节点下边框（底部）水平引出，源/目标句柄仍为朝向子节点的侧边
+  // bottom: the edge leaves horizontally from the node's bottom border; the source/target
+  // handles still sit on the side facing the child node
   if (connect === 'bottom') {
     const targetCenterX = targetNode ? nodeCenterX(targetNode) : fallback.targetX
     const sourceCenterX = sourceNode ? nodeCenterX(sourceNode) : fallback.sourceX
     const targetIsLeft = targetCenterX < sourceCenterX
     const sourcePosition = targetIsLeft ? Position.Left : Position.Right
     const targetPosition = targetIsLeft ? Position.Right : Position.Left
-    // 描边以路径为中心，向上偏移半个线宽，使边线与节点下边框重叠对齐（边框在元素底部 box 内）
+    // The stroke is centered on the path, so shift it up by half the stroke width to overlap the
+    // edge line with the node's bottom border (the border sits inside the element's bottom box)
     const yOffset = strokeWidth / 2
     return {
       sourceX: sourceNode ? resolveHandleX(sourceNode, sourcePosition) : fallback.sourceX,

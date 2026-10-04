@@ -20,16 +20,16 @@ export class ProjectFileManager {
     options?: { defaultPath?: string },
   ): Promise<IpcResult<{ filePath: string; data: MindLaneFile }>> {
     const result = await dialog.showOpenDialog(win, {
-      title: '打开 MindLane 文件',
+      title: 'Open MindLane file',
       defaultPath: options?.defaultPath,
       filters: [
-        { name: 'MindLane 文件', extensions: ['mindlane'] },
-        { name: '所有文件', extensions: ['*'] },
+        { name: 'MindLane files', extensions: ['mindlane'] },
+        { name: 'All files', extensions: ['*'] },
       ],
       properties: ['openFile'],
     })
     if (result.canceled || result.filePaths.length === 0) {
-      return { ok: false, error: '已取消' }
+      return { ok: false, error: 'Canceled' }
     }
     const filePath = result.filePaths[0]!
     return this.loadFromPath(filePath)
@@ -40,10 +40,10 @@ export class ProjectFileManager {
   ): Promise<IpcResult<{ filePath: string; data: MindLaneFile }>> {
     try {
       const raw = await fs.promises.readFile(filePath, 'utf-8')
-      // 迁移后 app 只认 XML（无读时兜底、无双格式支持）；JSON v1.0 由一次性迁移脚本转换。
+      // After the migration the app only reads XML (no read-time fallback, no dual-format support); JSON v1.0 is converted by a one-time migration script.
       const data = await deserializeMindLaneFile(raw)
       if (!data.version || !data.mindmap) {
-        return { ok: false, error: '文件格式不正确' }
+        return { ok: false, error: 'Invalid file format' }
       }
       if (this.appState && data.metadata?.fileUuid) {
         const fileUuid = await this.appState.claimFileUuid(filePath, data.metadata.fileUuid)
@@ -54,7 +54,7 @@ export class ProjectFileManager {
       }
       return { ok: true, data: { filePath, data } }
     } catch (e) {
-      return fail(e, '读取失败')
+      return fail(e, 'Read failed')
     }
   }
 
@@ -76,7 +76,7 @@ export class ProjectFileManager {
   ): Promise<IpcResult<SavedProject>> {
     try {
       if (options?.overwrite === false && fs.existsSync(filePath)) {
-        return { ok: false, error: '文件已存在' }
+        return { ok: false, error: 'File already exists' }
       }
       const fileUuid = this.appState
         ? await this.appState.claimFileUuid(filePath, data.metadata.fileUuid)
@@ -88,7 +88,7 @@ export class ProjectFileManager {
       await atomicWrite(filePath, serializeMindLaneFile(savedData))
       return { ok: true, data: { filePath, data: savedData } }
     } catch (e) {
-      return fail(e, '保存失败')
+      return fail(e, 'Save failed')
     }
   }
 
@@ -98,7 +98,7 @@ export class ProjectFileManager {
     data: MindLaneFile,
   ): Promise<IpcResult<SavedProject>> {
     try {
-      const trimmedName = assertEntryName(name, '文件名')
+      const trimmedName = assertEntryName(name, 'File name')
       const fileName = trimmedName.endsWith(MINDLANE_EXTENSION)
         ? trimmedName
         : `${trimmedName}${MINDLANE_EXTENSION}`
@@ -114,17 +114,17 @@ export class ProjectFileManager {
     win: BrowserWindow,
     options?: { defaultDirectory?: string | null },
   ): Promise<IpcResult<SavedProject>> {
-    const defaultFilename = `${data.metadata.title || '未命名'}.mindlane`
+    const defaultFilename = `${data.metadata.title || 'Untitled'}.mindlane`
     const defaultPath = options?.defaultDirectory
       ? path.join(options.defaultDirectory, defaultFilename)
       : defaultFilename
     const result = await dialog.showSaveDialog(win, {
-      title: '另存为',
+      title: 'Save As',
       defaultPath,
-      filters: [{ name: 'MindLane 文件', extensions: ['mindlane'] }],
+      filters: [{ name: 'MindLane files', extensions: ['mindlane'] }],
     })
     if (result.canceled || !result.filePath) {
-      return { ok: false, error: '已取消' }
+      return { ok: false, error: 'Canceled' }
     }
     try {
       const copiedData: MindLaneFile = {
@@ -140,7 +140,7 @@ export class ProjectFileManager {
       await atomicWrite(result.filePath, serializeMindLaneFile(copiedData))
       return { ok: true, data: { filePath: result.filePath, data: copiedData } }
     } catch (e) {
-      return fail(e, '保存失败')
+      return fail(e, 'Save failed')
     }
   }
 }

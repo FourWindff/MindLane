@@ -13,7 +13,7 @@ interface ConfirmDialogProps {
 export function ConfirmDialog({
   title,
   message,
-  confirmLabel = '确认',
+  confirmLabel = 'Confirm',
   danger,
   onConfirm,
   onCancel,
@@ -22,14 +22,14 @@ export function ConfirmDialog({
 
   return (
     <Modal labelledBy={titleId} onCancel={onCancel} onSubmit={onConfirm}>
-      <div className="workspace-modal__label">确认操作</div>
+      <div className="workspace-modal__label">Confirm action</div>
       <h2 id={titleId} className="workspace-modal__title">
         {title}
       </h2>
       <p className="workspace-modal__subtitle">{message}</p>
       <div className="workspace-modal__actions">
         <button type="button" className="workspace-home__action" onClick={onCancel}>
-          取消
+          Cancel
         </button>
         <button
           type="button"

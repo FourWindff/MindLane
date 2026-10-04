@@ -108,7 +108,7 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
   return (
     <div className="palace-modal__overlay" ref={overlayRef} onClick={onOverlayClick}>
       <div className="palace-modal">
-        <button className="palace-modal__close" onClick={onClose} aria-label="关闭">
+        <button className="palace-modal__close" onClick={onClose} aria-label="Close">
           ✕
         </button>
 
@@ -122,7 +122,7 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
                 draggable={false}
               />
             ) : (
-              <div className="palace-modal__no-image">暂无图片</div>
+              <div className="palace-modal__no-image">No image</div>
             )}
 
             {stations.length >= 2 && (
@@ -141,8 +141,8 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
           </div>
 
           <div className="palace-modal__sidebar">
-            <h2 className="palace-modal__title">{data.label || '记忆宫殿'}</h2>
-            <p className="palace-modal__count">{stations.length} 个记忆站点</p>
+            <h2 className="palace-modal__title">{data.label || 'Memory palace'}</h2>
+            <p className="palace-modal__count">{stations.length} memory stations</p>
 
             {stations.length >= 2 && (
               <button
@@ -150,7 +150,7 @@ export function PalaceModal({ data, onClose }: PalaceModalProps) {
                 onClick={playTrail}
                 disabled={trailPlaying}
               >
-                {trailPlaying ? '✦ 巡游中…' : '✦ 宫殿巡游'}
+                {trailPlaying ? '✦ Touring…' : '✦ Palace tour'}
               </button>
             )}
 

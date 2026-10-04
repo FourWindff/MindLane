@@ -84,7 +84,8 @@ describe('MindmapOperationController', () => {
 
     expect(editor.applyNativeNodeChanges).toHaveBeenCalledWith(nodeChanges)
     expect(editor.applyNativeEdgeChanges).toHaveBeenCalledWith(edgeChanges)
-    // 纯树约束：任意连线入口移除后，控制器不再暴露 handleConnect
+    // Pure-tree constraint: with every connect entry point removed, the controller no longer
+    // exposes handleConnect
     expect((controller as Record<string, unknown>).handleConnect).toBeUndefined()
   })
 

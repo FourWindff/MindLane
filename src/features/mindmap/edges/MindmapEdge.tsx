@@ -79,12 +79,12 @@ export function MindmapEdge(props: EdgeProps) {
     } else if (edge.path === 'smooth-step') {
       ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 8 })
     } else {
-      // step / 直角折线
+      // step / right-angle polyline
       ;[path] = getSmoothStepPath({ ...geometry, borderRadius: 0 })
     }
 
-    // 极简式（连接下边框）：边颜色从源节点边框色渐变到目标节点边框色，
-    // 使两端与节点下边框无缝衔接
+    // Minimal style (connects to the bottom border): the edge color gradients from the source node
+    // border to the target node border so both ends meet the node bottom seamlessly
     let edgeStroke = stroke
     let gradient: EdgeGradient | undefined
     if (edge.connect === 'bottom' && sourceNode && targetNode) {
@@ -162,7 +162,7 @@ export function MindmapEdge(props: EdgeProps) {
           ...edgeAnimateStyle,
           stroke: taperPath ? 'transparent' : edgeStroke,
           strokeWidth: taperPath ? undefined : edge.strokeWidth,
-          // 极简式边与节点下边框对齐：关闭像素吸附避免亚像素错位
+          // Minimal-style edges align with the node bottom border: disable pixel snapping to avoid subpixel offsets
           ...(edge.connect === 'bottom' ? { shapeRendering: 'auto' as const } : {}),
         }}
         markerEnd={markerEnd}

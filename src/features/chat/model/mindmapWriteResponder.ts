@@ -21,31 +21,36 @@ import type {
 } from '@contracts/ipc'
 
 /**
- * 渲染层落盘应答器（PRD：即时落盘 · 下半段）。
+ * Renderer-side landing responder (PRD: live apply, second half).
  *
- * 订阅主进程的落盘请求通道（01 契约：requestId + fileUuid + action + args），
- * 按 fileUuid 解析活编辑器，原子校验 + 落图，返回结构化 `{ok, action, data}`
- * 或错误——该结果即 ack，主进程原样作为工具结果回给模型。
- * 校验复用共享 mindmapXml 库（错误码 + 恢复策略文案与主进程同一词汇表）。
+ * Subscribes to the main process's write request channel (contract 01: requestId +
+ * fileUuid + action + args), resolves the live editor by fileUuid, atomically
+ * validates and lands the map, then returns a structured `{ok, action, data}` or
+ * an error — that result is the ack, and the main process hands it back to the
+ * model verbatim as the tool result. Validation reuses the shared mindmapXml
+ * library (error codes + recovery wording share the main process's vocabulary).
  *
- * 并发工具调用不得交错修改同一编辑器：按 fileUuid 串行化落盘队列，
- * 逐文件排队执行；不同 fileUuid 互不阻塞。超时语义归主进程，这里只保证单次应答。
+ * Concurrent tool calls must not interleave writes to the same editor: requests
+ * are serialized per fileUuid into one queue per file, and different fileUuids
+ * never block each other. Timeout semantics belong to the main process; here we
+ * only guarantee a single response.
  */
 interface MindmapWriteResponderDependencies {
-  /** 订阅主进程落盘请求通道（返回取消订阅函数）。 */
+  /** Subscribes to the main process's write request channel (returns an unsubscribe function). */
   subscribe: (listener: (request: MindmapWriteRequest) => void) => () => void
-  /** fileUuid → 活编辑器；未打开返回 undefined。 */
+  /** fileUuid → live editor; undefined when the file is not open. */
   resolveEditor: (fileUuid: string) => MindmapEditor | undefined
-  /** 落盘成功后的持久化回调（fire-and-forget，如 saveOpenFile）。 */
+  /** Post-landing persistence callback (fire-and-forget, e.g. saveOpenFile). */
   persistFile: (fileUuid: string) => void
-  /** 渲染层 → 主进程落盘应答（未知 requestId 为 no-op）。 */
+  /** Renderer → main process landing response (an unknown requestId is a no-op). */
   respond: (payload: MindmapWriteResponse) => void | Promise<void>
-  /** 可恢复的落图降级写入排障日志。 */
+  /** Diagnostics log for recoverable landing degradations. */
   warn: (message: string) => void
 }
 
 export function createMindmapWriteResponder(deps: MindmapWriteResponderDependencies) {
-  // 按 fileUuid 的串行队列：同一文件的请求逐条排队，不同文件各自独立链。
+  // Serial queue per fileUuid: requests for the same file run one after another,
+  // while different files keep independent chains.
   const queues = new Map<string, Promise<void>>()
   let unsubscribe: (() => void) | null = null
 
@@ -54,7 +59,8 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
     const task = previous.catch(() => undefined).then(() => handleRequest(request))
     queues.set(request.fileUuid, task)
     void task.finally(() => {
-      // 只清空仍指向本任务的槽位：后续排队的请求不应被本任务清理。
+      // Only clear the slot when it still points at this task: requests queued
+      // afterwards must not be dropped by this task's cleanup.
       if (queues.get(request.fileUuid) === task) queues.delete(request.fileUuid)
     })
   }
@@ -66,7 +72,7 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
         await deps.respond({
           requestId: request.requestId,
           ok: false,
-          error: '该文件未打开，无法落盘',
+          error: 'This file is not open, cannot land',
         })
         return
       }
@@ -144,7 +150,7 @@ async function materializePalaceArtwork(
       if (!svg || !isValidSvgArtwork(svg, stationCount)) {
         delete data.imageUrl
         changed = true
-        warn('宫殿画面未通过闸门，使用无图宫殿')
+        warn('Palace artwork failed the gate; using a palace without an image')
         continue
       }
     }
@@ -182,7 +188,7 @@ function clearProcessingCommands(sourceNodeIds: string[]): MindmapCommand[] {
 }
 
 /**
- * Deterministic palace placement (CONTEXT.md「确定性落图」): under the parent of
+ * Deterministic palace placement (CONTEXT.md "deterministic landing"): under the parent of
  * the first source node, at that node's position (so the palace takes the slot
  * and the source nodes move under it). No source nodes → a new child of root.
  */
@@ -207,9 +213,11 @@ function palacePlacement(
 }
 
 /**
- * 手动运行的占位宫殿：payload 还没生成时先给出进度与「继续」入口。放置代码与
- * 落图的插入分支共用，所以占位节点与最终宫殿落在同一位置。
- * 返回节点 id（渲染层运行登记表按它定位）。
+ * The manual run's placeholder palace: a progress node with a "continue" entry
+ * point that exists before the payload is generated. The placement code is shared
+ * with the landing insertion branch, so the placeholder and the final palace land
+ * in the same spot.
+ * Returns the node id (the renderer's run registry locates it by that id).
  */
 export function insertPalacePlaceholder(
   editor: MindmapEditor,
@@ -226,7 +234,7 @@ export function insertPalacePlaceholder(
         type: PALACE_TYPE,
         position,
         data: {
-          label: '生成中…',
+          label: 'Generating…',
           imageUrl: '',
           stations: [],
           sourceNodeIds,
@@ -292,9 +300,11 @@ function findPalacePlaceholder(editor: MindmapEditor, sourceNodeIds: string[]): 
 }
 
 /**
- * 宫殿落图（写动作 landPalace）：XML 由代码从子图 payload 序列化而来（模型不复述
- * 图片 data URL）。占位节点按 sourceNodeIds 就地更新；没有占位节点则新建，并按
- * 「新宫殿 → 选中节点」重挂父边。图片资源在此物化（与 insertXmlFragment 同一闸门）。
+ * Palace landing (write action landPalace): the XML is serialized by code from the
+ * subgraph payload (the model never repeats the image data URL). The placeholder
+ * node is updated in place by sourceNodeIds; without a placeholder a new node is
+ * created and the parent edges are rewired as "new palace → selected nodes". Image
+ * assets are materialized here (the same gate as insertXmlFragment).
  */
 async function applyPalaceLanding(
   editor: MindmapEditor,
@@ -303,7 +313,7 @@ async function applyPalaceLanding(
   const parsed = await parseXmlFragment(materialized.xml)
   const palaceNode = parsed.nodes.find((node) => node.type === PALACE_TYPE)
   if (!palaceNode) {
-    throw new MindmapXmlError('invalid_type', '落图片段缺少 palace 节点')
+    throw new MindmapXmlError('invalid_type', 'Landing fragment is missing the palace node')
   }
   const data = palaceNode.data as {
     label?: unknown
@@ -367,9 +377,11 @@ async function applyPalaceLanding(
 }
 
 /**
- * 原子校验 + 落图：校验失败抛 MindmapXmlError（错误码 + 恢复策略由 formatXmlError
- * 统一格式化），不触碰编辑器；成功返回 `data` 载荷（ack 的一部分）。
- * 校验顺序与主进程快照校验一致（01 移入共享库后同一词汇表）。
+ * Atomic validation + landing: a validation failure throws MindmapXmlError (the
+ * error code + recovery strategy are formatted uniformly by formatXmlError) and
+ * never touches the editor; success returns the `data` payload (part of the ack).
+ * The validation order matches the main-process snapshot validation (same
+ * vocabulary once contract 01 moved into the shared library).
  */
 async function applyWriteAction(
   action: WriteAction,
@@ -381,7 +393,7 @@ async function applyWriteAction(
     case 'landPalace': {
       const { xml } = args as WriteActionArgs['landPalace']
       if (typeof xml !== 'string') {
-        throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
+        throw new MindmapXmlError('empty_xml', 'The xml argument is missing')
       }
       const materialized = await materializePalaceArtwork(xml, editor, warn)
       return applyPalaceLanding(editor, materialized)
@@ -390,17 +402,19 @@ async function applyWriteAction(
     case 'insertXmlFragment': {
       const { xml, parentId, position } = args as WriteActionArgs['insertXmlFragment']
       if (typeof xml !== 'string') {
-        throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
+        throw new MindmapXmlError('empty_xml', 'The xml argument is missing')
       }
       if (typeof position !== 'undefined' && !INSERT_POSITIONS.has(position)) {
-        throw new Error(`position 参数无效：${String(position)}，只能是 root/child/after/before`)
+        throw new Error(
+          `Invalid position argument: ${String(position)}; must be root/child/after/before`,
+        )
       }
       const materialized = await materializePalaceArtwork(xml, editor, warn)
       const state = editor.getState()
       const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
       const pos = position ?? DEFAULT_POSITION
       if (pos !== 'root' && parentId && !ctx.nodeIds.has(parentId)) {
-        throw new MindmapXmlError('block_not_found', `定位节点「${parentId}」不存在`)
+        throw new MindmapXmlError('block_not_found', `Anchor node "${parentId}" does not exist`)
       }
       // insertFromXml re-runs validateFragmentForInsert on the live editor state,
       // so a structural failure surfaces as the same MindmapXmlError from there.
@@ -419,7 +433,7 @@ async function applyWriteAction(
     case 'updateMindmapNode': {
       const { xml } = args as WriteActionArgs['updateMindmapNode']
       if (typeof xml !== 'string') {
-        throw new MindmapXmlError('empty_xml', 'xml 参数缺失')
+        throw new MindmapXmlError('empty_xml', 'The xml argument is missing')
       }
       const materialized = await materializePalaceArtwork(xml, editor, warn)
       if (materialized.assets.length > 0) {
@@ -437,10 +451,12 @@ async function applyWriteAction(
     case 'moveMindmapNode': {
       const { nodeId, targetId, position } = args as WriteActionArgs['moveMindmapNode']
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
-        throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
+        throw new MindmapXmlError('block_not_found', 'The nodeId argument is missing')
       }
       if (typeof position !== 'undefined' && !MOVE_POSITIONS.has(position)) {
-        throw new Error(`position 参数无效：${String(position)}，只能是 child/after/before`)
+        throw new Error(
+          `Invalid position argument: ${String(position)}; must be child/after/before`,
+        )
       }
       const target = typeof targetId === 'string' && targetId.trim() ? targetId : 'root'
       const state = editor.getState()
@@ -454,10 +470,13 @@ async function applyWriteAction(
     case 'deleteNode': {
       const { nodeId, confirmDeleteSubtree } = args as WriteActionArgs['deleteNode']
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
-        throw new MindmapXmlError('block_not_found', 'nodeId 参数缺失')
+        throw new MindmapXmlError('block_not_found', 'The nodeId argument is missing')
       }
       if (nodeId === 'root') {
-        throw new MindmapXmlError('tree_invalid', 'root 是导图锚点，不可删除')
+        throw new MindmapXmlError(
+          'tree_invalid',
+          'root is the mindmap anchor and cannot be deleted',
+        )
       }
       // The renderer responder is now the sole validator (main-process snapshot
       // validation was removed): a missing node must fail with block_not_found
@@ -467,7 +486,7 @@ async function applyWriteAction(
       if (!ctx.nodeIds.has(nodeId)) {
         throw new MindmapXmlError(
           'block_not_found',
-          `节点「${nodeId}」不存在，请先 readMindmap 重新定位`,
+          `Node "${nodeId}" does not exist; call readMindmap to locate it again`,
         )
       }
       if (confirmDeleteSubtree === false) {
@@ -481,7 +500,7 @@ async function applyWriteAction(
       // The WriteAction union is exhaustive; this arm is unreachable and only
       // guards against adding a new action without a responder case.
       const neverAction: never = action
-      throw new Error(`未知的落盘动作：${neverAction}`)
+      throw new Error(`Unknown write action: ${neverAction}`)
     }
   }
 }

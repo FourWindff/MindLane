@@ -26,39 +26,46 @@ interface ConsolidatorDependencies {
 
 interface ConsolidationLimits {
   /**
-   * 单次模型调用允许的**总输入** token 预算（容量）。
-   * 未显式给出时由模型上下文窗口推导：窗口 − 输出预留 − 估算误差缓冲。
+   * **Total input** token budget (capacity) allowed for a single model call.
+   * When not given explicitly it is derived from the model context window:
+   * window − output reserve − estimation-error buffer.
    */
   inputBudgetTokens: number
   /**
-   * 压缩触发阈值（策略值）。触发点取它与容量的较小者：小窗口模型在容量处触发，
-   * 大窗口模型保持固定的摘要与记忆提取节奏。
+   * Compaction trigger threshold (policy value). The trigger point is the
+   * smaller of this and the capacity: small-window models trigger at their
+   * capacity, large-window models keep a fixed summarization and
+   * memory-extraction cadence.
    */
   consolidationTriggerTokens: number
-  /** 归档目标占容量的比例 */
+  /** Share of capacity targeted for archiving */
   consolidationRatio: number
-  /** 最大消息条数 */
+  /** Maximum number of messages */
   maxContextMessages: number
   maxMessagesBeforeTokenCheck: number
   maxConsolidationRounds: number
 }
 
 interface GetMessagesForContextOptions {
-  /** 最大返回消息条数（不含系统消息） */
+  /** Maximum number of messages returned (excluding system messages) */
   maxMessages?: number
 }
 
 /**
- * 会话上下文压缩器。
+ * Session context compactor.
  *
- * 负责按 prompt token 预算将 `session.jsonl` 中游标（`lastConsolidated`）之后的
- * 旧消息滚动摘要：每轮用 LLM 把「上一轮滚动摘要 + 新切片」合并为一份累积摘要，
- * 写入会话 meta 的 `_lastSummary` 并推进游标。摘要由 contextCompact 节点读入
- * `state.summary`，经 system prompt 的 `## 历史摘要` 段注入实际模型调用——
- * 归档的消息因此被摘要替代，而不是静默截断。
+ * Rolls the old messages after the cursor (`lastConsolidated`) in
+ * `session.jsonl` into a rolling summary within the prompt token budget: each
+ * round an LLM merges "previous rolling summary + new slice" into one cumulative
+ * summary, written to the session meta's `_lastSummary`, and the cursor
+ * advances. The summary is read by the contextCompact node into
+ * `state.summary` and injected into the real model call through the
+ * `## History summary` section of the system prompt — archived messages are
+ * therefore replaced by the summary rather than silently truncated.
  *
- * LLM 摘要失败时不推进游标（下轮 run 自愈重试），本轮由 `getMessagesForContext`
- * 按预算裁剪兜底，保证模型调用继续。
+ * When LLM summarization fails the cursor does not advance (the next run
+ * self-heals and retries) and the current round falls back to budget trimming
+ * in `getMessagesForContext`, so model calls keep working.
  */
 export class Consolidator {
   private readonly sessionManager: SessionManager
@@ -76,7 +83,8 @@ export class Consolidator {
     this.getToolDefinitions = deps.getToolDefinitions
     this.onArchived = deps.onArchived
     this.limits = {
-      // 容量从模型窗口现算：预留给模型的输出与估算缓冲都是固定扣减项。
+      // Capacity is derived from the model window on the fly: the output reserve and the
+      // estimation buffer are both fixed deductions.
       inputBudgetTokens:
         limits?.inputBudgetTokens ??
         deps.provider.contextWindow -
@@ -106,9 +114,9 @@ export class Consolidator {
   }
 
   /**
-   * 按 token 预算判断并执行压缩。
+   * Decide within the token budget whether to compact, and do it.
    *
-   * @returns 是否发生了压缩（游标是否推进）。
+   * @returns Whether compaction happened (whether the cursor advanced).
    */
   async maybe_consolidate_by_tokens(
     sessionId: string,
@@ -122,7 +130,7 @@ export class Consolidator {
       const lastConsolidated = meta?.lastConsolidated ?? 0
       const unarchived = allMessages.slice(lastConsolidated)
 
-      // 快速过滤：未归档消息数量较少且无工具定义时直接跳过。
+      // Fast path: skip when there are few unarchived messages and no tool definitions.
       if (
         unarchived.length <= limits.maxMessagesBeforeTokenCheck &&
         this.getToolDefinitions().length === 0
@@ -131,7 +139,8 @@ export class Consolidator {
       }
 
       const inputBudget = limits.inputBudgetTokens
-      // 容量与策略是两件事：塞得进多少由模型窗口决定，何时摘要由成本与记忆节奏决定。
+      // Capacity and policy are two different things: how much fits is decided by the model
+      // window, when to summarize by cost and memory cadence.
       const trigger = Math.min(limits.consolidationTriggerTokens, inputBudget)
       const target = Math.floor(inputBudget * limits.consolidationRatio)
 
@@ -156,17 +165,18 @@ export class Consolidator {
           currentSummary = await this.summarize(messagesToArchive, currentSummary)
           const remainingAfter = allMessages.slice(currentLast + boundaryIdx + 1)
           log.info(
-            'compact: 压缩 %d 条（剩余 %d 条），估算 tokens ~%d → 目标 ~%d, summarizer=%s',
+            'compact: archived %d messages (%d remaining), estimated tokens ~%d → target ~%d, summarizer=%s',
             messagesToArchive.length,
             remainingAfter.length,
             estimated,
             target,
             this.summarizerModel(),
           )
-          log.debug('compact 滚动摘要全文：\n%s', currentSummary)
+          log.debug('compact rolling summary (full text):\n%s', currentSummary)
         } catch (err) {
-          // 摘要失败：不推进游标，本轮交给 getMessagesForContext 预算裁剪兜底，
-          // 下轮 run 重试同一切片（自愈）。失败切片不进 onArchived，证据不丢。
+          // Summary failed: do not advance the cursor. This round falls back to budget
+          // trimming in getMessagesForContext and the next run retries the same slice
+          // (self-healing). Failed slices never reach onArchived, so no evidence is lost.
           log.warn(
             'LLM summary failed for session %s, cursor not advanced (retry next run):',
             sessionId,
@@ -209,7 +219,8 @@ export class Consolidator {
   }
 
   /**
-   * 从 `session.jsonl` 读取未压缩消息，按条数与 token 预算裁剪后返回。
+   * Read the uncompressed messages from `session.jsonl`, trim them by message count and token
+   * budget, and return them.
    */
   async getMessagesForContext(
     sessionId: string,
@@ -224,24 +235,25 @@ export class Consolidator {
 
     const candidate = allMessages.slice(lastConsolidated)
 
-    // 系统消息始终保留，除非预算超限时的兜底裁剪。
+    // System messages are always kept, except for the fallback trim when the budget is exceeded.
     const systemMessages = candidate.filter((m) => m.getType() === 'system')
     const nonSystem = candidate.filter((m) => m.getType() !== 'system')
 
-    // 始终保留当前用户消息（最后一条 human）。
+    // Always keep the current user message (the last human message).
     const currentUserMsg =
       nonSystem.length > 0 && nonSystem[nonSystem.length - 1].getType() === 'human'
         ? nonSystem[nonSystem.length - 1]
         : null
     let history = currentUserMsg ? nonSystem.slice(0, nonSystem.length - 1) : nonSystem
 
-    // 条数限制：保留最近的 maxMessages 条非系统消息（含当前用户消息）。
+    // Message-count limit: keep the most recent maxMessages non-system messages (including the
+    // current user message).
     const historyLimit = maxMessages - (currentUserMsg ? 1 : 0)
     if (history.length > historyLimit) {
       history = history.slice(-historyLimit)
     }
 
-    // 从旧到新裁剪历史消息，直到总 token 在预算内。
+    // Trim history oldest-first until the total token count fits the budget.
     while (
       estimateMessageTokens([
         ...systemMessages,
@@ -253,7 +265,8 @@ export class Consolidator {
       history.shift()
     }
 
-    // 兜底：若历史已清空但系统消息+当前用户仍超预算，裁剪最旧的系统消息。
+    // Fallback: if history is empty but system messages + current user still exceed the budget,
+    // trim the oldest system message.
     while (
       estimateMessageTokens([...systemMessages, ...(currentUserMsg ? [currentUserMsg] : [])]) >
         budget &&
@@ -266,9 +279,9 @@ export class Consolidator {
   }
 
   /**
-   * 在 `user` 消息边界选择压缩终点。
+   * Pick the end of the compaction chunk at a `user` message boundary.
    *
-   * @returns 压缩 chunk 的结束索引（包含），-1 表示无合适边界。
+   * @returns Inclusive end index of the compaction chunk, or -1 when no suitable boundary exists.
    */
   pickConsolidationBoundary(messages: BaseMessage[], tokensToRemove: number): number {
     let accumulated = 0
@@ -286,7 +299,7 @@ export class Consolidator {
       }
     }
 
-    // 无满足 token 要求的 user 边界时，回退到最后一个 user 边界。
+    // No user boundary satisfies the token requirement: fall back to the last user boundary.
     return lastUserIdx
   }
 
@@ -306,9 +319,11 @@ export class Consolidator {
   }
 
   /**
-   * 滚动摘要输入剥离：归档消息喂给摘要调用前去掉末尾 `<EDITOR_STATE>` 块，
-   * 避免过时的节点列表混入每轮重注入的 `## 历史摘要`。
-   * 复用共享契约的单一 strip 实现；只处理 human 消息（块只出现在用户消息末尾）。
+   * Rolling-summary input stripping: before archived messages are handed to the summarization
+   * call, drop a trailing `<EDITOR_STATE>` block so a stale node list does not leak into the
+   * `## History summary` section that is re-injected every round.
+   * Reuses the single strip implementation from the shared contract; only human messages are
+   * handled (the block only appears at the end of user messages).
    */
   private stripTurnStateFromMessages(messages: BaseMessage[]): BaseMessage[] {
     return messages.map((message) => {
@@ -325,27 +340,27 @@ export class Consolidator {
   }
 
   /**
-   * 滚动摘要：把「已有摘要 + 新切片」合并为一份累积摘要。
-   * 不写任何独立文件——结果只落在会话 meta 的 `_lastSummary`。
+   * Rolling summary: merge "existing summary + new slice" into one cumulative summary.
+   * No standalone file is written — the result only lands in the session meta's `_lastSummary`.
    */
   private async summarize(
     messages: BaseMessage[],
     previousSummary: string | undefined,
   ): Promise<string> {
     const summaryPrompt = new SystemMessage(
-      '请用中文维护对话的滚动摘要。保留：1）用户的主要目标，2）关键事实和约束，3）最近待继续执行的任务，4）重要文件、节点或工具结果的高层结论。保持简短具体。',
+      "Maintain a rolling summary of the conversation in English. Keep: 1) the user's main goals, 2) key facts and constraints, 3) recent tasks still to be done, 4) high-level conclusions about important files, nodes, or tool results. Keep it short and concrete.",
     )
 
     const inputs: BaseMessage[] = [summaryPrompt]
     if (previousSummary) {
-      inputs.push(new SystemMessage(`已有摘要：\n${previousSummary}`))
+      inputs.push(new SystemMessage(`Existing summary:\n${previousSummary}`))
     }
     inputs.push(...this.stripTurnStateFromMessages(messages))
     inputs.push(
       new HumanMessage(
         previousSummary
-          ? '请把以上新对话合并进已有摘要，输出更新后的完整摘要。'
-          : '请总结以上对话。',
+          ? 'Merge the new conversation above into the existing summary and output the updated full summary.'
+          : 'Summarize the conversation above.',
       ),
     )
 

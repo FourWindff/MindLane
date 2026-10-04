@@ -96,8 +96,8 @@ export function buildFallbackSummary(route: MemoryPalaceStation[], hasImage: boo
   const lines = route
     .sort((a, b) => a.order - b.order)
     .map((station) => {
-      const suffix = station.association ? `，联想：${station.association}` : ''
+      const suffix = station.association ? `, association: ${station.association}` : ''
       return `${station.order}. ${station.content}${suffix}`
     })
-  return `${hasImage ? '已生成记忆宫殿图。' : '已生成记忆路线。'}按顺序依次经过这些地点：\n${lines.join('\n')}`
+  return `${hasImage ? 'Memory palace image generated. ' : 'Memory route generated. '}Visit these locations in order:\n${lines.join('\n')}`
 }

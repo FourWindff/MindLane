@@ -24,8 +24,9 @@ import { createMcpClient } from './agent/mcp/clientFactory.js'
 import { logger, RotatingFileSink } from './shared/logger.js'
 import { cleanupToolResultOffloads } from './agent/tools/toolResultNormalizer.js'
 
-// XML 解析内核按进程装配（设计文档 5.1）：主进程用 linkedom（HTML parser 容错 AI 输出），
-// 渲染层用 DOMParser；linkedom 不进渲染层 bundle（可选依赖 canvas 无法被静态解析）。
+// The XML parsing kernel is assembled per process (design doc 5.1): the main process uses
+// linkedom (an HTML parser tolerant of AI output), the renderer uses DOMParser; linkedom does
+// not enter the renderer bundle (the optional canvas dependency cannot be statically resolved).
 registerXmlDomParser(LinkedomDOMParser)
 
 import { registerFsHandlers } from './main/handlers/fs.js'
@@ -234,7 +235,7 @@ app.whenReady().then(async () => {
   logFileSink = new RotatingFileSink({ filePath: path.join(userDataPath, 'logs', 'mindlane.log') })
   logger.setSink(logFileSink)
   appLog.info(
-    '启动： version=%s, platform=%s, arch=%s',
+    'Startup: version=%s, platform=%s, arch=%s',
     app.getVersion(),
     process.platform,
     process.arch,
@@ -243,7 +244,7 @@ app.whenReady().then(async () => {
   fsService = new FileSystemService(userDataPath)
   await fsService.initialize()
 
-  // MCP：safeStorage 不可用时凭据仅驻留内存（McpCredentialStore 会记录警告）
+  // MCP: when safeStorage is unavailable credentials stay in memory only (McpCredentialStore logs a warning)
   mcpManager = new McpManager({
     userDataPath,
     createClient: createMcpClient,
@@ -268,7 +269,7 @@ app.whenReady().then(async () => {
       void persistMcpStatus(fsService, serverId, status)
     },
   })
-  // 异步静默重连已授权 server，不阻塞 app 可用
+  // Silently reconnect authorized servers in the background; does not block app availability
   const manager = mcpManager
   void (async () => {
     try {
@@ -279,8 +280,9 @@ app.whenReady().then(async () => {
     }
   })()
 
-  // AI 服务装配：成功 → 置位就绪门控；失败 → 弹窗告知降级，不退出，
-  // 导图编辑等非 AI 功能照常可用（渲染层经桥读取 isReady 显示禁用态）。
+  // AI service assembly: success -> set the readiness gate; failure -> show a dialog about the
+  // degradation and keep running; non-AI features such as mindmap editing stay available
+  // (the renderer reads isReady over the bridge to show the disabled state).
   try {
     services = await initAgentServices(userDataPath)
     aiServiceReady = true
@@ -288,12 +290,12 @@ app.whenReady().then(async () => {
     appLog.error('AI service init failed:', err)
     console.error('AI service init failed:', err)
     dialog.showErrorBox(
-      'AI 服务初始化失败',
-      '聊天与记忆已禁用，导图编辑不受影响。可重启应用后重试。',
+      'AI service initialization failed',
+      'Chat and memory are disabled; mindmap editing is unaffected. Restart the app to retry.',
     )
   }
 
-  // best-effort，独立于 AI 装配：单次垃圾回收/脱敏故障不牵连 AI 就绪状态。
+  // best-effort, independent of AI assembly: a single garbage-collection/redaction failure must not affect AI readiness.
   void (async () => {
     try {
       await cleanupToolResultOffloads(userDataPath)
@@ -312,18 +314,20 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
-  // 主进程 → 渲染层读导图/落盘请求器：`win` 是模块级可变引用（窗口可重建），
-  // 经 getter 注入，窗口销毁时请求立即报错而非挂起。
+  // Main process -> renderer mindmap read/save requesters: `win` is a module-level mutable
+  // reference (the window can be recreated) injected via a getter, so a request fails
+  // immediately instead of hanging once the window is destroyed.
   const mindmapReadRequester = createMindmapReadRequester(() => win)
   const mindmapWriteRequester = createMindmapWriteRequester(() => win)
 
-  // 唯一装配点：惰性创建（或复用）当前 orchestrator。createRuntime 与
-  // 就绪门控后的聊天运行都从这里取，避免两条构造路径漂移。
+  // The single assembly point: lazily create (or reuse) the current orchestrator. Both
+  // createRuntime and post-readiness-gate chat runs get it from here, so the two construction
+  // paths cannot drift.
   const ensureChatOrchestrator = async (): Promise<AgentOrchestrator> => {
     if (!chatOrchestrator) {
       const settings = await fsService.appState.load()
       const provider = resolveChatProvider(settings)
-      // 惰性创建仅发生在就绪门控通过之后，services 必非空。
+      // Lazy creation only happens after the readiness gate passes, so services is non-null.
       chatOrchestrator = new AgentOrchestrator(provider, services!, {
         userDataPath,
         mindmapReadProvider: (fileUuid, query) =>
@@ -335,7 +339,7 @@ app.whenReady().then(async () => {
     return chatOrchestrator
   }
 
-  // 装配成功才构造 StreamManager：入参收窄为 sessionManager。
+  // StreamManager is constructed only after assembly succeeds: its input is narrowed to sessionManager.
   if (services) {
     const sessionManager = services.sessionManager
     streamManager = new StreamManager({
@@ -345,13 +349,13 @@ app.whenReady().then(async () => {
         const settings = await fsService.appState.load()
         const provider = resolveChatProvider(settings)
         providerLog.info(
-          '初始化： %s, model=%s',
+          'Initializing: %s, model=%s',
           settings.activeProviders.chat || 'dashscope',
           settings.chatModel,
         )
         const orchestrator = await ensureChatOrchestrator()
         orchestrator.updateProvider(provider)
-        // orchestrator 可能在 MCP 连接完成后才被创建，这里保证拿到当前 MCP 工具集
+        // the orchestrator may be created only after MCP connects; make sure it gets the current MCP tool set
         orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
         return orchestrator.getStreamRuntime(settings.palaceArtworkStyle)
       },

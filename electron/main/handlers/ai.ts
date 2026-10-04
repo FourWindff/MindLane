@@ -18,7 +18,7 @@ const appLog = logger.withContext('app')
 export function registerAiHandlers(ctx: HandlerContext): void {
   const fsService = ctx.fsService
 
-  // 只读裸布尔返回（不包 IpcResult 信封）：必然成功的读取，符合桥约定。
+  // Read-only bare boolean (not wrapped in an IpcResult envelope): a read that cannot fail, per the bridge contract.
   ipcMain.handle(IPC.AiIsReady, () => {
     return ctx.isAiServiceReady()
   })
@@ -43,7 +43,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         // subgraph takes its input from the selection, and a resume re-runs the
         // private thread with empty input.
         if (!payload.message?.trim() && !payload.ephemeral) {
-          return { ok: false, error: '消息不能为空' }
+          return { ok: false, error: 'Message cannot be empty' }
         }
 
         const workspacePath = payload.context.workspacePath
@@ -56,9 +56,9 @@ export function registerAiHandlers(ctx: HandlerContext): void {
           const workspaceState = await fsService.workspace.load(workspacePath)
           if (!workspaceState.ok) return workspaceState
           workspaceUuid = workspaceState.data.workspaceUuid
-          if (!workspaceUuid) return { ok: false, error: '工作区缺少稳定身份' }
+          if (!workspaceUuid) return { ok: false, error: 'Workspace is missing a stable identity' }
         } else if (!payload.ephemeral) {
-          return { ok: false, error: '聊天上下文缺少工作区路径' }
+          return { ok: false, error: 'Chat context is missing the workspace path' }
         }
 
         const request: StreamRequest = {
@@ -92,15 +92,16 @@ export function registerAiHandlers(ctx: HandlerContext): void {
     return { ok: ctx.getStreamManager()?.stopStream(payload.streamId) ?? false }
   })
 
-  // 渲染层 → 主进程：读导图应答（反向通道的 invoke 侧）。
-  // requestId 由渲染层原样带回，请求器据此解析挂起的请求；
-  // 未知 requestId（已超时/已应答）是 no-op。
+  // Renderer -> main process: mindmap read response (the invoke side of the reverse channel).
+  // The renderer passes the requestId back verbatim; the requester resolves the pending
+  // request with it; an unknown requestId (already timed out / answered) is a no-op.
   ipcMain.handle(IPC.AiMindmapReadRespond, (_e, payload: MindmapReadResponse) => {
     ctx.mindmapReadRequester.respond(payload)
   })
 
-  // 渲染层 → 主进程：落盘应答（反向通道的 invoke 侧，同读导图模式）。
-  // 未知 requestId（已超时/已应答）是 no-op。
+  // Renderer -> main process: save-to-disk response (the invoke side of the reverse channel,
+  // same pattern as mindmap read).
+  // An unknown requestId (already timed out / answered) is a no-op.
   ipcMain.handle(IPC.AiMindmapWriteRespond, (_e, payload: MindmapWriteResponse) => {
     ctx.mindmapWriteRequester.respond(payload)
   })
@@ -162,7 +163,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
       const providerId = settings.activeProviders.chat || 'dashscope'
       const providerMeta = getProviderMeta(providerId)
       if (!providerMeta) {
-        return { ok: false, error: `未知的 provider: ${providerId}` }
+        return { ok: false, error: `Unknown provider: ${providerId}` }
       }
 
       return {

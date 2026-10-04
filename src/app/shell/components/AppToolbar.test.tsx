@@ -12,9 +12,9 @@ describe('AppToolbar', () => {
       />,
     )
 
-    expect(html).toContain('打开文件管理器')
+    expect(html).toContain('Open file manager')
     expect(html).toContain('notes')
-    expect(html).not.toContain('显示聊天')
-    expect(html).not.toContain('隐藏聊天')
+    expect(html).not.toContain('Show chat')
+    expect(html).not.toContain('Hide chat')
   })
 })

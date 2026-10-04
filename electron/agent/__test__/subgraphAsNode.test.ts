@@ -11,7 +11,7 @@ import { StreamManager } from '../streamManager.js'
 import type { SessionManager } from '../context/sessionManager.js'
 import type { ChatStreamEvent } from '../../ipc.js'
 
-const TREE_XML = '<node>读书笔记\n  <node>第一点</node>\n</node>'
+const TREE_XML = '<node>Reading notes\n  <node>First point</node>\n</node>'
 
 /**
  * Scripted provider for a whole AI-triggered run: the supervisor asks for the
@@ -27,13 +27,13 @@ function scriptedProvider(contextWindow = 32_768): LLMProvider {
     const last = messages[messages.length - 1]
     if (last?.type === 'human') {
       return new AIMessage({
-        content: '我来生成思维导图',
+        content: 'Generating the mindmap now',
         tool_calls: [
           { name: 'generateMindmapFragment', args: {}, id: 'call-mm', type: 'tool_call' },
         ],
       })
     }
-    if (last?.type === 'tool') return new AIMessage({ content: '导图已完成' })
+    if (last?.type === 'tool') return new AIMessage({ content: 'Mindmap is done' })
     return new AIMessage({ content: TREE_XML })
   })
 
@@ -56,13 +56,13 @@ function failingMindmapProvider(): LLMProvider {
     const last = messages[messages.length - 1]
     if (last?.type === 'human') {
       return new AIMessage({
-        content: '我来生成思维导图',
+        content: 'Generating the mindmap now',
         tool_calls: [
           { name: 'generateMindmapFragment', args: {}, id: 'call-mm', type: 'tool_call' },
         ],
       })
     }
-    return new AIMessage({ content: '这不是 XML' })
+    return new AIMessage({ content: 'This is not XML' })
   })
   return {
     model: { invoke, bindTools: () => ({ invoke }), withStructuredOutput: () => ({ invoke }) },
@@ -164,16 +164,16 @@ function toolMessages(messages: BaseMessage[] | undefined): ToolMessage[] {
 }
 
 const PALACE_PLAN_JSON = JSON.stringify({
-  theme: '测试宫殿',
-  scene_brief: '一间测试大厅',
+  theme: 'Test palace',
+  scene_brief: 'a test hall',
   route_style: 'arc',
   stations: [
     {
       order: 1,
       linked_node_id: 'n1',
-      content: '第一站',
-      anchor_visual: '巨大的铜钟',
-      visual_bridge: '钟声让人想起这一站',
+      content: 'First station',
+      anchor_visual: 'giant bronze bell',
+      visual_bridge: 'the bell rings and recalls this station',
     },
   ],
 })
@@ -195,8 +195,9 @@ function palaceRunProvider(options: { blockArtwork?: boolean } = {}) {
     await new Promise((resolve) => setTimeout(resolve, 0))
     const last = messages[messages.length - 1] as { content?: unknown } | undefined
     const prompt = typeof last?.content === 'string' ? last.content : ''
-    if (prompt.includes('请为以下')) return new AIMessage({ content: PALACE_PLAN_JSON })
-    if (prompt.includes('主题：')) {
+    if (prompt.includes('Design a memory palace route'))
+      return new AIMessage({ content: PALACE_PLAN_JSON })
+    if (prompt.includes('Theme:')) {
       if (options.blockArtwork) await artworkGate
       return new AIMessage({ content: SVG_ARTIFACT })
     }
@@ -228,12 +229,12 @@ function palaceRunProvider(options: { blockArtwork?: boolean } = {}) {
 }
 
 /**
- * Manual palace generation is one ephemeral graph run (CONTEXT.md「临时运行」):
+ * Manual palace generation is one ephemeral graph run (CONTEXT.md "Ephemeral Run"):
  * the request carries the entry marker, START goes straight to the palace
  * subgraph, nothing reaches a session, and the run's `end` carries the landing
  * payload exactly once.
  */
-describe('手动宫殿：一次临时运行', () => {
+describe('Manual palace: one ephemeral run', () => {
   const palaceRequest = (sessionId: string, privateThreadId: string, resume = false) => ({
     sessionId,
     message: '',
@@ -242,13 +243,13 @@ describe('手动宫殿：一次临时运行', () => {
       fileUuid: 'file-a',
       workspacePath: '/workspace/test',
       filePath: '/a.mindlane',
-      fileTitle: '读书笔记',
-      selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+      fileTitle: 'Reading notes',
+      selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
     },
     ephemeral: { privateThreadId, runEntry: 'palace' as const, ...(resume ? { resume } : {}) },
   })
 
-  it('不发模型回合、不写会话、発阶段进度、只带一份落图载荷结束', async () => {
+  it('runs no model turns, writes no session, emits stage progress, and ends with a single landing payload', async () => {
     const scripted = palaceRunProvider()
     const harness = createHarness(scripted.provider)
 
@@ -268,8 +269,8 @@ describe('手动宫殿：一次临时运行', () => {
 
     // The model was asked to plan and to draw — never to route (no compaction,
     // no supervisor): two subgraph calls, zero supervisor turns.
-    expect(scripted.calls('请为以下')).toBe(1)
-    expect(scripted.calls('主题：')).toBe(1)
+    expect(scripted.calls('Design a memory palace route')).toBe(1)
+    expect(scripted.calls('Theme:')).toBe(1)
 
     // Zero session writes: no history read, no user message, no result.
     expect(harness.savedUserMessages).toEqual([])
@@ -292,13 +293,13 @@ describe('手动宫殿：一次临时运行', () => {
     expect(landingPayloads).toHaveLength(1)
     expect((landingPayloads[0]!.payload as { palaceData: unknown }).palaceData).toMatchObject({
       ok: true,
-      label: '测试宫殿',
+      label: 'Test palace',
       sourceNodeIds: ['n1'],
       imageUrl: expect.stringMatching(/^data:image\/svg\+xml/),
     })
   })
 
-  it('两条触发路径发出的宫殿写请求形状一致（同一份落图代码）', async () => {
+  it('both trigger paths emit palace write requests of the same shape (one landing code path)', async () => {
     // Manual trigger: one ephemeral entry run, same scripted palace stages.
     const manual = createHarness(palaceRunProvider().provider)
     manual.manager.startStream(palaceRequest('palace-shape-manual', 'palace-thread-shape'))
@@ -308,14 +309,14 @@ describe('手动宫殿：一次临时运行', () => {
     const ai = createHarness(multiCallProvider([{ name: 'generatePalace', id: 'call-pl' }]))
     ai.manager.startStream({
       sessionId: 'session-shape-ai',
-      message: '给选中的节点建个宫殿',
+      message: 'build a palace for the selected nodes',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
-        fileTitle: '读书笔记',
-        selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
+        fileTitle: 'Reading notes',
+        selectedNodes: [{ id: 'n1', type: 'text', label: 'First station' }],
       },
     })
     await waitUntil(() => settledStreamIds(ai.events).length === 1)
@@ -335,7 +336,7 @@ describe('手动宫殿：一次临时运行', () => {
     )
   })
 
-  it('中止后同线程空输入续跑：已完成的超步不重跑，落图仍在同一载荷上收尾', async () => {
+  it('resuming with empty input on the same thread after an abort: completed super-steps do not re-run and the landing still finishes on the same payload', async () => {
     const scripted = palaceRunProvider({ blockArtwork: true })
     const harness = createHarness(scripted.provider)
 
@@ -350,7 +351,7 @@ describe('手动宫殿：一次临时运行', () => {
           event.type === 'step' && (event.payload as { step?: string }).step === 'generating-image',
       ),
     )
-    expect(scripted.calls('请为以下')).toBe(1)
+    expect(scripted.calls('Design a memory palace route')).toBe(1)
     harness.manager.stopStream(firstStreamId)
     scripted.releaseArtwork()
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
@@ -367,8 +368,8 @@ describe('手动宫殿：一次临时运行', () => {
 
     // The completed stage did not re-run (one plan call across both runs), the
     // interrupted one did, and the resumed run still lands.
-    expect(scripted.calls('请为以下')).toBe(1)
-    expect(scripted.calls('主题：')).toBe(2)
+    expect(scripted.calls('Design a memory palace route')).toBe(1)
+    expect(scripted.calls('Theme:')).toBe(2)
     const ends = harness.events.filter(
       (event) => event.type === 'end' && (event.payload as { palaceData?: unknown }).palaceData,
     )
@@ -380,7 +381,7 @@ describe('手动宫殿：一次临时运行', () => {
     expect(harness.persisted.size).toBe(0)
   })
 
-  it('子图没有运行上下文时直接报错（兜底键已删除）', async () => {
+  it('the subgraph fails loudly when there is no run context (the fallback key has been removed)', async () => {
     const { provider } = palaceRunProvider()
     const orchestrator = new AgentOrchestrator(provider, {
       checkpointer: { getAdapter: () => new MemorySaver() },
@@ -396,7 +397,7 @@ describe('手动宫殿：一次临时运行', () => {
           runEntry: 'palace',
           context: {
             fileUuid: 'file-a',
-            selectedNodes: [{ id: 'n1', type: 'text' as const, label: '第一站' }],
+            selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
           },
           artworkStyle: 'vector' as const,
         },
@@ -406,7 +407,7 @@ describe('手动宫殿：一次临时运行', () => {
         void chunk // drain to the failure
       }
     }
-    await expect(runWithoutContext()).rejects.toThrow(/运行上下文/)
+    await expect(runWithoutContext()).rejects.toThrow(/run context/)
   })
 })
 
@@ -419,14 +420,14 @@ describe('手动宫殿：一次临时运行', () => {
  */
 function multiCallProvider(
   declared: Array<{ name: string; id: string; args?: Record<string, unknown> }>,
-  finalText = '都做完了',
+  finalText = 'All done',
 ): LLMProvider {
   const supervisorInvoke = vi.fn(async (messages: BaseMessage[]) => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     const last = messages[messages.length - 1]
     if (last?.type === 'tool') return new AIMessage({ content: finalText })
     return new AIMessage({
-      content: '一次做完',
+      content: 'Doing both at once',
       tool_calls: declared.map((call) => ({
         ...call,
         args: call.args ?? {},
@@ -439,8 +440,9 @@ function multiCallProvider(
     const last = messages[messages.length - 1] as { content?: unknown } | undefined
     const prompt = typeof last?.content === 'string' ? last.content : ''
     if (prompt.includes('Extract a mindmap outline')) return new AIMessage({ content: TREE_XML })
-    if (prompt.includes('请为以下')) return new AIMessage({ content: PALACE_PLAN_JSON })
-    if (prompt.includes('主题：')) return new AIMessage({ content: SVG_ARTIFACT })
+    if (prompt.includes('Design a memory palace route'))
+      return new AIMessage({ content: PALACE_PLAN_JSON })
+    if (prompt.includes('Theme:')) return new AIMessage({ content: SVG_ARTIFACT })
     throw new Error(`unexpected subgraph prompt: ${prompt.slice(0, 120)}`)
   })
 
@@ -456,19 +458,19 @@ function multiCallProvider(
   } as unknown as LLMProvider
 }
 
-describe('主图以节点形式挂载两个子图', () => {
-  it('AI 触发的导图生成：流事件序列与 ToolMessage 与改动前等价', async () => {
+describe('The main graph mounts both subgraphs as nodes', () => {
+  it('AI-triggered mindmap generation: stream event sequence and ToolMessage match the pre-change behaviour', async () => {
     const harness = createHarness(scriptedProvider())
     const sessionId = 'session-as-node'
     const request = {
       sessionId,
-      message: '把这段内容做成导图',
+      message: 'turn this content into a mindmap',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
-        fileTitle: '读书笔记',
+        fileTitle: 'Reading notes',
       },
     }
 
@@ -513,7 +515,7 @@ describe('主图以节点形式挂载两个子图', () => {
     expect(toolMessage!.tool_call_id).toBe('call-mm')
     expect(JSON.parse(String(toolMessage!.content))).toMatchObject({
       ok: true,
-      title: '读书笔记',
+      title: 'Reading notes',
     })
     expect(toolMessage!.additional_kwargs.toolSteps).toEqual([
       { step: 'reading-doc' },
@@ -523,19 +525,19 @@ describe('主图以节点形式挂载两个子图', () => {
     ])
   })
 
-  it('子图失败时只收口一次：一条错误 ToolMessage，然后结束而不是重新进子图', async () => {
+  it('a failing subgraph closes out once: one error ToolMessage, then the run ends instead of re-entering the subgraph', async () => {
     const harness = createHarness(failingMindmapProvider())
     const sessionId = 'session-as-node-failed'
 
     harness.manager.startStream({
       sessionId,
-      message: '把这段内容做成导图',
+      message: 'turn this content into a mindmap',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
-        fileTitle: '读书笔记',
+        fileTitle: 'Reading notes',
       },
     })
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
@@ -553,7 +555,7 @@ describe('主图以节点形式挂载两个子图', () => {
     expect(harness.events.map((event) => event.type)).toContain('end')
   })
 
-  it('长文档（多波 leaf + 归并）在共享预算内跑完，旧的 80 步预算不够', async () => {
+  it('a long document (several leaf waves + merge) finishes within the shared budget; the old 80-step budget was not enough', async () => {
     const batches = 150
     const runOnce = (recursionLimit: number): Promise<ToolMessage | undefined> =>
       // The run context is what the subgraph keys its waves by: the direct-graph
@@ -574,7 +576,7 @@ describe('主图以节点形式挂载两个子图', () => {
                 fileUuid: 'file-a',
                 workspacePath: '/workspace/test',
                 filePath: '/a.mindlane',
-                fileTitle: '长文档',
+                fileTitle: 'Long document',
               },
               artworkStyle: 'vector',
             },
@@ -600,7 +602,7 @@ describe('主图以节点形式挂载两个子图', () => {
     expect(JSON.parse(String(toolMessage!.content))).toMatchObject({ ok: true })
   }, 60_000)
 
-  it('一轮里的两个子图调用都执行：两条 ToolMessage，阶段进度各归各的调用', async () => {
+  it('both subgraph calls in one round execute: two ToolMessages, each call gets its own stage progress', async () => {
     const harness = createHarness(
       multiCallProvider([
         { name: 'generateMindmapFragment', id: 'call-mm' },
@@ -611,14 +613,14 @@ describe('主图以节点形式挂载两个子图', () => {
 
     harness.manager.startStream({
       sessionId,
-      message: '把文档做成导图，再给选中的节点建个宫殿',
+      message: 'turn the document into a mindmap, then build a palace for the selected nodes',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
-        fileTitle: '读书笔记',
-        selectedNodes: [{ id: 'n1', type: 'text', label: '第一站' }],
+        fileTitle: 'Reading notes',
+        selectedNodes: [{ id: 'n1', type: 'text', label: 'First station' }],
       },
     })
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
@@ -678,12 +680,12 @@ describe('主图以节点形式挂载两个子图', () => {
     const mindmapMessage = messages.find((message) => message.tool_call_id === 'call-mm')!
     expect(JSON.parse(String(mindmapMessage.content))).toMatchObject({
       ok: true,
-      title: '读书笔记',
+      title: 'Reading notes',
     })
     expect(harness.events.map((event) => event.type)).toContain('end')
   })
 
-  it('普通工具与子图混合声明时两者都执行', async () => {
+  it('a plain tool and a subgraph declared together both execute', async () => {
     const harness = createHarness(
       multiCallProvider([
         { name: 'readMindmap', id: 'call-read' },
@@ -694,13 +696,13 @@ describe('主图以节点形式挂载两个子图', () => {
 
     harness.manager.startStream({
       sessionId,
-      message: '先读图定位，再按文档建图',
+      message: 'read the mindmap first to orient, then build one from the document',
       workspaceUuid: 'workspace-a',
       context: {
         fileUuid: 'file-a',
         workspacePath: '/workspace/test',
         filePath: '/a.mindlane',
-        fileTitle: '读书笔记',
+        fileTitle: 'Reading notes',
       },
     })
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
