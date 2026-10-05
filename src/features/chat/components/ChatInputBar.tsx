@@ -29,15 +29,6 @@ import type { DocumentRef } from '@contracts/fileFormat'
 import { validateUrl, createUrlDocumentRef } from '@/features/chat/lib/urlAttachment'
 import '../styles/chat-input-bar.css'
 
-const MAX_ROWS = 4
-/** Row height in px; the CSS line box is 0.82rem × 1.45 ≈ 19px (drift is inert for ≤4 rows). */
-const LINE_HEIGHT = 20
-
-/** Rows the textarea currently needs, clamped to MAX_ROWS. */
-function rowsFor(textarea: HTMLTextAreaElement): number {
-  return Math.min(MAX_ROWS, Math.max(1, Math.round(textarea.scrollHeight / LINE_HEIGHT)))
-}
-
 interface ChatInputBarProps {
   onOpenSettings: () => void
 }
@@ -72,7 +63,6 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   }
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [inputRows, setInputRows] = useState(1)
   const [recording, setRecording] = useState(false)
 
   const inputDraft = useAiStore((s) => s.inputDraft)
@@ -83,10 +73,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   useEffect(() => {
     if (!inputDraft) return
     const textarea = inputRef.current
-    if (textarea) {
-      textarea.value = inputDraft
-      setInputRows(rowsFor(textarea))
-    }
+    if (textarea) textarea.value = inputDraft
     setInputDraft('')
   }, [inputDraft, setInputDraft])
 
@@ -193,10 +180,7 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
   const send = useCallback(async () => {
     const text = inputRef.current?.value.trim() || ''
     const accepted = await sendChatMessage(text)
-    if (accepted && inputRef.current) {
-      inputRef.current.value = ''
-      setInputRows(1)
-    }
+    if (accepted && inputRef.current) inputRef.current.value = ''
   }, [sendChatMessage])
 
   const handleKeyDown = useCallback(
@@ -208,12 +192,6 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
     },
     [send],
   )
-
-  const handleInputChange = useCallback(() => {
-    const textarea = inputRef.current
-    if (!textarea) return
-    setInputRows(rowsFor(textarea))
-  }, [])
 
   return (
     <div className="chat-input-bar">
@@ -301,10 +279,8 @@ export function ChatInputBar({ onOpenSettings }: ChatInputBarProps) {
           <textarea
             ref={inputRef}
             onKeyDown={handleKeyDown}
-            onChange={handleInputChange}
             placeholder={placeholder}
             disabled={busy || !inputEnabled}
-            rows={inputRows}
             className="chat-input-bar__textarea"
           />
           {busy ? (
