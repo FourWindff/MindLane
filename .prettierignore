@@ -6,9 +6,4 @@ package-lock.json
 .git
 coverage
 *.log
-_bmad
-_bmad-output
-.gitnexus
 .playwright-mcp
-.mcp.json
-openspec

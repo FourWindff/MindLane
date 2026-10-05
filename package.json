@@ -10,7 +10,6 @@
     "lint": "eslint \"**/*.{ts,tsx}\" --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "vite preview",
     "test": "node scripts/test.mjs run",
     "test:watch": "node scripts/test.mjs",
     "prepare": "husky",
