@@ -1,39 +1,12 @@
 import type { DetectedAnchor } from '../providers/index.js'
 import type { PalaceSubgraphStateType } from '../state.js'
-import type { MemoryPalaceStation, StationDesign } from '../state.js'
+import type { MemoryPalaceStation } from '../state.js'
 import { buildSummaryMessages } from './prompts/textToPalace.js'
 import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
 import { messageContentToString, formatAgentError } from '../utils.js'
 import { logger } from '../../shared/logger.js'
-import { applyCanonicalLayout, buildFallbackSummary, enforceMinDistance } from './palaceLayout.js'
-
-function normalizeDetectedMap(coords: DetectedAnchor[]): Map<number, DetectedAnchor> {
-  return new Map(coords.map((coord) => [coord.order, coord]))
-}
-
-function buildLocatedRoute(
-  stations: StationDesign[],
-  coordMap: Map<number, DetectedAnchor>,
-): MemoryPalaceStation[] {
-  const raw = stations
-    .sort((a, b) => a.order - b.order)
-    .map((station) => {
-      const coord = coordMap.get(station.order)
-      return {
-        order: station.order,
-        content: station.content,
-        x: coord?.x ?? 0.5,
-        y: coord?.y ?? 0.5,
-        anchorVisual: station.anchorVisual,
-        mnemonicMethod: station.mnemonicMethod,
-        association: station.association,
-        linkedNodeId: station.linkedNodeId,
-      }
-    })
-
-  return enforceMinDistance(raw)
-}
+import { applyCanonicalLayout, buildFallbackSummary, buildRouteFromCoordinates } from './palaceLayout.js'
 
 // ===== Vision Agent core logic =====
 
@@ -173,8 +146,7 @@ export class AnchorAgent extends PalaceAgent {
         const threshold = Math.max(1, Math.ceil(expectedCount * 0.5))
 
         if (detectedCoords.length >= threshold) {
-          const coordMap = normalizeDetectedMap(detectedCoords)
-          memoryRoute = buildLocatedRoute(state.palace.stations, coordMap)
+          memoryRoute = buildRouteFromCoordinates(state.palace.stations, detectedCoords)
         } else {
           memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
         }

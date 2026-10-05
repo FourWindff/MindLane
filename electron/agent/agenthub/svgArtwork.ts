@@ -1,9 +1,13 @@
-import type { PalaceSubgraphStateType, MemoryPalaceStation } from '../state.js'
+import type { PalaceSubgraphStateType } from '../state.js'
 import type { StationDesign } from '../state.js'
 import { isValidSvgArtwork } from '../../../contracts/mindmapXml/svg.js'
 import { messageContentToString, formatAgentError } from '../utils.js'
 import { logger } from '../../shared/logger.js'
-import { applyCanonicalLayout, buildFallbackSummary, enforceMinDistance } from './palaceLayout.js'
+import {
+  applyCanonicalLayout,
+  buildFallbackSummary,
+  buildRouteFromCoordinates,
+} from './palaceLayout.js'
 import { buildSvgArtworkMessages } from './prompts/svgArtwork.js'
 import { PalaceAgent } from './base.js'
 
@@ -99,27 +103,6 @@ function hasValidCoordinates(
   return stations.every((station) => orders.has(station.order))
 }
 
-function buildVectorRoute(
-  stations: StationDesign[],
-  coordinates: SvgStationCoordinate[],
-): MemoryPalaceStation[] {
-  const byOrder = new Map(coordinates.map((coordinate) => [coordinate.order, coordinate]))
-  const route = stations.map((station) => {
-    const coordinate = byOrder.get(station.order)!
-    return {
-      order: station.order,
-      content: station.content,
-      x: coordinate.x,
-      y: coordinate.y,
-      anchorVisual: station.anchorVisual,
-      mnemonicMethod: station.mnemonicMethod,
-      association: station.association,
-      linkedNodeId: station.linkedNodeId,
-    }
-  })
-  return enforceMinDistance(route)
-}
-
 export class SvgAgent extends PalaceAgent {
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
     if (!state.palace || state.palaceError) return {}
@@ -149,7 +132,7 @@ export class SvgAgent extends PalaceAgent {
 
       const validCoordinates = hasValidCoordinates(stations, artifact.stations)
       const memoryRoute = validCoordinates
-        ? buildVectorRoute(stations, artifact.stations)
+        ? buildRouteFromCoordinates(stations, artifact.stations)
         : fallbackRoute
       if (!validCoordinates) {
         logger
