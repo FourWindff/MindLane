@@ -13,7 +13,6 @@ import type {
 import { MainGraphState } from './state.js'
 
 import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
-import type { ChatToolCall } from '../../contracts/fileFormat.js'
 import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
@@ -28,25 +27,15 @@ import { getToolSchemas } from './subgraphRouter.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { MessagePreparationConfig } from './context/messagePreparation.js'
 import type { StreamRuntime } from './streamManager.js'
-import { splitCurrentTurn, type PalaceArtworkStyle, type PalaceRunPayload } from '../ipc.js'
+import { splitCurrentTurn, type PalaceArtworkStyle, type StreamResponse } from '../ipc.js'
 import {
   runContextCompact,
   type RunContextAssemblyDeps,
   type RunContextCompactConfig,
 } from './context/runContextCompact.js'
 
-interface AssistantMessage {
-  role: 'assistant'
-  content: string
-  toolCalls?: ChatToolCall[]
-}
-
-interface ChatResponse {
-  content: string
-  messages?: AssistantMessage[]
-  toolCalls?: ChatToolCall[]
-  palaceData?: PalaceRunPayload
-}
+/** Assistant entry shape of the stream response payload. */
+type AssistantMessage = NonNullable<StreamResponse['messages']>[number]
 
 interface AgentOrchestratorOptions {
   userDataPath?: string
@@ -322,7 +311,7 @@ export class AgentOrchestrator {
   /**
    * Build the response object.
    */
-  buildResponse(result: MainGraphStateType, streamingContent?: string): ChatResponse {
+  buildResponse(result: MainGraphStateType, streamingContent?: string): StreamResponse {
     // The palace entry has no supervisor reply to fall back to: its run carries
     // the palace payload, not prose.
     const fallback = result.runEntry === 'palace' ? '' : 'Sorry, I could not generate a reply.'
@@ -332,7 +321,7 @@ export class AgentOrchestrator {
     ).filter((msg): msg is AssistantMessage => msg.role === 'assistant')
     const messages = assistantMessages.length > 0 ? assistantMessages : undefined
 
-    const response: ChatResponse = {
+    const response: StreamResponse = {
       content: rawContent,
       messages,
       // A palace entry run has no chat record to keep: its reply is the landing
@@ -353,8 +342,8 @@ export class AgentOrchestrator {
     return response
   }
 
-  private extractToolCalls(messages: BaseMessage[]): ChatResponse['toolCalls'] {
-    const toolCalls: ChatResponse['toolCalls'] = []
+  private extractToolCalls(messages: BaseMessage[]): StreamResponse['toolCalls'] {
+    const toolCalls: StreamResponse['toolCalls'] = []
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i]
       if (msg.type === 'human') break
