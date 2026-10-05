@@ -81,18 +81,6 @@ class MeteringHandler extends BaseCallbackHandler {
     this.recordStart(llm, runId, metadata)
   }
 
-  override handleLLMStart(
-    llm: Serialized,
-    _prompts: string[],
-    runId: string,
-    _parentRunId?: string,
-    _extraParams?: Record<string, unknown>,
-    _tags?: string[],
-    metadata?: Record<string, unknown>,
-  ): void {
-    this.recordStart(llm, runId, metadata)
-  }
-
   override handleLLMEnd(output: LLMResult, runId: string): void {
     const record = this.starts.get(runId)
     if (!record) return
