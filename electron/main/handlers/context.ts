@@ -4,7 +4,6 @@ import type { EditLogStore } from '../../agent/memory/editLogStore.js'
 import type { StreamManager } from '../../agent/streamManager.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { AppSettings } from '../../fs/types.js'
-import type { ChatStreamEvent } from '../../ipc.js'
 import type { McpManager } from '../../agent/mcp/mcpManager.js'
 import type {
   MindmapReadRequest,
@@ -34,9 +33,7 @@ export interface HandlerContext {
   getMcpManager: () => McpManager | null
   isAiServiceReady: () => boolean
   userDataPath: string
-  eventSink: (event: ChatStreamEvent) => void
   invalidateStreamRuntime: () => void
   refreshLogSecrets: (settings: AppSettings) => void
-  getForceClose: () => boolean
   setForceClose: (value: boolean) => void
 }

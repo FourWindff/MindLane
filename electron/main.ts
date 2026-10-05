@@ -373,10 +373,8 @@ app.whenReady().then(async () => {
     getMcpManager: () => mcpManager,
     isAiServiceReady: () => aiServiceReady,
     userDataPath,
-    eventSink,
     invalidateStreamRuntime: () => streamManager?.invalidateRuntime(),
     refreshLogSecrets,
-    getForceClose: () => forceClose,
     setForceClose: (value: boolean) => {
       forceClose = value
     },
