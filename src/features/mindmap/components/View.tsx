@@ -13,8 +13,8 @@ import { useMindmapView, type MindmapSelectedTopic } from '@/features/mindmap/ho
 
 /** Props of both the public view and its inner workspace component. */
 type MindmapViewProps = {
-  onSwitchWorkspace?: () => void
-  onOpenSettings?: () => void
+  onSwitchWorkspace: () => void
+  onOpenSettings: () => void
   /** Generate-palace intent; the orchestration lives in chat and is wired by the root. */
   onGeneratePalace: (topics: MindmapSelectedTopic[]) => void
   syncAfterFileSaved: (filePath: string) => Promise<void>

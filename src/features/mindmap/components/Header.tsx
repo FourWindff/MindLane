@@ -19,32 +19,32 @@ type Props = {
   onAddChild: () => void
   onAddSibling: () => void
   onRemove: () => void
-  onUndo?: () => void
-  onRedo?: () => void
-  onOpenSettings?: () => void
-  onSwitchWorkspace?: () => void
-  onSave?: () => void
-  onCenterRoot?: () => void
-  onToggleStylePanel?: () => void
-  onToggleDocumentRefsPanel?: () => void
+  onUndo: () => void
+  onRedo: () => void
+  onOpenSettings: () => void
+  onSwitchWorkspace: () => void
+  onSave: () => void
+  onCenterRoot: () => void
+  onToggleStylePanel: () => void
+  onToggleDocumentRefsPanel: () => void
   canAddChild: boolean
   canAddSibling: boolean
   canRemove: boolean
-  canUndo?: boolean
-  canRedo?: boolean
-  stylePanelOpen?: boolean
-  documentRefsPanelOpen?: boolean
-  hasDocumentRefs?: boolean
+  canUndo: boolean
+  canRedo: boolean
+  stylePanelOpen: boolean
+  documentRefsPanelOpen: boolean
+  hasDocumentRefs: boolean
   /** Chat panel flags/actions: owned by chat, wired through the root. */
   chatOpen: boolean
   capsuleExpanded: boolean
   onToggleChatOpen: () => void
   /** AI readiness gate: when unavailable the chat entry is disabled with a red background hint. */
-  aiReady?: boolean
+  aiReady: boolean
   /** Style panel content; rendered below the toolbar when open. */
-  stylePanel?: React.ReactNode
+  stylePanel: React.ReactNode
   /** Linked files panel content; rendered below the toolbar when open. */
-  documentRefsPanel?: React.ReactNode
+  documentRefsPanel: React.ReactNode
 }
 
 function ToolbarButton({
@@ -114,16 +114,12 @@ export function MindmapHeader({
   chatOpen,
   capsuleExpanded,
   onToggleChatOpen,
-  aiReady = true,
+  aiReady,
   stylePanel,
   documentRefsPanel,
 }: Props) {
   useEffect(() => {
-    if (
-      (!stylePanelOpen && !documentRefsPanelOpen) ||
-      (!onToggleStylePanel && !onToggleDocumentRefsPanel)
-    )
-      return
+    if (!stylePanelOpen && !documentRefsPanelOpen) return
 
     const dismissPanel = (event: PointerEvent) => {
       const target = event.target
@@ -136,8 +132,8 @@ export function MindmapHeader({
       ) {
         return
       }
-      if (stylePanelOpen) onToggleStylePanel?.()
-      if (documentRefsPanelOpen) onToggleDocumentRefsPanel?.()
+      if (stylePanelOpen) onToggleStylePanel()
+      if (documentRefsPanelOpen) onToggleDocumentRefsPanel()
     }
 
     window.addEventListener('pointerdown', dismissPanel, true)
@@ -152,24 +148,20 @@ export function MindmapHeader({
         <div className="mindmap-header__toolbar-viewport">
           <nav className="float-toolbar" aria-label="Mindmap actions">
             <div className="float-toolbar__group float-toolbar__group--edit">
-              {onUndo && (
-                <ToolbarButton
-                  onClick={onUndo}
-                  disabled={!canUndo}
-                  ariaLabel="Undo"
-                  tooltip="Undo (Ctrl+Z)"
-                  icon={<Undo2 size={22} strokeWidth={1.5} />}
-                />
-              )}
-              {onRedo && (
-                <ToolbarButton
-                  onClick={onRedo}
-                  disabled={!canRedo}
-                  ariaLabel="Redo"
-                  tooltip="Redo (Ctrl+Shift+Z)"
-                  icon={<Redo2 size={22} strokeWidth={1.5} />}
-                />
-              )}
+              <ToolbarButton
+                onClick={onUndo}
+                disabled={!canUndo}
+                ariaLabel="Undo"
+                tooltip="Undo (Ctrl+Z)"
+                icon={<Undo2 size={22} strokeWidth={1.5} />}
+              />
+              <ToolbarButton
+                onClick={onRedo}
+                disabled={!canRedo}
+                ariaLabel="Redo"
+                tooltip="Redo (Ctrl+Shift+Z)"
+                icon={<Redo2 size={22} strokeWidth={1.5} />}
+              />
               <ToolbarButton
                 onClick={onAddChild}
                 disabled={!canAddChild}
@@ -199,62 +191,50 @@ export function MindmapHeader({
             <div className="float-toolbar__divider" />
 
             <div className="float-toolbar__group float-toolbar__group--file">
-              {onCenterRoot && (
-                <ToolbarButton
-                  onClick={onCenterRoot}
-                  ariaLabel="Back to central topic"
-                  tooltip="Back to central topic (Ctrl+0)"
-                  icon={<Locate size={22} strokeWidth={1.5} />}
-                />
-              )}
-              {onSave && (
-                <ToolbarButton
-                  onClick={onSave}
-                  ariaLabel="Save"
-                  tooltip="Save (Ctrl+S)"
-                  icon={<Save size={22} strokeWidth={1.5} />}
-                />
-              )}
-              {onSwitchWorkspace && (
-                <ToolbarButton
-                  onClick={onSwitchWorkspace}
-                  ariaLabel="Switch workspace"
-                  tooltip="Switch workspace"
-                  icon={<FolderInput size={22} strokeWidth={1.5} />}
-                />
-              )}
+              <ToolbarButton
+                onClick={onCenterRoot}
+                ariaLabel="Back to central topic"
+                tooltip="Back to central topic (Ctrl+0)"
+                icon={<Locate size={22} strokeWidth={1.5} />}
+              />
+              <ToolbarButton
+                onClick={onSave}
+                ariaLabel="Save"
+                tooltip="Save (Ctrl+S)"
+                icon={<Save size={22} strokeWidth={1.5} />}
+              />
+              <ToolbarButton
+                onClick={onSwitchWorkspace}
+                ariaLabel="Switch workspace"
+                tooltip="Switch workspace"
+                icon={<FolderInput size={22} strokeWidth={1.5} />}
+              />
             </div>
 
             <div className="float-toolbar__divider" />
 
             <div className="float-toolbar__group float-toolbar__group--system">
-              {onToggleDocumentRefsPanel && (
-                <ToolbarButton
-                  onClick={onToggleDocumentRefsPanel}
-                  disabled={!hasDocumentRefs}
-                  ariaLabel="Linked files"
-                  tooltip={!hasDocumentRefs ? 'No linked files' : 'Linked files'}
-                  active={documentRefsPanelOpen}
-                  icon={<Paperclip size={22} strokeWidth={1.5} />}
-                />
-              )}
-              {onToggleStylePanel && (
-                <ToolbarButton
-                  onClick={onToggleStylePanel}
-                  ariaLabel="Mindmap style"
-                  tooltip="Mindmap style"
-                  active={stylePanelOpen}
-                  icon={<Palette size={22} strokeWidth={1.5} />}
-                />
-              )}
-              {onOpenSettings && (
-                <ToolbarButton
-                  onClick={onOpenSettings}
-                  ariaLabel="Open settings"
-                  tooltip="Open settings"
-                  icon={<Settings size={22} strokeWidth={1.5} />}
-                />
-              )}
+              <ToolbarButton
+                onClick={onToggleDocumentRefsPanel}
+                disabled={!hasDocumentRefs}
+                ariaLabel="Linked files"
+                tooltip={!hasDocumentRefs ? 'No linked files' : 'Linked files'}
+                active={documentRefsPanelOpen}
+                icon={<Paperclip size={22} strokeWidth={1.5} />}
+              />
+              <ToolbarButton
+                onClick={onToggleStylePanel}
+                ariaLabel="Mindmap style"
+                tooltip="Mindmap style"
+                active={stylePanelOpen}
+                icon={<Palette size={22} strokeWidth={1.5} />}
+              />
+              <ToolbarButton
+                onClick={onOpenSettings}
+                ariaLabel="Open settings"
+                tooltip="Open settings"
+                icon={<Settings size={22} strokeWidth={1.5} />}
+              />
               <ToolbarButton
                 onClick={onToggleChatOpen}
                 disabled={!aiReady}
