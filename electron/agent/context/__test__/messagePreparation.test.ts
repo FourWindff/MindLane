@@ -10,7 +10,7 @@ import {
   backfillMissingToolResults,
   applyToolResultBudget,
   snipHistory,
-  mergeMessagePreparationConfig,
+  messagePreparationConfig,
 } from '../messagePreparation.js'
 import type { MessagePreparationConfig } from '../messagePreparation.js'
 
@@ -26,11 +26,8 @@ afterEach(async () => {
 
 function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
   return {
-    enabled: true,
     inputBudgetTokens: 100,
     toolResultMaxBytes: 1_000,
-    snipPreserveSystem: true,
-    snipPreserveLastUser: true,
     ...partial,
   }
 }
@@ -63,14 +60,6 @@ describe('prepareMessagesForModel', () => {
     ) as ToolMessage[]
     expect(bigToolResults.length).toBe(1)
     expect(bigToolResults[0].content).toContain('exceeded')
-  })
-
-  it('returns the original array unchanged when disabled', async () => {
-    const messages = [new HumanMessage('hello')]
-
-    const result = await prepareMessagesForModel(messages, makeConfig({ enabled: false }))
-
-    expect(result).toBe(messages)
   })
 
   it('backfills a missing tool_result', async () => {
@@ -242,11 +231,8 @@ describe('backfillMissingToolResults', () => {
 describe('applyToolResultBudget', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
-      enabled: true,
       inputBudgetTokens: 16_000,
       toolResultMaxBytes: 8_000,
-      snipPreserveSystem: true,
-      snipPreserveLastUser: true,
       ...partial,
     }
   }
@@ -300,11 +286,8 @@ describe('applyToolResultBudget', () => {
 describe('snipHistory', () => {
   function makeConfig(partial: Partial<MessagePreparationConfig> = {}): MessagePreparationConfig {
     return {
-      enabled: true,
       inputBudgetTokens: 100,
       toolResultMaxBytes: 8_000,
-      snipPreserveSystem: true,
-      snipPreserveLastUser: true,
       ...partial,
     }
   }
@@ -366,30 +349,14 @@ describe('snipHistory', () => {
       result.some((m) => m.type === 'tool' && (m as ToolMessage).tool_call_id === 'call-2'),
     ).toBe(false)
   })
-
-  it('allows disabling system-message preservation', () => {
-    const messages = [new SystemMessage('system'), new HumanMessage('current')]
-
-    const result = snipHistory(
-      messages,
-      makeConfig({ inputBudgetTokens: 5, snipPreserveSystem: false }),
-    )
-
-    expect(result.some((m) => m.type === 'system')).toBe(false)
-  })
 })
 
-describe('mergeMessagePreparationConfig', () => {
-  it('derives the budget from the model window when not given explicitly, always below the window', () => {
-    const config = mergeMessagePreparationConfig(undefined, 32_768)
+describe('messagePreparationConfig', () => {
+  it('derives the budget from the model window, always below the window', () => {
+    const config = messagePreparationConfig(32_768)
 
     expect(config.inputBudgetTokens).toBe(23_744)
     expect(config.inputBudgetTokens).toBeLessThan(32_768)
-  })
-
-  it('an explicit input budget wins over the derived value', () => {
-    const config = mergeMessagePreparationConfig({ inputBudgetTokens: 20 }, 1_000_000)
-
-    expect(config.inputBudgetTokens).toBe(20)
+    expect(config.toolResultMaxBytes).toBe(8_000)
   })
 })

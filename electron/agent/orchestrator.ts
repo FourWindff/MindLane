@@ -25,7 +25,6 @@ import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
 import { getToolSchemas } from './subgraphRouter.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
-import type { MessagePreparationConfig } from './context/messagePreparation.js'
 import type { StreamRuntime } from './streamManager.js'
 import { splitCurrentTurn, type PalaceArtworkStyle, type StreamResponse } from '../ipc.js'
 import {
@@ -39,7 +38,6 @@ type AssistantMessage = NonNullable<StreamResponse['messages']>[number]
 
 interface AgentOrchestratorOptions {
   userDataPath?: string
-  messagePipeline?: MessagePreparationConfig
   /** On-demand mindmap snapshot provider: injected by main-process assembly (pulled from the renderer over reverse IPC). */
   mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
   /** Write-tool renderer proxy: forwards args and returns the renderer's write ack (as-is). */
@@ -68,9 +66,8 @@ export class AgentOrchestrator {
     this.rebuildToolRegistry()
   }
 
-  updateProvider(provider: LLMProvider, messagePipeline?: MessagePreparationConfig): void {
+  updateProvider(provider: LLMProvider): void {
     this.provider = provider
-    this.options = { ...this.options, messagePipeline }
     this.compiledMindmapSubgraph = null
     this.compiledPalaceSubgraph = null
     this.rebuildToolRegistry()
@@ -245,7 +242,6 @@ export class AgentOrchestrator {
 
     const supervisor = new MindLaneAgent(this.provider, toolRegistry, this.services.memoryManager, {
       userDataPath: this.options.userDataPath,
-      messagePipeline: this.options.messagePipeline,
     })
 
     // Proactive compaction: compress to persistence (rolling summary), then read

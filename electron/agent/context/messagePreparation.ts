@@ -20,8 +20,6 @@ const log = logger.withContext('messagePreparation')
  * Used to normalize and compress state.messages before mindlaneAgent calls the LLM.
  */
 export interface MessagePreparationConfig {
-  /** Whether the preparation pipeline is enabled */
-  enabled: boolean
   /**
    * **Total input** token budget allowed for a single model call (including the system prompt
    * and the current user message).
@@ -30,36 +28,21 @@ export interface MessagePreparationConfig {
   inputBudgetTokens: number
   /** Max bytes for a single tool_result; larger results are offloaded to disk */
   toolResultMaxBytes: number
-  /** Whether snip always keeps system messages */
-  snipPreserveSystem: boolean
-  /** Whether snip always keeps the last user message */
-  snipPreserveLastUser: boolean
 }
 
-const DEFAULT_MESSAGE_PREPARATION_CONFIG: Omit<MessagePreparationConfig, 'inputBudgetTokens'> = {
-  enabled: true,
-  toolResultMaxBytes: 8_000,
-  snipPreserveSystem: true,
-  snipPreserveLastUser: true,
-}
+/** Default max bytes for a single tool_result before it is offloaded to disk. */
+export const DEFAULT_TOOL_RESULT_MAX_BYTES = 8_000
 
 /**
- * Merge a partial config into the default config.
- *
- * When no input budget is given explicitly, derive it from the model context
- * window on the fly: the output reserve and the estimation buffer are fixed
- * deductions (not scaled with the window), and the deduction values live in AGENT_LIMITS.
+ * Production config: the input budget is derived from the model context window.
+ * The output reserve and the estimation buffer are fixed deductions (not scaled
+ * with the window); both live in AGENT_LIMITS.
  */
-export function mergeMessagePreparationConfig(
-  partial: Partial<MessagePreparationConfig> | undefined,
-  contextWindow: number,
-): MessagePreparationConfig {
+export function messagePreparationConfig(contextWindow: number): MessagePreparationConfig {
   return {
-    ...DEFAULT_MESSAGE_PREPARATION_CONFIG,
-    ...partial,
     inputBudgetTokens:
-      partial?.inputBudgetTokens ??
       contextWindow - AGENT_LIMITS.maxCompletionTokens - AGENT_LIMITS.consolidationSafetyBuffer,
+    toolResultMaxBytes: DEFAULT_TOOL_RESULT_MAX_BYTES,
   }
 }
 
@@ -80,8 +63,6 @@ export async function prepareMessagesForModel(
   config: MessagePreparationConfig,
   userDataPath?: string,
 ): Promise<BaseMessage[]> {
-  if (!config.enabled) return messages
-
   const validMessages = messages
     .filter((m, i): m is BaseMessage => {
       const isValid = Boolean(
@@ -300,12 +281,8 @@ export function snipHistory(
   const systemMsgs = messages.filter((m) => m.type === 'system')
   const nonSystem = messages.filter((m) => m.type !== 'system')
 
-  const currentUserMsg =
-    config.snipPreserveLastUser &&
-    nonSystem.length > 0 &&
-    nonSystem[nonSystem.length - 1].type === 'human'
-      ? nonSystem[nonSystem.length - 1]
-      : null
+  const lastNonSystem = nonSystem[nonSystem.length - 1]
+  const currentUserMsg = lastNonSystem?.type === 'human' ? lastNonSystem : null
 
   const history = currentUserMsg ? nonSystem.slice(0, -1) : nonSystem
 
@@ -316,9 +293,7 @@ export function snipHistory(
       (currentUserMsg ? estimateMessageTokens([currentUserMsg]) : 0),
   )
 
-  const result: BaseMessage[] = config.snipPreserveSystem
-    ? [...systemMsgs, ...keptHistory]
-    : [...keptHistory]
+  const result: BaseMessage[] = [...systemMsgs, ...keptHistory]
 
   if (currentUserMsg) {
     result.push(currentUserMsg)

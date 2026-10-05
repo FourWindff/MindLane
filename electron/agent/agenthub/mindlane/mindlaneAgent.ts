@@ -18,7 +18,7 @@ import { isPromptTooLongError, trimToRecentWindow } from '../../memory/contextCo
 import { AGENT_LIMITS } from '../../config.js'
 import {
   prepareMessagesForModel,
-  mergeMessagePreparationConfig,
+  messagePreparationConfig,
   type MessagePreparationConfig,
 } from '../../context/messagePreparation.js'
 
@@ -41,7 +41,6 @@ type AIMessageContent = AIMessage['content']
  */
 interface MindLaneAgentOptions {
   userDataPath?: string
-  messagePipeline?: MessagePreparationConfig
 }
 
 export class MindLaneAgent extends BaseAgent {
@@ -62,10 +61,7 @@ export class MindLaneAgent extends BaseAgent {
     this.modelWithTools = this.provider.model.bindTools!(this.toolRegistry.allTools)
     this.memoryManager = memoryManager
     this.userDataPath = options?.userDataPath
-    this.messagePipelineConfig = mergeMessagePreparationConfig(
-      options?.messagePipeline,
-      provider.contextWindow,
-    )
+    this.messagePipelineConfig = messagePreparationConfig(provider.contextWindow)
   }
 
   async invoke(state: MainGraphStateType): Promise<Partial<MainGraphStateType>> {

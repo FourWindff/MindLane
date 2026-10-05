@@ -11,7 +11,6 @@ import {
   getToolSchemas,
 } from '../../../subgraphRouter.js'
 import { createMindmapActionTools } from '../../../tools/mindmapActions.js'
-import { mergeMessagePreparationConfig } from '../../../context/messagePreparation.js'
 import { ToolRegistry } from '../../../tools/registry.js'
 import { REMOVE_ALL_MESSAGES, Send } from '@langchain/langgraph'
 import type { MainGraphStateType } from '../../../state.js'
@@ -298,12 +297,7 @@ describe('MindLaneAgent.invoke()', () => {
       createMockProvider(mockInvoke),
       createTestRegistry({ extraTools: [mockSearchTool] }),
       undefined,
-      {
-        messagePipeline: mergeMessagePreparationConfig(
-          { inputBudgetTokens: 20, toolResultMaxBytes: 0 },
-          32_768,
-        ),
-      },
+      undefined,
     )
     const state = createInitialState()
     state.messages = [
