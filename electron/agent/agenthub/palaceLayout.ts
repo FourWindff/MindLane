@@ -40,7 +40,16 @@ export function enforceMinDistance(points: MemoryPalaceStation[]): MemoryPalaceS
   return result
 }
 
-type RouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
+/** The five canonical palace route shapes: one union for layout, prompts and payloads. */
+export type RouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
+
+export const ROUTE_STYLES = [
+  'arc',
+  's_curve',
+  'zigzag',
+  'loop',
+  'stairs',
+] as const satisfies readonly RouteStyle[]
 
 export function applyCanonicalLayout(
   stations: StationDesign[],

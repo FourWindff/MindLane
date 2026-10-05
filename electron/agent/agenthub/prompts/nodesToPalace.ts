@@ -1,11 +1,10 @@
 import type { WorkflowPromptMessage } from './shared.js'
+import type { RouteStyle } from '../palaceLayout.js'
 
 type SelectedNodePromptInput = {
   id: string
   label: string
 }
-
-type NodesPalaceRouteStyle = 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs'
 
 type PalaceAnchorPromptInput = {
   order: number
@@ -17,7 +16,7 @@ type PalaceAnchorPromptInput = {
 type PalaceImagePromptInput = {
   theme: string
   sceneBrief: string
-  routeStyle: NodesPalaceRouteStyle
+  routeStyle: RouteStyle
   stations: PalaceAnchorPromptInput[]
 }
 
@@ -74,7 +73,7 @@ Output strictly a JSON object with no extra text:
   ]
 }
 
-function describeRouteStyle(routeStyle: NodesPalaceRouteStyle): string {
+function describeRouteStyle(routeStyle: RouteStyle): string {
   switch (routeStyle) {
     case 'arc':
       return 'arc'

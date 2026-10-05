@@ -2,6 +2,7 @@ import type { PalaceSubgraphStateType } from '../state.js'
 import { buildImagePromptGeneratorMessages } from './prompts/textToPalace.js'
 import { buildPalaceImagePrompt } from './prompts/nodesToPalace.js'
 import { PalaceAgent } from './base.js'
+import type { RouteStyle } from './palaceLayout.js'
 import { logger } from '../../shared/logger.js'
 import { formatAgentError } from '../utils.js'
 
@@ -30,7 +31,7 @@ export class ImageGenAgent extends PalaceAgent {
         imagePrompt = buildPalaceImagePrompt({
           theme: state.palace.theme,
           sceneBrief: state.palace.sceneBrief,
-          routeStyle: state.palace.routeStyle as 'arc' | 's_curve' | 'zigzag' | 'loop' | 'stairs',
+          routeStyle: state.palace.routeStyle as RouteStyle,
           stations: state.palace.stations,
         })
       } else {

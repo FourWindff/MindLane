@@ -3,6 +3,7 @@ import type { PalaceSubgraphStateType } from '../state.js'
 import type { MemoryItem, StationDesign, SelectedNodeContent } from '../state.js'
 import type { LLMProvider } from '../providers/index.js'
 import { PalaceAgent } from './base.js'
+import { ROUTE_STYLES, type RouteStyle } from './palaceLayout.js'
 import { logger } from '../../shared/logger.js'
 import { formatAgentError } from '../utils.js'
 import { buildAnalyzeInputMessages, buildDesignMnemonicsMessages } from './prompts/textToPalace.js'
@@ -102,15 +103,9 @@ function buildPlannedStations(
     .map((station, index) => ({ ...station, order: index + 1 }))
 }
 
-function normalizeRouteStyle(value: string | undefined, stationCount: number): string {
-  if (
-    value === 'arc' ||
-    value === 's_curve' ||
-    value === 'zigzag' ||
-    value === 'loop' ||
-    value === 'stairs'
-  ) {
-    return value
+function normalizeRouteStyle(value: string | undefined, stationCount: number): RouteStyle {
+  if (value && (ROUTE_STYLES as readonly string[]).includes(value)) {
+    return value as RouteStyle
   }
   if (stationCount <= 3) return 'arc'
   if (stationCount <= 5) return 'zigzag'
