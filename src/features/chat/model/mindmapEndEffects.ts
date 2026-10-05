@@ -5,11 +5,9 @@ import type { MindmapEditor } from '@/features/mindmap/model/editor'
 /**
  * Remaining renderer-side duties for `end` events after live apply (ADR 0017
  * decision 3):
- * - `mindmapData` compatibility: when the legacy path still carries a full
- *   graph dump, feed it straight into the editor;
  * - `generatedDocumentRef` association: only when this turn had a write tool
- *   applied successfully (or mindmapData landed) do we attach the doc
- *   reference produced by the subgraph product, to avoid dangling references;
+ *   applied successfully do we attach the doc reference produced by the
+ *   subgraph product, to avoid dangling references;
  * - generated-title backfill: the map title lands on the file it was generated for.
  * Batch persistence was removed — write tools are applied instantly through
  * the write responder during the stream; this module no longer touches editor
@@ -78,16 +76,12 @@ export function createMindmapEndEffects(dependencies: MindmapEndEffectsDependenc
         if (!editor) return
         const response = event.payload
 
-        if (response.mindmapData) editor.insertMindmapData(response.mindmapData)
-
         const title = generatedMapTitle(response.toolCalls)
         if (title) dependencies.backfillTitle(fileUuid, title)
 
-        const appliedMindmapChange =
-          Boolean(response.mindmapData) ||
-          (response.toolCalls ?? []).some(
-            (toolCall) => WRITE_TOOL_NAMES.includes(toolCall.name) && toolResultOk(toolCall.result),
-          )
+        const appliedMindmapChange = (response.toolCalls ?? []).some(
+          (toolCall) => WRITE_TOOL_NAMES.includes(toolCall.name) && toolResultOk(toolCall.result),
+        )
         if (!appliedMindmapChange) return
 
         for (const toolCall of response.toolCalls ?? []) {

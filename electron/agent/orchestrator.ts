@@ -13,7 +13,7 @@ import type {
 import { MainGraphState } from './state.js'
 
 import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
-import type { MindLaneNode, MindLaneEdge, ChatToolCall } from '../../contracts/fileFormat.js'
+import type { ChatToolCall } from '../../contracts/fileFormat.js'
 import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
 import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
@@ -45,11 +45,6 @@ interface ChatResponse {
   content: string
   messages?: AssistantMessage[]
   toolCalls?: ChatToolCall[]
-  mindmapData?: {
-    nodes: MindLaneNode[]
-    edges: MindLaneEdge[]
-    title: string
-  }
   palaceData?: PalaceRunPayload
 }
 

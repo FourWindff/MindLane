@@ -4,7 +4,6 @@ import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 function stubEditor() {
   return {
-    insertMindmapData: vi.fn(),
     addDocumentRef: vi.fn(),
   } as unknown as MindmapEditor
 }
@@ -30,7 +29,7 @@ function endEvent(overrides: Record<string, unknown> = {}) {
 }
 
 describe('MindmapEndEffects (end responsibilities left after live apply)', () => {
-  it('applies mindmapData compat and associates the generated document ref when a write tool persisted', () => {
+  it('associates the generated document ref when a write tool persisted', () => {
     let listener: ((event: never) => void) | undefined
     const editor = stubEditor()
     const effects = createMindmapEndEffects({
@@ -46,7 +45,6 @@ describe('MindmapEndEffects (end responsibilities left after live apply)', () =>
     effects.start()
     listener?.(
       endEvent({
-        mindmapData: { nodes: [], edges: [], title: 'A' },
         toolCalls: [
           {
             name: 'generateMindmapFragment',
@@ -62,7 +60,6 @@ describe('MindmapEndEffects (end responsibilities left after live apply)', () =>
       }),
     )
 
-    expect(editor.insertMindmapData).toHaveBeenCalledTimes(1)
     expect(editor.addDocumentRef).toHaveBeenCalledWith(expect.objectContaining({ id: 'doc-a' }))
   })
 
@@ -98,7 +95,6 @@ describe('MindmapEndEffects (end responsibilities left after live apply)', () =>
     )
 
     expect(editor.addDocumentRef).not.toHaveBeenCalled()
-    expect(editor.insertMindmapData).not.toHaveBeenCalled()
   })
 
   it('ignores non-end events and unparseable tool results', () => {
@@ -139,7 +135,6 @@ describe('MindmapEndEffects (end responsibilities left after live apply)', () =>
     )
 
     expect(editor.addDocumentRef).not.toHaveBeenCalled()
-    expect(editor.insertMindmapData).not.toHaveBeenCalled()
   })
 
   it('backfills the file title with the generated map title', () => {

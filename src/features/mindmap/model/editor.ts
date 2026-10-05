@@ -1,6 +1,6 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
-import { type MindLaneFile, type MindLaneNode, type MindLaneAsset } from '@contracts/fileFormat'
+import { type MindLaneFile, type MindLaneAsset } from '@contracts/fileFormat'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -813,57 +813,6 @@ export class MindmapEditor {
     // the message ends. Skipping reflow here left the anchored fragment stacked
     // on top of the parent's existing first child for the whole stream.
     this.runBatch(commands, false)
-  }
-
-  insertMindmapData(data: {
-    nodes: MindLaneNode[]
-    edges: { id: string; source: string; target: string; type?: string }[]
-  }): void {
-    const nodes = this.state.nodes
-    const edges = this.state.edges
-
-    const newTargets = new Set(data.edges.map((e) => e.target))
-    const maxX = nodes.reduce((m, n) => Math.max(m, n.position.x + (n.measured?.width ?? 200)), 0)
-    const offsetX = nodes.length > 0 ? maxX + 300 : 0
-
-    const commands: MindmapCommand[] = []
-
-    for (const n of data.nodes) {
-      const isRoot = !newTargets.has(n.id)
-      commands.push({
-        type: 'addNode',
-        node: {
-          id: n.id,
-          type: n.type,
-          position: { x: offsetX, y: isRoot ? 0 : 50 },
-          data: n.data,
-        },
-      })
-    }
-
-    for (const e of data.edges) {
-      commands.push({
-        type: 'addEdge',
-        edge: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          type: e.type ?? 'mindmap',
-          className: 'mindmap-edge mindmap-edge--enter',
-        },
-      })
-    }
-
-    // Avoid duplicates of existing edges; the mindmapData returned by the AI is usually a detached subgraph
-    const existingEdgeIds = new Set(edges.map((e) => e.id))
-    const existingNodeIds = new Set(nodes.map((n) => n.id))
-    const filteredCommands = commands.filter((c) => {
-      if (c.type === 'addNode') return !existingNodeIds.has(c.node.id)
-      if (c.type === 'addEdge') return !existingEdgeIds.has(c.edge.id)
-      return true
-    })
-
-    this.runBatch(filteredCommands, true)
   }
 
   // ─── ReactFlow native change forwarding ───

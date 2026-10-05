@@ -5,7 +5,7 @@
  * reaching into the main process.
  */
 
-import type { ChatToolCall, DocumentRef, MindLaneEdge, MindLaneNode } from './fileFormat.js'
+import type { ChatToolCall, DocumentRef } from './fileFormat.js'
 import type { PalaceRunPayload } from './palace.js'
 
 export interface ContextNodeInfo {
@@ -123,7 +123,6 @@ export interface StreamResponse {
   content: string
   messages?: Array<{ role: 'assistant'; content: string; toolCalls?: ChatToolCall[] }>
   toolCalls?: ChatToolCall[]
-  mindmapData?: { nodes: MindLaneNode[]; edges: MindLaneEdge[]; title: string }
   /** Palace run outcome: a manual run's node settles on it (the landing itself happened already). */
   palaceData?: PalaceRunPayload
 }
