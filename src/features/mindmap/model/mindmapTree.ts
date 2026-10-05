@@ -312,49 +312,48 @@ function layoutMindmap(
   const leftChildren = children.filter((cid) => sideOf.get(cid) === 'left')
   const branchIndexOf = assignStableBranchIndexes(children, nodes)
 
-  // Right branch (skipped entirely when side-collapsed; nodes keep stale positions and are hidden by the render layer)
-  const rightHeights = rightChildren.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
-  const rightTotalH = rightHeights.reduce((s, h) => s + h, 0) + (rightChildren.length - 1) * gapY
-  let curRightY = root.position.y + rootH / 2 - rightTotalH / 2
-  if (rootData.rightCollapsed !== true) {
-    rightChildren.forEach((cid, i) => {
-      const childH = rightHeights[i]!
-      const childSelfH = nodeHeight(cid, nodes)
-      layoutMindmapSide(
-        cid,
-        root.position.x + rootW + gapX,
-        curRightY + childH / 2 - childSelfH / 2,
-        1,
-        branchIndexOf.get(cid)!,
-        'right',
-        nodes,
-        edges,
-        gapX,
-        gapY,
-        positions,
-        handleMap,
-        metaMap,
-      )
-      curRightY += childH + gapY
-    })
-  }
+  // Both branches run the same stacking loop; they only differ in the child set, the
+  // side-collapse flag and how a child's x is derived from the root (right grows away from
+  // the root, left grows back by the child's own width).
+  const branches: {
+    children: string[]
+    collapsed: boolean
+    side: 'left' | 'right'
+    xOf: (childId: string) => number
+  }[] = [
+    {
+      children: rightChildren,
+      collapsed: rootData.rightCollapsed === true,
+      side: 'right',
+      xOf: () => root.position.x + rootW + gapX,
+    },
+    {
+      children: leftChildren,
+      collapsed: rootData.leftCollapsed === true,
+      side: 'left',
+      xOf: (cid) => root.position.x - gapX - nodeWidth(cid, nodes),
+    },
+  ]
 
-  // Left branch (skipped entirely when side-collapsed)
-  const leftHeights = leftChildren.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
-  const leftTotalH = leftHeights.reduce((s, h) => s + h, 0) + (leftChildren.length - 1) * gapY
-  let curLeftY = root.position.y + rootH / 2 - leftTotalH / 2
-  if (rootData.leftCollapsed !== true) {
-    leftChildren.forEach((cid, i) => {
-      const childH = leftHeights[i]!
+  // A side-collapsed branch is skipped entirely; its nodes keep stale positions and are hidden
+  // by the render layer.
+  for (const branch of branches) {
+    if (branch.collapsed) continue
+
+    const heights = branch.children.map((cid) => subtreeHeight(cid, edges, nodes, gapY))
+    const totalH = heights.reduce((s, h) => s + h, 0) + (branch.children.length - 1) * gapY
+    let curY = root.position.y + rootH / 2 - totalH / 2
+
+    branch.children.forEach((cid, i) => {
+      const childH = heights[i]!
       const childSelfH = nodeHeight(cid, nodes)
-      const childSelfW = nodeWidth(cid, nodes)
       layoutMindmapSide(
         cid,
-        root.position.x - gapX - childSelfW,
-        curLeftY + childH / 2 - childSelfH / 2,
+        branch.xOf(cid),
+        curY + childH / 2 - childSelfH / 2,
         1,
         branchIndexOf.get(cid)!,
-        'left',
+        branch.side,
         nodes,
         edges,
         gapX,
@@ -363,7 +362,7 @@ function layoutMindmap(
         handleMap,
         metaMap,
       )
-      curLeftY += childH + gapY
+      curY += childH + gapY
     })
   }
 }
