@@ -28,15 +28,6 @@ export function MindmapEdge(props: EdgeProps) {
     sourcePosition,
     targetPosition,
     style,
-    markerEnd,
-    markerStart,
-    interactionWidth,
-    label,
-    labelStyle,
-    labelShowBg,
-    labelBgStyle,
-    labelBgPadding,
-    labelBgBorderRadius,
   } = props
 
   const { edges, nodes } = useStore((s) => ({ edges: s.edges, nodes: s.nodes }))
@@ -165,15 +156,6 @@ export function MindmapEdge(props: EdgeProps) {
           // Minimal-style edges align with the node bottom border: disable pixel snapping to avoid subpixel offsets
           ...(edge.connect === 'bottom' ? { shapeRendering: 'auto' as const } : {}),
         }}
-        markerEnd={markerEnd}
-        markerStart={markerStart}
-        interactionWidth={interactionWidth}
-        label={label}
-        labelStyle={labelStyle}
-        labelShowBg={labelShowBg}
-        labelBgStyle={labelBgStyle}
-        labelBgPadding={labelBgPadding}
-        labelBgBorderRadius={labelBgBorderRadius}
       />
     </g>
   )
