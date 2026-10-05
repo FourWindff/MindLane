@@ -91,7 +91,7 @@ function ToolbarButton({
   )
 }
 
-export function MindmapHeader({
+export function MindmapToolbar({
   onAddChild,
   onAddSibling,
   onRemove,
@@ -142,10 +142,10 @@ export function MindmapHeader({
 
   return (
     <header
-      className={`mindmap-header${capsuleExpanded ? ' mindmap-header--capsule-expanded' : ''}`}
+      className={`mindmap-toolbar${capsuleExpanded ? ' mindmap-toolbar--capsule-expanded' : ''}`}
     >
-      <div className="mindmap-header__panel">
-        <div className="mindmap-header__toolbar-viewport">
+      <div className="mindmap-toolbar__panel">
+        <div className="mindmap-toolbar__viewport">
           <nav className="float-toolbar" aria-label="Mindmap actions">
             <div className="float-toolbar__group float-toolbar__group--edit">
               <ToolbarButton

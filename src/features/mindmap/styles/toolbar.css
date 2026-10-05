@@ -1,5 +1,5 @@
 /* —— Floating Toolbar —— */
-.mindmap-header {
+.mindmap-toolbar {
   position: absolute;
   top: 0;
   left: var(--app-toolbar-right);
@@ -13,11 +13,11 @@
   transition: right 0.25s ease;
 }
 
-.mindmap-header--capsule-expanded {
+.mindmap-toolbar--capsule-expanded {
   right: calc(100vw - var(--app-toolbar-right));
 }
 
-.mindmap-header__panel {
+.mindmap-toolbar__panel {
   position: relative;
   display: inline-flex;
   width: max-content;
@@ -35,14 +35,14 @@
   transition: opacity 0.25s ease;
 }
 
-.mindmap-header--capsule-expanded .mindmap-header__panel {
+.mindmap-toolbar--capsule-expanded .mindmap-toolbar__panel {
   opacity: 0;
   pointer-events: none;
 }
 
 /* ponytail: no overflow clip here — it would cut off the below-button tooltip.
    The header squeeze is purely a `right` transition + fade, so clipping is not needed. */
-.mindmap-header__toolbar-viewport {
+.mindmap-toolbar__viewport {
   display: inline-flex;
   min-width: 0;
 }

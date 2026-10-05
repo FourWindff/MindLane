@@ -1,6 +1,6 @@
 import { ReactFlowProvider } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { MindmapHeader } from './Header'
+import { MindmapToolbar } from './Toolbar'
 import { MindmapCanvas } from './Canvas'
 import { MindmapContextMenu } from './ContextMenu'
 import { SelectionActionBar } from './SelectionActionBar'
@@ -41,7 +41,7 @@ function MindmapWorkspace({
 
   return (
     <div className="mindmap-shell" data-map-style={visualVariant} data-color-scheme={colorScheme}>
-      <MindmapHeader
+      <MindmapToolbar
         onAddChild={view.actions.addChild}
         onAddSibling={view.actions.addSibling}
         onRemove={view.actions.removeSelected}

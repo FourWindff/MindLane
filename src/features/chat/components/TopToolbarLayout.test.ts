@@ -28,12 +28,12 @@ describe('top toolbar layout', () => {
     const css = fs.readFileSync(path.resolve('src/features/mindmap/styles/toolbar.css'), 'utf8')
 
     expect(css).toMatch(
-      /\.mindmap-header\s*{[^}]*left:\s*var\(--app-toolbar-right\)[^}]*right:\s*376px[^}]*transition:\s*right 0\.25s ease/s,
+      /\.mindmap-toolbar\s*{[^}]*left:\s*var\(--app-toolbar-right\)[^}]*right:\s*376px[^}]*transition:\s*right 0\.25s ease/s,
     )
     expect(css).toMatch(
-      /\.mindmap-header--capsule-expanded\s*{[^}]*right:\s*calc\(100vw - var\(--app-toolbar-right\)\)/s,
+      /\.mindmap-toolbar--capsule-expanded\s*{[^}]*right:\s*calc\(100vw - var\(--app-toolbar-right\)\)/s,
     )
-    const viewportRule = css.match(/\.mindmap-header__toolbar-viewport\s*{[^}]*}/s)?.[0] ?? ''
+    const viewportRule = css.match(/\.mindmap-toolbar__viewport\s*{[^}]*}/s)?.[0] ?? ''
     expect(viewportRule).toMatch(/min-width:\s*0/)
     // Regression guard: the viewport must not clip, or it cuts off the below-button tooltip.
     expect(viewportRule).not.toMatch(/overflow:\s*hidden/)
@@ -56,7 +56,7 @@ describe('top toolbar layout', () => {
     const css = fs.readFileSync(path.resolve('src/features/mindmap/styles/toolbar.css'), 'utf8')
 
     expect(css).toMatch(
-      /\.mindmap-header__panel\s*{[^}]*opacity:\s*1[^}]*transition:[^}]*opacity 0\.25s ease/s,
+      /\.mindmap-toolbar__panel\s*{[^}]*opacity:\s*1[^}]*transition:[^}]*opacity 0\.25s ease/s,
     )
   })
 })
