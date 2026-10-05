@@ -214,7 +214,6 @@ export class AnalyzeAgent extends PalaceAgent {
       }
 
       return {
-        memoryItems,
         palace: {
           theme: designResult.theme.trim(),
           stations,
@@ -269,13 +268,7 @@ export class AnalyzeAgent extends PalaceAgent {
         `A unified memory scene built around ${selectedNodes.length} knowledge points`
       const routeStyle = normalizeRouteStyle(raw.route_style ?? raw.routeStyle, stations.length)
 
-      const memoryItems: MemoryItem[] = stations.map((s) => ({
-        order: s.order,
-        content: s.content,
-      }))
-
       return {
-        memoryItems,
         palace: {
           theme,
           sceneBrief,

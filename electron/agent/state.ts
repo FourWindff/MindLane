@@ -3,7 +3,6 @@ import type { BaseMessage } from '@langchain/core/messages'
 import type { Document } from '@langchain/core/documents'
 import type { ChatToolCallStep, DocumentRef } from '@contracts/fileFormat'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
-import type { DetectedAnchor } from './providers/index.js'
 import type { ChatContext, PalaceArtworkStyle } from '../ipc.js'
 import type { MindmapOutlineNode } from './utils/mindmapOutline.js'
 
@@ -222,17 +221,9 @@ const PalaceStateAnnotations = {
     reducer: replaceReducer,
     default: () => [],
   }),
-  memoryItems: Annotation<MemoryItem[]>({
-    reducer: replaceReducer,
-    default: () => [],
-  }),
   palace: Annotation<PalaceDesign | null>({
     reducer: replaceReducer,
     default: () => null,
-  }),
-  imagePrompt: Annotation<string>({
-    reducer: replaceReducer,
-    default: () => '',
   }),
   imageUrls: Annotation<string[]>({
     reducer: replaceReducer,
@@ -241,10 +232,6 @@ const PalaceStateAnnotations = {
   imageError: Annotation<string | undefined>({
     reducer: replaceReducer,
     default: () => undefined,
-  }),
-  detectedCoords: Annotation<DetectedAnchor[]>({
-    reducer: replaceReducer,
-    default: () => [],
   }),
   memoryRoute: Annotation<MemoryPalaceStation[]>({
     reducer: replaceReducer,

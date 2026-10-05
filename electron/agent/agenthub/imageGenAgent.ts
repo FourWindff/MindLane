@@ -16,7 +16,7 @@ import { formatAgentError } from '../utils.js'
  * Stateless design:
  * - No persistent memory access.
  * - All input travels through state.palace.
- * - Outputs imagePrompt and imageUrls.
+ * - Outputs imageUrls.
  */
 export class ImageGenAgent extends PalaceAgent {
   async invoke(state: PalaceSubgraphStateType): Promise<Partial<PalaceSubgraphStateType>> {
@@ -45,7 +45,7 @@ export class ImageGenAgent extends PalaceAgent {
       }
 
       if (!imagePrompt) {
-        return { imagePrompt: '', imageUrls: [] }
+        return { imageUrls: [] }
       }
 
       const imageResult = await this.provider.generateImage({
@@ -54,15 +54,11 @@ export class ImageGenAgent extends PalaceAgent {
         n: 1,
       })
 
-      return {
-        imagePrompt,
-        imageUrls: imageResult.urls,
-      }
+      return { imageUrls: imageResult.urls }
     } catch (err) {
       const formatted = formatAgentError(err)
       logger.withContext('ImageGenAgent').error('Image generation failed:', formatted)
       return {
-        imagePrompt: '',
         imageUrls: [],
         imageError: formatted,
       }

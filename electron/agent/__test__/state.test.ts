@@ -160,13 +160,7 @@ describe('MainGraphState', () => {
         expect(state.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
         expect(state.palaceInputText).toBe(' palace text')
         expect(state.imageUrls).toEqual([])
-        // Palace subgraph private keys: undeclared on the main graph, they are silently dropped
-        expect(state.imagePrompt).toBe('palace image prompt')
         expect(state.imageError).toBeUndefined()
-        expect(state.memoryItems).toEqual([{ order: 1, content: 'memory item' }])
-        expect(state.detectedCoords).toEqual([
-          { order: 1, anchorVisual: 'bronze bell', x: 0.5, y: 0.5 },
-        ])
         return {}
       })
       .addEdge('__start__', 'test')
@@ -187,12 +181,9 @@ describe('MainGraphState', () => {
       documentRef: null,
       palaceInputText: ' palace text',
       palaceInputNodes: [],
-      memoryItems: [{ order: 1, content: 'memory item' }],
       palace: null,
-      imagePrompt: 'palace image prompt',
       imageUrls: [],
       imageError: undefined,
-      detectedCoords: [{ order: 1, anchorVisual: 'bronze bell', x: 0.5, y: 0.5 }],
       memoryRoute: [],
     })
   })
@@ -249,18 +240,18 @@ describe('Subgraph channels and main graph channels', () => {
 
   it('private keys written by a subgraph are still readable after crossing graphs (guards against another silent drop)', async () => {
     const palaceSubgraph = new StateGraph(PalaceSubgraphState)
-      .addNode('writeImagePrompt', async () => ({ imagePrompt: 'a clock-tower hall' }))
-      .addEdge('__start__', 'writeImagePrompt')
-      .addEdge('writeImagePrompt', '__end__')
+      .addNode('writeImageUrls', async () => ({ imageUrls: ['https://example.test/a.png'] }))
+      .addEdge('__start__', 'writeImageUrls')
+      .addEdge('writeImageUrls', '__end__')
       .compile()
 
-    let seenInMainGraph: string | undefined
+    let seenInMainGraph: string[] | undefined
     const mainGraph = new StateGraph(MainGraphState)
       // Mounted the way AgentOrchestrator does it: the compiled subgraph is a
       // node of the main graph and its writes land in the main graph's channels.
       .addNode('palaceSubgraph', palaceSubgraph)
       .addNode('afterSubgraph', async (state) => {
-        seenInMainGraph = state.imagePrompt
+        seenInMainGraph = state.imageUrls
         return {}
       })
       .addEdge('__start__', 'palaceSubgraph')
@@ -270,6 +261,6 @@ describe('Subgraph channels and main graph channels', () => {
 
     await mainGraph.invoke({ messages: [], context: null })
 
-    expect(seenInMainGraph).toBe('a clock-tower hall')
+    expect(seenInMainGraph).toEqual(['https://example.test/a.png'])
   })
 })
