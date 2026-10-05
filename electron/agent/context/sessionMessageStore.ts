@@ -2,10 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import {
-  HumanMessage,
-  AIMessage,
-  SystemMessage,
-  ToolMessage,
   type BaseMessage,
   type StoredMessage,
   mapChatMessagesToStoredMessages,
@@ -13,7 +9,6 @@ import {
 } from '@langchain/core/messages'
 import { logger } from '../../shared/logger.js'
 import { atomicWrite } from '../../fs/atomicWrite.js'
-import type { ChatMessage, ChatToolCall } from '../../../contracts/fileFormat.js'
 
 export interface SessionMeta {
   id: string
@@ -332,69 +327,4 @@ export class SessionMessageStore {
       }
     }
   }
-}
-
-export function uiMessageToBaseMessages(msg: ChatMessage): BaseMessage[] {
-  const additionalKwargs: Record<string, unknown> = {}
-  const responseMetadata: Record<string, unknown> = {}
-  if (msg.timestamp) responseMetadata.timestamp = msg.timestamp
-
-  if (msg.role === 'user') {
-    if (msg.attachment) additionalKwargs.attachment = msg.attachment
-    return [
-      new HumanMessage({
-        content: msg.content,
-        additional_kwargs: additionalKwargs,
-        response_metadata: responseMetadata,
-      }),
-    ]
-  }
-  if (msg.role === 'system') {
-    return [
-      new SystemMessage({
-        content: msg.content,
-        additional_kwargs: additionalKwargs,
-        response_metadata: responseMetadata,
-      }),
-    ]
-  }
-  if (msg.role === 'assistant') {
-    const toolCalls = msg.toolCalls?.map((tc, idx): ChatToolCall & { id: string } => ({
-      ...tc,
-      id: `call-${idx}`,
-    }))
-    const result: BaseMessage[] = []
-    if (toolCalls && toolCalls.length > 0) {
-      result.push(
-        new AIMessage({
-          content: msg.content,
-          tool_calls: toolCalls,
-          additional_kwargs: additionalKwargs,
-          response_metadata: responseMetadata,
-        }),
-      )
-      for (let i = 0; i < toolCalls.length; i++) {
-        const tc = toolCalls[i]
-        const original = msg.toolCalls?.[i]
-        result.push(
-          new ToolMessage({
-            tool_call_id: tc.id,
-            name: tc.name,
-            content: original?.result ?? '',
-            additional_kwargs: tc.steps ? { toolSteps: tc.steps } : {},
-          }),
-        )
-      }
-    } else {
-      result.push(
-        new AIMessage({
-          content: msg.content,
-          additional_kwargs: additionalKwargs,
-          response_metadata: responseMetadata,
-        }),
-      )
-    }
-    return result
-  }
-  return []
 }

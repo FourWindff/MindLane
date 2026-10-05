@@ -2,10 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
-import type { BaseMessage } from '@langchain/core/messages'
+import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { SessionManager } from '../sessionManager.js'
-import { uiMessageToBaseMessages } from '../sessionMessageStore.js'
-import type { ChatMessage } from '../../../../contracts/fileFormat.js'
 
 describe('SessionManager', () => {
   let manager: SessionManager
@@ -27,24 +25,25 @@ describe('SessionManager', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  /** Fixture: uses the same shared append path as the runner (UI message → BaseMessage on disk). */
-  async function appendUiMessages(
+  /** Fixture: uses the same shared append path as the runner (BaseMessage[] on disk). */
+  const appendMessages = (
     sessionId: string,
-    messages: ChatMessage[],
+    messages: BaseMessage[],
     uuid: string = fileUuid,
-  ): Promise<void> {
-    const base: BaseMessage[] = []
-    for (const message of messages) base.push(...uiMessageToBaseMessages(message))
-    await manager.saveMessages(sessionId, base, uuid)
-  }
+  ): Promise<void> => manager.saveMessages(sessionId, messages, uuid)
 
   it('appends UI messages and writes the session file metadata', async () =>
     inWs(async () => {
-      const messages: ChatMessage[] = [
-        { role: 'user', content: 'Hello', timestamp: '2024-01-01T00:00:00Z' },
-        { role: 'assistant', content: 'Hi there', timestamp: '2024-01-01T00:00:01Z' },
-      ]
-      await appendUiMessages('session-1', messages)
+      await appendMessages('session-1', [
+        new HumanMessage({
+          content: 'Hello',
+          response_metadata: { timestamp: '2024-01-01T00:00:00Z' },
+        }),
+        new AIMessage({
+          content: 'Hi there',
+          response_metadata: { timestamp: '2024-01-01T00:00:01Z' },
+        }),
+      ])
 
       const sessions = await manager.listSessions({ fileUuid: 'file-uuid-1' })
       expect(sessions).toHaveLength(1)
@@ -60,8 +59,8 @@ describe('SessionManager', () => {
 
   it('listSessions returns only sessions bound to the requested file UUID', async () =>
     inWs(async () => {
-      await appendUiMessages('session-a', [{ role: 'user', content: 'A' }], 'file-a')
-      await appendUiMessages('session-b', [{ role: 'user', content: 'B' }], 'file-b')
+      await appendMessages('session-a', [new HumanMessage('A')], 'file-a')
+      await appendMessages('session-b', [new HumanMessage('B')], 'file-b')
 
       await expect(manager.listSessions({ fileUuid: 'file-a' })).resolves.toMatchObject([
         { id: 'session-a', fileUuid: 'file-a' },
@@ -73,9 +72,9 @@ describe('SessionManager', () => {
 
   it('listSessions returns results sorted by updatedAt', async () =>
     inWs(async () => {
-      await appendUiMessages('session-older', [{ role: 'user', content: 'Msg 1' }])
+      await appendMessages('session-older', [new HumanMessage('Msg 1')])
       await new Promise((r) => setTimeout(r, 10))
-      await appendUiMessages('session-newer', [{ role: 'user', content: 'Msg 2' }])
+      await appendMessages('session-newer', [new HumanMessage('Msg 2')])
 
       const sessions = await manager.listSessions()
       expect(sessions).toHaveLength(2)
@@ -86,7 +85,7 @@ describe('SessionManager', () => {
   it('listSessions supports pagination', async () =>
     inWs(async () => {
       for (let i = 1; i <= 5; i++) {
-        await appendUiMessages(`session-${i}`, [{ role: 'user', content: `Message ${i}` }])
+        await appendMessages(`session-${i}`, [new HumanMessage(`Message ${i}`)])
         if (i < 5) {
           await new Promise((r) => setTimeout(r, 10))
         }
@@ -112,7 +111,7 @@ describe('SessionManager', () => {
 
   it('deleteSession removes session metadata', async () =>
     inWs(async () => {
-      await appendUiMessages('session-delete', [{ role: 'user', content: 'Hello' }])
+      await appendMessages('session-delete', [new HumanMessage('Hello')])
 
       const sessionsBefore = await manager.listSessions()
       expect(sessionsBefore).toHaveLength(1)
@@ -125,10 +124,10 @@ describe('SessionManager', () => {
 
   it('data in different workspaces stays isolated', async () => {
     await inWs(async () => {
-      await appendUiMessages('session-ws1', [{ role: 'user', content: 'Workspace 1' }])
+      await appendMessages('session-ws1', [new HumanMessage('Workspace 1')])
     })
     await inWs(async () => {
-      await appendUiMessages('session-ws2', [{ role: 'user', content: 'Workspace 2' }])
+      await appendMessages('session-ws2', [new HumanMessage('Workspace 2')])
     }, 'workspace-uuid-2')
 
     const ws1Sessions = await inWs(() => manager.listSessions())
@@ -140,7 +139,22 @@ describe('SessionManager', () => {
 
   it('loadSessionMessages returns UI messages saved for the session', async () =>
     inWs(async () => {
-      const messages: ChatMessage[] = [
+      await appendMessages('session-ui-history', [
+        new HumanMessage({
+          content: 'Use this document',
+          additional_kwargs: { attachment: { name: 'doc.pdf', type: 'pdf' } },
+          response_metadata: { timestamp: '2024-01-01T00:00:00Z' },
+        }),
+        new AIMessage({
+          content: 'Done',
+          tool_calls: [{ name: 'batchAddMindmapNodes', args: { count: 1 }, id: 'call-0' }],
+          response_metadata: { timestamp: '2024-01-01T00:00:01Z' },
+        }),
+        new ToolMessage({ tool_call_id: 'call-0', name: 'batchAddMindmapNodes', content: 'ok' }),
+      ])
+
+      const loaded = await manager.loadSessionMessages('session-ui-history')
+      expect(loaded).toEqual([
         {
           role: 'user',
           content: 'Use this document',
@@ -155,12 +169,7 @@ describe('SessionManager', () => {
           ],
           timestamp: '2024-01-01T00:00:01Z',
         },
-      ]
-
-      await appendUiMessages('session-ui-history', messages)
-
-      const loaded = await manager.loadSessionMessages('session-ui-history')
-      expect(loaded).toEqual(messages)
+      ])
     }))
 
   it('round-trips subgraph tool steps through the append path', async () =>
@@ -170,22 +179,18 @@ describe('SessionManager', () => {
         { step: 'extracting', completed: 1, total: 2 },
         { step: 'finalizing' },
       ]
-      const messages: ChatMessage[] = [
-        {
-          role: 'assistant',
+      await appendMessages('session-steps', [
+        new AIMessage({
           content: 'mindmap generation complete',
-          toolCalls: [
-            {
-              name: 'generateMindmapFragment',
-              args: {},
-              result: '{"ok":true}',
-              steps,
-            },
-          ],
-        },
-      ]
-
-      await appendUiMessages('session-steps', messages)
+          tool_calls: [{ name: 'generateMindmapFragment', args: {}, id: 'call-0' }],
+        }),
+        new ToolMessage({
+          tool_call_id: 'call-0',
+          name: 'generateMindmapFragment',
+          content: '{"ok":true}',
+          additional_kwargs: { toolSteps: steps },
+        }),
+      ])
 
       const loaded = await manager.loadSessionMessages('session-steps')
       expect(loaded[0]!.toolCalls![0]!.steps).toEqual(steps)
@@ -200,7 +205,7 @@ describe('SessionManager', () => {
         },
       } as never)
 
-      await appendUiMessages('session-delete-linked', [{ role: 'user', content: 'delete me' }])
+      await appendMessages('session-delete-linked', [new HumanMessage('delete me')])
       await manager.deleteSession('session-delete-linked')
 
       await expect(manager.loadSessionMessages('session-delete-linked')).resolves.toEqual([])
