@@ -34,7 +34,6 @@ interface WorkspaceStore {
   createSubfolder: (parentPath: string, name: string) => Promise<boolean>
   deleteItem: (targetPath: string) => Promise<boolean>
   renameItem: (oldPath: string, newName: string) => Promise<string | null>
-  moveItem: (sourcePath: string, targetDirPath: string) => Promise<string | null>
   clearError: () => void
 }
 
@@ -501,39 +500,6 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       if (renamedInstance) {
         renamedInstance.store.getState().setFilePath(result.data.newPath)
         openFileRegistry.renameKey(oldPath, result.data.newPath)
-      }
-
-      const tree = await listWorkspaceTree(workspacePath)
-      set({ tree })
-      return result.data.newPath
-    } finally {
-      set({ busy: false })
-    }
-  },
-
-  moveItem: async (sourcePath: string, targetDirPath: string) => {
-    const workspacePath = get().workspacePath
-    if (!workspacePath) {
-      set({ lastError: 'Open a workspace first' })
-      return null
-    }
-
-    set({ busy: true, lastError: null })
-    try {
-      const result = await window.mindlane?.workspace.moveItem({
-        sourcePath,
-        targetDirPath,
-        workspacePath,
-      })
-      if (!result?.ok) {
-        set({ lastError: result?.error ?? 'Move failed' })
-        return null
-      }
-
-      const movedInstance = openFileRegistry.get(sourcePath)
-      if (movedInstance) {
-        movedInstance.store.getState().setFilePath(result.data.newPath)
-        openFileRegistry.renameKey(sourcePath, result.data.newPath)
       }
 
       const tree = await listWorkspaceTree(workspacePath)
