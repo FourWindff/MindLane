@@ -1,11 +1,10 @@
-import type { RefObject } from 'react'
+import { ContextMenu, type MenuEntry } from '@/shared/components/ContextMenu'
 
 export type ContextMenuState =
   { scope: 'closed' } | { clientX: number; clientY: number; scope: 'node'; nodeId: string }
 
 type ContextMenuProps = {
   menu: ContextMenuState
-  menuRef: RefObject<HTMLDivElement>
   onClose: () => void
   onAddChild: () => void
   onAddSibling: (mode: 'above' | 'below' | 'end') => void
@@ -22,20 +21,8 @@ type ContextMenuProps = {
   palaceEnabled: boolean
 }
 
-type MenuItem = {
-  label: string
-  onClick: () => void
-  disabled: boolean
-  modifier?: 'danger' | 'accent' | 'muted'
-  title?: string
-}
-
-/** The menu's content: plain items, separated by rules. */
-type MenuEntry = MenuItem | 'separator'
-
 export function MindmapContextMenu({
   menu,
-  menuRef,
   onClose,
   onAddChild,
   onAddSibling,
@@ -52,11 +39,6 @@ export function MindmapContextMenu({
   palaceEnabled,
 }: ContextMenuProps) {
   if (menu.scope === 'closed') return null
-
-  const run = (fn: () => void) => {
-    fn()
-    onClose()
-  }
 
   const items: MenuEntry[] = [
     { label: 'Child topic', onClick: onAddChild, disabled: aiBusy },
@@ -90,38 +72,14 @@ export function MindmapContextMenu({
     { label: 'Reset', onClick: onReset, disabled: aiBusy, modifier: 'muted' },
   ]
 
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 0
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 0
-  const menuW = 200
-  const menuH = 400
-  const left = Math.min(menu.clientX, Math.max(8, vw - menuW - 8))
-  const top = Math.min(menu.clientY, Math.max(8, vh - menuH - 8))
-
   return (
-    <div
-      ref={menuRef}
+    <ContextMenu
+      x={menu.clientX}
+      y={menu.clientY}
       className="mindmap-ctx"
-      style={{ left, top }}
-      role="menu"
-      aria-label="Mindmap menu"
-    >
-      {items.map((item, i) =>
-        item === 'separator' ? (
-          <div key={`sep-${i}`} className="mindmap-ctx__sep" role="separator" />
-        ) : (
-          <button
-            key={item.label}
-            type="button"
-            className={`mindmap-ctx__item${item.modifier ? ` mindmap-ctx__item--${item.modifier}` : ''}`}
-            role="menuitem"
-            onClick={() => run(item.onClick)}
-            disabled={item.disabled}
-            title={item.title}
-          >
-            {item.label}
-          </button>
-        ),
-      )}
-    </div>
+      ariaLabel="Mindmap menu"
+      items={items}
+      onClose={onClose}
+    />
   )
 }

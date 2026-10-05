@@ -78,7 +78,6 @@ export function useMindmapView({
   const [palaceModal, setPalaceModal] = useState<PalaceNodeData | null>(null)
   const [stylePanelOpen, setStylePanelOpen] = useState(false)
   const [documentRefsPanelOpen, setDocumentRefsPanelOpen] = useState(false)
-  const contextMenuRef = useRef<HTMLDivElement>(null)
   const lastClickRef = useRef<{ id: string; time: number } | null>(null)
   const lastRestoredFileRef = useRef<string | null>(null)
   const viewportDebounceRef = useRef<number | null>(null)
@@ -251,26 +250,6 @@ export function useMindmapView({
     [controller, editor],
   )
 
-  useEffect(() => {
-    if (contextMenu.scope === 'closed') return
-    const dismiss = (event: Event) => {
-      const target = event.target
-      if (target instanceof window.Node && contextMenuRef.current?.contains(target)) return
-      setContextMenu({ scope: 'closed' })
-    }
-    const dismissWithEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setContextMenu({ scope: 'closed' })
-    }
-    window.addEventListener('mousedown', dismiss, true)
-    window.addEventListener('scroll', dismiss, true)
-    window.addEventListener('keydown', dismissWithEscape)
-    return () => {
-      window.removeEventListener('mousedown', dismiss, true)
-      window.removeEventListener('scroll', dismiss, true)
-      window.removeEventListener('keydown', dismissWithEscape)
-    }
-  }, [contextMenu.scope])
-
   const openContextMenu = useCallback((menu: ContextMenuState) => setContextMenu(menu), [])
 
   // Local image insert: read the file into base64 -> sha256 dedupe -> addAsset -> image node
@@ -377,7 +356,6 @@ export function useMindmapView({
     palaceEnabled,
     selectedTopicCount: selectedTopicIds.length,
     contextMenu,
-    contextMenuRef,
     palaceModal,
     stylePanelOpen,
     documentRefsPanelOpen,

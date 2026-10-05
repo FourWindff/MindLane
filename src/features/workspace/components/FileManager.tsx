@@ -69,10 +69,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
 
   const handleContextMenu = useCallback((e: MouseEvent, entry: WorkspaceTreeEntry | null) => {
     e.preventDefault()
-    const container = (e.currentTarget as HTMLElement).closest('.file-manager__grid')
-    const rect = container?.getBoundingClientRect() ?? { left: 0, top: 0 }
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const { clientX: x, clientY: y } = e
     if (entry) {
       setContextMenu({ scope: 'entry', x, y, entry })
     } else {

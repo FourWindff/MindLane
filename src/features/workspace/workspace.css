@@ -266,8 +266,9 @@
 /* --- Context Menu --- */
 
 .context-menu {
-  position: absolute;
-  z-index: 20;
+  /* Portal-mounted at body level: fixed keeps it off the file panel's containing block. */
+  position: fixed;
+  z-index: 1000;
   min-width: 170px;
   padding: 5px;
   border: 1px solid var(--ml-border);

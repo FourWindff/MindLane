@@ -91,7 +91,6 @@ function MindmapWorkspace({
         />
         <MindmapContextMenu
           menu={view.contextMenu}
-          menuRef={view.contextMenuRef}
           onClose={view.actions.closeContextMenu}
           onAddChild={view.actions.addChild}
           onAddSibling={view.actions.addSibling}

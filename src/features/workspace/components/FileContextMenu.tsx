@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { ContextMenu, type MenuEntry } from '@/shared/components/ContextMenu'
 import type { WorkspaceTreeEntry } from '../types'
 
 interface ContextMenuAction {
@@ -38,63 +38,21 @@ function getMenuItems(entry: WorkspaceTreeEntry | null): ContextMenuAction[] {
 }
 
 export function FileContextMenu({ x, y, entry, onAction, onClose }: FileContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null)
-  const items = getMenuItems(entry)
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [onClose])
-
-  useEffect(() => {
-    if (!menuRef.current) return
-    const rect = menuRef.current.getBoundingClientRect()
-    const parent = menuRef.current.offsetParent as HTMLElement | null
-    if (!parent) return
-    const parentRect = parent.getBoundingClientRect()
-
-    let adjustedX = x
-    let adjustedY = y
-    if (rect.right > parentRect.right) {
-      adjustedX = Math.max(0, x - (rect.right - parentRect.right))
-    }
-    if (rect.bottom > parentRect.bottom) {
-      adjustedY = Math.max(0, y - (rect.bottom - parentRect.bottom))
-    }
-    if (adjustedX !== x || adjustedY !== y) {
-      menuRef.current.style.left = `${adjustedX}px`
-      menuRef.current.style.top = `${adjustedY}px`
-    }
-  }, [x, y])
+  const items: MenuEntry[] = getMenuItems(entry).map((item) => ({
+    label: item.label,
+    onClick: () => onAction(item.key, entry),
+    disabled: false,
+    modifier: item.danger ? 'danger' : undefined,
+  }))
 
   return (
-    <div ref={menuRef} className="context-menu" style={{ left: x, top: y }} role="menu">
-      {items.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          className={`context-menu__item${item.danger ? ' context-menu__item--danger' : ''}`}
-          role="menuitem"
-          onClick={() => {
-            onAction(item.key, entry)
-            onClose()
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
+    <ContextMenu
+      x={x}
+      y={y}
+      className="context-menu"
+      ariaLabel="File menu"
+      items={items}
+      onClose={onClose}
+    />
   )
 }
