@@ -87,9 +87,7 @@ describe('getWorkspaceSessionForService', () => {
     const workspaceState = await fsService.workspace.load(workspacePath)
     expect(workspaceState.ok).toBe(true)
     if (!workspaceState.ok) return
-    await fsService.workspace.updateActiveSessionIds(workspacePath, {
-      'file-uuid': 'session-uuid',
-    })
+    await fsService.workspace.setActiveSessionId(workspacePath, 'file-uuid', 'session-uuid')
 
     const session = await getWorkspaceSessionForService(fsService)
 

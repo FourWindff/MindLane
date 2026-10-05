@@ -203,7 +203,7 @@ describe('Workspace', () => {
 
     await Promise.all([
       workspace.openFile(workspacePath, fileA),
-      workspace.updateActiveSessionIds(workspacePath, { 'file-a': 'session-a' }),
+      workspace.setActiveSessionId(workspacePath, 'file-a', 'session-a'),
     ])
 
     const loaded = await workspace.load(workspacePath)

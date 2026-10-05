@@ -65,13 +65,6 @@ export class Workspace {
     }))
   }
 
-  async updateActiveSessionIds(
-    workspacePath: string,
-    activeSessionIds: Record<string, string>,
-  ): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => ({ activeSessionIds }))
-  }
-
   /**
    * Write/update one session file index mapping (fileUuid -> filePath).
    * Called by the open/new/save-as paths (main process) and the rename/move paths

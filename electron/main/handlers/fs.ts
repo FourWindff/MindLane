@@ -8,7 +8,6 @@ import { detectDocumentType, documentTypeByExtension } from '../documentType.js'
 import { getWorkspaceSessionForService } from '../workspaceSession.js'
 import type { HandlerContext } from './context.js'
 import { isWithinWorkspace } from '../../fs/paths.js'
-import type { WorkspaceState } from '../../fs/types.js'
 
 /** Extensions the open dialog offers: the same set `detectDocumentType` accepts, without the dot. */
 const DOCUMENT_EXTENSIONS = Object.keys(documentTypeByExtension).map((extension) =>
@@ -234,7 +233,7 @@ export function registerFsHandlers(ctx: HandlerContext): void {
       payload: {
         workspacePath: string
         activeSession?: { fileUuid: string; sessionId: string }
-      } & Partial<WorkspaceState>,
+      },
     ) => {
       const activeSession = payload.activeSession
       if (activeSession !== undefined) {
@@ -243,20 +242,6 @@ export function registerFsHandlers(ctx: HandlerContext): void {
           activeSession.fileUuid,
           activeSession.sessionId,
         )
-        if (!result.ok) return result
-      }
-      if (payload.activeSessionIds !== undefined) {
-        const result = await ctx.fsService.workspace.updateActiveSessionIds(
-          payload.workspacePath,
-          payload.activeSessionIds,
-        )
-        if (!result.ok) return result
-      }
-      if (payload.lastOpenedFilePath !== undefined) {
-        const result =
-          payload.lastOpenedFilePath === null
-            ? await ctx.fsService.workspace.clearLastOpenedFile(payload.workspacePath)
-            : { ok: false, error: 'Setting lastOpenedFilePath directly is not supported' }
         if (!result.ok) return result
       }
       return { ok: true }
