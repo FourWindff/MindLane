@@ -5,6 +5,7 @@ import {
   useActiveMindmapStore,
 } from '@/features/mindmap/hooks/useActiveOpenFile'
 import type { ImageNodeData } from '@contracts/nodeData'
+import { assetToDataUrl } from '@contracts/mindmapXml/asset'
 
 function ImageNodeInner({ id, data: rawData, selected }: NodeProps) {
   const data = rawData as ImageNodeData
@@ -41,7 +42,7 @@ function ImageNodeInner({ id, data: rawData, selected }: NodeProps) {
       {asset ? (
         <img
           className="image-node__img"
-          src={`data:${asset.mime};base64,${asset.data}`}
+          src={assetToDataUrl(asset)}
           alt={data.alt ?? ''}
           style={{
             ...(width ? { width } : {}),

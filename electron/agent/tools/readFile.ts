@@ -51,9 +51,7 @@ export function createReadFileTool(getWorkspacePath: () => string) {
       }
 
       // Resolve first, then check the boundary, so `../` cannot escape.
-      const resolved = path.isAbsolute(inputPath)
-        ? path.resolve(inputPath)
-        : path.resolve(workspaceRoot, inputPath)
+      const resolved = path.resolve(workspaceRoot, inputPath)
 
       if (!isWithinWorkspace(resolved, path.resolve(workspaceRoot))) {
         // Echo only the user-supplied path, never the resolved absolute path.

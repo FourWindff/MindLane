@@ -402,9 +402,6 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
                 <div className="settings-card__value">0.0.0</div>
                 <div className="settings-card__hint">This is a desktop preview build.</div>
               </div>
-              <button type="button" className="btn panel-btn panel-btn--primary">
-                Check for updates
-              </button>
             </div>
             <div className="settings-card__row">
               <div>

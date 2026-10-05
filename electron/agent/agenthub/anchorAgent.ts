@@ -49,7 +49,6 @@ function normalizeCoord(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null
   if (value >= 0 && value <= 1) return value
   if (value >= 0 && value <= 1000) return value / 1000
-  if (value >= 0 && value <= 100) return value / 100
   return null
 }
 
