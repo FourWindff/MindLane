@@ -16,7 +16,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   if (!launchResult.ok) {
     return {
       workspacePath: null as string | null,
-      workspaceUuid: null as string | null,
       activeSessionIds: {} as Record<string, string>,
       fileUuidPaths: {} as Record<string, string>,
       recentWorkspacePaths: [] as string[],
@@ -27,7 +26,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
   const { workspacePath, recentWorkspacePaths, restoreLastWorkspaceOnLaunch } = launchResult.data
 
   let lastOpenedFilePath: string | null = null
-  let workspaceUuid: string | null = null
   let activeSessionIds: Record<string, string> = {}
   let fileUuidPaths: Record<string, string> = {}
   if (workspacePath) {
@@ -58,7 +56,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     if (finalResult.ok) workspaceState = finalResult.data
 
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
-    workspaceUuid = workspaceState.workspaceUuid
     activeSessionIds = workspaceState.activeSessionIds
     fileUuidPaths = workspaceState.fileUuidPaths
   }
@@ -67,7 +64,6 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     workspacePath,
     recentWorkspacePaths,
     lastOpenedFilePath,
-    workspaceUuid,
     activeSessionIds,
     fileUuidPaths,
     restoreLastWorkspaceOnLaunch,

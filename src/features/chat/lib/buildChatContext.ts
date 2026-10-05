@@ -27,7 +27,6 @@ export function buildChatContext(): ChatContext {
 
   if (openFileState.filePath) ctx.filePath = openFileState.filePath
   if (openFileState.fileTitle) ctx.fileTitle = openFileState.fileTitle
-  ctx.hasDocumentOpen = openFileState.hasDocumentOpen
 
   if (openFileState.documentRefs.length > 0) {
     ctx.linkedDocuments = openFileState.documentRefs.map((doc) => ({ ...doc }))

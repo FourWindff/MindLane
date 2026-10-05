@@ -63,7 +63,6 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
         listTree: vi.fn(async () => ({ ok: true, data: [] })),
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
-          workspaceUuid: 'workspace-uuid',
           activeSessionIds: {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: '/a.mindlane',

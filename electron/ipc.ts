@@ -122,7 +122,6 @@ interface SelectedDocumentInfo {
 
 interface WorkspaceSession {
   workspacePath: string | null
-  workspaceUuid: string | null
   activeSessionIds: Record<string, string>
   /** Session file index: fileUuid -> filePath, used by the renderer's capsule bar across launches. */
   fileUuidPaths: Record<string, string>

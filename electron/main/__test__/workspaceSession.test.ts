@@ -91,7 +91,6 @@ describe('getWorkspaceSessionForService', () => {
 
     const session = await getWorkspaceSessionForService(fsService)
 
-    expect(session.workspaceUuid).toBe(workspaceState.data.workspaceUuid)
     expect(session.activeSessionIds).toEqual({ 'file-uuid': 'session-uuid' })
   })
 })

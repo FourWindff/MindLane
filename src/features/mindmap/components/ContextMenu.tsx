@@ -78,18 +78,14 @@ export function MindmapContextMenu({
     },
     { label: 'Insert image', onClick: () => onInsertImage?.(), disabled: !onInsertImage || aiBusy },
     { label: 'Delete', onClick: onRemove, disabled: !canRemove || aiBusy, modifier: 'danger' },
-    ...(menu.scope === 'node'
-      ? ([
-          'separator',
-          {
-            label: `Generate memory palace${selectedCount > 1 ? ` (${selectedCount} nodes)` : ''}`,
-            onClick: () => onGeneratePalace?.(),
-            disabled: !onGeneratePalace || aiBusy || !palaceEnabled,
-            modifier: 'accent',
-            title: palaceEnabled ? undefined : 'Chat model configuration required',
-          },
-        ] as MenuEntry[])
-      : []),
+    'separator',
+    {
+      label: `Generate memory palace${selectedCount > 1 ? ` (${selectedCount} nodes)` : ''}`,
+      onClick: () => onGeneratePalace?.(),
+      disabled: !onGeneratePalace || aiBusy || !palaceEnabled,
+      modifier: 'accent',
+      title: palaceEnabled ? undefined : 'Chat model configuration required',
+    },
     'separator',
     { label: 'Reset', onClick: onReset, disabled: aiBusy, modifier: 'muted' },
   ]

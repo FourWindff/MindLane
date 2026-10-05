@@ -41,7 +41,6 @@ function installStreamApi() {
       workspace: {
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
-          workspaceUuid: null,
           activeSessionIds: {},
           fileUuidPaths: {},
           recentWorkspacePaths: ['/workspace'],

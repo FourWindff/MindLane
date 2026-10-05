@@ -18,7 +18,6 @@ async function withMemoryManager(dir: string): Promise<MemoryManager> {
 
 const ctx: ChatContext = {
   fileUuid: 'file-1',
-  hasDocumentOpen: true,
   filePath: '/t.mindlane',
   fileTitle: 't',
 }
@@ -99,7 +98,6 @@ describe('buildSystemPrompt sections', () => {
       ...baseInput,
       context: {
         ...ctx,
-        hasDocumentOpen: true,
         selectedNodes: [{ id: 'n1', type: 'text', label: 'Node one' }],
       },
     })

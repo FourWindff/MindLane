@@ -16,10 +16,6 @@ function extractNodeInfo(node: Node): ContextNodeInfo {
           id: node.id,
           type: 'palace',
           label: node.data.label || node.id,
-          extra: {
-            stationCount: node.data.stations.length,
-            sourceNodeIds: node.data.sourceNodeIds,
-          },
         }
       }
       break

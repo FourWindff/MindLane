@@ -74,7 +74,6 @@ function installApis(options?: {
       workspace: {
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
-          workspaceUuid: 'workspace-uuid',
           activeSessionIds: options?.activeSessionIds ?? {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: '/a.mindlane',

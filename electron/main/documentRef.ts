@@ -2,8 +2,7 @@ import path from 'node:path'
 import type { DocumentRef } from '../../contracts/fileFormat.js'
 
 type ResolvedDocumentRef =
-  | { ok: true; displayText: string; target: string; external: boolean }
-  | { ok: false; displayText: string; error: string }
+  { ok: true; target: string; external: boolean } | { ok: false; error: string }
 
 export function resolveDocumentRef(doc: DocumentRef, userDataPath: string): ResolvedDocumentRef {
   switch (doc.type) {
@@ -12,16 +11,15 @@ export function resolveDocumentRef(doc: DocumentRef, userDataPath: string): Reso
     case 'pptx':
     case 'xlsx':
     case 'markdown':
-      return { ok: true, displayText: doc.filename, target: doc.source, external: false }
+      return { ok: true, target: doc.source, external: false }
     case 'url':
-      return { ok: true, displayText: doc.source, target: doc.source, external: true }
+      return { ok: true, target: doc.source, external: true }
     case 'text': {
       if (!doc.textPath) {
-        return { ok: false, displayText: doc.source, error: 'Cached file path is missing' }
+        return { ok: false, error: 'Cached file path is missing' }
       }
       return {
         ok: true,
-        displayText: doc.source,
         target: path.join(userDataPath, doc.textPath),
         external: false,
       }

@@ -83,14 +83,6 @@ export async function prepareDocument(input: PrepareDocumentInput): Promise<Prep
       filename = existingRef?.filename || `URL source_${shortHash(hash)}.txt`
       break
     }
-    default: {
-      // Exhaustive fallback
-      type = source.type as DocumentRef['type']
-      hash = hashText(text)
-      baseFilename = existingRef?.filename || 'Untitled'
-      persistedSource = String(source.path ?? source.url ?? source.content ?? '')
-      filename = existingRef?.filename || `Untitled_${shortHash(hash)}.txt`
-    }
   }
 
   let textPath: string | undefined

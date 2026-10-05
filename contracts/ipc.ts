@@ -16,7 +16,6 @@ export interface ContextNodeInfo {
   chain?: string[]
   /** Direct children (compact subtree, depth 1) */
   children?: ContextNodeInfo[]
-  extra?: Record<string, unknown>
 }
 
 export interface ChatContext {
@@ -24,7 +23,6 @@ export interface ChatContext {
   selectedNodes?: ContextNodeInfo[]
   filePath?: string
   fileTitle?: string
-  hasDocumentOpen?: boolean
   workspacePath?: string
   attachedDocument?: DocumentRef
   linkedDocuments?: DocumentRef[]

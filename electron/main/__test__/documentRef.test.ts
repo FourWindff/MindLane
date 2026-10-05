@@ -19,7 +19,6 @@ describe('resolveDocumentRef', () => {
 
     expect(result).toEqual({
       ok: true,
-      displayText: 'report.pdf',
       target: '/tmp/report.pdf',
       external: false,
     })
@@ -41,7 +40,6 @@ describe('resolveDocumentRef', () => {
 
       expect(result).toEqual({
         ok: true,
-        displayText: `report.${type === 'markdown' ? 'md' : type}`,
         target: `/tmp/report.${type === 'markdown' ? 'md' : type}`,
         external: false,
       })
@@ -62,7 +60,6 @@ describe('resolveDocumentRef', () => {
 
     expect(result).toEqual({
       ok: true,
-      displayText: 'https://example.com/article',
       target: 'https://example.com/article',
       external: true,
     })
@@ -83,7 +80,6 @@ describe('resolveDocumentRef', () => {
 
     expect(result).toEqual({
       ok: true,
-      displayText: 'Lorem ipsum dolor sit amet...',
       target: path.join(userDataPath, 'text-cache', 'doc-3.txt'),
       external: false,
     })
@@ -103,7 +99,6 @@ describe('resolveDocumentRef', () => {
 
     expect(result).toEqual({
       ok: false,
-      displayText: 'some preview text',
       error: 'Cached file path is missing',
     })
   })

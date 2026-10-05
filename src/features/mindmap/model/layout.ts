@@ -6,16 +6,15 @@ import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
 type MindmapStructureType = 'logic' | 'mindmap'
 
 interface InitialLayoutOptions {
-  horizontalGap?: number
-  verticalGap?: number
   rootX?: number
   rootY?: number
   direction?: 'LR' | 'TB'
 }
 
+const RANK_SEPARATION = 260
+const NODE_SEPARATION = 24
+
 const DEFAULT_OPTIONS = {
-  horizontalGap: 260,
-  verticalGap: 24,
   rootX: 0,
   rootY: 0,
   direction: 'LR' as const,
@@ -34,8 +33,8 @@ export function layoutInitial(
   graph.setDefaultEdgeLabel(() => ({}))
   graph.setGraph({
     rankdir: resolved.direction,
-    ranksep: resolved.horizontalGap,
-    nodesep: resolved.verticalGap,
+    ranksep: RANK_SEPARATION,
+    nodesep: NODE_SEPARATION,
     marginx: 0,
     marginy: 0,
   })

@@ -31,7 +31,6 @@ function installApis() {
   const api = {
     getSession: vi.fn(async () => ({
       workspacePath: '/ws',
-      workspaceUuid: null,
       activeSessionIds: {},
       fileUuidPaths: {},
       recentWorkspacePaths: ['/ws'],
