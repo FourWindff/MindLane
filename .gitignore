@@ -12,7 +12,6 @@ dist
 dist-electron
 release
 *.local
-tsconfig.node.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
