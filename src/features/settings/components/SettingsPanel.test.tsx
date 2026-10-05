@@ -19,7 +19,6 @@ const settingsState = vi.hoisted(() => ({
         capabilities: ['chat'],
       },
     ],
-    capabilities: ['chat'],
     setApiKey: vi.fn(),
     setChatModel: vi.fn(),
     setPalaceArtworkStyle: vi.fn(),
@@ -55,7 +54,7 @@ function renderSettings() {
 describe('SettingsPanel palace artwork setting', () => {
   beforeEach(() => {
     settingsState.current.palaceArtworkStyle = 'raster'
-    settingsState.current.capabilities = ['chat']
+    settingsState.current.providers[0]!.capabilities = ['chat']
   })
 
   it('disables raster and explains the vector fallback without image generation', () => {
@@ -72,7 +71,7 @@ describe('SettingsPanel palace artwork setting', () => {
   })
 
   it('enables raster and describes the effective concept-image carrier', () => {
-    settingsState.current.capabilities = ['chat', 'imageGen']
+    settingsState.current.providers[0]!.capabilities = ['chat', 'imageGen']
 
     const { document, text } = renderSettings()
     const raster = document.querySelector('input[value="raster"]') as HTMLInputElement

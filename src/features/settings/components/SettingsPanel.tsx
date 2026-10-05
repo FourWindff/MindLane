@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Plug, ChevronDown, CircleAlert } from 'lucide-react'
-import { selectActiveApiKey, useSettingsStore } from '@/features/settings/model/settingsStore'
+import {
+  selectActiveApiKey,
+  selectActiveCapabilities,
+  useSettingsStore,
+} from '@/features/settings/model/settingsStore'
 import { ShortcutsList } from './ShortcutsList'
 import { resolveArtworkStyle } from '@contracts/palaceArtworkStyle'
 
@@ -344,7 +348,7 @@ export function SettingsPanel({ fileActions }: { fileActions: SettingsFileAction
   const setChatModel = useSettingsStore((s) => s.setChatModel)
   const palaceArtworkStyle = useSettingsStore((s) => s.palaceArtworkStyle)
   const setPalaceArtworkStyle = useSettingsStore((s) => s.setPalaceArtworkStyle)
-  const capabilities = useSettingsStore((s) => s.capabilities)
+  const capabilities = useSettingsStore(selectActiveCapabilities)
   const autoSaveIntervalMs = useSettingsStore((s) => s.autoSaveIntervalMs)
   const setAutoSaveIntervalMs = useSettingsStore((s) => s.setAutoSaveIntervalMs)
   const providers = useSettingsStore((s) => s.providers)

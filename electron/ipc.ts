@@ -24,7 +24,6 @@ export enum IPC {
   AiMindmapWriteRequest = 'ai:mindmap-write-request',
   AiMindmapWriteRespond = 'ai:mindmap-write-respond',
   AiGetProviders = 'ai:get-providers',
-  AiGetCapabilities = 'ai:get-capabilities',
   AiIsReady = 'ai:is-ready',
 
   FileOpen = 'file:open',
@@ -181,9 +180,6 @@ export interface MindLaneBridge {
           }[]
         }
       | { ok: false; error: string }
-    >
-    getCapabilities: () => Promise<
-      { ok: true; capabilities: string[] } | { ok: false; error: string }
     >
     /** Read-only bare boolean: AI service readiness (whether assembly succeeded), not wrapped in an IpcResult envelope. */
     isReady: () => Promise<boolean>

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import crypto from 'node:crypto'
-import { getProviderMeta, getRegisteredProviders } from '../../agent/providers/index.js'
+import { getRegisteredProviders } from '../../agent/providers/index.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
 import type {
   ChatContext,
@@ -154,24 +154,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         capabilities: meta.capabilities,
         models: meta.defaultModels,
       })),
-    }
-  })
-
-  ipcMain.handle(IPC.AiGetCapabilities, async () => {
-    try {
-      const settings = await fsService.appState.load()
-      const providerId = settings.activeProviders.chat || 'dashscope'
-      const providerMeta = getProviderMeta(providerId)
-      if (!providerMeta) {
-        return { ok: false, error: `Unknown provider: ${providerId}` }
-      }
-
-      return {
-        ok: true,
-        capabilities: providerMeta.capabilities,
-      }
-    } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
 }

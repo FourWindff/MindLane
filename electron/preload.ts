@@ -14,7 +14,6 @@ const api: MindLaneBridge = {
     stopStream: (streamId) => ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }),
     onStreamEvent: onChatStreamEvent,
     getProviders: () => ipcRenderer.invoke(IPC.AiGetProviders),
-    getCapabilities: () => ipcRenderer.invoke(IPC.AiGetCapabilities),
     isReady: () => ipcRenderer.invoke(IPC.AiIsReady),
     onMindmapReadRequest: onMindmapReadRequest,
     respondMindmapRead: (payload: MindmapReadResponse) =>

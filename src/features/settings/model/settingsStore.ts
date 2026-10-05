@@ -8,8 +8,13 @@ interface ProviderInfo {
   capabilities: string[]
 }
 
-function capabilitiesForProvider(providers: ProviderInfo[], providerId: string): string[] {
-  return providers.find((provider) => provider.id === providerId)?.capabilities ?? []
+/** Capabilities of the active provider: derived from the provider metadata, never stored twice. */
+export function selectActiveCapabilities(
+  state: Pick<SettingsState, 'providers' | 'activeChatProvider'>,
+): string[] {
+  return (
+    state.providers.find((provider) => provider.id === state.activeChatProvider)?.capabilities ?? []
+  )
 }
 
 interface SettingsState {
@@ -19,7 +24,6 @@ interface SettingsState {
   palaceArtworkStyle: PalaceArtworkStyle
   autoSaveIntervalMs: number
   providers: ProviderInfo[]
-  capabilities: string[]
   providerConfigs: Record<string, { apiKey: string; baseUrl?: string }>
 
   hydrate: (data: Partial<SettingsState>) => void
@@ -29,7 +33,6 @@ interface SettingsState {
   setPalaceArtworkStyle: (style: PalaceArtworkStyle) => void
   setAutoSaveIntervalMs: (ms: number) => void
   setProviders: (providers: ProviderInfo[]) => void
-  setCapabilities: (capabilities: string[]) => void
 }
 
 function persistToBackend(partial: Record<string, unknown>) {
@@ -63,21 +66,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   palaceArtworkStyle: 'vector',
   autoSaveIntervalMs: 30_000,
   providers: [],
-  capabilities: [],
   providerConfigs: {},
 
   hydrate: (data) => set({ ...data, loaded: true }),
 
   setActiveChatProvider: (id) => {
-    const state = get()
-    const provider = state.providers.find((p) => p.id === id)
-    set({
-      activeChatProvider: id,
-      chatModel: '',
-      capabilities: provider?.capabilities ?? [],
-    })
+    set({ activeChatProvider: id, chatModel: '' })
     persistToBackend({ activeProviders: { chat: id }, chatModel: '' })
-    loadCapabilities()
   },
   setApiKey: (key) => {
     const providerId = get().activeChatProvider
@@ -103,15 +98,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ autoSaveIntervalMs: ms })
     persistToBackend({ editor: { autoSaveIntervalMs: ms } })
   },
-  setProviders: (providers) =>
-    set((state) => ({
-      providers,
-      capabilities:
-        state.capabilities.length > 0
-          ? state.capabilities
-          : capabilitiesForProvider(providers, state.activeChatProvider),
-    })),
-  setCapabilities: (capabilities) => set({ capabilities }),
+  setProviders: (providers) => set({ providers }),
 }))
 
 export async function loadSettingsFromBackend(): Promise<void> {
@@ -139,8 +126,6 @@ export async function loadSettingsFromBackend(): Promise<void> {
 
   // Load providers from backend
   await loadProviders()
-  // Load capabilities for current provider
-  await loadCapabilities()
 }
 
 async function loadProviders(): Promise<void> {
@@ -166,19 +151,4 @@ async function loadProviders(): Promise<void> {
   } catch {
     // Keep the local provider metadata initialized in the store.
   }
-}
-
-async function loadCapabilities(): Promise<void> {
-  try {
-    const result = await window.mindlane?.ai.getCapabilities?.()
-    if (result?.ok && result.capabilities) {
-      useSettingsStore.getState().setCapabilities(result.capabilities)
-      return
-    }
-  } catch {
-    // ignore and fall back to local metadata
-  }
-
-  const state = useSettingsStore.getState()
-  state.setCapabilities(capabilitiesForProvider(state.providers, state.activeChatProvider))
 }
