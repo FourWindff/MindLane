@@ -1,19 +1,8 @@
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import type { WorkspaceTreeEntry } from '@/features/workspace/types'
 import { useAiStore } from '@/features/chat/model/aiStore'
 import { extractNodeInfoCompact } from '@/features/chat/lib/chatUtils'
-import type { ChatContext, WorkspaceFileInfo } from '@contracts/ipc'
-
-/** Flatten the workspace tree to the file list the model sees (nested files included). */
-function collectWorkspaceFiles(entries: WorkspaceTreeEntry[]): WorkspaceFileInfo[] {
-  const result: WorkspaceFileInfo[] = []
-  for (const entry of entries) {
-    if (entry.type === 'file') result.push({ name: entry.name, filePath: entry.path })
-    if (entry.children) result.push(...collectWorkspaceFiles(entry.children))
-  }
-  return result
-}
+import type { ChatContext } from '@contracts/ipc'
 
 /**
  * Build the ChatContext for a chat send with no React hook dependencies.
@@ -53,7 +42,6 @@ export function buildChatContext(): ChatContext {
 
   if (wsState.workspacePath) {
     ctx.workspacePath = wsState.workspacePath
-    ctx.workspaceFiles = collectWorkspaceFiles(wsState.tree)
   }
 
   const aiState = useAiStore.getState()

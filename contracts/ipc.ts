@@ -19,11 +19,6 @@ export interface ContextNodeInfo {
   extra?: Record<string, unknown>
 }
 
-export interface WorkspaceFileInfo {
-  name: string
-  filePath: string
-}
-
 export interface ChatContext {
   fileUuid: string
   selectedNodes?: ContextNodeInfo[]
@@ -31,7 +26,6 @@ export interface ChatContext {
   fileTitle?: string
   hasDocumentOpen?: boolean
   workspacePath?: string
-  workspaceFiles?: WorkspaceFileInfo[]
   attachedDocument?: DocumentRef
   linkedDocuments?: DocumentRef[]
 }
