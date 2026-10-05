@@ -232,7 +232,7 @@ app.whenReady().then(async () => {
   const userDataPath = app.getPath('userData')
 
   // File sink first: every later log line (debug included) lands on disk.
-  logFileSink = new RotatingFileSink({ filePath: path.join(userDataPath, 'logs', 'mindlane.log') })
+  logFileSink = new RotatingFileSink(path.join(userDataPath, 'logs', 'mindlane.log'))
   logger.setSink(logFileSink)
   appLog.info(
     'Startup: version=%s, platform=%s, arch=%s',

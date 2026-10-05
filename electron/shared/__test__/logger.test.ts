@@ -1,27 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { logger, RotatingFileSink, type LogSink, type FileSinkIO } from '../logger.js'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { logger, RotatingFileSink, type LogSink } from '../logger.js'
 
 /** Capturing sink: records every line handed to it. */
 function makeCapturingSink(): { sink: LogSink; lines: string[] } {
   const lines: string[] = []
   return { sink: { write: (line) => lines.push(line) }, lines }
-}
-
-/** In-memory virtual fs for RotatingFileSink rotation tests. */
-function makeMemoryIO(): { io: FileSinkIO; files: Map<string, string> } {
-  const files = new Map<string, string>()
-  const io: FileSinkIO = {
-    append: (path, data) => files.set(path, (files.get(path) ?? '') + data),
-    exists: (path) => files.has(path),
-    size: (path) => files.get(path)?.length ?? 0,
-    rename: (from, to) => {
-      files.set(to, files.get(from) ?? '')
-      files.delete(from)
-    },
-    remove: (path) => files.delete(path),
-    ensureDir: () => {},
-  }
-  return { io, files }
 }
 
 describe('logger level routing', () => {
@@ -81,69 +67,72 @@ describe('logger level routing', () => {
   })
 })
 
-describe('logger redaction', () => {
-  afterEach(() => {
-    logger.setSink(null)
+describe('RotatingFileSink', () => {
+  let dir: string
+  let logPath: string
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mindlane-logger-'))
+    logPath = path.join(dir, 'logs', 'mindlane.log')
   })
 
+  afterEach(() => {
+    logger.setSink(null)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
+
+  const read = (p: string): string => (fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : '')
+
   it('a configured API key is replaced literally', () => {
-    const { io, files } = makeMemoryIO()
-    const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
+    const sink = new RotatingFileSink(logPath)
     sink.setSecrets(['sk-live-abcdef123456'])
     logger.setSink(sink)
 
     logger.info('calling with key sk-live-abcdef123456 ok')
 
-    const content = files.get('/logs/mindlane.log') ?? ''
+    const content = read(logPath)
     expect(content).not.toContain('sk-live-abcdef123456')
     expect(content).toContain('[REDACTED]')
   })
 
   it('the generic Bearer credential pattern is replaced by regex', () => {
-    const { io, files } = makeMemoryIO()
-    const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
+    const sink = new RotatingFileSink(logPath)
     logger.setSink(sink)
 
     logger.info('Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload')
 
-    const content = files.get('/logs/mindlane.log') ?? ''
+    const content = read(logPath)
     expect(content).not.toContain('eyJhbGciOiJIUzI1NiJ9')
     expect(content).toContain('[REDACTED]')
   })
 
   it('secrets shorter than 8 characters are not replaced', () => {
-    const { io, files } = makeMemoryIO()
-    const sink = new RotatingFileSink({ filePath: '/logs/mindlane.log', io })
+    const sink = new RotatingFileSink(logPath)
     sink.setSecrets(['abc'])
     logger.setSink(sink)
 
     logger.info('abc stays')
 
-    expect(files.get('/logs/mindlane.log')).toContain('abc stays')
+    expect(read(logPath)).toContain('abc stays')
   })
-})
 
-describe('RotatingFileSink rotation', () => {
   it('exceeding the size triggers rotation and keeps only 3 generations', () => {
-    const { io, files } = makeMemoryIO()
-    const sink = new RotatingFileSink({
-      filePath: '/logs/mindlane.log',
-      maxBytes: 20,
-      maxGenerations: 3,
-      io,
-    })
+    const sink = new RotatingFileSink(logPath)
+    const padding = 'y'.repeat(100_000 - 1) // 100 KB per write
 
-    // Each write is 5 bytes; rotation triggers every 4 writes.
-    for (let i = 0; i < 20; i += 1) {
-      sink.write(`g${String(i).padStart(3, '0')}\n`)
+    // ~52 writes cross the 5 MB generation cap; 200 writes force several rotations.
+    for (let i = 0; i < 200; i += 1) {
+      sink.write(`g${String(i).padStart(3, '0')}${padding}`)
     }
 
-    const names = [...files.keys()].sort()
-    expect(names).toEqual(['/logs/mindlane.log', '/logs/mindlane.log.1', '/logs/mindlane.log.2'])
+    expect(fs.existsSync(logPath)).toBe(true)
+    expect(fs.existsSync(`${logPath}.1`)).toBe(true)
+    expect(fs.existsSync(`${logPath}.2`)).toBe(true)
+    expect(fs.existsSync(`${logPath}.3`)).toBe(false)
     // The oldest generations were dropped: .2 must not contain the very first writes.
-    expect(files.get('/logs/mindlane.log.2')).not.toContain('g000')
+    expect(read(`${logPath}.2`)).not.toContain('g000')
     // Current file holds the freshest writes.
-    expect(files.get('/logs/mindlane.log')).toContain('g019')
+    expect(read(logPath)).toContain('g199')
   })
 })
 

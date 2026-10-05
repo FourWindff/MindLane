@@ -4,7 +4,7 @@
  * - Console shows info and above only (ANSI colors, dev-friendly).
  * - Once a file sink is configured, every level (including debug) is appended
  *   synchronously to disk: plain text (no ANSI), size-based rotation
- *   (3 generations kept by default), secrets redacted before writing.
+ *   (3 generations kept), secrets redacted before writing.
  * - Log context is `module:streamIdShort`: the module name is declared via
  *   chained withContext, and the streamId short prefix is auto-attached at
  *   write time from AsyncLocalStorage (see runContext.ts).
@@ -29,38 +29,8 @@ export interface LogSink {
   write(line: string): void
 }
 
-/** Injectable fs operations so tests can substitute in-memory IO. */
-export interface FileSinkIO {
-  append(path: string, data: string): void
-  exists(path: string): boolean
-  size(path: string): number
-  rename(from: string, to: string): void
-  remove(path: string): void
-  ensureDir(path: string): void
-}
-
-const nodeFileSinkIO: FileSinkIO = {
-  append: (path, data) => appendFileSync(path, data),
-  exists: (path) => existsSync(path),
-  size: (path) => (existsSync(path) ? statSync(path).size : 0),
-  rename: (from, to) => renameSync(from, to),
-  remove: (path) => {
-    if (existsSync(path)) unlinkSync(path)
-  },
-  ensureDir: (path) => mkdirSync(path, { recursive: true }),
-}
-
-interface FileSinkOptions {
-  filePath: string
-  /** Bytes per generation before rotating; default 5 MB. */
-  maxBytes?: number
-  /** Total generations kept including the current file; default 3. */
-  maxGenerations?: number
-  io?: FileSinkIO
-}
-
-const DEFAULT_MAX_BYTES = 5 * 1024 * 1024
-const DEFAULT_MAX_GENERATIONS = 3
+const MAX_BYTES = 5 * 1024 * 1024
+const MAX_GENERATIONS = 3
 const REDACTED = '[REDACTED]'
 /** Short secrets would nuke common substrings; real API keys are always longer. */
 const MIN_SECRET_LENGTH = 8
@@ -77,17 +47,11 @@ const GENERIC_SECRET_PATTERNS = [
  */
 export class RotatingFileSink implements LogSink {
   private readonly filePath: string
-  private readonly maxBytes: number
-  private readonly maxGenerations: number
-  private readonly io: FileSinkIO
   private secrets: string[] = []
   private dirReady = false
 
-  constructor(options: FileSinkOptions) {
-    this.filePath = options.filePath
-    this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
-    this.maxGenerations = Math.max(1, options.maxGenerations ?? DEFAULT_MAX_GENERATIONS)
-    this.io = options.io ?? nodeFileSinkIO
+  constructor(filePath: string) {
+    this.filePath = filePath
   }
 
   /** Configured API keys, replaced literally before writing. */
@@ -99,13 +63,14 @@ export class RotatingFileSink implements LogSink {
     try {
       const sanitized = this.sanitize(line)
       if (!this.dirReady) {
-        this.io.ensureDir(dirname(this.filePath))
+        mkdirSync(dirname(this.filePath), { recursive: true })
         this.dirReady = true
       }
-      if (this.io.size(this.filePath) + Buffer.byteLength(sanitized) > this.maxBytes) {
+      const size = existsSync(this.filePath) ? statSync(this.filePath).size : 0
+      if (size + Buffer.byteLength(sanitized) > MAX_BYTES) {
         this.rotate()
       }
-      this.io.append(this.filePath, sanitized)
+      appendFileSync(this.filePath, sanitized)
     } catch {
       // Logging must never take the app down.
     }
@@ -123,13 +88,13 @@ export class RotatingFileSink implements LogSink {
   }
 
   private rotate(): void {
-    // generations: current, .1, .2, ... up to maxGenerations - 1 backups
-    for (let i = this.maxGenerations - 1; i >= 1; i -= 1) {
+    // generations: current, .1, .2, ... up to MAX_GENERATIONS - 1 backups
+    for (let i = MAX_GENERATIONS - 1; i >= 1; i -= 1) {
       const from = i === 1 ? this.filePath : `${this.filePath}.${i - 1}`
       const to = `${this.filePath}.${i}`
-      if (!this.io.exists(from)) continue
-      this.io.remove(to)
-      this.io.rename(from, to)
+      if (!existsSync(from)) continue
+      if (existsSync(to)) unlinkSync(to)
+      renameSync(from, to)
     }
   }
 }
