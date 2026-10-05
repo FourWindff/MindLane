@@ -28,14 +28,6 @@ import { buildSubgraphToolMessage } from '../subgraphRouter.js'
 
 const log = logger.withContext('palace')
 
-/** Per-run start times keyed by streamId for the closing summary line. */
-const runStarts = new Map<string, number>()
-
-/** Run key for the per-stream bookkeeping maps (see `requireStreamId`). */
-function runKey(): string {
-  return requireStreamId('memory palace subgraph')
-}
-
 // ===== Configuration options =====
 
 interface PalaceSubgraphOptions {
@@ -211,7 +203,9 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
           palaceToolSteps: [],
         }
       }
-      runStarts.set(runKey(), Date.now())
+      // The subgraph's per-stream bookkeeping (model call counts, stage traces)
+      // keys off the Runner's streamId: fail loudly instead of sharing a bucket.
+      requireStreamId('memory palace subgraph')
       log.info(
         'input: nodes=%d, text=%d chars',
         resolution.palaceInputNodes.length,
@@ -243,7 +237,6 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       const toolSteps = beginStage(state, 'generating-image')
       const start = Date.now()
       const result = await svgGen.invoke(state)
-      runStarts.delete(runKey())
       log.info(
         'svgGen finished: artwork %s, %ss',
         result.imageUrls?.length ? 'available' : 'missing',
@@ -278,12 +271,8 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         ((Date.now() - start) / 1000).toFixed(1),
       )
 
-      const key = runKey()
-      const runStart = runStarts.get(key)
-      runStarts.delete(key)
       log.info(
-        'done: %ss total, %d stations produced, %d model calls',
-        runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
+        'done: %d stations produced, %d model calls',
         route?.length ?? 0,
         takeModelCallCount(currentStreamId() ?? ''),
       )

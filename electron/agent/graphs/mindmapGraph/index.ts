@@ -38,20 +38,9 @@ const XML_GENERATION_ATTEMPTS = 3
 /** Wave width: max parallel leaf/merge branches per super-step (ADR-0008). */
 const EXTRACT_CONCURRENCY = 4
 
-/** Per-run start times keyed by streamId so summary lines can report total elapsed. */
-const runStarts = new Map<string, number>()
-
 /** Run key for the per-stream bookkeeping maps (see `requireStreamId`). */
 function runKey(): string {
   return requireStreamId('mindmap subgraph')
-}
-
-/** Read and clear the run start (build_output always runs, so this never leaks). */
-function takeRunStart(): number | undefined {
-  const key = runKey()
-  const start = runStarts.get(key)
-  runStarts.delete(key)
-  return start
 }
 
 function countTreeNodes(node: MindmapOutlineNode): number {
@@ -251,7 +240,6 @@ async function resolveInputNode(
     }
   }
 
-  runStarts.set(runKey(), Date.now())
   resetItemProgress()
   // A new run starts: clear the previous leftover trace (build_output already
   // consumed it; this is a leak safety net).
@@ -486,9 +474,8 @@ async function buildOutputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<typeof MindmapSubgraphState.Update> {
   emitProgress(state.mindmapToolCallId, 'finalizing')
-  // build_output always terminates a run — consume the run start and the item
-  // progress counter here so failed runs don't leak entries in either map.
-  const runStart = takeRunStart()
+  // build_output always terminates a run — consume the item progress counter
+  // here so failed runs don't leak entries in the map.
   const toolSteps = takeStepTrace() ?? []
   resetItemProgress()
 
@@ -531,8 +518,7 @@ async function buildOutputNode(
   }
 
   log.info(
-    'done: %ss total, %d nodes produced, %d model calls, title=%s',
-    runStart ? ((Date.now() - runStart) / 1000).toFixed(1) : '0',
+    'done: %d nodes produced, %d model calls, title=%s',
     countTreeNodes(tree),
     takeModelCallCount(currentStreamId() ?? ''),
     finalTitle,
