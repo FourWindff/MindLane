@@ -581,7 +581,14 @@ describe('MindmapWriteResponder', () => {
  * the subgraph payload.
  */
 describe('MindmapWriteResponder landPalace', () => {
-  const station = (order: number, content: string) => ({ order, content, x: 0.2, y: 0.3 })
+  const station = (order: number, content: string) => ({
+    order,
+    content,
+    anchorVisual: `anchor-${order}`,
+    x: 0.2,
+    y: 0.3,
+    linkedNodeId: '',
+  })
 
   it('creates a new palace when there is no placeholder and rewires the parent edges as "new palace → selected nodes"', async () => {
     const { editor, store } = createRealEditor()

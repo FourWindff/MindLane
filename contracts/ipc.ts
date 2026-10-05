@@ -153,12 +153,11 @@ export type ChatStreamEvent =
 /**
  * Ephemeral run marker (CONTEXT.md "ephemeral run"): the manual palace generation.
  * The run lives on a private checkpoint thread, writes no session record and
- * still emits stream events; `runEntry` picks the graph's edge out of START.
+ * still emits stream events; the marker itself picks the palace entry out of START.
  */
 export interface EphemeralRunRequest {
   /** Resume by re-running with the same id and empty input; never a session id. */
   privateThreadId: string
-  runEntry: 'palace'
   /**
    * Continue the private thread instead of starting it: when the thread still
    * has a pending super-step (a stopped run), the graph is driven with no new

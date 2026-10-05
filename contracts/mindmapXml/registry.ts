@@ -9,7 +9,7 @@
  */
 
 import { escapeXml } from './escape.js'
-import type { MindLaneAsset, MindmapXmlNode, XmlElementLike } from './types.js'
+import type { MindmapXmlNode, XmlElementLike } from './types.js'
 
 interface XmlNodeReaderContext {
   /** XML attributes (lowercase keys, entities already unescaped) */
@@ -200,5 +200,3 @@ register({
 })
 
 // ─── Shared utilities ────────────────────────────────────────────────────────────────
-
-export type { MindLaneAsset }

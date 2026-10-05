@@ -5,6 +5,7 @@
  */
 
 import type { ChatContext } from './ipc.js'
+import { escapeXml as xmlEscape } from './mindmapXml/escape.js'
 
 // ---- Turn state contract ----
 // Single serialization and stripping implementation: persistence in the main
@@ -13,15 +14,6 @@ import type { ChatContext } from './ipc.js'
 
 /** Root tag name of the turn-state XML block. */
 export const EDITOR_STATE_TAG = 'EDITOR_STATE'
-
-/** XML attribute-value escaping: `<` `>` `&` `"` cannot break the structure. */
-export function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
 
 /**
  * Serialize `ChatContext` into an `<EDITOR_STATE>` XML block (turn state).

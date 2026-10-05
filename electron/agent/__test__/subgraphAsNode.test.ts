@@ -246,7 +246,7 @@ describe('Manual palace: one ephemeral run', () => {
       fileTitle: 'Reading notes',
       selectedNodes: [{ id: 'n1', type: 'text' as const, label: 'First station' }],
     },
-    ephemeral: { privateThreadId, runEntry: 'palace' as const, ...(resume ? { resume } : {}) },
+    ephemeral: { privateThreadId, ...(resume ? { resume } : {}) },
   })
 
   it('runs no model turns, writes no session, emits stage progress, and ends with a single landing payload', async () => {

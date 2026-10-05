@@ -91,7 +91,6 @@ async function sendRun(
     context: run.context,
     ephemeral: {
       privateThreadId: run.threadId,
-      runEntry: 'palace',
       ...(options.resume ? { resume: true } : {}),
     },
   })

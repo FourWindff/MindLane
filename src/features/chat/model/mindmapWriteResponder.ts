@@ -8,7 +8,7 @@ import {
   formatXmlError,
   isValidSvgArtwork,
   parseXmlFragment,
-  serializeTreeFragment,
+  serializeMindmapSection,
   type MindLaneAsset,
   validateMove,
 } from '@contracts/mindmapXml'
@@ -167,7 +167,7 @@ async function materializePalaceArtwork(
   }
 
   return {
-    xml: changed ? serializeTreeFragment(parsed.nodes, parsed.edges) : xml,
+    xml: changed ? serializeMindmapSection(parsed.nodes, parsed.edges) : xml,
     nodeCount: parsed.nodes.length,
     rootId: parsed.rootIds[0]!,
     assets,

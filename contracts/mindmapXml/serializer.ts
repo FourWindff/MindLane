@@ -5,6 +5,7 @@
  */
 
 import type { MindLaneFile } from '../fileFormat.js'
+import type { PalaceRunPayload } from '../palace.js'
 import { escapeXml } from './escape.js'
 import { xmlNodeTypeRegistry } from './registry.js'
 import {
@@ -97,23 +98,10 @@ function serializeSubtree(
 }
 
 /**
- * Serialize nodes/edges into an XML fragment (multiple top-level <node> = multiple roots).
- * Positions, edges and transient UI markers are never persisted (PRD 2.2).
+ * Palace landing input: the successful subgraph payload (CONTEXT.md "subgraph
+ * output"); the error envelope never lands.
  */
-export function serializeTreeFragment(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string {
-  return serializeMindmapSection(nodes, edges)
-}
-
-/**
- * Palace landing input: the subgraph payload (CONTEXT.md "subgraph output") minus the
- * kind/error envelope.
- */
-interface PalaceNodePayload {
-  label: string
-  imageUrl: string
-  stations: readonly unknown[]
-  sourceNodeIds: readonly string[]
-}
+type PalaceNodePayload = Omit<Extract<PalaceRunPayload, { ok: true }>, 'ok'>
 
 /**
  * Palace payload → XML fragment (deterministic landing: serialized by **code**;

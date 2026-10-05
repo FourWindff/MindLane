@@ -17,7 +17,6 @@ export { parseXmlTolerant, topLevelElements } from './parser.js'
 export { isValidSvgArtwork } from './svg.js'
 export {
   serializeMindLaneFile,
-  serializeTreeFragment,
   serializeMindmapSection,
   serializePalaceNodeXml,
 } from './serializer.js'

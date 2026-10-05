@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState, xmlEscape } from '../ipc.js'
+import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState } from '../ipc.js'
 import type { ChatContext, MindmapReadRequest, MindmapReadResponse } from '../ipc.js'
 
 /** Minimal context: file identity + empty selection. */
@@ -155,10 +155,6 @@ describe('serializeTurnState', () => {
     expect(xml).not.toContain('<MINDMAP')
     // Mindmap tree nodes (root etc.) never appear: only the selected nodes inside SELECTED_NODES.
     expect(xml).not.toContain('root (id:')
-  })
-
-  it('xmlEscape escapes the five XML specials', () => {
-    expect(xmlEscape('a&b<c>"d\'e')).toBe("a&amp;b&lt;c&gt;&quot;d'e")
   })
 })
 

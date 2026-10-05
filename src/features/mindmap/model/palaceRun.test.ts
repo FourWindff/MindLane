@@ -128,10 +128,9 @@ describe('palaceRun', () => {
 
     const request = harness.chatStream.mock.calls[0]![0] as {
       message: string
-      ephemeral: { privateThreadId: string; runEntry: string }
+      ephemeral: { privateThreadId: string }
     }
     expect(request.message).toBe('')
-    expect(request.ephemeral.runEntry).toBe('palace')
     expect(request.ephemeral.privateThreadId).toBeTruthy()
 
     // Stage progress lands on the placeholder node (beside the node, not in chat).

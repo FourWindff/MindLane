@@ -1073,7 +1073,7 @@ describe('StreamManager + Runner', () => {
       message: '',
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a' },
-      ephemeral: { privateThreadId: 'palace-thread-1', runEntry: 'palace' },
+      ephemeral: { privateThreadId: 'palace-thread-1' },
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
@@ -1110,7 +1110,7 @@ describe('StreamManager + Runner', () => {
       message: '',
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a' },
-      ephemeral: { privateThreadId: 'palace-thread-2', runEntry: 'palace' },
+      ephemeral: { privateThreadId: 'palace-thread-2' },
     })
     await waitUntil(() => events.some((event) => event.type === 'token'))
 

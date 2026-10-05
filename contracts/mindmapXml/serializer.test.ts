@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createEmptyFile, type MindLaneFile } from '../fileFormat.js'
 import type { MindmapXmlEdge, MindmapXmlNode } from './types.js'
-import { serializeMindLaneFile, serializeTreeFragment, serializeMindmapSection } from './serializer'
+import { serializeMindLaneFile, serializeMindmapSection } from './serializer'
 import { deserializeMindLaneFile, parseXmlFragment } from './deserializer'
 
 function makeNodes(
@@ -206,7 +206,7 @@ describe('serializeMindLaneFile', () => {
   })
 })
 
-describe('serializeTreeFragment', () => {
+describe('serializeMindmapSection fragment output', () => {
   it('serializes a subtree fragment with nested nodes', () => {
     const nodes = makeNodes(
       { id: 'n1', type: 'text', label: 'a' },
@@ -217,7 +217,7 @@ describe('serializeTreeFragment', () => {
       { id: 'e1', source: 'n1', target: 'n2', type: 'mindmap' },
       { id: 'e2', source: 'n2', target: 'n3', type: 'mindmap' },
     ]
-    const xml = serializeTreeFragment(nodes, edges)
+    const xml = serializeMindmapSection(nodes, edges)
     expect(xml).toBe(
       '<node id="n1" type="text" content="a">\n  <node id="n2" type="text" content="b">\n    <node id="n3" type="text" content="c" />\n  </node>\n</node>',
     )
@@ -228,7 +228,7 @@ describe('serializeTreeFragment', () => {
       { id: 'n1', type: 'text', label: 'a' },
       { id: 'n2', type: 'text', label: 'b' },
     )
-    const xml = serializeTreeFragment(nodes, [])
+    const xml = serializeMindmapSection(nodes, [])
     expect(xml.split('\n')).toHaveLength(2)
   })
 
@@ -243,7 +243,7 @@ describe('serializeTreeFragment', () => {
       { id: 'e1', source: 'n1', target: 'n2', type: 'mindmap' },
       { id: 'e2', source: 'n2', target: 'n3', type: 'mindmap' },
     ]
-    const xml = serializeTreeFragment(nodes, edges)
+    const xml = serializeMindmapSection(nodes, edges)
     const parsed = await parseXmlFragment(xml)
     expect(parsed.nodes).toHaveLength(3)
     expect(parsed.edges).toHaveLength(2)
@@ -319,7 +319,7 @@ describe('visual sibling order (edge order may diverge)', () => {
   })
 
   it('serializeTreeFragment emits children in visual order', () => {
-    const xml = serializeTreeFragment(nodes, edges)
+    const xml = serializeMindmapSection(nodes, edges)
     expect(xml.indexOf('content="a"')).toBeLessThan(xml.indexOf('content="above"'))
     expect(xml.indexOf('content="above"')).toBeLessThan(xml.indexOf('content="b"'))
   })

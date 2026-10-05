@@ -399,7 +399,7 @@ export class Runner {
       context: request.context,
       documentRef: request.documentRef ?? null,
       artworkStyle: runtime.artworkStyle,
-      runEntry: request.ephemeral?.runEntry ?? 'chat',
+      runEntry: request.ephemeral ? 'palace' : 'chat',
     }
   }
 
