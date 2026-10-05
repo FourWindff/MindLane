@@ -6,11 +6,8 @@ import { deserializeMindLaneFile } from '@contracts/mindmapXml'
 
 function createDirtyInstance(filePath: string | null): OpenFile {
   const instance = new OpenFile('test')
-  if (filePath) {
-    instance.load(filePath, createEmptyFile('B'), '/ws')
-  } else {
-    instance.newFile('B')
-  }
+  instance.load(filePath ?? '', createEmptyFile('B'), filePath ? '/ws' : null)
+  if (!filePath) instance.store.setState({ filePath: null })
   instance.editor.addChild('root', { label: 'Node added in the background' })
   return instance
 }

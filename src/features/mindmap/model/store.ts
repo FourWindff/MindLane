@@ -53,8 +53,6 @@ export interface OpenFileState {
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void
 
   loadFile: (filePath: string, data: MindLaneFile, workspacePath: string | null) => void
-  newFile: (title?: string) => void
-  clearDocument: () => void
   toMindLaneFile: () => MindLaneFile
   addDocumentRef: (ref: DocumentRef) => void
 }
@@ -164,48 +162,6 @@ export function createMindmapStore(): MindmapStore {
         dirty: false,
         viewport: data.mindmap.viewport,
         style,
-        canUndo: false,
-        canRedo: false,
-      })
-    },
-
-    newFile: (title) => {
-      const f = createEmptyFile(title)
-      set({
-        nodes: f.mindmap.nodes as Node[],
-        edges: f.mindmap.edges as Edge[],
-        documentRefs: [],
-        hasDocumentOpen: true,
-        filePath: null,
-        fileUuid: f.metadata.fileUuid,
-        fileTitle: f.metadata.title,
-        fileCreatedAt: f.metadata.createdAt,
-        workspacePath: null,
-        dirty: false,
-        viewport: f.mindmap.viewport,
-        assets: [],
-        style: { ...DEFAULT_STYLE },
-        canUndo: false,
-        canRedo: false,
-      })
-    },
-
-    clearDocument: () => {
-      const f = createEmptyFile()
-      set({
-        nodes: f.mindmap.nodes as Node[],
-        edges: f.mindmap.edges as Edge[],
-        hasDocumentOpen: false,
-        filePath: null,
-        fileUuid: f.metadata.fileUuid,
-        fileTitle: f.metadata.title,
-        fileCreatedAt: f.metadata.createdAt,
-        workspacePath: null,
-        dirty: false,
-        viewport: f.mindmap.viewport,
-        assets: [],
-        style: { ...DEFAULT_STYLE },
-        documentRefs: [],
         canUndo: false,
         canRedo: false,
       })

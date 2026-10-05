@@ -5,10 +5,11 @@ import { OpenFile } from '@/features/mindmap/model/openFile'
 import { OpenFileContext } from '@/features/mindmap/hooks/useActiveOpenFile'
 import { SCHEME_PALETTES } from '@/features/mindmap/theme/colorPalettes'
 import { COLOR_SCHEMES } from '@/features/mindmap/theme/presets'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 function renderStylePanel(): string {
   const instance = new OpenFile('/test/path.mindlane')
-  instance.newFile('Test file')
+  instance.load('/test.mindlane', createEmptyFile('Test file'), null)
   instance.store
     .getState()
     .setStyle({ structureType: 'mindmap', visualVariant: 'card', colorScheme: 'warm' })

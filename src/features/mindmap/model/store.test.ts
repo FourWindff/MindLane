@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore } from './store'
-import { createEmptyFile, DEFAULT_VIEWPORT } from '@contracts/fileFormat'
+import { createEmptyFile } from '@contracts/fileFormat'
 import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 
 describe('store.viewport', () => {
@@ -8,7 +8,7 @@ describe('store.viewport', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('Test')
+    store.getState().loadFile('/test/empty.mindlane', createEmptyFile('Test'), null)
   })
 
   it('should restore viewport from loaded file', () => {
@@ -27,22 +27,6 @@ describe('store.viewport', () => {
 
     expect(file.mindmap.viewport).toEqual({ x: 50, y: 75, zoom: 1.2 })
   })
-
-  it('should reset viewport on newFile', () => {
-    store.getState().setViewport({ x: 999, y: 999, zoom: 2 })
-
-    store.getState().newFile('New file')
-
-    expect(store.getState().viewport).toEqual(DEFAULT_VIEWPORT)
-  })
-
-  it('should reset viewport on clearDocument', () => {
-    store.getState().setViewport({ x: 999, y: 999, zoom: 2 })
-
-    store.getState().clearDocument()
-
-    expect(store.getState().viewport).toEqual(DEFAULT_VIEWPORT)
-  })
 })
 
 describe('store.style', () => {
@@ -50,7 +34,7 @@ describe('store.style', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('Test')
+    store.getState().loadFile('/test/empty.mindlane', createEmptyFile('Test'), null)
   })
 
   it('should restore per-file style from loaded file', () => {
@@ -100,22 +84,10 @@ describe('store.style', () => {
 
     expect(store.getState().dirty).toBe(false)
   })
-
-  it('should reset style on newFile', () => {
-    store.getState().setStyle({ structureType: 'mindmap', colorScheme: 'night' })
-
-    store.getState().newFile('New file')
-
-    expect(store.getState().style).toEqual({
-      structureType: 'logic',
-      visualVariant: 'card',
-      colorScheme: 'default',
-    })
-  })
 })
 
 describe('store.workspacePath', () => {
-  it('records workspacePath on loadFile and clears it on newFile/clearDocument', () => {
+  it('records workspacePath on loadFile', () => {
     const store = createMindmapStore()
     const file = createEmptyFile('WS')
 
@@ -123,13 +95,6 @@ describe('store.workspacePath', () => {
 
     store.getState().loadFile('/ws/a.mindlane', file, '/ws')
     expect(store.getState().workspacePath).toBe('/ws')
-
-    store.getState().newFile('Fresh')
-    expect(store.getState().workspacePath).toBeNull()
-
-    store.getState().loadFile('/ws/b.mindlane', file, '/ws')
-    store.getState().clearDocument()
-    expect(store.getState().workspacePath).toBeNull()
   })
 })
 
@@ -142,15 +107,6 @@ describe('store.fileUuid', () => {
 
     expect(store.getState().toMindLaneFile().metadata.fileUuid).toBe(file.metadata.fileUuid)
   })
-
-  it('creates a fresh UUID for a new file', () => {
-    const store = createMindmapStore()
-    const previousUuid = store.getState().toMindLaneFile().metadata.fileUuid
-
-    store.getState().newFile('Fresh')
-
-    expect(store.getState().toMindLaneFile().metadata.fileUuid).not.toBe(previousUuid)
-  })
 })
 
 describe('store.documentRefs', () => {
@@ -158,7 +114,7 @@ describe('store.documentRefs', () => {
 
   beforeEach(() => {
     store = createMindmapStore()
-    store.getState().newFile('Test')
+    store.getState().loadFile('/test/empty.mindlane', createEmptyFile('Test'), null)
   })
 
   it('should persist document refs in toMindLaneFile', () => {

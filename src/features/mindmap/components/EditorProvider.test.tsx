@@ -10,6 +10,7 @@ import {
 import { MindmapEditor } from '@/features/mindmap/model/editor'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 function ProbeComponent() {
   const instance = useActiveOpenFile()
@@ -32,7 +33,7 @@ function ProbeComponent() {
 function prepareActiveInstance(key: string) {
   resetRegistry()
   const instance = openFileRegistry.getOrCreate(key)
-  instance.newFile('Test file')
+  instance.load('/test.mindlane', createEmptyFile('Test file'), null)
   openFileRegistry.setActive(key)
   return instance
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { openFileRegistry } from './openFileRegistry'
 import { resetRegistry } from './registryReset.testutil'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('OpenFileRegistry', () => {
   beforeEach(() => {
@@ -15,13 +16,13 @@ describe('OpenFileRegistry', () => {
 
   it('should isolate history between files', () => {
     const fileA = openFileRegistry.getOrCreate('/a.mindlane')
-    fileA.newFile('A')
+    fileA.load('/a.mindlane', createEmptyFile('A'), null)
     const rootA = fileA.store.getState().nodes[0]!.id
     fileA.editor.addChild(rootA)
     expect(fileA.store.getState().canUndo).toBe(true)
 
     const fileB = openFileRegistry.getOrCreate('/b.mindlane')
-    fileB.newFile('B')
+    fileB.load('/b.mindlane', createEmptyFile('B'), null)
     expect(fileB.store.getState().canUndo).toBe(false)
 
     openFileRegistry.setActive('/a.mindlane')
@@ -30,13 +31,13 @@ describe('OpenFileRegistry', () => {
 
   it('should preserve history when switching active files', () => {
     const fileA = openFileRegistry.getOrCreate('/a.mindlane')
-    fileA.newFile('A')
+    fileA.load('/a.mindlane', createEmptyFile('A'), null)
     const rootA = fileA.store.getState().nodes[0]!.id
     fileA.editor.addChild(rootA)
 
     openFileRegistry.setActive('/a.mindlane')
     const fileB = openFileRegistry.getOrCreate('/b.mindlane')
-    fileB.newFile('B')
+    fileB.load('/b.mindlane', createEmptyFile('B'), null)
     openFileRegistry.setActive('/b.mindlane')
 
     // History must survive switching back to a
@@ -46,7 +47,7 @@ describe('OpenFileRegistry', () => {
 
   it('should drop oldest undo entry after 10 commands', () => {
     const file = openFileRegistry.getOrCreate('/cap.mindlane')
-    file.newFile('Cap')
+    file.load('/cap.mindlane', createEmptyFile('Cap'), null)
     const root = file.store.getState().nodes[0]!.id
 
     const nodeIds: string[] = []
@@ -65,7 +66,7 @@ describe('OpenFileRegistry', () => {
 
   it('should release instance history on close', () => {
     const file = openFileRegistry.getOrCreate('/close.mindlane')
-    file.newFile('Close')
+    file.load('/close.mindlane', createEmptyFile('Close'), null)
     const root = file.store.getState().nodes[0]!.id
     file.editor.addChild(root)
 
@@ -78,7 +79,7 @@ describe('OpenFileRegistry', () => {
 
   it('should rename instance key without losing history', () => {
     const file = openFileRegistry.getOrCreate('/old.mindlane')
-    file.newFile('Old')
+    file.load('/old.mindlane', createEmptyFile('Old'), null)
     const root = file.store.getState().nodes[0]!.id
     file.editor.addChild(root)
 

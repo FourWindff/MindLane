@@ -4,6 +4,7 @@ import { MindmapHistory } from './history'
 import { MindmapEditor } from './editor'
 import { serializeMindLaneFile } from '@contracts/mindmapXml'
 import { MindmapXmlError } from '@contracts/mindmapXml'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('MindmapEditor XML integration', () => {
   let store: ReturnType<typeof createMindmapStore>
@@ -14,7 +15,7 @@ describe('MindmapEditor XML integration', () => {
     store = createMindmapStore()
     history = new MindmapHistory()
     editor = new MindmapEditor(store, history)
-    editor.newFile('Test')
+    editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
   })
 
   describe('insertFromXml', () => {

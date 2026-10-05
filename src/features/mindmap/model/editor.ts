@@ -941,18 +941,6 @@ export class MindmapEditor {
     this.syncHistoryState()
   }
 
-  newFile(title?: string): void {
-    this.state.newFile(title)
-    this.history.clear()
-    this.syncHistoryState()
-  }
-
-  clearDocument(): void {
-    this.state.clearDocument()
-    this.history.clear()
-    this.syncHistoryState()
-  }
-
   // ─── Internal helpers ───
 
   private takeSnapshot(): MindmapSnapshot {

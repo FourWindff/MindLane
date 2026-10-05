@@ -14,7 +14,7 @@ describe('MindmapEditor', () => {
     store = createMindmapStore()
     history = new MindmapHistory()
     editor = new MindmapEditor(store, history)
-    editor.newFile('Test')
+    editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
   })
 
   function rootId(): string {

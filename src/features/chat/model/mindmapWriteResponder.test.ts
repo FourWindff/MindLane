@@ -6,6 +6,7 @@ import { MindmapHistory } from '@/features/mindmap/model/history'
 import { createMindmapStore } from '@/features/mindmap/model/store'
 import { MindmapXmlError, formatXmlError } from '@contracts/mindmapXml'
 import type { MindmapWriteRequest } from '@contracts/ipc'
+import { createEmptyFile } from '@contracts/fileFormat'
 import { createMindmapWriteResponder, insertPalacePlaceholder } from './mindmapWriteResponder'
 import { serializePalaceNodeXml } from '@contracts/mindmapXml'
 
@@ -69,7 +70,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0))
 function createRealEditor() {
   const store = createMindmapStore()
   const editor = new RealMindmapEditor(store, new MindmapHistory())
-  editor.newFile('Responder test')
+  editor.loadFile('', createEmptyFile('Responder test'), null)
   return { editor, store }
 }
 

@@ -3,12 +3,13 @@ import { MindmapEditor } from './editor'
 import { MindmapHistory } from './history'
 import { createMindmapStore } from './store'
 import { createMindmapOperationController } from './operationController'
+import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('MindmapOperationController integration', () => {
   it('keeps consecutive children attached to the selected parent', () => {
     const store = createMindmapStore()
     const editor = new MindmapEditor(store, new MindmapHistory())
-    editor.newFile('Test')
+    editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
 
     const rootId = store.getState().nodes[0]!.id
     const parentId = editor.addChild(rootId).nodeId

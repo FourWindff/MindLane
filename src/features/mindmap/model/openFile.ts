@@ -55,11 +55,6 @@ export class OpenFile {
     this.history.clear()
   }
 
-  newFile(title?: string): void {
-    this.store.getState().newFile(title)
-    this.history.clear()
-  }
-
   dispose(): void {
     this.editor.cancelPendingDeletes()
     this.history.clear()
