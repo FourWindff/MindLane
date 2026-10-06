@@ -1,4 +1,6 @@
 import { useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Sparkles, FileText, Trash2 } from 'lucide-react'
 import {
   selectCurrentChatActiveSessionId,
@@ -12,7 +14,6 @@ import {
   type ChatSession,
 } from '@/features/chat/model/aiStore'
 import { cx } from '@/features/chat/lib/cx'
-import { MarkdownContent } from './MarkdownContent'
 import { ToolCardList } from './ToolCardList'
 
 import '../styles/chat-message-list.css'
@@ -25,6 +26,14 @@ const QUICK_ACTIONS = [
   { label: 'Brainstorm', prompt: 'Brainstorm some creative ideas for me' },
   { label: 'Optimize structure', prompt: 'Optimize the structure of the current mindmap' },
 ]
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="chat-float-markdown">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  )
+}
 
 /**
  * Fold pure-tool assistant messages (no text, only tool calls) into the next

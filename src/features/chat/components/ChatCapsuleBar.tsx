@@ -6,9 +6,26 @@ import {
   type ChatCapsuleEntry,
 } from '@/features/chat/model/aiStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
-import { resolveCapsuleOpenPath } from '@/features/chat/lib/capsuleOpenPath'
+import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 
 import '../styles/chat-capsule-bar.css'
+
+/**
+ * Resolve the file path to open when a capsule is clicked: prefer the currently
+ * loaded instance (freshest after a rename or move), falling back to the
+ * persisted `fileUuidPaths` map when the file was not opened in this launch.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- exported for its unit test; the only cost is a full-page HMR refresh
+export function resolveCapsuleOpenPath(
+  fileUuid: string,
+  fileUuidPaths: Record<string, string>,
+): string | null {
+  return (
+    openFileRegistry.getByFileUuid(fileUuid)?.store.getState().filePath ??
+    fileUuidPaths[fileUuid] ??
+    null
+  )
+}
 
 interface ChatCapsuleBarProps {
   expanded: boolean

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
-import { ChatCapsuleBar } from './ChatCapsuleBar'
-import { resolveCapsuleOpenPath } from '@/features/chat/lib/capsuleOpenPath'
+import { ChatCapsuleBar, resolveCapsuleOpenPath } from './ChatCapsuleBar'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 
 interface MockFileChat {

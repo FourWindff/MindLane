@@ -1,8 +1,10 @@
 import { BaseEdge, getBezierPath, getSmoothStepPath, useStore, type EdgeProps } from '@xyflow/react'
 import { useMemo, type CSSProperties } from 'react'
-import { computeSiblingCurvature } from './siblingOffset'
 import { buildTaperedPath } from './taperedEdge'
-import { resolveEdgeGeometry } from '@/features/mindmap/model/layout/edgeGeometry'
+import {
+  computeSiblingCurvature,
+  resolveEdgeGeometry,
+} from '@/features/mindmap/model/layout/edgeGeometry'
 import { useMapStyle } from '@/features/mindmap/theme/useMapStyle'
 import { getEdgeColor, getNodeColor } from '@/features/mindmap/theme/colorPalettes'
 
