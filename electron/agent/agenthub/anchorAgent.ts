@@ -6,7 +6,11 @@ import { buildAnchorLocateMessages } from './prompts/anchorLocate.js'
 import { PalaceAgent } from './base.js'
 import { messageContentToString, formatAgentError } from '../utils.js'
 import { logger } from '../../shared/logger.js'
-import { applyCanonicalLayout, buildFallbackSummary, buildRouteFromCoordinates } from './palaceLayout.js'
+import {
+  applyCanonicalLayout,
+  buildFallbackSummary,
+  buildRouteFromCoordinates,
+} from './palaceLayout.js'
 
 // ===== Vision Agent core logic =====
 
