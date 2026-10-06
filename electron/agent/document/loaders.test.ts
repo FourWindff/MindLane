@@ -1,0 +1,331 @@
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { Document } from '@langchain/core/documents'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { loadDocument, createDefaultLoaders, type DocumentLoaderRegistry } from './loaders.js'
+import { OfficeConverter } from 'officeparser/slim'
+import { PDFParse } from 'pdf-parse'
+import {
+  createDocxFixture,
+  createPptxFixture,
+  createXlsxFixture,
+} from './officeFixtures.testutil.js'
+
+// Repeated vi.spyOn on the same prototype method (PDFParse) accumulates spy call
+// counts across tests; restore all spies after each test to isolate them.
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+function fakeRegistry(): DocumentLoaderRegistry & {
+  pdf: ReturnType<typeof vi.fn>
+  url: ReturnType<typeof vi.fn>
+  text: ReturnType<typeof vi.fn>
+} {
+  return {
+    pdf: vi.fn().mockResolvedValue([new Document({ pageContent: 'pdf text' })]),
+    url: vi.fn().mockResolvedValue([new Document({ pageContent: 'url text' })]),
+    text: vi.fn().mockResolvedValue([new Document({ pageContent: 'plain text' })]),
+  }
+}
+
+describe('loadDocument registry routing', () => {
+  it('routes pdf input to the pdf loader', async () => {
+    const registry = fakeRegistry()
+    const source = { type: 'pdf' as const, path: '/tmp/a.pdf' }
+
+    const docs = await loadDocument(source, registry)
+
+    expect(registry.pdf).toHaveBeenCalledWith(source)
+    expect(registry.url).not.toHaveBeenCalled()
+    expect(docs[0]!.pageContent).toBe('pdf text')
+  })
+
+  it('routes url input to the url loader', async () => {
+    const registry = fakeRegistry()
+    const source = { type: 'url' as const, url: 'https://example.test/a' }
+
+    const docs = await loadDocument(source, registry)
+
+    expect(registry.url).toHaveBeenCalledWith(source)
+    expect(registry.pdf).not.toHaveBeenCalled()
+    expect(docs[0]!.pageContent).toBe('url text')
+  })
+
+  it('routes text input to the text loader', async () => {
+    const registry = fakeRegistry()
+    const source = { type: 'text' as const, content: 'hello' }
+
+    const docs = await loadDocument(source, registry)
+
+    expect(registry.text).toHaveBeenCalledWith(source)
+    expect(docs[0]!.pageContent).toBe('plain text')
+  })
+
+  it('throws a clear error when the registry lacks the loader', async () => {
+    await expect(loadDocument({ type: 'pdf', path: '/tmp/a.pdf' }, {})).rejects.toThrow(
+      'Unsupported input type: pdf',
+    )
+  })
+})
+
+describe('default text loader', () => {
+  it('wraps text into a single Document', async () => {
+    const docs = await loadDocument({ type: 'text', content: 'directly pasted content' })
+
+    expect(docs).toHaveLength(1)
+    expect(docs[0]!.pageContent).toBe('directly pasted content')
+  })
+
+  it('throws a clear error for empty text', async () => {
+    await expect(loadDocument({ type: 'text', content: '   ' })).rejects.toThrow(
+      'Text input is empty.',
+    )
+  })
+})
+
+describe('default registry', () => {
+  it('covers all supported input types', () => {
+    const registry = createDefaultLoaders()
+    expect(Object.keys(registry).sort()).toEqual([
+      'docx',
+      'markdown',
+      'pdf',
+      'pptx',
+      'text',
+      'url',
+      'xlsx',
+    ])
+  })
+})
+
+describe('default file loaders', () => {
+  async function fixturePath(filename: string, content: string | Buffer): Promise<string> {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'mindlane-document-'))
+    const filePath = path.join(directory, filename)
+    await writeFile(filePath, content)
+    return filePath
+  }
+
+  it('loads docx content along paragraph boundaries', async () => {
+    const filePath = await fixturePath('report.docx', createDocxFixture())
+
+    const docs = await loadDocument({ type: 'docx', path: filePath })
+
+    expect(docs.map((doc) => doc.pageContent)).toEqual(['Quarterly report', 'Revenue increased'])
+  })
+
+  it('falls back to the office text conversion when no chunks are produced', async () => {
+    const filePath = await fixturePath('report.docx', createDocxFixture())
+    const convertSpy = vi
+      .spyOn(OfficeConverter, 'convert')
+      .mockResolvedValueOnce({ value: [], messages: [] } as never)
+      .mockResolvedValueOnce({ value: 'Recovered DOCX text', messages: [] } as never)
+
+    await expect(loadDocument({ type: 'docx', path: filePath })).resolves.toEqual([
+      expect.objectContaining({ pageContent: 'Recovered DOCX text' }),
+    ])
+
+    expect(convertSpy).toHaveBeenCalledTimes(2)
+    convertSpy.mockRestore()
+  })
+
+  it('loads pptx content with slide metadata', async () => {
+    const filePath = await fixturePath('slides.pptx', createPptxFixture())
+
+    const docs = await loadDocument({ type: 'pptx', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.slideNumber])).toEqual([
+      ['Opening slide', 1],
+      ['Closing slide', 2],
+    ])
+  })
+
+  it('loads xlsx content with sheet metadata', async () => {
+    const filePath = await fixturePath('workbook.xlsx', createXlsxFixture())
+
+    const docs = await loadDocument({ type: 'xlsx', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.sheetName])).toEqual([
+      ['Total revenue', 'Summary'],
+      ['Region north', 'Details'],
+    ])
+  })
+
+  it('loads markdown as one document', async () => {
+    const filePath = await fixturePath('notes.md', '# Notes\n\nUseful details')
+
+    const docs = await loadDocument({ type: 'markdown', path: filePath })
+
+    expect(docs).toHaveLength(1)
+    expect(docs[0]!.pageContent).toBe('# Notes\n\nUseful details')
+  })
+
+  it('loads PDF content by page with source metadata', async () => {
+    const filePath = await fixturePath('report.pdf', 'stubbed PDF content')
+    const getText = vi.spyOn(PDFParse.prototype, 'getText').mockResolvedValue({
+      pages: [
+        { num: 1, text: 'First page' },
+        { num: 2, text: '   ' },
+        { num: 3, text: 'Third page' },
+      ],
+      total: 3,
+    } as never)
+    const getInfo = vi.spyOn(PDFParse.prototype, 'getInfo').mockResolvedValue({
+      info: { Title: 'Report' },
+      metadata: { format: 'PDF 1.7' },
+    } as never)
+    const destroy = vi.spyOn(PDFParse.prototype, 'destroy').mockResolvedValue()
+
+    const docs = await loadDocument({ type: 'pdf', path: filePath })
+
+    expect(docs.map((doc) => [doc.pageContent, doc.metadata.loc.pageNumber])).toEqual([
+      ['First page', 1],
+      ['Third page', 3],
+    ])
+    expect(docs[0]!.metadata).toEqual(
+      expect.objectContaining({
+        source: filePath,
+        pdf: expect.objectContaining({ totalPages: 3, info: { Title: 'Report' } }),
+      }),
+    )
+    expect(getText).toHaveBeenCalledOnce()
+    expect(getInfo).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
+  it('loads URL body text and title metadata', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          '<html><head><title>Example</title></head><body><main>Hello web</main></body></html>',
+          { headers: { 'Content-Type': 'text/html' } },
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/article' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Hello web',
+        metadata: { source: 'https://example.test/article', title: 'Example' },
+      }),
+    ])
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.test/article',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('reports corrupt office documents clearly', async () => {
+    const filePath = await fixturePath('broken.docx', 'not an office archive')
+
+    await expect(loadDocument({ type: 'docx', path: filePath })).rejects.toThrow(
+      'Failed to parse DOCX document',
+    )
+  })
+
+  it('reports empty markdown clearly', async () => {
+    const filePath = await fixturePath('empty.markdown', '   \n')
+
+    await expect(loadDocument({ type: 'markdown', path: filePath })).rejects.toThrow(
+      'Markdown document contains no text content.',
+    )
+  })
+})
+
+describe('default URL loader', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubFetchWith(
+    body: string,
+    status: number,
+    contentType?: string,
+  ): ReturnType<typeof vi.fn> {
+    const init: { status: number; headers?: Record<string, string> } = { status }
+    if (contentType) init.headers = { 'Content-Type': contentType }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body, init))
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('dispatches text/html to HTML extraction with title metadata', async () => {
+    stubFetchWith(
+      '<html><head><title>Page</title></head><body><article>Body text</article></body></html>',
+      200,
+      'text/html; charset=utf-8',
+    )
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/a' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Body text',
+        metadata: { source: 'https://example.test/a', title: 'Page' },
+      }),
+    ])
+  })
+
+  it('dispatches application/pdf to the shared pdf parser', async () => {
+    const getText = vi.spyOn(PDFParse.prototype, 'getText').mockResolvedValue({
+      pages: [{ num: 1, text: 'Page one' }],
+      total: 1,
+    } as never)
+    const getInfo = vi.spyOn(PDFParse.prototype, 'getInfo').mockResolvedValue({
+      info: { Title: 'Paper' },
+      metadata: { format: 'PDF 1.7' },
+    } as never)
+    const destroy = vi.spyOn(PDFParse.prototype, 'destroy').mockResolvedValue()
+    stubFetchWith('fake-pdf-bytes', 200, 'application/pdf')
+
+    const docs = await loadDocument({ type: 'url', url: 'https://example.test/paper.pdf' })
+
+    expect(docs).toEqual([
+      expect.objectContaining({
+        pageContent: 'Page one',
+        metadata: expect.objectContaining({
+          source: 'https://example.test/paper.pdf',
+          pdf: expect.objectContaining({ info: { Title: 'Paper' } }),
+        }),
+      }),
+    ])
+    expect(getText).toHaveBeenCalledOnce()
+    expect(getInfo).toHaveBeenCalledOnce()
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
+  it('rejects unsupported content types clearly', async () => {
+    stubFetchWith('x', 200, 'image/png')
+
+    await expect(
+      loadDocument({ type: 'url', url: 'https://example.test/img.png' }),
+    ).rejects.toThrow('Unsupported link type: image/png')
+  })
+
+  it('reports non-2xx responses clearly', async () => {
+    stubFetchWith('Not Found', 404)
+
+    await expect(
+      loadDocument({ type: 'url', url: 'https://example.test/missing' }),
+    ).rejects.toThrow('The link returned HTTP 404')
+  })
+
+  it('rejects non-http(s) protocols before fetching', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(loadDocument({ type: 'url', url: 'file:///etc/passwd' })).rejects.toThrow(
+      'Only http:// and https://',
+    )
+    await expect(loadDocument({ type: 'url', url: 'javascript:alert(1)' })).rejects.toThrow(
+      'Only http:// and https://',
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})

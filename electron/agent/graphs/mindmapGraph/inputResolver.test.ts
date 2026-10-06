@@ -1,0 +1,208 @@
+import { describe, it, expect } from 'vitest'
+import { HumanMessage, AIMessage } from '@langchain/core/messages'
+import { MindmapInputResolver } from './inputResolver.js'
+import type { MindmapSubgraphStateType } from '../../state.js'
+import type { DocumentRef } from '../../state.js'
+
+function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSubgraphStateType {
+  return {
+    messages: [],
+    context: null,
+    mindmapError: '',
+    mindmapResponse: '',
+    mindmapInputSource: null,
+    mindmapInputTitle: '',
+    mindmapXml: '',
+    mindmapTitle: '',
+    documentBatches: [],
+    batchIndex: -1,
+    leafResults: [],
+    mergeInputs: [],
+    mergeGroup: null,
+    mergeResults: [],
+    finalTree: null,
+    documentRef: null,
+    mindmapToolSteps: [],
+    mindmapToolCallId: '',
+    mindmapToolName: '',
+    ...partial,
+  } as MindmapSubgraphStateType
+}
+
+describe('MindmapInputResolver', () => {
+  it('resolves attached PDF document', () => {
+    const documentRef: DocumentRef = {
+      id: 'doc-1',
+      type: 'pdf',
+      source: '/data/report.pdf',
+      filename: 'report.pdf',
+      importedAt: new Date().toISOString(),
+      title: 'Annual Report',
+      sha256: 'pdf-hash-1',
+    }
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'pdf', path: '/data/report.pdf' },
+      title: 'Annual Report',
+    })
+  })
+
+  it.each([
+    ['docx', '/data/report.docx'],
+    ['pptx', '/data/slides.pptx'],
+    ['xlsx', '/data/workbook.xlsx'],
+    ['markdown', '/data/notes.md'],
+  ] as const)('resolves attached %s document', (type, source) => {
+    const documentRef: DocumentRef = {
+      id: `doc-${type}`,
+      type,
+      source,
+      filename: source.split('/').at(-1)!,
+      importedAt: new Date().toISOString(),
+      sha256: `${type}-hash`,
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type, path: source },
+      title: documentRef.filename,
+    })
+  })
+
+  it('resolves attached URL document', () => {
+    const documentRef: DocumentRef = {
+      id: 'doc-2',
+      type: 'url',
+      source: 'https://example.test/article',
+      filename: 'article',
+      importedAt: new Date().toISOString(),
+      sha256: 'url-hash-1',
+    }
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'url', url: 'https://example.test/article' },
+      title: 'article',
+    })
+  })
+
+  it('resolves attached text document', () => {
+    const documentRef: DocumentRef = {
+      id: 'doc-3',
+      type: 'text',
+      source: 'This is attached text content.',
+      filename: 'notes.txt',
+      importedAt: new Date().toISOString(),
+      sha256: 'text-hash-1',
+    }
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'text', content: 'This is attached text content.' },
+      title: 'notes.txt',
+    })
+  })
+
+  it('falls back to latest user message text', () => {
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({
+        messages: [
+          new HumanMessage('first'),
+          new AIMessage('ok'),
+          new HumanMessage('latest user content'),
+        ],
+      }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'text', content: 'latest user content' },
+      title: '',
+    })
+  })
+
+  it('uses fileTitle as fallback title when no document title or filename', () => {
+    const documentRef: DocumentRef = {
+      id: 'doc-4',
+      type: 'pdf',
+      source: '/data/report.pdf',
+      filename: '',
+      importedAt: new Date().toISOString(),
+      sha256: 'pdf-hash-2',
+    }
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({
+        context: { fileUuid: 'file-1', attachedDocument: documentRef, fileTitle: 'Project X' },
+      }),
+    )
+
+    expect(result?.title).toBe('Project X')
+  })
+
+  it('returns null when no input is available', () => {
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(createState())
+
+    expect(result).toBeNull()
+  })
+
+  it('preserves existing mindmapInputSource if already set', () => {
+    const resolver = new MindmapInputResolver()
+
+    const result = resolver.resolve(
+      createState({
+        mindmapInputSource: { type: 'text', content: 'pre-set' },
+        mindmapInputTitle: 'Pre-set Title',
+        context: { fileUuid: 'file-1', attachedDocument: undefined },
+      }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'text', content: 'pre-set' },
+      title: 'Pre-set Title',
+    })
+  })
+
+  it('prefers the current attachment over a source restored from an earlier run', () => {
+    const currentDocument: DocumentRef = {
+      id: 'doc-md',
+      type: 'markdown',
+      source: '/data/MEMORY.md',
+      filename: 'MEMORY.md',
+      importedAt: new Date().toISOString(),
+    }
+
+    const result = new MindmapInputResolver().resolve(
+      createState({
+        mindmapInputSource: { type: 'docx', path: '/data/resume.docx' },
+        mindmapInputTitle: 'resume.docx',
+        context: { fileUuid: 'file-1', attachedDocument: currentDocument },
+      }),
+    )
+
+    expect(result).toEqual({
+      source: { type: 'markdown', path: '/data/MEMORY.md' },
+      title: 'MEMORY.md',
+    })
+  })
+})

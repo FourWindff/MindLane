@@ -1,0 +1,304 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import { AppState } from './appState.js'
+import type { AppSettings } from './types.js'
+
+describe('AppState', () => {
+  let tmpDir: string
+  let appState: AppState
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-appstate-'))
+    appState = new AppState(tmpDir)
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('defaults a missing palace artwork style to vector', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ chatModel: 'qwen-plus' }))
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('vector')
+  })
+
+  it('coerces an invalid palace artwork style to vector', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ palaceArtworkStyle: 'oil-painting' }),
+    )
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('vector')
+  })
+
+  it('preserves the raster palace artwork style', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ palaceArtworkStyle: 'raster' }),
+    )
+
+    const settings = await appState.load()
+
+    expect(settings.palaceArtworkStyle).toBe('raster')
+  })
+
+  it('keeps non-enumerated setting fields when updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({ someFutureField: { enabled: true } }),
+    )
+
+    const result = await appState.update({ chatModel: 'new-model' })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect((settings as unknown as Record<string, unknown>).someFutureField).toEqual({
+      enabled: true,
+    })
+  })
+
+  it('deep merges activeProviders and editor while updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        activeProviders: { chat: 'openai' },
+      }),
+    )
+
+    const result = await appState.update({
+      activeProviders: { chat: 'anthropic' } as unknown as AppSettings['activeProviders'],
+      editor: { autoSaveIntervalMs: 10000 } as unknown as AppSettings['editor'],
+    })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.activeProviders).toEqual({ chat: 'anthropic' })
+    expect(settings.editor).toEqual({
+      autoSaveIntervalMs: 10000,
+    })
+  })
+
+  it('deep merges providerConfigs while updating', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        providerConfigs: {
+          anthropic: {
+            apiKey: 'key',
+            baseUrl: 'https://api.anthropic.com',
+          },
+        },
+      }),
+    )
+
+    const result = await appState.update({
+      providerConfigs: {
+        anthropic: { baseUrl: 'https://proxy.example.com' },
+      } as unknown as AppSettings['providerConfigs'],
+    })
+    expect(result.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.providerConfigs.anthropic).toEqual({
+      apiKey: 'key',
+      baseUrl: 'https://proxy.example.com',
+    })
+  })
+
+  it('drops legacy keys when saving', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        apiKey: 'legacy-global-key',
+        lastOpenedFilePath: '/old/file.mindlane',
+        providerConfigs: { dashscope: { apiKey: 'provider-key' } },
+      }),
+    )
+
+    const result = await appState.update({ chatModel: 'new-model' })
+    expect(result.ok).toBe(true)
+
+    const raw = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf-8')
+    const parsed = JSON.parse(raw)
+
+    expect(parsed.chatModel).toBe('new-model')
+    expect(parsed.lastOpenedFilePath).toBeUndefined()
+    // The global apiKey is gone for good; per-provider keys stay.
+    expect(parsed.apiKey).toBeUndefined()
+    expect(parsed.providerConfigs.dashscope.apiKey).toBe('provider-key')
+  })
+
+  it('migrates legacy workspace-scoped keys once when lastWorkspacePath matches', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        lastWorkspacePath: workspacePath,
+        lastOpenedFilePath: '/old/file.mindlane',
+      }),
+    )
+
+    const migrated = await appState.migrateLegacyWorkspaceState(workspacePath)
+
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.data).toEqual({
+      lastOpenedFilePath: '/old/file.mindlane',
+    })
+
+    const raw = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf-8')
+    const parsed = JSON.parse(raw)
+    expect(parsed.lastOpenedFilePath).toBeUndefined()
+    expect(parsed.lastWorkspacePath).toBe(workspacePath)
+  })
+
+  it('does not migrate legacy keys when lastWorkspacePath does not match', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        apiKey: 'key',
+        lastWorkspacePath: '/other/workspace',
+        lastOpenedFilePath: '/old/file.mindlane',
+      }),
+    )
+
+    const migrated = await appState.migrateLegacyWorkspaceState(workspacePath)
+
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.data).toBeNull()
+
+    const raw = fs.readFileSync(path.join(tmpDir, 'settings.json'), 'utf-8')
+    const parsed = JSON.parse(raw)
+    expect(parsed.lastOpenedFilePath).toBe('/old/file.mindlane')
+  })
+
+  it('returns null when no legacy workspace-scoped keys exist', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    fs.writeFileSync(
+      path.join(tmpDir, 'settings.json'),
+      JSON.stringify({
+        apiKey: 'key',
+        lastWorkspacePath: workspacePath,
+      }),
+    )
+
+    const migrated = await appState.migrateLegacyWorkspaceState(workspacePath)
+
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.data).toBeNull()
+  })
+
+  it('switchWorkspace updates lastWorkspacePath and dedupes recentWorkspacePaths', async () => {
+    const workspaceA = path.join(tmpDir, 'workspace-a')
+    const workspaceB = path.join(tmpDir, 'workspace-b')
+    fs.mkdirSync(workspaceA, { recursive: true })
+    fs.mkdirSync(workspaceB, { recursive: true })
+
+    const first = await appState.switchWorkspace(workspaceB)
+    expect(first.ok).toBe(true)
+
+    const second = await appState.switchWorkspace(workspaceA)
+    expect(second.ok).toBe(true)
+
+    const third = await appState.switchWorkspace(workspaceB)
+    expect(third.ok).toBe(true)
+
+    const settings = await appState.load()
+    expect(settings.lastWorkspacePath).toBe(workspaceB)
+    expect(settings.recentWorkspacePaths).toEqual([workspaceB, workspaceA])
+  })
+
+  it('switchWorkspace respects recentFilesMax', async () => {
+    const workspaces = Array.from({ length: 4 }, (_, i) => path.join(tmpDir, `workspace-${i}`))
+    for (const workspacePath of workspaces) {
+      fs.mkdirSync(workspacePath, { recursive: true })
+    }
+
+    fs.writeFileSync(path.join(tmpDir, 'settings.json'), JSON.stringify({ recentFilesMax: 2 }))
+
+    for (const workspacePath of workspaces) {
+      const result = await appState.switchWorkspace(workspacePath)
+      expect(result.ok).toBe(true)
+    }
+
+    const settings = await appState.load()
+    expect(settings.recentWorkspacePaths).toHaveLength(2)
+    expect(settings.recentWorkspacePaths[0]).toBe(workspaces[3])
+    expect(settings.recentWorkspacePaths[1]).toBe(workspaces[2])
+  })
+
+  it('getLaunchSession restores the last workspace when it exists and restore is enabled', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+
+    const update = await appState.update({
+      lastWorkspacePath: workspacePath,
+      recentWorkspacePaths: [workspacePath],
+      restoreLastWorkspaceOnLaunch: true,
+    })
+    expect(update.ok).toBe(true)
+
+    const session = await appState.getLaunchSession()
+
+    expect(session.ok).toBe(true)
+    if (!session.ok) return
+    expect(session.data.workspacePath).toBe(workspacePath)
+    expect(session.data.restoreLastWorkspaceOnLaunch).toBe(true)
+  })
+
+  it('getLaunchSession clears an invalid lastWorkspacePath and prunes stale recent paths', async () => {
+    const missingWorkspacePath = path.join(tmpDir, 'missing-workspace')
+    const existingWorkspacePath = path.join(tmpDir, 'existing-workspace')
+    fs.mkdirSync(existingWorkspacePath, { recursive: true })
+
+    const update = await appState.update({
+      lastWorkspacePath: missingWorkspacePath,
+      recentWorkspacePaths: [missingWorkspacePath, existingWorkspacePath],
+    })
+    expect(update.ok).toBe(true)
+
+    const session = await appState.getLaunchSession()
+
+    expect(session.ok).toBe(true)
+    if (!session.ok) return
+    expect(session.data.workspacePath).toBeNull()
+    expect(session.data.recentWorkspacePaths).toEqual([existingWorkspacePath])
+
+    const settings = await appState.load()
+    expect(settings.lastWorkspacePath).toBeNull()
+    expect(settings.recentWorkspacePaths).toEqual([existingWorkspacePath])
+  })
+
+  it('getLaunchSession returns no workspace when restore is disabled', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+
+    const update = await appState.update({
+      lastWorkspacePath: workspacePath,
+      recentWorkspacePaths: [workspacePath],
+      restoreLastWorkspaceOnLaunch: false,
+    })
+    expect(update.ok).toBe(true)
+
+    const session = await appState.getLaunchSession()
+
+    expect(session.ok).toBe(true)
+    if (!session.ok) return
+    expect(session.data.workspacePath).toBeNull()
+
+    const settings = await appState.load()
+    expect(settings.lastWorkspacePath).toBe(workspacePath)
+  })
+})
