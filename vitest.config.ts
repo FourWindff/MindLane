@@ -17,12 +17,8 @@ export default defineConfig({
     ],
     testTimeout: 120000,
     hookTimeout: 60000,
-    // Use single fork sequentially to avoid memory issues with large PDF
-    pool: 'forks',
+    // Run test files one at a time (single worker) to avoid memory spikes with large PDFs
     fileParallelism: false,
-    maxWorkers: 1,
-    // Reduce memory usage
-    maxConcurrency: 1,
   },
   resolve: {
     tsconfigPaths: true,
