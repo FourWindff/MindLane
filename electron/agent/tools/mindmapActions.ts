@@ -28,6 +28,19 @@ function asToolError(err: unknown): { ok: false; error: string } {
   return { ok: false, error: err instanceof Error ? err.message : String(err) }
 }
 
+/** Forwards one renderer write and normalizes the outcome into a tool result. */
+function runWrite(
+  proxy: MindmapWriteProxy,
+  fileUuid: string | undefined,
+  action: WriteAction,
+  args: Record<string, unknown>,
+  adapt: (result: unknown) => unknown = (result) => result,
+): Promise<unknown> {
+  return proxy(fileUuid ?? '', action, args)
+    .then(adapt)
+    .catch((err) => adapt(asToolError(err)))
+}
+
 /**
  * ADR-0023: the criterion "short content self-written / documents or long text via
  * the mindmap subgraph" lives in the subgraph tool's description. When a self-written
@@ -55,15 +68,14 @@ function withLongContentCorrection(result: unknown): unknown {
  */
 function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
-    async ({ fileUuid, xml, parentId, position }) => {
-      try {
-        return withLongContentCorrection(
-          await proxy(fileUuid ?? '', 'insertXmlFragment', { xml, parentId, position }),
-        )
-      } catch (err) {
-        return withLongContentCorrection(asToolError(err))
-      }
-    },
+    async ({ fileUuid, xml, parentId, position }) =>
+      runWrite(
+        proxy,
+        fileUuid,
+        'insertXmlFragment',
+        { xml, parentId, position },
+        withLongContentCorrection,
+      ),
     {
       name: 'insertXmlFragment',
       description: `Insert an XML fragment into the mindmap (nested subtree, batching supported). position: child=attach under parentId (default); after/before=insert before/after the sibling parentId; root=attach under the root node. When parentId is omitted the target falls back from the selected node to the root node. Rules: new nodes must not carry an id (the system mints it); type is required (text/image/palace); content is a plain-text attribute whose special characters must be escaped; an image node must reference an asset from the context. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
@@ -95,13 +107,7 @@ function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
  */
 function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
-    async ({ fileUuid, xml }) => {
-      try {
-        return await proxy(fileUuid ?? '', 'updateMindmapNode', { xml })
-      } catch (err) {
-        return asToolError(err)
-      }
-    },
+    async ({ fileUuid, xml }) => runWrite(proxy, fileUuid, 'updateMindmapNode', { xml }),
     {
       name: 'updateMindmapNode',
       description: `Replace a mindmap node wholesale (content/type/subtree). The xml argument is a single root <node> whose id must be an existing node id provided by readMindmap; the node itself takes the shape of the new XML and its old subtree is replaced entirely by the new subtree. root cannot be replaced. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
@@ -122,13 +128,8 @@ function createUpdateMindmapNodeTool(proxy: MindmapWriteProxy) {
  */
 function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
-    async ({ fileUuid, nodeId, targetId, position }) => {
-      try {
-        return await proxy(fileUuid ?? '', 'moveMindmapNode', { nodeId, targetId, position })
-      } catch (err) {
-        return asToolError(err)
-      }
-    },
+    async ({ fileUuid, nodeId, targetId, position }) =>
+      runWrite(proxy, fileUuid, 'moveMindmapNode', { nodeId, targetId, position }),
     {
       name: 'moveMindmapNode',
       description: `Move a node (with its whole subtree) to a new position, atomically (one undo restores it). position: child=become a child of targetId (default); after/before=become a sibling of targetId. root cannot be moved; a node cannot move inside its own subtree. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
@@ -153,13 +154,8 @@ function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
  */
 function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
-    async ({ fileUuid, nodeId, confirmDeleteSubtree }) => {
-      try {
-        return await proxy(fileUuid ?? '', 'deleteNode', { nodeId, confirmDeleteSubtree })
-      } catch (err) {
-        return asToolError(err)
-      }
-    },
+    async ({ fileUuid, nodeId, confirmDeleteSubtree }) =>
+      runWrite(proxy, fileUuid, 'deleteNode', { nodeId, confirmDeleteSubtree }),
     {
       name: 'deleteMindmapNode',
       description:
