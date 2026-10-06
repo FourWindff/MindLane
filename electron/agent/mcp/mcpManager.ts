@@ -2,6 +2,7 @@ import path from 'node:path'
 import type { StructuredToolInterface } from '@langchain/core/tools'
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js'
 import { logger } from '../../shared/logger.js'
+import { withTimeout } from '../providers/middleware/index.js'
 import { McpCredentialStore, type McpCredentialCrypto } from './credentials.js'
 import {
   LoopbackOAuthProvider,
@@ -37,10 +38,6 @@ export interface McpManagerOptions {
   openBrowser?: (url: string) => void
   onToolsChanged?: (tools: StructuredToolInterface[]) => void
   onStatusChanged?: (serverId: string, status: McpServerStatus) => void
-  /** Per-call getTools timeout (15s by default) */
-  connectTimeoutMs?: number
-  /** Timeout for waiting on the user to finish browser authorization (5min by default) */
-  authTimeoutMs?: number
 }
 
 /**
@@ -237,10 +234,9 @@ export class McpManager {
       }> => {
         const client = this.options.createClient(def, provider, headers)
         try {
-          const tools = await withTimeout(
-            client.getTools(),
-            this.options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS,
-          )
+          const tools = await withTimeout(() => client.getTools(), DEFAULT_CONNECT_TIMEOUT_MS, {
+            timeoutMessage: 'Connection timed out',
+          })
           return { client, tools }
         } catch (err) {
           await client.close().catch(() => {})
@@ -254,7 +250,7 @@ export class McpManager {
         if (interactive && loopback && provider?.authRedirected && def.connection.url) {
           const code = await loopback.waitForCallback(
             provider.expectedState,
-            this.options.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS,
+            DEFAULT_AUTH_TIMEOUT_MS,
           )
           await auth(provider, { serverUrl: def.connection.url, authorizationCode: code })
           return await attempt()
@@ -296,20 +292,4 @@ export class McpManager {
   private emitToolsChanged(): void {
     this.options.onToolsChanged?.(this.getTools())
   }
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Connection timed out')), timeoutMs)
-    promise.then(
-      (value) => {
-        clearTimeout(timer)
-        resolve(value)
-      },
-      (err) => {
-        clearTimeout(timer)
-        reject(err)
-      },
-    )
-  })
 }
