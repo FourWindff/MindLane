@@ -43,7 +43,6 @@ const api: MindLaneBridge = {
     createSubfolder: (payload) => ipcRenderer.invoke(IPC.WorkspaceCreateSubfolder, payload),
     deleteItem: (payload) => ipcRenderer.invoke(IPC.WorkspaceDeleteItem, payload),
     renameItem: (payload) => ipcRenderer.invoke(IPC.WorkspaceRenameItem, payload),
-    moveItem: (payload) => ipcRenderer.invoke(IPC.WorkspaceMoveItem, payload),
   },
   chat: {
     listSessions: (payload) => ipcRenderer.invoke(IPC.ChatListSessions, payload),

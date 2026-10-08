@@ -301,17 +301,4 @@ export function registerFsHandlers(ctx: HandlerContext): void {
       return { ok: true, data: { newPath: result.data } }
     },
   )
-
-  ipcMain.handle(
-    IPC.WorkspaceMoveItem,
-    async (_e, payload: { sourcePath: string; targetDirPath: string; workspacePath: string }) => {
-      const result = await ctx.fsService.workspaceTree.move(
-        payload.sourcePath,
-        payload.targetDirPath,
-        payload.workspacePath,
-      )
-      if (!result.ok) return result
-      return { ok: true, data: { newPath: result.data } }
-    },
-  )
 }

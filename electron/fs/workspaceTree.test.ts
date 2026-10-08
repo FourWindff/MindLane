@@ -131,42 +131,4 @@ describe('WorkspaceTree', () => {
     if (result.ok) return
     expect(result.error).toContain('already exists')
   })
-
-  it('move returns an error when the source is outside the workspace', async () => {
-    const outsideFile = path.join(tmpDir, 'outside.mindlane')
-    fs.writeFileSync(outsideFile, '{}')
-
-    const result = await tree.move(outsideFile, workspacePath, workspacePath)
-
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toContain('Source path is not inside the workspace')
-  })
-
-  it('move relocates an item inside the workspace', async () => {
-    const sourceFile = path.join(workspacePath, 'source.mindlane')
-    const targetDir = path.join(workspacePath, 'target')
-    fs.writeFileSync(sourceFile, '{}')
-    fs.mkdirSync(targetDir)
-
-    const result = await tree.move(sourceFile, targetDir, workspacePath)
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(fs.existsSync(result.data)).toBe(true)
-    expect(path.basename(result.data)).toBe('source.mindlane')
-  })
-
-  it('move returns an error when the target directory is outside the workspace', async () => {
-    const sourceFile = path.join(workspacePath, 'source.mindlane')
-    const outsideDir = path.join(tmpDir, 'outside')
-    fs.writeFileSync(sourceFile, '{}')
-    fs.mkdirSync(outsideDir)
-
-    const result = await tree.move(sourceFile, outsideDir, workspacePath)
-
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toContain('Target directory is not inside the workspace')
-  })
 })

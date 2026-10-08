@@ -46,7 +46,6 @@ export enum IPC {
   WorkspaceCreateSubfolder = 'workspace:create-subfolder',
   WorkspaceDeleteItem = 'workspace:delete-item',
   WorkspaceRenameItem = 'workspace:rename-item',
-  WorkspaceMoveItem = 'workspace:move-item',
   WorkspaceUpdateFileUuidPath = 'workspace:update-file-uuid-path',
 
   ChatListSessions = 'chat:list-sessions',
@@ -247,11 +246,6 @@ export interface MindLaneBridge {
     renameItem: (payload: {
       oldPath: string
       newName: string
-      workspacePath: string
-    }) => Promise<IpcResult<{ newPath: string }>>
-    moveItem: (payload: {
-      sourcePath: string
-      targetDirPath: string
       workspacePath: string
     }) => Promise<IpcResult<{ newPath: string }>>
   }
