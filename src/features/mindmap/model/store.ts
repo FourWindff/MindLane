@@ -133,17 +133,13 @@ export function createMindmapStore(): MindmapStore {
     markClean: () => set({ dirty: false }),
 
     loadFile: (filePath, data, workspacePath) => {
-      const hydratedNodes = data.mindmap.nodes.map((n) => ({
-        ...n,
-        data: n.data,
-      }))
-      // Discard position on open (files do not store positions); the deterministic layout
-      // recomputes it and caches it in the in-memory instance
+      // Positions are not stored in the file: the deterministic layout recomputes them
+      // from the style structure on open.
       const style = data.mindmap.style
         ? { ...DEFAULT_STYLE, ...data.mindmap.style }
         : { ...DEFAULT_STYLE }
       const laidOut = layoutReflow(
-        hydratedNodes as Node[],
+        data.mindmap.nodes as Node[],
         data.mindmap.edges as Edge[],
         style.structureType,
       )
