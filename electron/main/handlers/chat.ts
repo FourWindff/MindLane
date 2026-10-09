@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { IPC } from '../../ipc.js'
 import { aiNotReadyResponse } from './helpers.js'
 import type { HandlerContext } from './context.js'
+import type { ChatMessage } from '../../../contracts/fileFormat.js'
 
 export function registerChatHandlers(ctx: HandlerContext): void {
   const fsService = ctx.fsService
@@ -37,25 +38,13 @@ export function registerChatHandlers(ctx: HandlerContext): void {
   ipcMain.handle(
     IPC.ChatLoadSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
-      if (!ctx.isAiServiceReady()) {
-        return {
-          ok: true,
-          data: {
-            sessionId: payload.sessionId,
-            messages: [],
-          },
-        }
-      }
+      const sessionResult = (messages: ChatMessage[]) => ({
+        ok: true as const,
+        data: { sessionId: payload.sessionId, messages },
+      })
+      if (!ctx.isAiServiceReady()) return sessionResult([])
       const sessionManager = ctx.sessionManager
-      if (!sessionManager) {
-        return {
-          ok: true,
-          data: {
-            sessionId: payload.sessionId,
-            messages: [],
-          },
-        }
-      }
+      if (!sessionManager) return sessionResult([])
       try {
         const workspaceState = await fsService.workspace.load(payload.workspacePath)
         if (!workspaceState.ok) throw new Error(workspaceState.error)
@@ -63,21 +52,9 @@ export function registerChatHandlers(ctx: HandlerContext): void {
           workspaceState.data.workspaceUuid,
           () => sessionManager.loadSessionMessages(payload.sessionId),
         )
-        return {
-          ok: true,
-          data: {
-            sessionId: payload.sessionId,
-            messages,
-          },
-        }
+        return sessionResult(messages)
       } catch {
-        return {
-          ok: true,
-          data: {
-            sessionId: payload.sessionId,
-            messages: [],
-          },
-        }
+        return sessionResult([])
       }
     },
   )
