@@ -55,8 +55,23 @@ export class Workspace {
     return this.initializeIdentity(workspacePath, result.data)
   }
 
-  async openFile(workspacePath: string, filePath: string): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => ({ lastOpenedFilePath: filePath }))
+  /** Record the last opened file, plus its session index entry in the same save. */
+  async openFile(
+    workspacePath: string,
+    filePath: string,
+    fileUuid?: string,
+  ): Promise<IpcResult<void>> {
+    return this.saveState(workspacePath, async () => {
+      if (!fileUuid) return { lastOpenedFilePath: filePath }
+      const current = await this.loadFromDisk(workspacePath)
+      return {
+        lastOpenedFilePath: filePath,
+        fileUuidPaths: {
+          ...(current.ok ? current.data.fileUuidPaths : DEFAULT_WORKSPACE_STATE.fileUuidPaths),
+          [fileUuid]: filePath,
+        },
+      }
+    })
   }
 
   async clearLastOpenedFile(workspacePath: string): Promise<IpcResult<void>> {

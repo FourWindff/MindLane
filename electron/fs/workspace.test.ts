@@ -125,7 +125,7 @@ describe('Workspace', () => {
     const filePath = path.join(workspacePath, 'note.mindlane')
     fs.writeFileSync(filePath, '{}')
 
-    const result = await workspace.openFile(workspacePath, filePath)
+    const result = await workspace.openFile(workspacePath, filePath, 'file-a')
 
     expect(result.ok).toBe(true)
 
@@ -133,6 +133,7 @@ describe('Workspace', () => {
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
     expect(loaded.data.lastOpenedFilePath).toBe(filePath)
+    expect(loaded.data.fileUuidPaths['file-a']).toBe(filePath)
   })
 
   it('falls back to defaults when state file is corrupt', async () => {

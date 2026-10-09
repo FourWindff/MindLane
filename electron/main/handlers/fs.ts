@@ -34,14 +34,9 @@ async function syncWorkspaceFromFile(
   const workspacePath = fileIsInCurrentWorkspace ? currentWorkspace : path.dirname(filePath)
 
   await ctx.fsService.appState.switchWorkspace(workspacePath).catch(() => {})
-  await ctx.fsService.workspace.openFile(workspacePath, filePath).catch(() => {})
-  // Also persist the session file index; silently skipped when fileUuid is missing (old file / no metadata).
-  const fileUuid = data?.metadata?.fileUuid
-  if (fileUuid) {
-    await ctx.fsService.workspace
-      .updateFileUuidPath(workspacePath, fileUuid, filePath)
-      .catch(() => {})
-  }
+  await ctx.fsService.workspace
+    .openFile(workspacePath, filePath, data?.metadata?.fileUuid)
+    .catch(() => {})
 }
 
 export function registerFsHandlers(ctx: HandlerContext): void {
