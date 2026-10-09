@@ -22,58 +22,11 @@ const mockAiState = vi.hoisted(() => ({
   },
 }))
 
-vi.mock('@/features/chat/model/aiStore', () => ({
+// Only the store hook is faked; the projection under test stays the production one.
+vi.mock('@/features/chat/model/aiStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/chat/model/aiStore')>()),
   useAiStore: (selector?: (state: typeof mockAiState.current) => unknown) =>
     selector ? selector(mockAiState.current) : mockAiState.current,
-  deriveChatCapsuleEntries: (
-    fileChats: typeof mockAiState.current.fileChats,
-    filePaths: typeof mockAiState.current.filePaths,
-    fileUuidPaths: typeof mockAiState.current.fileUuidPaths,
-    allSessions: typeof mockAiState.current.allSessions,
-    currentFileUuid: typeof mockAiState.current.currentFileUuid,
-    currentFilePath: typeof mockAiState.current.currentFilePath,
-  ) => {
-    const entries: {
-      fileUuid: string
-      fileName: string
-      status: 'generating' | 'stopping' | 'idle'
-      lastActivityAt: number
-    }[] = []
-    const sessionAt = (fileUuid: string): number => {
-      const ats = allSessions
-        .filter((session) => session.fileUuid === fileUuid)
-        .map((session) => Date.parse(session.updatedAt) || 0)
-      return ats.length ? Math.max(...ats) : 0
-    }
-    const keys = new Set([...Object.keys(fileChats), ...allSessions.map((s) => s.fileUuid)])
-    if (currentFileUuid) keys.add(currentFileUuid)
-    for (const fileUuid of keys) {
-      const chat = fileChats[fileUuid]
-      const isCurrent = fileUuid === currentFileUuid
-      const isStreaming = Boolean(chat?.busy || chat?.stopRequested)
-      if (
-        !isCurrent &&
-        !isStreaming &&
-        !(allSessions.some((s) => s.fileUuid === fileUuid) && fileUuidPaths[fileUuid])
-      ) {
-        continue
-      }
-      entries.push({
-        fileUuid,
-        fileName:
-          (fileUuidPaths[fileUuid] ?? filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null))
-            ?.split(/[\\/]/)
-            .pop() ?? fileUuid,
-        status: chat?.stopRequested ? 'stopping' : chat?.busy ? 'generating' : 'idle',
-        lastActivityAt: sessionAt(fileUuid),
-      })
-    }
-    return entries.sort((a, b) => {
-      if (a.fileUuid === currentFileUuid) return -1
-      if (b.fileUuid === currentFileUuid) return 1
-      return b.lastActivityAt - a.lastActivityAt
-    })
-  },
 }))
 
 vi.mock('@/features/workspace/store', () => ({
