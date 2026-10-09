@@ -19,7 +19,6 @@ interface TextPromptDialogProps {
   onConfirm: (value: string) => void
   onCancel: () => void
   backdropClassName?: string
-  panelClassName?: string
 }
 
 export function TextPromptDialog({
@@ -35,7 +34,6 @@ export function TextPromptDialog({
   onConfirm,
   onCancel,
   backdropClassName,
-  panelClassName,
 }: TextPromptDialogProps) {
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,7 +53,6 @@ export function TextPromptDialog({
       initialFocusRef={inputRef}
       selectInitial={selectInitial}
       backdropClassName={backdropClassName}
-      panelClassName={panelClassName}
     >
       <div className="workspace-modal__label">{label}</div>
       <h2 id={titleId} className="workspace-modal__title">

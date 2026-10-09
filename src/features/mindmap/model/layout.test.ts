@@ -10,11 +10,11 @@ describe('layout', () => {
     ]
     const edges: Edge[] = [{ id: 'root-child', source: 'root', target: 'child' }]
 
-    const result = layoutInitial(nodes, edges, { rootX: 10, rootY: 20 })
+    const result = layoutInitial(nodes, edges)
     const root = result.find((node) => node.id === 'root')!
     const child = result.find((node) => node.id === 'child')!
 
-    expect(root.position).toEqual({ x: 10, y: 20 })
+    expect(root.position).toEqual({ x: 0, y: 0 })
     expect(child.position.x).toBeGreaterThan(root.position.x)
     expect(child.position.y).toBe(root.position.y)
   })

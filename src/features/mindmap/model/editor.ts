@@ -732,11 +732,7 @@ export class MindmapEditor {
     anchorX: number,
     anchorY: number,
   ): void {
-    const laidOut = layoutInitial(parsed.nodes, parsed.edges, {
-      rootX: 0,
-      rootY: 0,
-      direction: 'LR',
-    })
+    const laidOut = layoutInitial(parsed.nodes, parsed.edges)
 
     const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {

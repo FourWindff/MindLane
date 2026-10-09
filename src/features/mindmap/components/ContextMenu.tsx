@@ -11,8 +11,8 @@ type ContextMenuProps = {
   onAddParent: () => void
   onRemove: () => void
   onReset: () => void
-  onGeneratePalace?: () => void
-  onInsertImage?: () => void
+  onGeneratePalace: () => void
+  onInsertImage: () => void
   canAddSibling: boolean
   canAddParent: boolean
   canRemove: boolean
@@ -58,13 +58,13 @@ export function MindmapContextMenu({
       onClick: () => onAddSibling('end'),
       disabled: !canAddSibling || aiBusy,
     },
-    { label: 'Insert image', onClick: () => onInsertImage?.(), disabled: !onInsertImage || aiBusy },
+    { label: 'Insert image', onClick: onInsertImage, disabled: aiBusy },
     { label: 'Delete', onClick: onRemove, disabled: !canRemove || aiBusy, modifier: 'danger' },
     'separator',
     {
       label: `Generate memory palace${selectedCount > 1 ? ` (${selectedCount} nodes)` : ''}`,
-      onClick: () => onGeneratePalace?.(),
-      disabled: !onGeneratePalace || aiBusy || !palaceEnabled,
+      onClick: onGeneratePalace,
+      disabled: aiBusy || !palaceEnabled,
       modifier: 'accent',
       title: palaceEnabled ? undefined : 'Chat model configuration required',
     },

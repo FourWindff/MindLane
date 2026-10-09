@@ -5,34 +5,17 @@ import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
 
 type MindmapStructureType = 'logic' | 'mindmap'
 
-interface InitialLayoutOptions {
-  rootX?: number
-  rootY?: number
-  direction?: 'LR' | 'TB'
-}
-
 const RANK_SEPARATION = 260
 const NODE_SEPARATION = 24
 
-const DEFAULT_OPTIONS = {
-  rootX: 0,
-  rootY: 0,
-  direction: 'LR' as const,
-}
-
 /** Initial layout (dagre); used when a whole graph first lands on the canvas. */
-export function layoutInitial(
-  nodes: Node[],
-  edges: Edge[],
-  options: InitialLayoutOptions = {},
-): Node[] {
+export function layoutInitial(nodes: Node[], edges: Edge[]): Node[] {
   if (nodes.length === 0) return nodes
 
-  const resolved = { ...DEFAULT_OPTIONS, ...options }
   const graph = new dagre.graphlib.Graph()
   graph.setDefaultEdgeLabel(() => ({}))
   graph.setGraph({
-    rankdir: resolved.direction,
+    rankdir: 'LR',
     ranksep: RANK_SEPARATION,
     nodesep: NODE_SEPARATION,
     marginx: 0,
@@ -59,8 +42,8 @@ export function layoutInitial(
     return {
       ...node,
       position: {
-        x: position.x - position.width / 2 + resolved.rootX,
-        y: position.y - position.height / 2 + resolved.rootY,
+        x: position.x - position.width / 2,
+        y: position.y - position.height / 2,
       },
     }
   })
