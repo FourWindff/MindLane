@@ -196,10 +196,6 @@ export function registerFsHandlers(ctx: HandlerContext): void {
     },
   )
 
-  ipcMain.handle(IPC.WorkspaceListFiles, async (_e, payload: { workspacePath: string }) => {
-    return ctx.fsService.workspaceTree.listFiles(payload.workspacePath)
-  })
-
   ipcMain.handle(IPC.WorkspaceOpenFilePath, async (_e, payload: { filePath: string }) => {
     const result = await ctx.fsService.project.loadFromPath(payload.filePath)
     if (result.ok) {

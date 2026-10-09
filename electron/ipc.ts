@@ -37,7 +37,6 @@ export enum IPC {
   WorkspaceOpenDirectory = 'workspace:open-directory',
   WorkspaceCreateDirectory = 'workspace:create-directory',
   WorkspaceCreateFile = 'workspace:create-file',
-  WorkspaceListFiles = 'workspace:list-files',
   WorkspaceOpenFilePath = 'workspace:open-file-path',
   WorkspaceGetSession = 'workspace:get-session',
   WorkspaceUpdateState = 'workspace:update-state',
@@ -93,12 +92,6 @@ export interface McpAuthorizeUatPayload {
   serverId: string
   appId: string
   appSecret: string
-}
-
-export interface WorkspaceFileEntry {
-  filePath: string
-  name: string
-  lastModifiedAt: string
 }
 
 export interface WorkspaceTreeEntry {
@@ -213,7 +206,6 @@ export interface MindLaneBridge {
       name: string
       data: unknown
     }) => Promise<IpcResult<{ filePath: string; data: unknown }>>
-    listFiles: (payload: { workspacePath: string }) => Promise<IpcResult<WorkspaceFileEntry[]>>
     openFilePath: (payload: {
       filePath: string
     }) => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>

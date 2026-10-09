@@ -59,7 +59,6 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
       shell: { logError },
       workspace: {
         createFile,
-        listFiles: vi.fn(async () => ({ ok: true, data: [] })),
         listTree: vi.fn(async () => ({ ok: true, data: [] })),
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',

@@ -11,7 +11,6 @@ type WorkspaceApiOverrides = Partial<{
   createDirectory: (payload: { name: string }) => Promise<unknown>
   switchDirectory: (payload: { workspacePath: string }) => Promise<unknown>
   getSession: () => Promise<unknown>
-  listFiles: (payload: { workspacePath: string }) => Promise<unknown>
   listTree: (payload: { workspacePath: string }) => Promise<unknown>
   deleteItem: (payload: { targetPath: string; workspacePath: string }) => Promise<unknown>
 }>
@@ -28,10 +27,6 @@ function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
       recentWorkspacePaths: ['/ws'],
       lastOpenedFilePath: null,
       restoreLastWorkspaceOnLaunch: true,
-    })),
-    listFiles: vi.fn(async () => ({
-      ok: true as const,
-      data: [{ filePath: '/ws/a.mindlane', name: 'a', lastModifiedAt: '2026-01-01T00:00:00.000Z' }],
     })),
     listTree: vi.fn(async () => ({
       ok: true as const,
@@ -168,7 +163,6 @@ describe('workspace switch restore protocol', () => {
           lastModifiedAt: '2026-01-01T00:00:00.000Z',
         },
       ])
-      expect(api.listFiles).not.toHaveBeenCalled()
       expect(api.listTree).toHaveBeenCalledWith({ workspacePath: '/ws' })
       expect(openFileRegistry.getActive()).toBeNull()
     },

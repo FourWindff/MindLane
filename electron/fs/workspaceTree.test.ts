@@ -29,26 +29,6 @@ describe('WorkspaceTree', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('listFiles returns supported files sorted by name', async () => {
-    fs.writeFileSync(path.join(workspacePath, 'b.mindlane'), '{}')
-    fs.writeFileSync(path.join(workspacePath, 'a.mindlane'), '{}')
-    fs.writeFileSync(path.join(workspacePath, 'ignored.txt'), 'text')
-
-    const result = await tree.listFiles(workspacePath)
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.data.map((f) => f.name)).toEqual(['a.mindlane', 'b.mindlane'])
-  })
-
-  it('listFiles returns an error when the workspace does not exist', async () => {
-    const result = await tree.listFiles(path.join(workspacePath, 'missing'))
-
-    expect(result.ok).toBe(false)
-    if (result.ok) return
-    expect(result.error).toContain('Workspace directory does not exist')
-  })
-
   it('createDirectory creates a new directory and returns its path', async () => {
     const result = await tree.createDirectory(workspacePath, 'new-project')
 

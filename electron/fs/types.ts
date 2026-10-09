@@ -1,13 +1,8 @@
 import type { McpServerUserState } from '../agent/mcp/types.js'
-import type {
-  IpcResult,
-  PalaceArtworkStyle,
-  WorkspaceFileEntry,
-  WorkspaceTreeEntry,
-} from '../ipc.js'
+import type { IpcResult, PalaceArtworkStyle, WorkspaceTreeEntry } from '../ipc.js'
 
 // Boundary DTOs and the result envelope are declared once in the contracts module; the main-process fs domain re-exports and reuses the same types.
-export type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry }
+export type { IpcResult, WorkspaceTreeEntry }
 
 export interface AppSettings {
   chatModel: string

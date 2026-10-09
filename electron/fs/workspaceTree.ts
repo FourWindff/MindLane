@@ -6,42 +6,12 @@ import { assertEntryName } from './entryName.js'
 import { isMindLaneFile, MINDLANE_EXTENSION } from './constants.js'
 import { guard } from './ipcResult.js'
 import type { ThumbnailManager } from './thumbnailManager.js'
-import type { IpcResult, WorkspaceFileEntry, WorkspaceTreeEntry } from './types.js'
+import type { IpcResult, WorkspaceTreeEntry } from './types.js'
 
 const IGNORED_NAMES = new Set(['node_modules', 'Thumbs.db'])
 
 export class WorkspaceTree {
   constructor(private readonly thumbnails: ThumbnailManager) {}
-
-  async listFiles(workspacePath: string): Promise<IpcResult<WorkspaceFileEntry[]>> {
-    return guard(async () => {
-      const resolvedPath = path.resolve(workspacePath)
-      if (!fs.existsSync(resolvedPath)) {
-        throw new Error('Workspace directory does not exist')
-      }
-      const stats = await fs.promises.stat(resolvedPath)
-      if (!stats.isDirectory()) {
-        throw new Error('Workspace directory does not exist')
-      }
-
-      const entries = await fs.promises.readdir(resolvedPath, { withFileTypes: true })
-      const files = await Promise.all(
-        entries
-          .filter((entry) => entry.isFile() && isMindLaneFile(entry.name))
-          .map(async (entry) => {
-            const filePath = path.join(resolvedPath, entry.name)
-            const fileStats = await fs.promises.stat(filePath)
-            return {
-              filePath,
-              name: entry.name,
-              lastModifiedAt: fileStats.mtime.toISOString(),
-            } satisfies WorkspaceFileEntry
-          }),
-      )
-
-      return files.sort((a, b) => a.name.localeCompare(b.name, 'en-US'))
-    })
-  }
 
   async listTree(workspacePath: string): Promise<IpcResult<WorkspaceTreeEntry[]>> {
     return guard(async () => {
