@@ -70,13 +70,6 @@ const api: MindLaneBridge = {
         ipcRenderer.off(IPC.AppBeforeClose, handler)
       }
     },
-    onMainProcessMessage: (callback) => {
-      const handler = (_event: unknown, message: string) => callback(message)
-      ipcRenderer.on(IPC.MainProcessMessage, handler)
-      return () => {
-        ipcRenderer.off(IPC.MainProcessMessage, handler)
-      }
-    },
   },
   shell: {
     openDocumentRef: (doc) => ipcRenderer.invoke(IPC.ShellOpenDocumentRef, doc),

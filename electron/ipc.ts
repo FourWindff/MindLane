@@ -13,7 +13,6 @@ import type { AppSettings, WorkspaceState } from './fs/types.js'
 import type { McpServerStatusInfo } from './agent/mcp/types.js'
 
 export enum IPC {
-  MainProcessMessage = 'main-process-message',
   AppBeforeClose = 'app:before-close',
 
   AiChatStream = 'ai:chat-stream',
@@ -288,7 +287,6 @@ export interface MindLaneBridge {
     close: () => Promise<void>
     closeConfirmed: () => Promise<void>
     onBeforeClose: (callback: () => void) => () => void
-    onMainProcessMessage: (callback: (message: string) => void) => () => void
   }
   shell: {
     openDocumentRef: (doc: DocumentRef) => Promise<{ ok: true } | { ok: false; error: string }>

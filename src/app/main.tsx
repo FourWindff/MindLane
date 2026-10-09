@@ -8,7 +8,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 )
-
-window.mindlane.window.onMainProcessMessage((message) => {
-  console.log(message)
-})

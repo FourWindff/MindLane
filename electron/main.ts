@@ -190,10 +190,6 @@ function createWindow() {
       })
   })
 
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send(IPC.MainProcessMessage, new Date().toLocaleString())
-  })
-
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return
     if (input.key === 'F12') {
