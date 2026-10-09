@@ -5,7 +5,7 @@ export type { PalaceNodeData, PalaceStation } from './nodeData.js'
 export type { MindLaneAsset } from './mindmapXml/types.js'
 import type { MindLaneAsset } from './mindmapXml/types.js'
 
-export const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
+const DEFAULT_VIEWPORT = { x: 0, y: 0, zoom: 1 }
 
 export function isDefaultViewport(vp: { x: number; y: number; zoom: number }): boolean {
   return (
@@ -33,7 +33,7 @@ export interface MindLaneFile {
   documents: DocumentRef[]
 }
 
-export interface MindLaneEdge {
+interface MindLaneEdge {
   id: string
   source: string
   target: string

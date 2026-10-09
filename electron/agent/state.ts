@@ -2,6 +2,7 @@ import { Annotation, messagesStateReducer } from '@langchain/langgraph'
 import type { BaseMessage } from '@langchain/core/messages'
 import type { Document } from '@langchain/core/documents'
 import type { ChatToolCallStep, DocumentRef } from '@contracts/fileFormat'
+import type { PalaceStationPayload } from '@contracts/palace'
 import type { DocumentSource as MindmapInputSource } from './document/index.js'
 import type { ChatContext, PalaceArtworkStyle } from '../ipc.js'
 import type { MindmapOutlineNode } from './utils/mindmapOutline.js'
@@ -61,15 +62,14 @@ type PalaceDesign = {
   stations: StationDesign[]
 }
 
-export type MemoryPalaceStation = {
-  order: number
-  content: string
-  x: number
-  y: number
+/**
+ * Station as the palace run carries it before the layout resolves the anchor visual
+ * and the linked node id; `mnemonicMethod` is graph-side only (never landed).
+ */
+export type MemoryPalaceStation = Omit<PalaceStationPayload, 'anchorVisual' | 'linkedNodeId'> & {
   anchorVisual?: string
-  mnemonicMethod?: string
-  association?: string
   linkedNodeId?: string
+  mnemonicMethod?: string
 }
 
 type PendingSubgraph = 'mindmap' | 'palace'

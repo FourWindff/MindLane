@@ -6,6 +6,7 @@
 
 import type { MindLaneFile } from '../fileFormat.js'
 import type { PalaceRunPayload } from '../palace.js'
+import type { MindmapReadQuery } from '../ipc.js'
 import { escapeXml } from './escape.js'
 import { xmlNodeTypeRegistry } from './registry.js'
 import {
@@ -127,12 +128,7 @@ export function serializePalaceNodeXml(input: PalaceNodePayload): string {
 }
 
 /** Serialize a mindmap section subtree (readMindmap output / turn state). */
-interface MindmapSectionQuery {
-  subtreeId?: string
-  type?: string
-  textContains?: string
-  maxDepth?: number
-}
+type MindmapSectionQuery = Omit<MindmapReadQuery, 'scope'>
 
 function matchesQuery(node: MindmapXmlNode, query: MindmapSectionQuery | undefined): boolean {
   if (!query) return true
