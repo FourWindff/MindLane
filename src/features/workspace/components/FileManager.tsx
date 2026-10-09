@@ -77,6 +77,14 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
     }
   }, [])
 
+  const openNewDialog = useCallback(
+    (type: 'new-file' | 'new-folder', parentPath: string | null | undefined) => {
+      if (!parentPath) return
+      setDialog({ type, parentPath })
+    },
+    [],
+  )
+
   const handleContextAction = useCallback(
     (action: string, entry: WorkspaceTreeEntry | null) => {
       if (!workspacePath) return
@@ -84,18 +92,10 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
         case 'open':
           if (entry?.type === 'file') void openWorkspaceFile(entry.path)
           break
-        case 'new-file': {
-          const parentPath = entry?.type === 'directory' ? entry.path : currentDirectoryPath
-          if (!parentPath) return
-          setDialog({ type: 'new-file', parentPath })
+        case 'new-file':
+        case 'new-folder':
+          openNewDialog(action, entry?.type === 'directory' ? entry.path : currentDirectoryPath)
           break
-        }
-        case 'new-folder': {
-          const parentPath = entry?.type === 'directory' ? entry.path : currentDirectoryPath
-          if (!parentPath) return
-          setDialog({ type: 'new-folder', parentPath })
-          break
-        }
         case 'rename':
           if (entry) setDialog({ type: 'rename', entry })
           break
@@ -104,7 +104,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
           break
       }
     },
-    [workspacePath, currentDirectoryPath, openWorkspaceFile],
+    [workspacePath, currentDirectoryPath, openWorkspaceFile, openNewDialog],
   )
 
   const closeDialog = () => setDialog({ type: 'none' })
@@ -154,16 +154,6 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
     setNavigationPath([])
   }, [onClose])
 
-  const handleToolbarNewFile = useCallback(() => {
-    if (!currentDirectoryPath) return
-    setDialog({ type: 'new-file', parentPath: currentDirectoryPath })
-  }, [currentDirectoryPath])
-
-  const handleToolbarNewFolder = useCallback(() => {
-    if (!currentDirectoryPath) return
-    setDialog({ type: 'new-folder', parentPath: currentDirectoryPath })
-  }, [currentDirectoryPath])
-
   if (!isOpen) return null
 
   return (
@@ -184,8 +174,8 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
           <FileManagerToolbar
             busy={busy}
             workspacePath={workspacePath}
-            onNewFile={handleToolbarNewFile}
-            onNewFolder={handleToolbarNewFolder}
+            onNewFile={() => openNewDialog('new-file', currentDirectoryPath)}
+            onNewFolder={() => openNewDialog('new-folder', currentDirectoryPath)}
             onRefresh={() => void refreshWorkspaceFiles()}
             onSwitchWorkspace={() => void switchWorkspace()}
             onClose={handleClose}
@@ -200,7 +190,7 @@ export function FileManager({ isOpen, onClose }: FileManagerProps) {
           navigationPath={navigationPath}
           onNavigateInto={handleNavigateInto}
           onContextMenu={handleContextMenu}
-          onNewFile={handleToolbarNewFile}
+          onNewFile={() => openNewDialog('new-file', currentDirectoryPath)}
         />
 
         {/* Context Menu */}
