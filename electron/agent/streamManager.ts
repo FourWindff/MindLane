@@ -177,6 +177,17 @@ export class Runner {
       string,
       { name: string; input: Record<string, unknown> }
     >()
+    // Both "the subgraph progressed" and "the subgraph closed out" anchor the same card.
+    const emitPendingSubgraphStart = (callId: string) => {
+      const pending = callId ? pendingSubgraphStarts.get(callId) : undefined
+      if (!pending) return
+      pendingSubgraphStarts.delete(callId)
+      this.emit('tool-start', {
+        id: toolEventId(callId, pending.name, 'subgraph tool-start'),
+        name: pending.name,
+        input: pending.input,
+      })
+    }
 
     try {
       const history = await this.prepareHistory()
@@ -226,15 +237,7 @@ export class Runner {
             // run's own end event carries the landing payload.
             if (this.options.request.ephemeral) continue
             const subgraphId = message.tool_call_id ?? ''
-            const pending = subgraphId ? pendingSubgraphStarts.get(subgraphId) : undefined
-            if (pending) {
-              pendingSubgraphStarts.delete(subgraphId)
-              this.emit('tool-start', {
-                id: toolEventId(subgraphId, pending.name, 'subgraph tool-start'),
-                name: pending.name,
-                input: pending.input,
-              })
-            }
+            emitPendingSubgraphStart(subgraphId)
             const output =
               typeof message.content === 'string'
                 ? message.content
@@ -339,15 +342,7 @@ export class Runner {
             // with two subgraphs in one super-step the declaration order says
             // nothing about which one progresses first.
             const callId = event.callId ?? ''
-            const pending = callId ? pendingSubgraphStarts.get(callId) : undefined
-            if (pending) {
-              pendingSubgraphStarts.delete(callId)
-              this.emit('tool-start', {
-                id: toolEventId(callId, pending.name, 'subgraph tool-start'),
-                name: pending.name,
-                input: pending.input,
-              })
-            }
+            emitPendingSubgraphStart(callId)
             // Contract: the step payload is { step, callId?, completed?, total? };
             // counts must pass through (cards render n/m).
             this.emit('step', {
