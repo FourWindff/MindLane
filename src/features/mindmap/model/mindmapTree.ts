@@ -1,4 +1,5 @@
 import { defaultNodeSize } from './layout/nodeSize'
+import { findRootIds, getChildIdsOrdered } from '@contracts/mindmapXml/serializer'
 import type { Edge, Node, Position as XyflowPosition } from '@xyflow/react'
 
 /**
@@ -66,15 +67,11 @@ export function collectDescendantIds(edges: Edge[], rootId: string): Set<string>
   return ids
 }
 
-export function getChildIdsOrdered(nodes: Node[], edges: Edge[], parentId: string): string[] {
-  const ids = getChildIds(edges, parentId)
-  const y = new Map(nodes.map((n) => [n.id, n.position.y]))
-  return [...ids].sort((a, b) => (y.get(a) ?? 0) - (y.get(b) ?? 0))
-}
+export { getChildIdsOrdered }
 
 export function findRootNode(nodes: Node[], edges: Edge[]): Node | undefined {
-  const parentSet = new Set(edges.map((e) => e.target))
-  return nodes.find((n) => !parentSet.has(n.id))
+  const rootId = findRootIds(nodes, edges)[0]
+  return nodes.find((n) => n.id === rootId)
 }
 
 function nodeHeight(nodeId: string, nodes: Node[]): number {

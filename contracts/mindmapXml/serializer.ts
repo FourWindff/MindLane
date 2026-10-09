@@ -21,7 +21,7 @@ import { newId } from '../ids.js'
  * Child order: visual order (position.y ascending), so the serialized sibling
  * order matches the UI and the edge-array order cannot drift from the visual one.
  */
-function getChildIdsOrdered(
+export function getChildIdsOrdered(
   nodes: MindmapXmlNode[],
   edges: MindmapXmlEdge[],
   parentId: string,
@@ -39,7 +39,7 @@ function buildChildrenMap(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): Map
   return map
 }
 
-function findRootIds(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string[] {
+export function findRootIds(nodes: MindmapXmlNode[], edges: MindmapXmlEdge[]): string[] {
   const targets = new Set(edges.map((e) => e.target))
   return nodes.filter((n) => !targets.has(n.id)).map((n) => n.id)
 }
