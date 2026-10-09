@@ -316,25 +316,6 @@ app.whenReady().then(async () => {
   const mindmapReadRequester = createMindmapReadRequester(() => win)
   const mindmapWriteRequester = createMindmapWriteRequester(() => win)
 
-  // The single assembly point: lazily create (or reuse) the current orchestrator. Both
-  // createRuntime and post-readiness-gate chat runs get it from here, so the two construction
-  // paths cannot drift.
-  const ensureChatOrchestrator = async (): Promise<AgentOrchestrator> => {
-    if (!chatOrchestrator) {
-      const settings = await fsService.appState.load()
-      const provider = resolveChatProvider(settings)
-      // Lazy creation only happens after the readiness gate passes, so services is non-null.
-      chatOrchestrator = new AgentOrchestrator(provider, services!, {
-        userDataPath,
-        mindmapReadProvider: (fileUuid, query) =>
-          mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
-        mindmapWriteProxy: (fileUuid, action, args) =>
-          mindmapWriteRequester.request(() => buildMindmapWriteRequest(fileUuid, action, args)),
-      })
-    }
-    return chatOrchestrator
-  }
-
   // StreamManager is constructed only after assembly succeeds: its input is narrowed to sessionManager.
   if (services) {
     const sessionManager = services.sessionManager
@@ -349,11 +330,22 @@ app.whenReady().then(async () => {
           settings.activeProviders.chat || 'dashscope',
           settings.chatModel,
         )
-        const orchestrator = await ensureChatOrchestrator()
-        orchestrator.updateProvider(provider)
-        // the orchestrator may be created only after MCP connects; make sure it gets the current MCP tool set
-        orchestrator.setMcpTools(mcpManager?.getTools() ?? [])
-        return orchestrator.getStreamRuntime(settings.palaceArtworkStyle)
+        if (!chatOrchestrator) {
+          // Lazy creation only happens after the readiness gate passes, so services is non-null.
+          chatOrchestrator = new AgentOrchestrator(provider, services!, {
+            userDataPath,
+            mindmapReadProvider: (fileUuid, query) =>
+              mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
+            mindmapWriteProxy: (fileUuid, action, args) =>
+              mindmapWriteRequester.request(() => buildMindmapWriteRequest(fileUuid, action, args)),
+          })
+        } else {
+          // The reused orchestrator still runs the model it was built with.
+          chatOrchestrator.updateProvider(provider)
+        }
+        // the orchestrator may be created before MCP connects; make sure it gets the current MCP tool set
+        chatOrchestrator.setMcpTools(mcpManager?.getTools() ?? [])
+        return chatOrchestrator.getStreamRuntime(settings.palaceArtworkStyle)
       },
     })
   }
