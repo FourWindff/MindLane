@@ -118,7 +118,6 @@ interface AiState {
   setAttachedDocument: (document: DocumentRef | null) => void
   setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
-  updateFileLocation: (fileUuid: string, filePath: string) => void
   /** Sync the in-memory and persisted mapping after rename/move (caller persists via the bridge). */
   updateFileUuidPath: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string) => void
@@ -468,12 +467,6 @@ export const useAiStore = create<AiState>((set, get) => ({
     }
     useAiStore.setState({ workspacePath, fileUuidPaths, allSessions })
   },
-  updateFileLocation: (fileUuid, filePath) =>
-    set((state) => ({
-      ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
-      filePaths: { ...state.filePaths, [fileUuid]: filePath },
-    })),
-
   /** Persisted mapping + in-memory path updated together (called by workspaceSync after rename/move). */
   updateFileUuidPath: (fileUuid, filePath) =>
     set((state) => ({

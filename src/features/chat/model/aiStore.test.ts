@@ -194,20 +194,6 @@ describe('aiStore per-file chat state', () => {
     }
   })
 
-  it('updates active-session navigation metadata after a file move', () => {
-    installApis()
-    useAiStore.setState({
-      currentFileUuid: 'file-b',
-      currentFilePath: '/b.mindlane',
-      filePaths: { 'file-a': '/a.mindlane' },
-    })
-
-    useAiStore.getState().updateFileLocation('file-a', '/folder/renamed.mindlane')
-
-    expect(useAiStore.getState().filePaths['file-a']).toBe('/folder/renamed.mindlane')
-    expect(useAiStore.getState().currentFilePath).toBe('/b.mindlane')
-  })
-
   it('routes stream events to the file bound to the session', () => {
     const { emit } = installApis()
     const harness = createRegistryHarness()
