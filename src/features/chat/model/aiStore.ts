@@ -56,7 +56,6 @@ export interface FileChatState {
   streamText: string
   toolCards: ToolCard[]
   stopRequested: boolean
-  lastUserMessageAt: number
 }
 
 export type { ChatStreamEvent }
@@ -137,7 +136,6 @@ export function createFileChatState(activeSessionId = generateSessionId()): File
     streamText: '',
     toolCards: [],
     stopRequested: false,
-    lastUserMessageAt: 0,
   }
 }
 
@@ -339,7 +337,6 @@ export const useAiStore = create<AiState>((set, get) => ({
       const current = state.fileChats[fileUuid]
       return patchFileChat(state, fileUuid, {
         chatMessages: [...(current?.chatMessages ?? []), message],
-        lastUserMessageAt: Date.now(),
       })
     }),
   setShowSessionList: (showSessionList) => set({ showSessionList }),
@@ -484,7 +481,6 @@ export const useAiStore = create<AiState>((set, get) => ({
           ...current,
           activeSessionId: sessionId,
           busy: true,
-          lastUserMessageAt: Date.now(),
         },
       }
       return {

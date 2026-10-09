@@ -814,7 +814,7 @@ describe('deriveChatCapsuleEntries projection', () => {
   it('excludes files opened this launch but never chatted and not current', () => {
     useAiStore.setState({
       fileChats: {
-        'file-dormant': { ...createFileChatState('session-dormant'), lastUserMessageAt: 0 },
+        'file-dormant': createFileChatState('session-dormant'),
       },
       filePaths: { 'file-dormant': '/dormant.mindlane' },
       fileUuidPaths: { 'file-dormant': '/dormant.mindlane' },
