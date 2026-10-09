@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ChatToolCallStep } from '../../contracts/fileFormat.js'
 import type { AgentServices } from './service.js'
 import { ProviderCapability, type LLMProvider } from './providers/index.js'
 import { AgentOrchestrator } from './orchestrator.js'
-import { HumanMessage, AIMessage, ToolMessage } from '@langchain/core/messages'
-import type { BaseMessage } from '@langchain/core/messages'
 
 // ─── Mock factory ────────────────────────────────────────────
 
@@ -176,122 +173,5 @@ describe('AgentOrchestrator contextCompact node', () => {
         .branches['__start__']?.condition.ends ?? {}
     expect(ends.contextCompact).toBe('contextCompact')
     expect(ends.palaceSubgraph).toBe('palaceSubgraph')
-  })
-})
-
-describe('AgentOrchestrator extractToolCalls', () => {
-  let extractToolCalls: (
-    msgs: BaseMessage[],
-  ) =>
-    Array<{ name: string; result: string; status?: string; steps?: ChatToolCallStep[] }> | undefined
-
-  beforeEach(() => {
-    const orchestrator = new AgentOrchestrator(createMockProvider(), createMockServices())
-    extractToolCalls = (orchestrator as unknown as { extractToolCalls: typeof extractToolCalls })[
-      'extractToolCalls'
-    ].bind(orchestrator)
-  })
-
-  it('extracts only ToolMessages from the current turn (after the last human message)', () => {
-    const messages: BaseMessage[] = [
-      new HumanMessage('first turn'),
-      new AIMessage('reply 1'),
-      new ToolMessage({ content: 'old tool result', tool_call_id: 'call-1', name: 'oldTool' }),
-      new HumanMessage('second turn'),
-      new AIMessage('reply 2'),
-      new ToolMessage({ content: 'new tool result', tool_call_id: 'call-2', name: 'newTool' }),
-    ]
-
-    const result = extractToolCalls(messages)
-    expect(result).toHaveLength(1)
-    expect(result![0]).toMatchObject({ name: 'newTool', result: 'new tool result' })
-  })
-
-  it('extracts every ToolMessage when there is no human message', () => {
-    const messages: BaseMessage[] = [
-      new ToolMessage({ content: 'tool result', tool_call_id: 'call-1', name: 'singleTool' }),
-    ]
-
-    const result = extractToolCalls(messages)
-    expect(result).toHaveLength(1)
-    expect(result![0]).toMatchObject({ name: 'singleTool', result: 'tool result' })
-  })
-
-  it('returns undefined when the current turn has no ToolMessage', () => {
-    const messages: BaseMessage[] = [
-      new HumanMessage('first turn'),
-      new ToolMessage({ content: 'old tool', tool_call_id: 'call-1', name: 'oldTool' }),
-      new HumanMessage('second turn'),
-      new AIMessage('plain text reply'),
-    ]
-
-    const result = extractToolCalls(messages)
-    expect(result).toBeUndefined()
-  })
-
-  it('reads additional_kwargs.toolSteps as ChatToolCall.steps', () => {
-    const messages: BaseMessage[] = [
-      new ToolMessage({
-        content: '{"ok":true}',
-        tool_call_id: 'call-sc1',
-        name: 'generateMindmapFragment',
-        additional_kwargs: {
-          toolSteps: [
-            { step: 'reading-doc' },
-            { step: 'extracting', completed: 1, total: 1 },
-            { step: 'finalizing' },
-          ],
-        },
-      }),
-    ]
-
-    const result = extractToolCalls(messages)
-    expect(result![0].steps).toEqual([
-      { step: 'reading-doc' },
-      { step: 'extracting', completed: 1, total: 1 },
-      { step: 'finalizing' },
-    ])
-  })
-
-  it('a ToolMessage with no trace (older session) produces no steps', () => {
-    const messages: BaseMessage[] = [
-      new ToolMessage({
-        content: 'ok',
-        tool_call_id: 'call-sc2',
-        name: 'generateMindmapFragment',
-      }),
-    ]
-
-    const result = extractToolCalls(messages)
-    expect(result![0].steps).toBeUndefined()
-  })
-
-  it('derives ChatToolCall.status from the tool result ok flag', () => {
-    const ok = extractToolCalls([
-      new ToolMessage({
-        content: JSON.stringify({ ok: true, action: 'insertXmlFragment', data: { nodeCount: 1 } }),
-        tool_call_id: 'call-ok',
-        name: 'insertXmlFragment',
-      }),
-    ])
-    expect(ok![0].status).toBe('success')
-
-    const failed = extractToolCalls([
-      new ToolMessage({
-        content: JSON.stringify({ ok: false, error: '[block_not_found] Node not found' }),
-        tool_call_id: 'call-fail',
-        name: 'updateMindmapNode',
-      }),
-    ])
-    expect(failed![0].status).toBe('error')
-
-    const freeText = extractToolCalls([
-      new ToolMessage({
-        content: 'mindmap generated',
-        tool_call_id: 'call-txt',
-        name: 'readMindmap',
-      }),
-    ])
-    expect(freeText![0].status).toBe('success')
   })
 })

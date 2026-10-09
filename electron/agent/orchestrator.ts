@@ -21,7 +21,6 @@ import { currentWorkspacePath } from '../shared/runContext.js'
 import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
 import { ToolRegistry } from './tools/registry.js'
 import { _normalize_tool_result } from './tools/toolResultNormalizer.js'
-import { deriveToolStatus } from './toolStatus.js'
 import { logger } from '../shared/logger.js'
 import { getToolSchemas } from './subgraphRouter.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
@@ -316,13 +315,16 @@ export class AgentOrchestrator {
       splitCurrentTurn(result.messages).current,
     ).filter((msg): msg is AssistantMessage => msg.role === 'assistant')
     const messages = assistantMessages.length > 0 ? assistantMessages : undefined
+    // The flat list is the messages' own tool calls — never a second scan of the turn.
+    const turnToolCalls = assistantMessages.flatMap((msg) => msg.toolCalls ?? [])
 
     const response: StreamResponse = {
       content: rawContent,
       messages,
       // A palace entry run has no chat record to keep: its reply is the landing
       // payload below, not a tool-call log.
-      toolCalls: result.runEntry === 'palace' ? undefined : this.extractToolCalls(result.messages),
+      toolCalls:
+        result.runEntry === 'palace' || turnToolCalls.length === 0 ? undefined : turnToolCalls,
     }
 
     // Mindmap data flows through XML fragment → insertXmlFragment tool calls
@@ -336,31 +338,5 @@ export class AgentOrchestrator {
     }
 
     return response
-  }
-
-  private extractToolCalls(messages: BaseMessage[]): StreamResponse['toolCalls'] {
-    const toolCalls: StreamResponse['toolCalls'] = []
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i]
-      if (msg.type === 'human') break
-      if (msg.type === 'tool') {
-        const toolMsg = msg as BaseMessage & {
-          name?: string
-          content: unknown
-          additional_kwargs?: Record<string, unknown>
-        }
-        const toolSteps = toolMsg.additional_kwargs?.toolSteps
-        const result =
-          typeof toolMsg.content === 'string' ? toolMsg.content : JSON.stringify(toolMsg.content)
-        toolCalls.unshift({
-          name: toolMsg.name ?? 'unknown',
-          args: {},
-          result,
-          status: deriveToolStatus(result),
-          steps: Array.isArray(toolSteps) ? toolSteps : undefined,
-        })
-      }
-    }
-    return toolCalls.length > 0 ? toolCalls : undefined
   }
 }
