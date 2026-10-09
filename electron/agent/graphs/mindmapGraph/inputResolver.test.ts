@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
-import { MindmapInputResolver } from './inputResolver.js'
+import { resolveMindmapInput } from './inputResolver.js'
 import type { MindmapSubgraphStateType } from '../../state.js'
 import type { DocumentRef } from '../../state.js'
 
@@ -29,7 +29,7 @@ function createState(partial: Partial<MindmapSubgraphStateType> = {}): MindmapSu
   } as MindmapSubgraphStateType
 }
 
-describe('MindmapInputResolver', () => {
+describe('resolveMindmapInput', () => {
   it('resolves attached PDF document', () => {
     const documentRef: DocumentRef = {
       id: 'doc-1',
@@ -40,9 +40,7 @@ describe('MindmapInputResolver', () => {
       title: 'Annual Report',
       sha256: 'pdf-hash-1',
     }
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
     )
 
@@ -67,7 +65,7 @@ describe('MindmapInputResolver', () => {
       sha256: `${type}-hash`,
     }
 
-    const result = new MindmapInputResolver().resolve(
+    const result = resolveMindmapInput(
       createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
     )
 
@@ -86,9 +84,7 @@ describe('MindmapInputResolver', () => {
       importedAt: new Date().toISOString(),
       sha256: 'url-hash-1',
     }
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
     )
 
@@ -107,9 +103,7 @@ describe('MindmapInputResolver', () => {
       importedAt: new Date().toISOString(),
       sha256: 'text-hash-1',
     }
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({ context: { fileUuid: 'file-1', attachedDocument: documentRef } }),
     )
 
@@ -120,9 +114,7 @@ describe('MindmapInputResolver', () => {
   })
 
   it('falls back to latest user message text', () => {
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({
         messages: [
           new HumanMessage('first'),
@@ -147,9 +139,7 @@ describe('MindmapInputResolver', () => {
       importedAt: new Date().toISOString(),
       sha256: 'pdf-hash-2',
     }
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({
         context: { fileUuid: 'file-1', attachedDocument: documentRef, fileTitle: 'Project X' },
       }),
@@ -159,17 +149,13 @@ describe('MindmapInputResolver', () => {
   })
 
   it('returns null when no input is available', () => {
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(createState())
+    const result = resolveMindmapInput(createState())
 
     expect(result).toBeNull()
   })
 
   it('preserves existing mindmapInputSource if already set', () => {
-    const resolver = new MindmapInputResolver()
-
-    const result = resolver.resolve(
+    const result = resolveMindmapInput(
       createState({
         mindmapInputSource: { type: 'text', content: 'pre-set' },
         mindmapInputTitle: 'Pre-set Title',
@@ -192,7 +178,7 @@ describe('MindmapInputResolver', () => {
       importedAt: new Date().toISOString(),
     }
 
-    const result = new MindmapInputResolver().resolve(
+    const result = resolveMindmapInput(
       createState({
         mindmapInputSource: { type: 'docx', path: '/data/resume.docx' },
         mindmapInputTitle: 'resume.docx',

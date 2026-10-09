@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { HumanMessage } from '@langchain/core/messages'
-import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
+import { resolvePalaceInput } from './palaceGraph/inputResolver.js'
 import type { PalaceSubgraphStateType } from '../state.js'
 
 function createState(partial: Partial<PalaceSubgraphStateType> = {}): PalaceSubgraphStateType {
@@ -22,11 +22,9 @@ function createState(partial: Partial<PalaceSubgraphStateType> = {}): PalaceSubg
   } as PalaceSubgraphStateType
 }
 
-describe('PalaceInputResolver', () => {
+describe('resolvePalaceInput', () => {
   it('resolves selected nodes as priority input', async () => {
-    const resolver = new PalaceInputResolver()
-
-    const result = await resolver.resolve(
+    const result = resolvePalaceInput(
       createState({
         context: {
           fileUuid: 'file-1',
@@ -49,9 +47,7 @@ describe('PalaceInputResolver', () => {
   })
 
   it('falls back to latest user message text', async () => {
-    const resolver = new PalaceInputResolver()
-
-    const result = await resolver.resolve(
+    const result = resolvePalaceInput(
       createState({
         messages: [new HumanMessage('hello'), new HumanMessage('palace input')],
       }),
@@ -64,9 +60,7 @@ describe('PalaceInputResolver', () => {
   })
 
   it('returns null when no input is available', async () => {
-    const resolver = new PalaceInputResolver()
-
-    const result = await resolver.resolve(createState())
+    const result = resolvePalaceInput(createState())
 
     expect(result).toBeNull()
   })

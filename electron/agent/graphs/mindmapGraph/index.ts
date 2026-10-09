@@ -15,7 +15,7 @@ import {
   prepareDocument,
   type DocumentLoaderRegistry,
 } from '../../document/index.js'
-import { MindmapInputResolver } from './inputResolver.js'
+import { resolveMindmapInput } from './inputResolver.js'
 import { logger } from '../../../shared/logger.js'
 import { currentStreamId, requireStreamId } from '../../../shared/runContext.js'
 import { takeModelCallCount } from '../../providers/metering.js'
@@ -230,7 +230,7 @@ async function resolveInputNode(
   state: typeof MindmapSubgraphState.State,
 ): Promise<typeof MindmapSubgraphState.Update> {
   const reset = createMindmapRunReset()
-  const resolution = new MindmapInputResolver().resolve(state)
+  const resolution = resolveMindmapInput(state)
 
   if (!resolution) {
     return {

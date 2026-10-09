@@ -21,7 +21,7 @@ import type { ChatToolCallStep } from '../../../contracts/fileFormat.js'
 import { serializePalaceNodeXml } from '../../../contracts/mindmapXml/index.js'
 import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
 
-import { PalaceInputResolver } from './palaceGraph/inputResolver.js'
+import { resolvePalaceInput } from './palaceGraph/inputResolver.js'
 import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
 import { resolveArtworkStyle } from '../../../contracts/palaceArtworkStyle.js'
 import { buildSubgraphToolMessage } from '../subgraphRouter.js'
@@ -188,12 +188,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const imageGen = new ImageGenAgent(provider)
   const vision = new AnchorAgent(provider)
   const svgGen = new SvgAgent(provider)
-  const inputResolver = new PalaceInputResolver()
 
   // Use the state type dedicated to the Palace subgraph
   const graph = new StateGraph(PalaceSubgraphState)
     .addNode('resolve_input', async (state) => {
-      const resolution = await inputResolver.resolve(state)
+      const resolution = resolvePalaceInput(state)
       if (!resolution) {
         return {
           palaceError: 'Provide input content for the memory palace.',

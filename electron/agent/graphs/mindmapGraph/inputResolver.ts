@@ -39,34 +39,34 @@ function resolveTitle(documentRef: DocumentRef | undefined, fileTitle: string | 
  * 1. Currently attached document (state.context.attachedDocument)
  * 2. Latest non-empty user message text
  */
-export class MindmapInputResolver {
-  resolve(state: MindmapSubgraphStateType): MindmapInputResolution | null {
-    const attachedDocument = state.context?.attachedDocument
-    const fileTitle = state.context?.fileTitle
+export function resolveMindmapInput(
+  state: MindmapSubgraphStateType,
+): MindmapInputResolution | null {
+  const attachedDocument = state.context?.attachedDocument
+  const fileTitle = state.context?.fileTitle
 
-    if (attachedDocument) {
-      return {
-        source: resolveAttachedDocument(attachedDocument),
-        title: resolveTitle(attachedDocument, fileTitle),
-      }
+  if (attachedDocument) {
+    return {
+      source: resolveAttachedDocument(attachedDocument),
+      title: resolveTitle(attachedDocument, fileTitle),
     }
-
-    // With no new attachment, reuse the input source already in state (e.g. a subgraph retry).
-    if (state.mindmapInputSource) {
-      return {
-        source: state.mindmapInputSource,
-        title: state.mindmapInputTitle || fileTitle || '',
-      }
-    }
-
-    const userText = findLatestUserMessageText(state.messages)
-    if (userText) {
-      return {
-        source: { type: 'text', content: userText },
-        title: fileTitle || '',
-      }
-    }
-
-    return null
   }
+
+  // With no new attachment, reuse the input source already in state (e.g. a subgraph retry).
+  if (state.mindmapInputSource) {
+    return {
+      source: state.mindmapInputSource,
+      title: state.mindmapInputTitle || fileTitle || '',
+    }
+  }
+
+  const userText = findLatestUserMessageText(state.messages)
+  if (userText) {
+    return {
+      source: { type: 'text', content: userText },
+      title: fileTitle || '',
+    }
+  }
+
+  return null
 }
