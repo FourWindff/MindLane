@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
-  createFileChatState,
   resetChatRetryStateForTests,
   useAiStore,
   type ChatStreamEvent,
@@ -10,7 +9,7 @@ import { connectAiWritingProjection } from './aiWritingProjection'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
-import { createEmptyFile } from '@contracts/fileFormat'
+import { activateFile } from '@/__testutils__/chatHarness'
 
 type ChatStreamResult = { ok: true; streamId: string } | { ok: false; error: string }
 
@@ -57,23 +56,6 @@ function installStreamApi() {
   })
   emitStreamEvent = (event) => streamListener?.(event)
   return { chatStream }
-}
-
-/** Active file in both places the projection bridges: the registry and the chat store. */
-function activateFile(fileUuid: string) {
-  const key = `test-${fileUuid}`
-  const instance = openFileRegistry.getOrCreate(key)
-  const file = createEmptyFile('Test mindmap')
-  file.metadata.fileUuid = fileUuid
-  instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
-  openFileRegistry.setActive(key)
-  useAiStore.setState({
-    currentFileUuid: fileUuid,
-    currentFilePath: `/${fileUuid}.mindlane`,
-    fileChats: { [fileUuid]: createFileChatState('session-a') },
-    sessionFileUuids: { 'session-a': fileUuid },
-  })
-  return instance
 }
 
 function openFile(fileUuid: string) {

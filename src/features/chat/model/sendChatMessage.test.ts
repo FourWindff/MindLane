@@ -1,18 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
-  createFileChatState,
   deriveChatCapsuleEntries,
   resetChatRetryStateForTests,
   useAiStore,
   type ChatStreamEvent,
-  type FileChatState,
 } from './aiStore'
 import { useSettingsStore } from '@/features/settings/model/settingsStore'
 import { useWorkspaceStore } from '@/features/workspace/store'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
-import { createEmptyFile } from '@contracts/fileFormat'
+import { activateFile, createRegistryHarness } from '@/__testutils__/chatHarness'
 import type { ChatContext } from '@contracts/ipc'
 
 type ChatStreamPayload = { threadId: string; message: string; context: ChatContext }
@@ -79,49 +77,6 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
     createFile,
     emit: (event: ChatStreamEvent) => streamListener?.(event),
   }
-}
-
-function createRegistryHarness() {
-  let listener: (() => void) | undefined
-  let active: { fileUuid: string; filePath: string; fileTitle: string } | null = null
-  return {
-    registry: {
-      getActiveFile: () => active,
-      subscribe: (next: () => void) => {
-        listener = next
-        return () => {
-          listener = undefined
-        }
-      },
-    },
-    activate(fileUuid: string, filePath: string, fileTitle: string) {
-      active = { fileUuid, filePath, fileTitle }
-      listener?.()
-    },
-  }
-}
-
-function activateMindmap(fileUuid: string): void {
-  // Source invariant: a send always has an active file. buildChatContext no
-  // longer falls back to a default instance, so the test establishes the
-  // invariant here (register an active mindmap instance whose uuid/path/title
-  // exist from creation).
-  const key = `test-${fileUuid}`
-  const instance = openFileRegistry.getOrCreate(key)
-  const file = createEmptyFile('Test mindmap')
-  file.metadata.fileUuid = fileUuid
-  instance.store.getState().loadFile(`/${fileUuid}.mindlane`, file, '/workspace')
-  openFileRegistry.setActive(key)
-}
-
-function activateFile(fileUuid: string, overrides?: Partial<FileChatState>) {
-  activateMindmap(fileUuid)
-  useAiStore.setState({
-    currentFileUuid: fileUuid,
-    currentFilePath: `/${fileUuid}.mindlane`,
-    fileChats: { [fileUuid]: { ...createFileChatState('session-a'), ...overrides } },
-    sessionFileUuids: { 'session-a': fileUuid },
-  })
 }
 
 beforeEach(() => {

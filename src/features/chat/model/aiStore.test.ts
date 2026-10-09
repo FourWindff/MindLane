@@ -87,25 +87,7 @@ function installApis(options?: {
   return { chat, emit: (event: ChatStreamEvent) => streamListener?.(event) }
 }
 
-function createRegistryHarness() {
-  let listener: (() => void) | undefined
-  let active: { fileUuid: string; filePath: string; fileTitle: string } | null = null
-  return {
-    registry: {
-      getActiveFile: () => active,
-      subscribe: (next: () => void) => {
-        listener = next
-        return () => {
-          listener = undefined
-        }
-      },
-    },
-    activate(fileUuid: string, filePath: string, fileTitle: string) {
-      active = { fileUuid, filePath, fileTitle }
-      listener?.()
-    },
-  }
-}
+import { createRegistryHarness } from '@/__testutils__/chatHarness'
 
 beforeEach(() => {
   resetChatRetryStateForTests()
