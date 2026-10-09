@@ -65,32 +65,6 @@ export interface DocumentRef {
   sha256?: string
 }
 
-/** Migrate a legacy DocumentRef carrying metadata to the flat shape. */
-export function migrateDocumentRef(doc: unknown): DocumentRef {
-  if (typeof doc !== 'object' || doc === null) {
-    throw new Error('Invalid DocumentRef: expected object')
-  }
-  const record = doc as Record<string, unknown>
-  const metadata = (record.metadata as Record<string, unknown> | undefined) ?? {}
-
-  return {
-    id: String(record.id ?? ''),
-    type: String(record.type ?? 'text') as DocumentRef['type'],
-    source: String(record.source ?? ''),
-    filename: String(record.filename ?? ''),
-    importedAt: String(record.importedAt ?? new Date().toISOString()),
-    title: typeof record.title === 'string' ? record.title : undefined,
-    pageCount: typeof record.pageCount === 'number' ? record.pageCount : undefined,
-    textPath: typeof record.textPath === 'string' ? record.textPath : undefined,
-    sha256:
-      typeof record.sha256 === 'string'
-        ? record.sha256
-        : typeof metadata.sha256 === 'string'
-          ? metadata.sha256
-          : undefined,
-  }
-}
-
 /** One subgraph stage: step name + optional progress counts (same source as `step` stream events). */
 export interface ChatToolCallStep {
   step: string

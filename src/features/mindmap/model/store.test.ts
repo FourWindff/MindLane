@@ -138,26 +138,6 @@ describe('store.documentRefs', () => {
     ])
   })
 
-  it('should migrate legacy document refs with metadata on loadFile', () => {
-    const file = createEmptyFile('Test file')
-    file.documents = [
-      {
-        id: 'legacy-doc',
-        type: 'pdf',
-        source: '/tmp/legacy.pdf',
-        filename: 'legacy.pdf',
-        importedAt: '2026-05-30T00:00:00.000Z',
-        metadata: { sha256: 'legacy-hash' },
-      } as never,
-    ]
-
-    store.getState().loadFile('/test/legacy.mindlane', file, null)
-
-    const loaded = store.getState().documentRefs[0]!
-    expect(loaded.sha256).toBe('legacy-hash')
-    expect(loaded).not.toHaveProperty('metadata')
-  })
-
   it('should replace document refs with the same id', () => {
     store.getState().addDocumentRef({
       id: 'doc-1',

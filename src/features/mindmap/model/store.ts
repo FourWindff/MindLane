@@ -5,7 +5,6 @@ import {
   type MindLaneFile,
   type DocumentRef,
   type MindLaneAsset,
-  migrateDocumentRef,
 } from '@contracts/fileFormat'
 import { canvasNodeRegistry } from '@/features/mindmap/nodes/registry'
 import { DEFAULT_STYLE } from '@/features/mindmap/theme/presets'
@@ -152,7 +151,7 @@ export function createMindmapStore(): MindmapStore {
         nodes: laidOut,
         edges: data.mindmap.edges as Edge[],
         assets: data.assets ?? [],
-        documentRefs: (data.documents || []).map(migrateDocumentRef),
+        documentRefs: data.documents ?? [],
         hasDocumentOpen: true,
         filePath,
         fileUuid: data.metadata.fileUuid,
