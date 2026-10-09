@@ -18,7 +18,7 @@
 import {
   escapeXml,
   formatXmlError,
-  NODE_TAG,
+  isNodeElement,
   normalizeSelfClosingTags,
   parseXmlTolerant,
   topLevelElements,
@@ -33,10 +33,6 @@ export interface MindmapOutlineNode {
 
 type MindmapOutlineParseResult =
   { ok: true; tree: MindmapOutlineNode } | { ok: false; reason: string }
-
-function isNodeElement(el: DomElementLike): boolean {
-  return el.tagName.toLowerCase() === NODE_TAG
-}
 
 /** Element label = trimmed concatenation of direct text children (nested <node> elements are carried by children, not counted as label). */
 function elementLabel(el: DomElementLike): string {

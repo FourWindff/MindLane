@@ -39,9 +39,7 @@ export async function _normalize_tool_result(
     if (offloadPath) {
       return buildOffloadSummary(content, offloadPath)
     }
-    if (content.length > AGENT_LIMITS.toolResultMaxChars) {
-      return truncate(content)
-    }
+    return truncate(content)
   }
 
   return content

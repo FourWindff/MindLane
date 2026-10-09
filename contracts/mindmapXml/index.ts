@@ -20,5 +20,5 @@ export {
   serializeMindmapSection,
   serializePalaceNodeXml,
 } from './serializer.js'
-export { parseXmlFragment, deserializeMindLaneFile } from './deserializer.js'
+export { parseXmlFragment, deserializeMindLaneFile, isNodeElement } from './deserializer.js'
 export { validateFragmentForInsert, validateMove, buildValidationContext } from './validate.js'

@@ -177,16 +177,8 @@ export function registerFsHandlers(ctx: HandlerContext): void {
         payload.name,
         data,
       )
-      if (result.ok) {
-        await syncWorkspaceFromFile(ctx, result.data.filePath, result.data.data)
-        return {
-          ok: true,
-          data: {
-            filePath: result.data.filePath,
-            data: result.data.data,
-          },
-        }
-      }
+      if (!result.ok) return result
+      await syncWorkspaceFromFile(ctx, result.data.filePath, result.data.data)
       return result
     },
   )

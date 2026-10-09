@@ -59,7 +59,7 @@ function elementView(el: DomElementLike): XmlElementLike {
   return { tag: el.tagName.toLowerCase(), attrs, text: text.trim(), elements }
 }
 
-function isNodeElement(el: DomElementLike): boolean {
+export function isNodeElement(el: DomElementLike): boolean {
   return el.tagName.toLowerCase() === NODE_TAG
 }
 

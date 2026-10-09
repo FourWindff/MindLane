@@ -65,12 +65,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
           sessionId: payload.threadId || crypto.randomUUID(),
           message: payload.message ?? '',
           workspaceUuid,
-          context: {
-            ...payload.context,
-            selectedNodes: payload.context.selectedNodes?.filter(
-              (n) => n.type === 'text' || n.type === 'palace',
-            ),
-          },
+          context: payload.context,
           documentRef: payload.context?.attachedDocument,
           ephemeral: payload.ephemeral,
         }
