@@ -136,36 +136,34 @@ export class AppState {
   }
 
   async claimWorkspaceUuid(workspacePath: string, candidateUuid?: string): Promise<string> {
-    const resolvedPath = path.resolve(workspacePath)
-    const settings = await this.load()
-    let workspaceUuid = candidateUuid ?? crypto.randomUUID()
-    const indexedPath = settings.workspacePathsByUuid[workspaceUuid]
-
-    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && directoryExists(indexedPath)) {
-      workspaceUuid = crypto.randomUUID()
-    }
-
-    await this.update({
-      workspacePathsByUuid: {
-        ...settings.workspacePathsByUuid,
-        [workspaceUuid]: resolvedPath,
-      },
-    })
-    return workspaceUuid
+    return this.claimUuid('workspacePathsByUuid', workspacePath, candidateUuid, directoryExists)
   }
 
   async claimFileUuid(filePath: string, candidateUuid: string): Promise<string> {
-    const resolvedPath = path.resolve(filePath)
+    return this.claimUuid('filePathsByUuid', filePath, candidateUuid, fs.existsSync)
+  }
+
+  /**
+   * Bind a path to a uuid, minting a fresh one when the candidate is already
+   * bound to a different path that still exists.
+   */
+  private async claimUuid(
+    mapKey: 'workspacePathsByUuid' | 'filePathsByUuid',
+    filePath: string,
+    candidateUuid: string | undefined,
+    exists: (indexedPath: string) => boolean,
+  ): Promise<string> {
     const settings = await this.load()
-    let fileUuid = candidateUuid
-    const indexedPath = settings.filePathsByUuid[fileUuid]
-    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && fs.existsSync(indexedPath)) {
-      fileUuid = crypto.randomUUID()
+    const resolvedPath = path.resolve(filePath)
+    let uuid = candidateUuid ?? crypto.randomUUID()
+    const indexedPath = settings[mapKey][uuid]
+
+    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && exists(indexedPath)) {
+      uuid = crypto.randomUUID()
     }
-    await this.update({
-      filePathsByUuid: { ...settings.filePathsByUuid, [fileUuid]: resolvedPath },
-    })
-    return fileUuid
+
+    await this.update({ [mapKey]: { ...settings[mapKey], [uuid]: resolvedPath } })
+    return uuid
   }
 
   /**
