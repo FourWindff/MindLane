@@ -52,12 +52,13 @@ export type MindmapReadResponse =
 export interface WriteActionArgs {
   insertXmlFragment: {
     xml: string
-    parentId?: string
+    /** Anchor node: the parent when position=child, the sibling when position=after/before. */
+    targetId?: string
     position?: 'root' | 'child' | 'after' | 'before'
   }
   updateMindmapNode: { xml: string }
   moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
-  deleteNode: { nodeId: string; confirmDeleteSubtree?: boolean }
+  deleteMindmapNode: { nodeId: string; confirmDeleteSubtree?: boolean }
   /**
    * Palace landing (CONTEXT.md "deterministic landing"): code serializes the subgraph
    * payload to a palace XML fragment and both trigger surfaces land through

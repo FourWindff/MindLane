@@ -117,12 +117,12 @@ describe('MindmapWrite request/response payload shapes', () => {
       requestId: 'req-1',
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
-      args: { xml: '<node/>', parentId: 'root' },
+      args: { xml: '<node/>', targetId: 'root' },
     }
     expect(request.requestId).toBe('req-1')
     expect(request.fileUuid).toBe('file-a')
     expect(request.action).toBe('insertXmlFragment')
-    expect(request.args).toEqual({ xml: '<node/>', parentId: 'root' })
+    expect(request.args).toEqual({ xml: '<node/>', targetId: 'root' })
   })
 
   it('declares the ok response shape: {ok, action, data}', () => {

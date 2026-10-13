@@ -62,33 +62,33 @@ function withLongContentCorrection(result: unknown): unknown {
 /**
  * Creates the unified write-entry tool: inserts a nested XML fragment at any
  * position (including batched subtree generation).
- * position: root=attach under the root / child=attach under parentId /
- * after|before=become a sibling of parentId.
+ * position: root=attach under the root / child=attach under targetId /
+ * after|before=become a sibling of targetId.
  * Validation and apply both happen inside the renderer responder (atomic live-editor op).
  */
 function createInsertXmlFragmentTool(proxy: MindmapWriteProxy) {
   return tool(
-    async ({ fileUuid, xml, parentId, position }) =>
+    async ({ fileUuid, xml, targetId, position }) =>
       runWrite(
         proxy,
         fileUuid,
         'insertXmlFragment',
-        { xml, parentId, position },
+        { xml, targetId, position },
         withLongContentCorrection,
       ),
     {
       name: 'insertXmlFragment',
-      description: `Insert an XML fragment into the mindmap (nested subtree, batching supported). position: child=attach under parentId (default); after/before=insert before/after the sibling parentId; root=attach under the root node. When parentId is omitted the target falls back from the selected node to the root node. Rules: new nodes must not carry an id (the system mints it); type is required (text/image/palace); content is a plain-text attribute whose special characters must be escaped; an image node must reference an asset from the context. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
+      description: `Insert an XML fragment into the mindmap (nested subtree, batching supported). position: child=attach under targetId (default); after/before=insert before/after the sibling targetId; root=attach under the root node. When targetId is omitted the target falls back from the selected node to the root node. Rules: new nodes must not carry an id (the system mints it); type is required (text/image/palace); content is a plain-text attribute whose special characters must be escaped; an image node must reference an asset from the context. fileUuid is available from <EDITOR_STATE file_uuid="..."> at the end of the user message.`,
       schema: z.object({
         fileUuid: z.string().optional().describe('Mindmap file identity, fileUuid'),
         xml: z
           .string()
           .describe('XML fragment to insert (several top-level <node> elements = batched insert)'),
-        parentId: z
+        targetId: z
           .string()
           .optional()
           .describe(
-            'Parent node id when position=child; sibling node id when position=after/before',
+            'Anchor node id: the parent when position=child, the sibling when position=after/before',
           ),
         position: z
           .enum(['root', 'child', 'after', 'before'])
@@ -149,13 +149,13 @@ function createMoveMindmapNodeTool(proxy: MindmapWriteProxy) {
 // ========== deleteMindmapNode (kept) ==========
 
 /**
- * Creates the delete tool: deletes the node (with its subtree). The action
- * name stays `deleteNode` (the renderer responder applies by that name).
+ * Creates the delete tool: deletes the node (with its subtree). The action name
+ * matches the tool name (the renderer responder applies by that name).
  */
 function createDeleteMindmapNodeTool(proxy: MindmapWriteProxy) {
   return tool(
     async ({ fileUuid, nodeId, confirmDeleteSubtree }) =>
-      runWrite(proxy, fileUuid, 'deleteNode', { nodeId, confirmDeleteSubtree }),
+      runWrite(proxy, fileUuid, 'deleteMindmapNode', { nodeId, confirmDeleteSubtree }),
     {
       name: 'deleteMindmapNode',
       description:

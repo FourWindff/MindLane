@@ -33,14 +33,14 @@ describe('insertXmlFragment (renderer proxy)', () => {
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
       xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
-      parentId: 'n1',
+      targetId: 'n1',
       position: 'child',
     })
 
     expect(proxy).toHaveBeenCalledTimes(1)
     expect(proxy).toHaveBeenCalledWith('file-a', 'insertXmlFragment', {
       xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
-      parentId: 'n1',
+      targetId: 'n1',
       position: 'child',
     })
     // The renderer ack is returned as-is as the tool result (model-facing contract: {ok, action, data})
@@ -49,7 +49,7 @@ describe('insertXmlFragment (renderer proxy)', () => {
       action: 'insertXmlFragment',
       data: {
         xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
-        parentId: 'n1',
+        targetId: 'n1',
         position: 'child',
       },
     })
@@ -101,7 +101,7 @@ describe('moveMindmapNode (renderer proxy)', () => {
 })
 
 describe('deleteMindmapNode (renderer proxy)', () => {
-  it('forwards to the deleteNode action the renderer responder applies', async () => {
+  it('forwards to the deleteMindmapNode action the renderer responder applies', async () => {
     const { tools: t, proxy } = fakeProxy()
     const result = await t.deleteNodeTool.invoke({
       fileUuid: 'file-a',
@@ -109,11 +109,11 @@ describe('deleteMindmapNode (renderer proxy)', () => {
       confirmDeleteSubtree: true,
     })
 
-    expect(proxy).toHaveBeenCalledWith('file-a', 'deleteNode', {
+    expect(proxy).toHaveBeenCalledWith('file-a', 'deleteMindmapNode', {
       nodeId: 'n1',
       confirmDeleteSubtree: true,
     })
-    expect(result).toMatchObject({ ok: true, action: 'deleteNode' })
+    expect(result).toMatchObject({ ok: true, action: 'deleteMindmapNode' })
   })
 })
 

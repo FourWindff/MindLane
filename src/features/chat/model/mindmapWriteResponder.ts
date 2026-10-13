@@ -400,7 +400,7 @@ async function applyWriteAction(
     }
 
     case 'insertXmlFragment': {
-      const { xml, parentId, position } = args as WriteActionArgs['insertXmlFragment']
+      const { xml, targetId, position } = args as WriteActionArgs['insertXmlFragment']
       if (typeof xml !== 'string') {
         throw new MindmapXmlError('empty_xml', 'The xml argument is missing')
       }
@@ -413,21 +413,21 @@ async function applyWriteAction(
       const state = editor.getState()
       const { ctx } = buildValidationContext(state.nodes, state.edges, state.assets)
       const pos = position ?? DEFAULT_POSITION
-      if (pos !== 'root' && parentId && !ctx.nodeIds.has(parentId)) {
-        throw new MindmapXmlError('block_not_found', `Anchor node "${parentId}" does not exist`)
+      if (pos !== 'root' && targetId && !ctx.nodeIds.has(targetId)) {
+        throw new MindmapXmlError('block_not_found', `Anchor node "${targetId}" does not exist`)
       }
       // insertFromXml re-runs validateFragmentForInsert on the live editor state,
       // so a structural failure surfaces as the same MindmapXmlError from there.
       if (materialized.assets.length > 0) {
         await editor.insertFromXml(
           materialized.xml,
-          { parentId, position: pos },
+          { parentId: targetId, position: pos },
           materialized.assets,
         )
       } else {
-        await editor.insertFromXml(materialized.xml, { parentId, position: pos })
+        await editor.insertFromXml(materialized.xml, { parentId: targetId, position: pos })
       }
-      return { nodeCount: materialized.nodeCount, parentId: parentId ?? null, position: pos }
+      return { nodeCount: materialized.nodeCount, targetId: targetId ?? null, position: pos }
     }
 
     case 'updateMindmapNode': {
@@ -467,8 +467,8 @@ async function applyWriteAction(
       return { nodeId, targetId: target, position: pos }
     }
 
-    case 'deleteNode': {
-      const { nodeId, confirmDeleteSubtree } = args as WriteActionArgs['deleteNode']
+    case 'deleteMindmapNode': {
+      const { nodeId, confirmDeleteSubtree } = args as WriteActionArgs['deleteMindmapNode']
       if (typeof nodeId !== 'string' || !nodeId.trim()) {
         throw new MindmapXmlError('block_not_found', 'The nodeId argument is missing')
       }

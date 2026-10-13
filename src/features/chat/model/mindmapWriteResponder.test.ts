@@ -95,7 +95,7 @@ describe('MindmapWriteResponder', () => {
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
       args: {
-        parentId: 'root',
+        targetId: 'root',
         xml: `<node type="palace" content="Palace" imageUrl="${imageUrl}"><station order="1" x="0.1" y="0.1">Entrance</station></node>`,
       },
     })
@@ -143,7 +143,7 @@ describe('MindmapWriteResponder', () => {
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
       args: {
-        parentId: 'root',
+        targetId: 'root',
         xml: `<node type="palace" content="Palace" imageUrl="${imageUrl}"><station order="1">Entrance</station></node>`,
       },
     })
@@ -174,7 +174,7 @@ describe('MindmapWriteResponder', () => {
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
       args: {
-        parentId: 'root',
+        targetId: 'root',
         xml: `<node type="palace" content="Existing palace" asset="${existingAssetId}" />`,
       },
     })
@@ -199,7 +199,7 @@ describe('MindmapWriteResponder', () => {
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
       args: {
-        parentId: 'root',
+        targetId: 'root',
         xml: `<node id="${duplicateId}" type="palace" imageUrl="${imageUrl}" />`,
       },
     })
@@ -247,7 +247,7 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
-      args: { xml: '<node type="text" content="Branch" />', parentId: 'root' },
+      args: { xml: '<node type="text" content="Branch" />', targetId: 'root' },
     })
     await flush()
 
@@ -263,7 +263,7 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       ok: true,
       action: 'insertXmlFragment',
-      data: { nodeCount: 1, parentId: 'root', position: 'child' },
+      data: { nodeCount: 1, targetId: 'root', position: 'child' },
     })
     stop()
   })
@@ -289,7 +289,7 @@ describe('MindmapWriteResponder', () => {
       requestId: 'r1',
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
-      args: { xml: '<node id="n1" type="text" content="x" />', parentId: 'root' },
+      args: { xml: '<node id="n1" type="text" content="x" />', targetId: 'root' },
     })
     await flush()
 
@@ -337,7 +337,7 @@ describe('MindmapWriteResponder', () => {
     send({
       requestId: 'r1',
       fileUuid: 'file-unknown',
-      action: 'deleteNode',
+      action: 'deleteMindmapNode',
       args: { nodeId: 'n1' },
     })
     await flush()
@@ -437,7 +437,7 @@ describe('MindmapWriteResponder', () => {
     send({
       requestId: 'r1',
       fileUuid: 'file-a',
-      action: 'deleteNode',
+      action: 'deleteMindmapNode',
       args: { nodeId: 'n1', confirmDeleteSubtree: false },
     })
     await flush()
@@ -446,7 +446,7 @@ describe('MindmapWriteResponder', () => {
     expect(respond).toHaveBeenCalledWith({
       requestId: 'r1',
       ok: true,
-      action: 'deleteNode',
+      action: 'deleteMindmapNode',
       data: { nodeId: 'n1', deleted: false },
     })
     stop()
@@ -459,7 +459,7 @@ describe('MindmapWriteResponder', () => {
     send({
       requestId: 'r1',
       fileUuid: 'file-a',
-      action: 'deleteNode',
+      action: 'deleteMindmapNode',
       args: { nodeId: 'root' },
     })
     await flush()
@@ -482,7 +482,12 @@ describe('MindmapWriteResponder', () => {
     ]
     const { send, respond, persistFile, stop } = setupResponder({ 'file-a': asEditor(fake) })
 
-    send({ requestId: 'r1', fileUuid: 'file-a', action: 'deleteNode', args: { nodeId: 'ghost' } })
+    send({
+      requestId: 'r1',
+      fileUuid: 'file-a',
+      action: 'deleteMindmapNode',
+      args: { nodeId: 'ghost' },
+    })
     await flush()
 
     expect(fake.editor.deleteSubtree).not.toHaveBeenCalled()

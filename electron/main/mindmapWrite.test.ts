@@ -118,7 +118,9 @@ describe('MindmapWriteRequester', () => {
     const { window, sent } = fakeWindow()
     const requester = createMindmapWriteRequester(() => window as unknown as BrowserWindow)
 
-    const promise = requester.request(() => buildMindmapWriteRequest('file-a', 'deleteNode', {}))
+    const promise = requester.request(() =>
+      buildMindmapWriteRequest('file-a', 'deleteMindmapNode', {}),
+    )
     requester.respond({ requestId: 'unknown', ok: true, action: 'x', data: null })
     expect(requester.pendingCount).toBe(1)
 
