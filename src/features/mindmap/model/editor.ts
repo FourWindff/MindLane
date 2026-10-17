@@ -463,10 +463,67 @@ export class MindmapEditor {
       edges,
     )
 
-    // Mark the exit animation first (not recorded in history, no dirty flag)
+    this.markExiting(allIds, exitDelays)
+    this.scheduleDelete(
+      rootIds.map((rootId) => ({ type: 'deleteSubtree' as const, rootId })),
+      totalExitDuration(exitDelays, NODE_EXIT_MS),
+    )
+  }
+
+  /**
+   * Delete one node and promote its children to its parent (their subtrees are kept,
+   * one atomic history entry). The node itself still plays the plain exit animation.
+   */
+  deleteNodeKeepingChildren(nodeId: string): void {
+    const { nodes, edges } = this.state
+    if (nodeId === 'root' || !nodes.some((n) => n.id === nodeId)) return
+    const parentId = findParentId(edges, nodeId)
+    if (!parentId) return
+
+    const node = nodes.find((n) => n.id === nodeId)!
+    const commands: MindmapCommand[] = []
+    getChildIdsOrdered(nodes, edges, nodeId).forEach((childId, index) => {
+      const incoming = edges.find((e) => e.target === childId)
+      if (incoming) commands.push({ type: 'removeEdge', edgeId: incoming.id })
+      commands.push({
+        type: 'addEdge',
+        edge: {
+          id: `e-${parentId}-${childId}`,
+          source: parentId,
+          target: childId,
+          type: 'mindmap',
+          className: 'mindmap-edge',
+        },
+      })
+      // Stack the promoted children at the deleted node's slot: the reflow orders
+      // siblings by y, so this keeps their order without interleaving with the
+      // surviving siblings.
+      commands.push({
+        type: 'moveNode',
+        nodeId: childId,
+        position: { x: node.position.x, y: node.position.y + index * CHILD_GAP_Y },
+      })
+    })
+    // The batch reattaches the child edges before `deleteSubtree` runs, so the deleted
+    // subtree is just the node itself here. One history entry: a single undo restores all.
+    commands.push({ type: 'deleteSubtree', rootId: nodeId })
+
+    this.markExiting(new Set([nodeId]), new Map())
+    this.scheduleDelete(commands, NODE_EXIT_MS)
+  }
+
+  cancelPendingDeletes(): void {
+    for (const id of this.pendingDeleteTimers) {
+      clearTimeout(id)
+    }
+    this.pendingDeleteTimers.clear()
+  }
+
+  /** Mark nodes (and the edges touching them) as exiting: transient, not recorded in history, no dirty flag. */
+  private markExiting(ids: Set<string>, exitDelays: Map<string, number>): void {
     this.state.setNodesTransient((nodes) =>
       nodes.map((n) => {
-        if (!allIds.has(n.id)) return n
+        if (!ids.has(n.id)) return n
         const delay = exitDelays.get(n.id) ?? 0
         return {
           ...n,
@@ -480,7 +537,7 @@ export class MindmapEditor {
     )
     this.state.setEdgesTransient((edges) =>
       edges.map((e) => {
-        const touch = allIds.has(e.source) || allIds.has(e.target)
+        const touch = ids.has(e.source) || ids.has(e.target)
         if (!touch) return e
         // Drop a lingering `mindmap-edge--enter` marker: agent-inserted edges
         // keep it forever (nodes clear theirs on animationend, edges have no
@@ -494,22 +551,15 @@ export class MindmapEditor {
         return { ...e, className: [...classes].join(' ') }
       }),
     )
-
-    const timerId = setTimeout(
-      () => {
-        this.pendingDeleteTimers.delete(timerId)
-        this.batch(rootIds.map((rootId) => ({ type: 'deleteSubtree' as const, rootId })))
-      },
-      totalExitDuration(exitDelays, NODE_EXIT_MS),
-    )
-    this.pendingDeleteTimers.add(timerId)
   }
 
-  cancelPendingDeletes(): void {
-    for (const id of this.pendingDeleteTimers) {
-      clearTimeout(id)
-    }
-    this.pendingDeleteTimers.clear()
+  /** Commit the delete batch after the exit animation; tracked so any later batch cancels it. */
+  private scheduleDelete(commands: MindmapCommand[], delay: number): void {
+    const timerId = setTimeout(() => {
+      this.pendingDeleteTimers.delete(timerId)
+      this.batch(commands)
+    }, delay)
+    this.pendingDeleteTimers.add(timerId)
   }
 
   moveNode(nodeId: string, position: { x: number; y: number }): void {

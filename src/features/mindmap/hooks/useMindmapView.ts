@@ -332,6 +332,14 @@ export function useMindmapView({
     [edges, selectedId],
   )
   const canRemove = Boolean(selectedId && selectedId !== 'root')
+  const selectedNodeCount = useMemo(
+    () => nodes.filter((node) => node.selected && !node.data?.exiting).length,
+    [nodes],
+  )
+  // "Delete node only" promotes the children into the deleted node's parent, which
+  // needs exactly one target (selectedTopicCount only counts text topics, so it cannot
+  // stand in for the raw selection size).
+  const canRemoveNodeOnly = canRemove && selectedNodeCount === 1
 
   useShortcuts(
     shortcutRows({ controller, selectedId, canAddSibling, enabled: shortcutsEnabled, save }),
@@ -364,6 +372,7 @@ export function useMindmapView({
     canAddSibling,
     canAddParent: canAddSibling,
     canRemove,
+    canRemoveNodeOnly,
     canUndo,
     canRedo,
     hiddenFlowRef,
@@ -384,6 +393,7 @@ export function useMindmapView({
       addSibling: controller.addSibling,
       addParent: controller.addParent,
       removeSelected: controller.removeSelected,
+      removeNodeOnly: controller.removeNodeOnly,
       reset: controller.reset,
       undo: controller.undo,
       redo: controller.redo,

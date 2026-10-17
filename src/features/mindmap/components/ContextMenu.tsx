@@ -10,12 +10,14 @@ type ContextMenuProps = {
   onAddSibling: (mode: 'above' | 'below' | 'end') => void
   onAddParent: () => void
   onRemove: () => void
+  onRemoveNodeOnly: (nodeId: string) => void
   onReset: () => void
   onGeneratePalace: () => void
   onInsertImage: () => void
   canAddSibling: boolean
   canAddParent: boolean
   canRemove: boolean
+  canRemoveNodeOnly: boolean
   aiBusy: boolean
   selectedCount: number
   palaceEnabled: boolean
@@ -28,12 +30,14 @@ export function MindmapContextMenu({
   onAddSibling,
   onAddParent,
   onRemove,
+  onRemoveNodeOnly,
   onReset,
   onGeneratePalace,
   onInsertImage,
   canAddSibling,
   canAddParent,
   canRemove,
+  canRemoveNodeOnly,
   aiBusy,
   selectedCount,
   palaceEnabled,
@@ -59,7 +63,18 @@ export function MindmapContextMenu({
       disabled: !canAddSibling || aiBusy,
     },
     { label: 'Insert image', onClick: onInsertImage, disabled: aiBusy },
-    { label: 'Delete', onClick: onRemove, disabled: !canRemove || aiBusy, modifier: 'danger' },
+    {
+      label: 'Delete node only',
+      onClick: () => onRemoveNodeOnly(menu.nodeId),
+      disabled: !canRemoveNodeOnly || aiBusy,
+      modifier: 'danger',
+    },
+    {
+      label: 'Delete subtree',
+      onClick: onRemove,
+      disabled: !canRemove || aiBusy,
+      modifier: 'danger',
+    },
     'separator',
     {
       label: `Generate memory palace${selectedCount > 1 ? ` (${selectedCount} nodes)` : ''}`,

@@ -181,8 +181,8 @@ export function MindmapToolbar({
               <ToolbarButton
                 onClick={onRemove}
                 disabled={!canRemove}
-                ariaLabel="Delete"
-                tooltip="Delete"
+                ariaLabel="Delete subtree"
+                tooltip="Delete subtree"
                 variant="danger"
                 icon={<Trash2 size={22} strokeWidth={1.5} />}
               />

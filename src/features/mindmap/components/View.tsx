@@ -96,12 +96,14 @@ function MindmapWorkspace({
           onAddSibling={view.actions.addSibling}
           onAddParent={view.actions.addParent}
           onRemove={view.actions.removeSelected}
+          onRemoveNodeOnly={view.actions.removeNodeOnly}
           onReset={view.actions.reset}
           onGeneratePalace={view.actions.generatePalace}
           onInsertImage={view.actions.insertImage}
           canAddSibling={view.canAddSibling}
           canAddParent={view.canAddParent}
           canRemove={view.canRemove}
+          canRemoveNodeOnly={view.canRemoveNodeOnly}
           aiBusy={view.aiBusy}
           selectedCount={view.selectedTopicCount || 1}
           palaceEnabled={view.palaceEnabled}

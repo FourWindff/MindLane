@@ -247,6 +247,48 @@ describe('MindmapEditor', () => {
     })
   })
 
+  describe('deleteNodeKeepingChildren', () => {
+    it('promotes the children under the parent, deletes only the node, and undoes in one step', () => {
+      vi.useFakeTimers()
+      const { nodeId: b } = editor.addChild(rootId(), { label: 'B' })
+      const { nodeId: a } = editor.addChild(rootId(), { label: 'A' })
+      const { nodeId: a1 } = editor.addChild(a, { label: 'A1' })
+      const { nodeId: a2 } = editor.addChild(a, { label: 'A2' })
+      const { nodeId: a11 } = editor.addChild(a1, { label: 'A11' })
+      const beforeNodeCount = store.getState().nodes.length
+      expect(childOrder(rootId())).toEqual([b, a])
+
+      editor.deleteNodeKeepingChildren(a)
+      expect(store.getState().nodes.find((n) => n.id === a)?.data.exiting).toBe(true)
+
+      vi.advanceTimersByTime(300)
+      const { nodes, edges } = store.getState()
+      expect(nodes.some((n) => n.id === a)).toBe(false)
+      expect(nodes.length).toBe(beforeNodeCount - 1)
+      // children and grandchild survive, reattached under the parent in order
+      expect(childOrder(rootId())).toEqual([b, a1, a2])
+      expect(childOrder(a1)).toEqual([a11])
+      expect(edges.every((e) => e.source !== a && e.target !== a)).toBe(true)
+
+      editor.undo()
+      expect(store.getState().nodes.length).toBe(beforeNodeCount)
+      expect(childOrder(rootId())).toEqual([b, a])
+      expect(childOrder(a)).toEqual([a1, a2])
+
+      vi.useRealTimers()
+    })
+
+    it('ignores the root and unknown node ids', () => {
+      const beforeNodeCount = store.getState().nodes.length
+
+      editor.deleteNodeKeepingChildren('root')
+      editor.deleteNodeKeepingChildren('missing')
+
+      expect(store.getState().nodes.length).toBe(beforeNodeCount)
+      expect(store.getState().canUndo).toBe(false)
+    })
+  })
+
   describe('moveNode', () => {
     it('should move a node and allow undo/redo', () => {
       const { nodeId } = editor.addChild(rootId())

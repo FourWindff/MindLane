@@ -36,6 +36,7 @@ describe('MindmapOperationController', () => {
       addSibling: vi.fn(),
       addParent: vi.fn(),
       deleteSubtrees: vi.fn(),
+      deleteNodeKeepingChildren: vi.fn(),
       applyNativeNodeChanges: vi.fn(),
       applyNativeEdgeChanges: vi.fn(),
       setNodeSelected: vi.fn(),
@@ -100,6 +101,27 @@ describe('MindmapOperationController', () => {
     expect(editor.deleteSubtrees).toHaveBeenCalledWith(['a'])
   })
 
+  it('deletes a single node only: selects the parent first, then promotes through the editor', () => {
+    const controller = createController()
+
+    controller.removeNodeOnly('a-child')
+
+    expect(setSelectedId).toHaveBeenCalledWith('a')
+    expect(editor.setNodeSelected).toHaveBeenCalledWith('a', true)
+    expect(clearSelectionMode).toHaveBeenCalledOnce()
+    expect(editor.deleteNodeKeepingChildren).toHaveBeenCalledWith('a-child')
+  })
+
+  it('ignores delete-node-only for the root and for unknown nodes', () => {
+    const controller = createController()
+
+    controller.removeNodeOnly('root')
+    controller.removeNodeOnly('missing')
+
+    expect(editor.deleteNodeKeepingChildren).not.toHaveBeenCalled()
+    expect(setSelectedId).not.toHaveBeenCalled()
+  })
+
   it('navigates through the tree without ReactFlow mounted', () => {
     const controller = createController()
 
@@ -119,12 +141,14 @@ describe('MindmapOperationController', () => {
     controller.addChild()
     controller.addSibling()
     controller.removeSelected()
+    controller.removeNodeOnly('a')
     controller.undo()
     controller.redo()
 
     expect(editor.addChild).not.toHaveBeenCalled()
     expect(editor.addSibling).not.toHaveBeenCalled()
     expect(editor.deleteSubtrees).not.toHaveBeenCalled()
+    expect(editor.deleteNodeKeepingChildren).not.toHaveBeenCalled()
     expect(editor.undo).not.toHaveBeenCalled()
     expect(editor.redo).not.toHaveBeenCalled()
   })

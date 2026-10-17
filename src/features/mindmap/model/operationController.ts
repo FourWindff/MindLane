@@ -14,6 +14,7 @@ type OperationEditor = Pick<
   | 'addSibling'
   | 'addParent'
   | 'deleteSubtrees'
+  | 'deleteNodeKeepingChildren'
   | 'applyNativeNodeChanges'
   | 'applyNativeEdgeChanges'
   | 'setNodeSelected'
@@ -140,6 +141,21 @@ export function createMindmapOperationController({
 
       selectNode(nextSelectedId)
       editor.deleteSubtrees(targets.map((target) => target.id))
+    },
+
+    /**
+     * Delete the node itself and promote its children to its parent (unlike
+     * `removeSelected`, which deletes the whole subtree). Single selection only.
+     */
+    removeNodeOnly(nodeId: string) {
+      const state = getState()
+      if (state.aiBusy || nodeId === 'root') return
+      if (!state.nodes.some((node) => node.id === nodeId && !node.data?.exiting)) return
+      const parentId = findParentId(state.edges, nodeId)
+      if (!parentId) return
+
+      selectNode(parentId)
+      editor.deleteNodeKeepingChildren(nodeId)
     },
 
     reset() {
