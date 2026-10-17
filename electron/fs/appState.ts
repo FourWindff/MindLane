@@ -158,7 +158,9 @@ export class AppState {
 
   /**
    * Bind a path to a uuid, minting a fresh one when the candidate is already
-   * bound to a different path that still exists.
+   * bound to a different path that still exists. A binding that is already
+   * correct is left untouched, so repeated opens and saves do not rewrite
+   * settings.json.
    */
   private async claimUuid(
     mapKey: 'workspacePathsByUuid' | 'filePathsByUuid',
@@ -172,9 +174,8 @@ export class AppState {
       let uuid = candidateUuid ?? crypto.randomUUID()
       const indexedPath = settings[mapKey][uuid]
 
-      if (indexedPath && path.resolve(indexedPath) !== resolvedPath && exists(indexedPath)) {
-        uuid = crypto.randomUUID()
-      }
+      if (indexedPath && path.resolve(indexedPath) === resolvedPath) return uuid
+      if (indexedPath && exists(indexedPath)) uuid = crypto.randomUUID()
 
       await this.applyUpdate({ [mapKey]: { ...settings[mapKey], [uuid]: resolvedPath } })
       return uuid

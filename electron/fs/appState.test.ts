@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -300,6 +300,20 @@ describe('AppState', () => {
 
     const settings = await appState.load()
     expect(settings.lastWorkspacePath).toBe(workspacePath)
+  })
+
+  it('skips the write when a path is already bound to the uuid', async () => {
+    const filePath = path.join(tmpDir, 'a.mindlane')
+    fs.writeFileSync(filePath, '{}')
+    await appState.claimFileUuid(filePath, 'uuid-a')
+
+    const writeFile = vi.spyOn(fs.promises, 'writeFile')
+    const claimed = await appState.claimFileUuid(filePath, 'uuid-a')
+    const calls = writeFile.mock.calls.length
+    writeFile.mockRestore()
+
+    expect(claimed).toBe('uuid-a')
+    expect(calls).toBe(0)
   })
 
   it('keeps both entries when two file records are claimed at once', async () => {
