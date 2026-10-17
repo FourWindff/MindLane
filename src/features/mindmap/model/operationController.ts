@@ -6,6 +6,7 @@ import {
   findRootNode,
   getChildIdsOrdered,
 } from '@/features/mindmap/model/mindmapTree'
+import { defaultNodeSize } from './layout/nodeSize'
 import type { SiblingInsertMode } from './editor'
 
 type OperationEditor = Pick<
@@ -19,6 +20,7 @@ type OperationEditor = Pick<
   | 'applyNativeEdgeChanges'
   | 'setNodeSelected'
   | 'setNodeEditing'
+  | 'setNodeCollapsed'
   | 'reset'
   | 'undo'
   | 'redo'
@@ -50,6 +52,8 @@ export interface MindmapOperationControllerDependencies {
   getState(): MindmapOperationState
   selection: MindmapSelectionPort
   flow: MindmapFlowPort
+  /** Last child entered per parent, kept for the app session (not per file). */
+  lastChildByParent?: Map<string, string>
 }
 
 export function createMindmapOperationController({
@@ -57,11 +61,30 @@ export function createMindmapOperationController({
   getState,
   selection,
   flow,
+  lastChildByParent = new Map<string, string>(),
 }: MindmapOperationControllerDependencies) {
   const selectNode = (targetId: string) => {
     selection.setSelectedId(targetId)
     editor.setNodeSelected(targetId, true)
     flow.clearSelectionMode()
+  }
+
+  const centerNode = async (nodeId: string, zoom: number) => {
+    const node = flow.getNode(nodeId)
+    if (!node) return
+    const size = defaultNodeSize(node.type)
+    const width = node.measured?.width ?? size.width
+    const height = node.measured?.height ?? size.height
+    await flow.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom,
+      duration: 300,
+    })
+    flow.persistViewport(flow.getViewport())
+  }
+
+  const navigateTo = (targetId: string) => {
+    selectNode(targetId)
+    void centerNode(targetId, flow.getViewport().zoom)
   }
 
   return {
@@ -168,14 +191,25 @@ export function createMindmapOperationController({
       const state = getState()
       if (!state.selectedId) return
       const parentId = findParentId(state.edges, state.selectedId)
-      if (parentId) selectNode(parentId)
+      if (!parentId) return
+      lastChildByParent.set(parentId, state.selectedId)
+      navigateTo(parentId)
     },
 
     navigateRight() {
       const state = getState()
       if (!state.selectedId) return
-      const children = getChildIdsOrdered(state.nodes, state.edges, state.selectedId)
-      if (children.length > 0) selectNode(children[0]!)
+      const parentId = state.selectedId
+      const children = getChildIdsOrdered(state.nodes, state.edges, parentId)
+      if (children.length === 0) return
+
+      const parent = state.nodes.find((node) => node.id === parentId)
+      if (parent?.data?.collapsed === true && !state.aiBusy) {
+        editor.setNodeCollapsed(parentId, false)
+      }
+
+      const remembered = lastChildByParent.get(parentId)
+      navigateTo(remembered && children.includes(remembered) ? remembered : children[0]!)
     },
 
     navigateUp() {
@@ -185,7 +219,7 @@ export function createMindmapOperationController({
       if (!parentId) return
       const siblings = getChildIdsOrdered(state.nodes, state.edges, parentId)
       const index = siblings.indexOf(state.selectedId)
-      if (index > 0) selectNode(siblings[index - 1]!)
+      if (index > 0) navigateTo(siblings[index - 1]!)
     },
 
     navigateDown() {
@@ -195,26 +229,14 @@ export function createMindmapOperationController({
       if (!parentId) return
       const siblings = getChildIdsOrdered(state.nodes, state.edges, parentId)
       const index = siblings.indexOf(state.selectedId)
-      if (index >= 0 && index < siblings.length - 1) selectNode(siblings[index + 1]!)
+      if (index >= 0 && index < siblings.length - 1) navigateTo(siblings[index + 1]!)
     },
 
     async centerRoot() {
       const state = getState()
-      const rootNode =
-        flow.getNode('root') ??
-        (() => {
-          const root = findRootNode(state.nodes, state.edges)
-          return root ? flow.getNode(root.id) : undefined
-        })()
-      if (!rootNode) return
-
-      const width = rootNode.measured?.width ?? 160
-      const height = rootNode.measured?.height ?? 40
-      await flow.setCenter(rootNode.position.x + width / 2, rootNode.position.y + height / 2, {
-        zoom: 1,
-        duration: 300,
-      })
-      flow.persistViewport(flow.getViewport())
+      const rootId = flow.getNode('root')?.id ?? findRootNode(state.nodes, state.edges)?.id
+      if (!rootId) return
+      await centerNode(rootId, 1)
     },
 
     undo() {

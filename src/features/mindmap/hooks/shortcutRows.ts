@@ -60,7 +60,7 @@ export function shortcutRows({
     [
       'mindmap.navRight',
       'arrowright',
-      'Select the first child node',
+      'Select the child node (remembers the last one)',
       controller.navigateRight,
       base,
     ],

@@ -38,6 +38,9 @@ import { createMindmapOperationController } from '@/features/mindmap/model/opera
 import type { ContextMenuState } from '@/features/mindmap/components/ContextMenu'
 import type { PalaceNodeData } from '@contracts/nodeData'
 
+/** Last child entered per parent. App lifetime, deliberately not per file. */
+const lastChildByParent = new Map<string, string>()
+
 /** A selected topic node the view hands to the generate-palace intent. */
 export interface MindmapSelectedTopic {
   id: string
@@ -97,6 +100,7 @@ export function useMindmapView({
           persistViewport: (viewport) => activeInstance.store.getState().setViewport(viewport),
           clearSelectionMode: () => reactFlowStore.setState({ nodesSelectionActive: false }),
         },
+        lastChildByParent,
       }),
     [activeInstance.store, editor, reactFlow, reactFlowStore],
   )
