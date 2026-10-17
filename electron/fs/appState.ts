@@ -14,9 +14,18 @@ const LEGACY_SETTINGS_KEYS = ['expandedFolderPaths', 'lastOpenedFilePath', 'apiK
 export class AppState {
   private filePath: string
   private cache: AppSettings | null = null
+  /** Serializes read-modify-write settings updates, so two concurrent callers cannot drop each other's keys. */
+  private queue: Promise<unknown> = Promise.resolve()
 
   constructor(userDataPath: string) {
     this.filePath = path.join(userDataPath, 'settings.json')
+  }
+
+  /** Run `action` after every queued action, even when one of them failed. */
+  private enqueue<T>(action: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(action, action)
+    this.queue = run.catch(() => {})
+    return run
   }
 
   async load(): Promise<AppSettings> {
@@ -36,6 +45,10 @@ export class AppState {
   }
 
   async update(partial: Partial<AppSettings>): Promise<IpcResult<void>> {
+    return this.enqueue(() => this.applyUpdate(partial))
+  }
+
+  private async applyUpdate(partial: Partial<AppSettings>): Promise<IpcResult<void>> {
     try {
       const current = await this.load()
       const merged = { ...current, ...partial }
@@ -153,17 +166,19 @@ export class AppState {
     candidateUuid: string | undefined,
     exists: (indexedPath: string) => boolean,
   ): Promise<string> {
-    const settings = await this.load()
     const resolvedPath = path.resolve(filePath)
-    let uuid = candidateUuid ?? crypto.randomUUID()
-    const indexedPath = settings[mapKey][uuid]
+    return this.enqueue(async () => {
+      const settings = await this.load()
+      let uuid = candidateUuid ?? crypto.randomUUID()
+      const indexedPath = settings[mapKey][uuid]
 
-    if (indexedPath && path.resolve(indexedPath) !== resolvedPath && exists(indexedPath)) {
-      uuid = crypto.randomUUID()
-    }
+      if (indexedPath && path.resolve(indexedPath) !== resolvedPath && exists(indexedPath)) {
+        uuid = crypto.randomUUID()
+      }
 
-    await this.update({ [mapKey]: { ...settings[mapKey], [uuid]: resolvedPath } })
-    return uuid
+      await this.applyUpdate({ [mapKey]: { ...settings[mapKey], [uuid]: resolvedPath } })
+      return uuid
+    })
   }
 
   /**
@@ -172,6 +187,12 @@ export class AppState {
    * does not match the requested path.
    */
   async migrateLegacyWorkspaceState(
+    workspacePath: string,
+  ): Promise<IpcResult<Partial<WorkspaceState> | null>> {
+    return this.enqueue(() => this.applyLegacyMigration(workspacePath))
+  }
+
+  private async applyLegacyMigration(
     workspacePath: string,
   ): Promise<IpcResult<Partial<WorkspaceState> | null>> {
     try {

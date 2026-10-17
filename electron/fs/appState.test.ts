@@ -301,4 +301,22 @@ describe('AppState', () => {
     const settings = await appState.load()
     expect(settings.lastWorkspacePath).toBe(workspacePath)
   })
+
+  it('keeps both entries when two file records are claimed at once', async () => {
+    const first = path.join(tmpDir, 'first.mindlane')
+    const second = path.join(tmpDir, 'second.mindlane')
+    fs.writeFileSync(first, '{}')
+    fs.writeFileSync(second, '{}')
+
+    const [firstUuid, secondUuid] = await Promise.all([
+      appState.claimFileUuid(first, 'uuid-a'),
+      appState.claimFileUuid(second, 'uuid-b'),
+    ])
+
+    const settings = await appState.load()
+    expect(settings.filePathsByUuid).toEqual({
+      [firstUuid]: first,
+      [secondUuid]: second,
+    })
+  })
 })
