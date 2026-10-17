@@ -177,6 +177,23 @@ describe('workspace switch restore protocol', () => {
   })
 })
 
+describe('parent folder deletion', () => {
+  beforeEach(() => {
+    resetRegistry()
+    useWorkspaceStore.setState({ busy: false, lastError: null, workspacePath: 'C:\\ws' })
+  })
+
+  it('clears the open file when its Windows parent folder is deleted', async () => {
+    installWorkspaceApis()
+    activateLegacyFile('C:\\ws\\notes\\a.mindlane')
+
+    const ok = await useWorkspaceStore.getState().deleteItem('C:\\ws\\notes')
+
+    expect(ok).toBe(true)
+    expect(openFileRegistry.getActive()).toBeNull()
+  })
+})
+
 describe('file deletion capsule cleanup', () => {
   let disconnectWorkspaceSync: () => void
 

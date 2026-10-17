@@ -47,6 +47,13 @@ function dirname(filePath: string): string {
   return index <= 0 ? normalizedPath : normalizedPath.slice(0, index)
 }
 
+/** Delete the given entry, or any file inside a deleted folder. Windows paths use `\`. */
+function isPathInside(filePath: string, targetPath: string): boolean {
+  const normalizedFile = filePath.replace(/\\/g, '/')
+  const normalizedTarget = targetPath.replace(/\\/g, '/')
+  return normalizedFile === normalizedTarget || normalizedFile.startsWith(`${normalizedTarget}/`)
+}
+
 function updateWorkspaceState(
   session: WorkspaceSessionState,
 ): Pick<WorkspaceStore, 'workspacePath' | 'recentWorkspacePaths' | 'restoreLastWorkspaceOnLaunch'> {
@@ -462,10 +469,7 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
 
       const activeInstance = openFileRegistry.getActive()
       const currentFilePath = activeInstance?.store.getState().filePath
-      if (
-        currentFilePath === targetPath ||
-        (currentFilePath && currentFilePath.startsWith(targetPath + '/'))
-      ) {
+      if (currentFilePath && isPathInside(currentFilePath, targetPath)) {
         clearMindLaneFile()
       }
 
