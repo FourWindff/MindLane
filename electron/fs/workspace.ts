@@ -230,6 +230,9 @@ export class Workspace {
       const workspaceUuid = this.appState
         ? await this.appState.claimWorkspaceUuid(workspacePath, candidateUuid)
         : (candidateUuid ?? crypto.randomUUID())
+      // The identity already on disk needs no rewrite: `load` is called on every
+      // file switch, and `claimWorkspaceUuid` skipped its own write here too.
+      if (workspaceUuid === state.workspaceUuid) return { ok: true, data: state }
       const next = { ...state, workspaceUuid }
       await fs.promises.mkdir(path.dirname(statePath), { recursive: true })
       await atomicWrite(statePath, JSON.stringify(next, null, 2))

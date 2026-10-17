@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -328,5 +328,23 @@ describe('Workspace', () => {
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
     expect(loaded.data.fileUuidPaths).toEqual({ 'file-kept': keptFile })
+  })
+
+  it('does not rewrite state.json when the workspace identity is unchanged', async () => {
+    const indexedWorkspace = new Workspace(new AppState(path.join(tmpDir, 'userData')))
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    await indexedWorkspace.load(workspacePath)
+
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    const before = fs.readFileSync(statePath, 'utf-8')
+    const writeFile = vi.spyOn(fs.promises, 'writeFile')
+    const again = await indexedWorkspace.load(workspacePath)
+    const calls = writeFile.mock.calls.length
+    writeFile.mockRestore()
+
+    expect(again.ok).toBe(true)
+    expect(calls).toBe(0)
+    expect(fs.readFileSync(statePath, 'utf-8')).toBe(before)
   })
 })
