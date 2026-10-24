@@ -1,17 +1,17 @@
 import { createMindmapStore, type MindmapStore } from './store'
-import { MindmapHistory } from './history'
 import { MindmapEditor } from './editor'
 import type { MindLaneFile } from '@contracts/fileFormat'
 
 /**
- * The mindmap instance behind one open file, with its own store, history and editor.
- * The instance lives as long as the file stays open, so switching the active file never
- * destroys the history stack.
+ * The view-side instance behind one open file: the projected store (fed by the
+ * main-process document) and the editor facade that sends commands. The
+ * authoritative document and its history live in the main-process document
+ * service, keyed by fileUuid; the instance here lives as long as the file stays
+ * open so switching the active file never rebuilds the view or the history.
  */
 export class OpenFile {
   key: string
   readonly store: MindmapStore
-  readonly history: MindmapHistory
   readonly editor: MindmapEditor
 
   /**
@@ -25,8 +25,7 @@ export class OpenFile {
   constructor(key: string) {
     this.key = key
     this.store = createMindmapStore()
-    this.history = new MindmapHistory()
-    this.editor = new MindmapEditor(this.store, this.history)
+    this.editor = new MindmapEditor(this.store)
   }
 
   isAiWriting(): boolean {
@@ -52,12 +51,11 @@ export class OpenFile {
 
   load(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
     this.store.getState().loadFile(filePath, data, workspacePath)
-    this.history.clear()
   }
 
   dispose(): void {
     this.editor.cancelPendingDeletes()
-    this.history.clear()
+    this.store.getState().dispose()
     this.aiWritingListeners.clear()
     this.aiWriting = false
   }

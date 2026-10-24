@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MindmapEditor } from './editor'
-import { MindmapHistory } from './history'
 import { createMindmapStore } from './store'
 import { createMindmapOperationController } from './operationController'
 import { createEmptyFile } from '@contracts/fileFormat'
@@ -8,7 +7,7 @@ import { createEmptyFile } from '@contracts/fileFormat'
 describe('MindmapOperationController integration', () => {
   it('keeps consecutive children attached to the selected parent', () => {
     const store = createMindmapStore()
-    const editor = new MindmapEditor(store, new MindmapHistory())
+    const editor = new MindmapEditor(store)
     editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
 
     const rootId = store.getState().nodes[0]!.id

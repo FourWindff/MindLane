@@ -5,6 +5,11 @@ import { fileURLToPath } from 'node:url'
 import { IPC } from './ipc.js'
 import type { MindLaneBridge, McpConnectPayload } from './ipc.js'
 import type { McpCredentialField, McpServerStatusInfo } from './agent/mcp/types.js'
+import type {
+  MindmapDocumentCommandResult,
+  MindmapDocumentIntent,
+  MindmapDocumentState,
+} from '../contracts/mindmapDocument/state.js'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -105,7 +110,7 @@ function collectEnumUsages(files: string[]): Set<string> {
   return usages
 }
 
-/** File list of the 7 handler modules (the guard target for registration completeness). */
+/** File list of the handler modules (the guard target for registration completeness). */
 const handlerModuleFiles = [
   'electron/main/handlers/fs.ts',
   'electron/main/handlers/ai.ts',
@@ -114,6 +119,7 @@ const handlerModuleFiles = [
   'electron/main/handlers/mcp.ts',
   'electron/main/handlers/shell.ts',
   'electron/main/handlers/window.ts',
+  'electron/main/handlers/document.ts',
 ].map((f) => path.join(repoRoot, f))
 
 describe('IPC seam contract', () => {
@@ -218,6 +224,17 @@ describe('IPC seam contract', () => {
     expect(pushed.sort()).toEqual(listened.sort())
   })
 
+  it('exposes exactly one document command channel plus one versioned state subscription', () => {
+    expectTypeOf<MindLaneBridge['mindmap']>().toMatchTypeOf<{
+      command: (intent: MindmapDocumentIntent) => Promise<MindmapDocumentCommandResult>
+      onDocumentState: (callback: (state: MindmapDocumentState) => void) => () => void
+    }>()
+    expectTypeOf<{
+      command: (intent: MindmapDocumentIntent) => Promise<MindmapDocumentCommandResult>
+      onDocumentState: (callback: (state: MindmapDocumentState) => void) => () => void
+    }>().toMatchTypeOf<MindLaneBridge['mindmap']>()
+  })
+
   it('declares Window.mindlane as the same type as MindLaneBridge', () => {
     expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindLaneBridge>()
     expectTypeOf<MindLaneBridge>().toMatchTypeOf<Window['mindlane']>()
@@ -301,6 +318,14 @@ describe('renderer module boundaries', () => {
       }
     }
     expect(offenders).toEqual([])
+  })
+
+  it('keeps the authoritative document service and its history in the main process', () => {
+    const offenders = walkSourceFiles(path.join(repoRoot, 'src')).filter((file) => {
+      const source = fs.readFileSync(file, 'utf-8')
+      return /MindmapDocumentService|class DocumentHistory|new DocumentHistory/.test(source)
+    })
+    expect(offenders.map((file) => path.relative(repoRoot, file))).toEqual([])
   })
 
   it('keeps shared free of app and feature knowledge', () => {

@@ -1,5 +1,5 @@
 import { Position } from '@xyflow/react'
-import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
+import { defaultNodeSize } from '@contracts/mindmapDocument/nodeSize'
 import type { ConnectPosition } from '@/features/mindmap/theme/types'
 
 interface EdgeNodeLike {

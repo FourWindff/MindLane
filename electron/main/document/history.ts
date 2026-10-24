@@ -1,17 +1,19 @@
-import type { MindmapSnapshot, MindmapTransaction } from './types'
+/**
+ * Per-file undo/redo stack of the document service (ADR-0002 principle: one
+ * history per open file, capped so memory stays bounded).
+ *
+ * After the document authority moved into the main process, this is the only
+ * history stack; the renderer holds no transactions.
+ */
+
+import type {
+  MindmapSnapshot,
+  MindmapTransaction,
+} from '../../../contracts/mindmapDocument/types.js'
 
 const DEFAULT_MAX_SIZE = 10
 
-/**
- * Manages the history stacks of one open mindmap file. The undo and redo stacks each
- * keep at most `maxSize` entries.
- *
- * Uses a "commands + pre-execution snapshot" model:
- * - `undo` returns the `before` snapshot of the newest transaction.
- * - `redo` only moves the transaction back to the undo stack; the caller re-runs
- *   `commands` to get a deterministic new layout.
- */
-export class MindmapHistory {
+export class DocumentHistory {
   private undoStack: MindmapTransaction[] = []
   private redoStack: MindmapTransaction[] = []
 

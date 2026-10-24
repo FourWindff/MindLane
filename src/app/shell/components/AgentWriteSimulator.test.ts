@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { MindmapEditor } from '@/features/mindmap/model/editor'
-import { MindmapHistory } from '@/features/mindmap/model/history'
 import { createMindmapStore } from '@/features/mindmap/model/store'
 import { createEmptyFile } from '@contracts/fileFormat'
 import { selectCurrentChatBusy, useAiStore } from '@/features/chat/model/aiStore'
@@ -14,7 +13,7 @@ describe('simulatePalaceInsert', () => {
 
   it('replays the palace user operation in front of the selection, then lands the picture', async () => {
     const store = createMindmapStore()
-    const editor = new MindmapEditor(store, new MindmapHistory())
+    const editor = new MindmapEditor(store)
     editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
     const first = editor.addChild('root', { label: 'Point one' }).nodeId
     const second = editor.addChild('root', { label: 'Point two' }).nodeId

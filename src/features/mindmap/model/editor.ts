@@ -1,7 +1,15 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
-import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
-import { type MindLaneFile, type MindLaneAsset } from '@contracts/fileFormat'
-import { applyDocumentCommands, shouldRecordHistory } from '@contracts/mindmapDocument/commands'
+import type { MindLaneFile, MindLaneAsset } from '@contracts/fileFormat'
+import { shouldRecordHistory } from '@contracts/mindmapDocument/commands'
+import { layoutInitial } from '@contracts/mindmapDocument/layout'
+import { defaultNodeSize } from '@contracts/mindmapDocument/nodeSize'
+import {
+  TRANSIENT_NODE_DATA_FLAGS,
+  stripTransientNodeData,
+  type MindmapCommand,
+  type MindmapDocumentNode,
+} from '@contracts/mindmapDocument/types'
+import type { MindmapWireCommand } from '@contracts/mindmapDocument/wire'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -12,24 +20,13 @@ import {
   CHILD_GAP_Y,
   CHILD_OFFSET_X,
   collectSubtreeIds,
-  createInitialEdges,
-  createInitialNodes,
   findParentId,
   findRootNode,
   getChildIdsOrdered,
   newId,
 } from '@/features/mindmap/model/mindmapTree'
-import { defaultNodeSize } from '@/features/mindmap/model/layout/nodeSize'
 import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
 import type { OpenFileState, MindmapStore } from './store'
-import { MindmapHistory } from './history'
-import { layoutInitial, layoutReflow } from './layout'
-import {
-  TRANSIENT_NODE_DATA_FLAGS,
-  type MindmapCommand,
-  type MindmapSnapshot,
-  type TransientNodeDataFlag,
-} from './types'
 
 const NODE_EXIT_MS = 300
 /** Glide animation length; keeps the transient `gliding` marker alive until the landing burst finishes. */
@@ -38,106 +35,156 @@ const GLIDE_MS = 1000
 /** Sibling insertion position: end of all siblings / above / below the selected sibling. */
 export type SiblingInsertMode = 'end' | 'above' | 'below'
 
+type ViewFlags = Array<{ nodeId: string; flags: Record<string, unknown> }>
+
+/** View-only data flags carried by a node's data (stripped before the command leaves the renderer). */
+function pickTransientFlags(data: Record<string, unknown>): Record<string, unknown> {
+  const flags: Record<string, unknown> = {}
+  for (const flag of TRANSIENT_NODE_DATA_FLAGS) {
+    if (flag in data) flags[flag] = data[flag]
+  }
+  return flags
+}
+
+function dataDiff(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): { data: Record<string, unknown>; viewFlags: Record<string, unknown> } {
+  const data: Record<string, unknown> = {}
+  const viewFlags: Record<string, unknown> = {}
+  const transient = new Set<string>(TRANSIENT_NODE_DATA_FLAGS)
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+  for (const key of keys) {
+    if (Object.is(before[key], after[key])) continue
+    if (transient.has(key)) viewFlags[key] = after[key]
+    else data[key] = after[key]
+  }
+  return { data, viewFlags }
+}
+
 /**
- * The single public entry point of the mindmap editor. Every structural change
- * (add/edit/delete, drag, connect, AI batch insert) goes through this class so
- * history is recorded automatically and undo/redo keep working.
+ * The renderer's mindmap view facade: it builds document commands from the
+ * projected state and sends them down the one command channel. It no longer
+ * owns the document, the history stack, the layout or a write path — the
+ * main-process document service does. What stays here is the view-side
+ * bookkeeping: animation markers, selection, deletion timers.
  */
 export class MindmapEditor {
   private pendingDeleteTimers = new Set<ReturnType<typeof setTimeout>>()
 
-  constructor(
-    private store: MindmapStore,
-    private history: MindmapHistory,
-  ) {}
+  constructor(private store: MindmapStore) {}
 
   private get state(): OpenFileState {
     return this.store.getState()
   }
 
-  /** Read the current editor state (validation scenarios, e.g. the write responder checking existence/pure-tree against live state). */
+  /** Read the current projection (validation scenarios check existence/pure-tree against it). */
   getState(): OpenFileState {
     return this.state
+  }
+
+  /** Resolve once everything sent so far has landed in the projection. */
+  whenSettled(): Promise<void> {
+    return this.state.whenSettled()
   }
 
   // ─── History operations ───
 
   undo(): void {
     this.cancelPendingDeletes()
-    const before = this.history.undo()
-    if (!before) return
-    this.state.setNodes(before.nodes)
-    this.state.setEdges(before.edges)
-    this.syncHistoryState()
+    this.state.undo()
   }
 
   redo(): void {
     this.cancelPendingDeletes()
-    const transaction = this.history.redo()
-    if (!transaction) return
-    const outcome = applyDocumentCommands(transaction.before, transaction.commands)
-    if (!outcome.ok) return
-    const nodes = outcome.reflow
-      ? layoutReflow(outcome.document.nodes, outcome.document.edges, this.state.style.structureType)
-      : outcome.document.nodes
-    // redo is time travel: strip entrance/exit/cascade markers baked into the
-    // replayed commands (the undo snapshot is already stripped), so redo never
-    // replays a "whole fragment at once" entrance.
-    const strippedNodes = this.stripTransientFlags(nodes)
-    const strippedEdges = this.stripEdgeAnimClasses(outcome.document.edges)
-    this.state.setNodes(strippedNodes)
-    this.state.setEdges(strippedEdges)
-    this.syncHistoryState()
+    this.state.redo()
   }
 
   get canUndo(): boolean {
-    return this.history.canUndo
+    return this.state.canUndo
   }
 
   get canRedo(): boolean {
-    return this.history.canRedo
+    return this.state.canRedo
   }
 
   // ─── Core command execution ───
 
   execute(command: MindmapCommand): void {
-    this.runBatch([command], false)
+    this.runBatch([command])
   }
 
   batch(commands: MindmapCommand[]): void {
-    this.runBatch(commands, false)
+    this.runBatch(commands)
   }
 
-  private runBatch(commands: MindmapCommand[], skipReflow: boolean): void {
+  private runBatch(commands: MindmapCommand[]): void {
     if (!shouldRecordHistory(commands)) return
     this.cancelPendingDeletes()
-    const before = this.takeSnapshot()
-    const outcome = applyDocumentCommands(
-      { nodes: this.state.nodes, edges: this.state.edges },
-      commands,
-    )
-    if (!outcome.ok) {
-      // Renderer-built commands are structurally valid; a rejection means a
-      // caller raced a structural change. Keep the current state untouched.
-      console.warn(`[MindmapEditor] command rejected (${outcome.code}): ${outcome.message}`)
-      return
+    const projected = this.toWireCommands(commands)
+    this.state.applyCommands(projected.commands)
+    this.applyViewFlags(projected.viewFlags)
+  }
+
+  /**
+   * Translate the pure command values the renderer builds into the serializable
+   * shape. `updateNode` patches are materialised against the current projection;
+   * view-only data flags move to the renderer's own view state so they never
+   * enter the document.
+   */
+  private toWireCommands(commands: MindmapCommand[]): {
+    commands: MindmapWireCommand[]
+    viewFlags: ViewFlags
+  } {
+    const wire: MindmapWireCommand[] = []
+    const viewFlags: ViewFlags = []
+    for (const command of commands) {
+      switch (command.type) {
+        case 'addNode': {
+          const flags = pickTransientFlags(command.node.data)
+          wire.push({ ...command, node: stripTransientNodeData(command.node) })
+          if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.node.id, flags })
+          break
+        }
+        case 'updateNode': {
+          const current = this.state.nodes.find((node) => node.id === command.nodeId)
+          if (!current) {
+            // Unknown ids are no-ops in the document; nothing to translate.
+            break
+          }
+          const next = command.patch(current as unknown as MindmapDocumentNode) as unknown as Node
+          const { data, viewFlags: flags } = dataDiff(
+            current.data as Record<string, unknown>,
+            next.data as Record<string, unknown>,
+          )
+          const position =
+            next.position && !Object.is(current.position, next.position) ? next.position : undefined
+          wire.push({
+            type: 'updateNode',
+            nodeId: command.nodeId,
+            ...(Object.keys(data).length > 0 ? { data } : {}),
+            ...(position ? { position } : {}),
+          })
+          if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.nodeId, flags })
+          break
+        }
+        case 'batch': {
+          const nested = this.toWireCommands(command.commands)
+          wire.push({ type: 'batch', commands: nested.commands })
+          viewFlags.push(...nested.viewFlags)
+          break
+        }
+        default:
+          wire.push(command)
+      }
     }
-    let nodes = outcome.document.nodes
-    const edges = outcome.document.edges
-    if (!skipReflow && outcome.reflow) {
-      nodes = layoutReflow(nodes, edges, this.state.style.structureType)
+    return { commands: wire, viewFlags }
+  }
+
+  private applyViewFlags(viewFlags: ViewFlags): void {
+    for (const { nodeId, flags } of viewFlags) {
+      this.state.setNodeViewFlags(nodeId, flags)
     }
-    this.state.setNodes(nodes)
-    this.state.setEdges(edges)
-    if (outcome.recordHistory) {
-      this.history.record({
-        id: crypto.randomUUID(),
-        before,
-        commands,
-        timestamp: Date.now(),
-      })
-    }
-    this.syncHistoryState()
   }
 
   // ─── Convenience builders ───
@@ -316,7 +363,11 @@ export class MindmapEditor {
   }
 
   updateNode(nodeId: string, patch: (node: Node) => Node): void {
-    this.execute({ type: 'updateNode', nodeId, patch })
+    this.execute({
+      type: 'updateNode',
+      nodeId,
+      patch: patch as unknown as (node: MindmapDocumentNode) => MindmapDocumentNode,
+    })
   }
 
   updateNodeData(nodeId: string, changes: Record<string, unknown>): void {
@@ -414,32 +465,23 @@ export class MindmapEditor {
       },
     })
     // The glide marker must be present on the render BEFORE the position batch
-    // lands: stamp gliding/glideFrom at the old positions, then runBatch commits
-    // the new layout in the same tick so the view layer can transition. The
-    // marker is transient (stripped from history snapshots); the cleanup timer
-    // is a no-op on a disposed store.
+    // lands: stamp gliding/glideFrom at the old positions, then send the batch in
+    // the same tick so the view layer can transition. The marker is view state
+    // (never part of the document); the cleanup timer is a no-op on a disposed store.
     const oldPositions = new Map<string, { x: number; y: number }>()
     for (const id of subtreeIds) {
       const node = this.state.nodes.find((n) => n.id === id)
       if (node) oldPositions.set(id, { x: node.position.x, y: node.position.y })
     }
-    this.state.setNodesTransient((ns) =>
-      ns.map((n) => {
-        const from = oldPositions.get(n.id)
-        if (!from) return n
-        return { ...n, data: { ...n.data, gliding: true, glideFrom: from } }
-      }),
-    )
-    // runBatch reflows inline (removeEdge/addEdge both require a layout pass)
-    this.runBatch(commands, false)
+    for (const [id, from] of oldPositions) {
+      this.state.setNodeViewFlags(id, { gliding: true, glideFrom: from })
+    }
+    this.runBatch(commands)
     setTimeout(() => {
-      this.state.setNodesTransient((ns) =>
-        ns.map((n) =>
-          subtreeIds.has(n.id)
-            ? { ...n, data: { ...n.data, gliding: undefined, glideFrom: undefined } }
-            : n,
-        ),
-      )
+      for (const id of subtreeIds) {
+        this.state.clearNodeFlag(id, 'gliding')
+        this.state.clearNodeFlag(id, 'glideFrom')
+      }
     }, GLIDE_MS)
   }
 
@@ -521,38 +563,28 @@ export class MindmapEditor {
     this.pendingDeleteTimers.clear()
   }
 
-  /** Mark nodes (and the edges touching them) as exiting: transient, not recorded in history, no dirty flag. */
+  /** Mark nodes (and the edges touching them) as exiting: view state, not recorded in history, no dirty flag. */
   private markExiting(ids: Set<string>, exitDelays: Map<string, number>): void {
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => {
-        if (!ids.has(n.id)) return n
-        const delay = exitDelays.get(n.id) ?? 0
-        return {
-          ...n,
-          data: {
-            ...n.data,
-            exiting: true,
-            ...(delay > 0 ? { exitingDelay: delay } : {}),
-          },
-        }
-      }),
-    )
-    this.state.setEdgesTransient((edges) =>
-      edges.map((e) => {
-        const touch = ids.has(e.source) || ids.has(e.target)
-        if (!touch) return e
-        // Drop a lingering `mindmap-edge--enter` marker: agent-inserted edges
-        // keep it forever (nodes clear theirs on animationend, edges have no
-        // cleanup), and a completed enter animation (fill-mode both) pins the
-        // path at opacity 1, blocking the exit transition below.
-        const classes = new Set(
-          [...(e.className ?? '').split(/\s+/), 'mindmap-edge', 'mindmap-edge--exiting'].filter(
-            (c) => Boolean(c) && c !== 'mindmap-edge--enter',
-          ),
-        )
-        return { ...e, className: [...classes].join(' ') }
-      }),
-    )
+    for (const id of ids) {
+      const delay = exitDelays.get(id) ?? 0
+      this.state.setNodeViewFlags(id, {
+        exiting: true,
+        ...(delay > 0 ? { exitingDelay: delay } : {}),
+      })
+    }
+    for (const edge of this.state.edges) {
+      if (!ids.has(edge.source) && !ids.has(edge.target)) continue
+      // Drop a lingering `mindmap-edge--enter` marker: agent-inserted edges
+      // keep it forever (nodes clear theirs on animationend, edges have no
+      // cleanup), and a completed enter animation (fill-mode both) pins the
+      // path at opacity 1, blocking the exit transition below.
+      const classes = new Set(
+        [...(edge.className ?? '').split(/\s+/), 'mindmap-edge', 'mindmap-edge--exiting'].filter(
+          (name) => Boolean(name) && name !== 'mindmap-edge--enter',
+        ),
+      )
+      this.state.setEdgeClassName(edge.id, [...classes].join(' '))
+    }
   }
 
   /** Commit the delete batch after the exit animation; tracked so any later batch cancels it. */
@@ -588,7 +620,8 @@ export class MindmapEditor {
    * A failed validation throws MindmapXmlError (the error code goes back to the AI) and mounts nothing partially.
    * position: child=attach under parentId (default); after/before=insert before/after parentId's sibling;
    * root=attach to the root node.
-   */ async insertFromXml(
+   */
+  async insertFromXml(
     xml: string,
     options: { parentId?: string; position?: 'root' | 'child' | 'after' | 'before' } = {},
     pendingAssets: MindLaneAsset[] = [],
@@ -620,10 +653,12 @@ export class MindmapEditor {
         siblingId: options.parentId ?? '',
         before: position === 'before',
       })
+      await this.whenSettled()
       return
     }
     const parentId = position === 'root' ? 'root' : options.parentId
     this.insertParsedFragment(parsed, { parentId })
+    await this.whenSettled()
   }
 
   /**
@@ -707,7 +742,8 @@ export class MindmapEditor {
         },
       })
     }
-    this.runBatch(commands, false)
+    this.runBatch(commands)
+    await this.whenSettled()
   }
 
   /**
@@ -784,7 +820,7 @@ export class MindmapEditor {
     anchorX: number,
     anchorY: number,
   ): void {
-    const laidOut = layoutInitial(parsed.nodes, parsed.edges)
+    const laidOut = layoutInitial(parsed.nodes as MindmapDocumentNode[], parsed.edges) as Node[]
 
     const subRootIds = parsed.rootIds
     if (subRootIds.length === 0) {
@@ -804,7 +840,7 @@ export class MindmapEditor {
     // Cascade entrance: DFS pre-order (parent before child, siblings in layout
     // order) computes a per-node delay; multi-root fragments keep subtrees
     // independent. Stamped into the addNode commands so it lands with the
-    // fragment (a transient marker, stripped from snapshots).
+    // fragment (a view-only marker, moved to the renderer view state).
     const enterDelays = computeEnterDelays(subRootIds, laidOut, parsed.edges)
 
     const commands: MindmapCommand[] = []
@@ -855,33 +891,38 @@ export class MindmapEditor {
       })
     }
 
-    // Reflow in place, not just on a later dimensions change: during an AI
-    // stream the canvas is disabled (onNodesChange dropped), so the measured-
-    // dimensions reflow that would normally spread siblings never arrives until
-    // the message ends. Skipping reflow here left the anchored fragment stacked
-    // on top of the parent's existing first child for the whole stream.
-    this.runBatch(commands, false)
+    // Reflow happens in the document service; the renderer only provides the
+    // anchored command inputs.
+    this.runBatch(commands)
   }
 
   // ─── ReactFlow native change forwarding ───
 
   applyNativeNodeChanges(changes: NodeChange[]): void {
     const positionChanges: Array<{ id: string; position: { x: number; y: number } }> = []
+    const sizeChanges: Array<{ id: string; width: number; height: number }> = []
     const removeNodeIds: string[] = []
-    const transientChanges: NodeChange[] = []
 
     for (const change of changes) {
       if (change.type === 'position' && change.position) {
+        if (change.dragging) {
+          // Drag is a local preview; the document only learns the final position.
+          this.state.previewNodePosition(change.id, change.position)
+          continue
+        }
+        // The preview stays until the versioned state shows the same position.
         positionChanges.push({ id: change.id, position: change.position })
       } else if (change.type === 'remove') {
         removeNodeIds.push(change.id)
-      } else {
-        transientChanges.push(change)
+      } else if (change.type === 'select') {
+        this.state.setNodeSelection(change.id, change.selected)
+      } else if (change.type === 'dimensions' && change.dimensions) {
+        sizeChanges.push({
+          id: change.id,
+          width: change.dimensions.width,
+          height: change.dimensions.height,
+        })
       }
-    }
-
-    if (transientChanges.length > 0) {
-      this.state.setNodesTransient((nodes) => applyNodeChanges(transientChanges, nodes))
     }
 
     if (positionChanges.length > 0) {
@@ -899,128 +940,66 @@ export class MindmapEditor {
       this.deleteSubtree(nodeId)
     }
 
-    if (transientChanges.some((c) => c.type === 'dimensions')) {
-      this.reflow()
+    if (sizeChanges.length > 0) {
+      this.reflow({ sizes: sizeChanges })
     }
   }
 
   applyNativeEdgeChanges(changes: EdgeChange[]): void {
-    const removeEdgeIds: string[] = []
-    const transientChanges: EdgeChange[] = []
-
     for (const change of changes) {
       if (change.type === 'remove') {
-        removeEdgeIds.push(change.id)
-      } else {
-        transientChanges.push(change)
+        this.removeEdge(change.id)
+      } else if (change.type === 'select') {
+        this.state.setEdgeSelection(change.id, change.selected)
       }
-    }
-
-    if (transientChanges.length > 0) {
-      this.state.setEdgesTransient((edges) => applyEdgeChanges(transientChanges, edges))
-    }
-
-    for (const edgeId of removeEdgeIds) {
-      this.removeEdge(edgeId)
     }
   }
 
   setNodeEditing(nodeId: string, editing: boolean): void {
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => {
-        if (n.id === nodeId)
-          return { ...n, data: { ...n.data, editing: editing ? true : undefined } }
-        // Starting to edit a node clears the editing flag on the others
-        return editing && n.data.editing ? { ...n, data: { ...n.data, editing: undefined } } : n
-      }),
-    )
+    this.state.setNodeEditing(nodeId, editing)
   }
 
-  clearNodeFlag(nodeId: string, flag: TransientNodeDataFlag): void {
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [flag]: undefined } } : n)),
-    )
+  clearNodeFlag(
+    nodeId: string,
+    flag: import('@contracts/mindmapDocument/types').TransientNodeDataFlag,
+  ): void {
+    this.state.clearNodeFlag(nodeId, flag)
   }
 
-  setNodeFlag(nodeId: string, flag: TransientNodeDataFlag, value: unknown): void {
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, [flag]: value } } : n)),
-    )
+  setNodeFlag(
+    nodeId: string,
+    flag: import('@contracts/mindmapDocument/types').TransientNodeDataFlag,
+    value: unknown,
+  ): void {
+    this.state.setNodeFlag(nodeId, flag, value)
   }
 
   setNodeSelected(nodeId: string | string[], selected: boolean): void {
-    const ids = new Set(Array.isArray(nodeId) ? nodeId : [nodeId])
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => {
-        if (ids.has(n.id)) return { ...n, selected }
-        // Selecting a node clears the other nodes' selection, keeping the current single-select behavior
-        return selected ? { ...n, selected: false } : n
-      }),
-    )
+    this.state.setNodeSelected(nodeId, selected)
   }
 
   setNodeExpanded(nodeId: string, expanded: boolean): void {
-    this.state.setNodesTransient((nodes) =>
-      nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, expanded } } : n)),
-    )
+    this.state.setNodeFlag(nodeId, 'expanded', expanded)
   }
 
   clearNodeSelection(): void {
-    this.state.setNodesTransient((nodes) => nodes.map((n) => ({ ...n, selected: false })))
+    this.state.clearNodeSelection()
   }
 
   // ─── Layout and lifecycle ───
 
-  reflow(): void {
-    const nodes = layoutReflow(this.state.nodes, this.state.edges, this.state.style.structureType)
-    this.state.setNodesTransient(nodes)
+  reflow(options?: { sizes?: Array<{ id: string; width: number; height: number }> }): void {
+    this.state.relayout({
+      structureType: this.state.style.structureType,
+      ...(options?.sizes ? { sizes: options.sizes } : {}),
+    })
   }
 
   reset(): void {
-    this.state.setNodes(createInitialNodes() as Node[])
-    this.state.setEdges(createInitialEdges())
-    this.history.clear()
-    this.syncHistoryState()
+    this.state.resetDocument()
   }
 
   loadFile(filePath: string, data: MindLaneFile, workspacePath: string | null): void {
     this.state.loadFile(filePath, data, workspacePath)
-    this.history.clear()
-    this.syncHistoryState()
-  }
-
-  // ─── Internal helpers ───
-
-  private takeSnapshot(): MindmapSnapshot {
-    return {
-      nodes: this.stripTransientFlags(this.state.nodes),
-      edges: this.stripEdgeAnimClasses(this.state.edges),
-    }
-  }
-
-  /** Strip enter/exit animation classes from edges (snapshots and redo replays must not carry animation residue). */
-  private stripEdgeAnimClasses(edges: Edge[]): Edge[] {
-    return edges.map((e) => {
-      if (!e.className?.includes('mindmap-edge--')) return e
-      const classes = e.className
-        .split(/\s+/)
-        .filter((c) => c !== 'mindmap-edge--exiting' && c !== 'mindmap-edge--enter')
-        .join(' ')
-      return { ...e, className: classes || undefined }
-    })
-  }
-
-  private stripTransientFlags(nodes: Node[]): Node[] {
-    return nodes.map((n) => {
-      const data = { ...n.data }
-      for (const flag of TRANSIENT_NODE_DATA_FLAGS) {
-        delete data[flag]
-      }
-      return { ...n, data, selected: undefined }
-    })
-  }
-
-  private syncHistoryState(): void {
-    this.state.setHistoryAvailability(this.history.canUndo, this.history.canRedo)
   }
 }

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import { MindmapEditor as RealMindmapEditor } from '@/features/mindmap/model/editor'
-import { MindmapHistory } from '@/features/mindmap/model/history'
 import { createMindmapStore } from '@/features/mindmap/model/store'
 import { MindmapXmlError, formatXmlError } from '@contracts/mindmapXml'
 import type { MindmapWriteRequest } from '@contracts/ipc'
@@ -23,6 +22,7 @@ function createFakeEditor() {
     replaceNodeFromXml: vi.fn(async () => {}),
     moveSubtree: vi.fn(),
     deleteSubtree: vi.fn(),
+    whenSettled: vi.fn(async () => undefined),
   }
   return { editor, state }
 }
@@ -69,7 +69,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0))
 
 function createRealEditor() {
   const store = createMindmapStore()
-  const editor = new RealMindmapEditor(store, new MindmapHistory())
+  const editor = new RealMindmapEditor(store)
   editor.loadFile('', createEmptyFile('Responder test'), null)
   return { editor, store }
 }

@@ -36,6 +36,8 @@ import { registerSettingsHandlers } from './main/handlers/settings.js'
 import { registerMcpHandlers, persistMcpStatus } from './main/handlers/mcp.js'
 import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
+import { registerDocumentHandlers } from './main/handlers/document.js'
+import { MindmapDocumentService } from './main/document/documentService.js'
 import {
   buildMindmapReadRequest,
   buildMindmapWriteRequest,
@@ -96,6 +98,8 @@ let aiServiceReady = false
 let streamManager: StreamManager | null = null
 let chatOrchestrator: AgentOrchestrator | null = null
 let mcpManager: McpManager | null = null
+// One document service for the whole app: per-file instances live inside it.
+const documentService = new MindmapDocumentService()
 
 function setupApplicationMenu() {
   if (process.platform === 'darwin') {
@@ -375,6 +379,7 @@ app.whenReady().then(async () => {
   registerMcpHandlers(ctx)
   registerShellHandlers(ctx)
   registerWindowHandlers(ctx)
+  registerDocumentHandlers(ctx, documentService)
 
   setupApplicationMenu()
   createWindow()

@@ -15,6 +15,9 @@ import {
 } from '@/features/mindmap/model/mindmapTree'
 import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 import type { MindmapCommand } from '@/features/mindmap/model/types'
+import type { MindmapDocumentNode } from '@contracts/mindmapDocument/types'
+
+type MindmapCommandNodePatch = (node: MindmapDocumentNode) => MindmapDocumentNode
 import type { OpenFileState } from '@/features/mindmap/model/store'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
@@ -310,7 +313,10 @@ export async function simulatePalaceInsert({
     ...selectedIds.map((nodeId) => ({
       type: 'updateNode' as const,
       nodeId,
-      patch: (node: Node) => ({ ...node, data: { ...node.data, processing: undefined } }),
+      patch: ((node: Node) => ({
+        ...node,
+        data: { ...node.data, processing: undefined },
+      })) as unknown as MindmapCommandNodePatch,
     })),
   ])
   ai.reset()

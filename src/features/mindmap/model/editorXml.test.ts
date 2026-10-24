@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore, type OpenFileState } from './store'
-import { MindmapHistory } from './history'
 import { MindmapEditor } from './editor'
 import { serializeMindLaneFile } from '@contracts/mindmapXml'
 import { MindmapXmlError } from '@contracts/mindmapXml'
@@ -8,13 +7,11 @@ import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('MindmapEditor XML integration', () => {
   let store: ReturnType<typeof createMindmapStore>
-  let history: MindmapHistory
   let editor: MindmapEditor
 
   beforeEach(() => {
     store = createMindmapStore()
-    history = new MindmapHistory()
-    editor = new MindmapEditor(store, history)
+    editor = new MindmapEditor(store)
     editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
   })
 
@@ -292,7 +289,7 @@ describe('MindmapEditor XML integration', () => {
       expect(xml).toContain(`collapsed="true"`)
 
       // Reload (open file -> reflow -> collapsed state kept)
-      const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
+      const editor2 = new MindmapEditor(createMindmapStore())
       editor2.loadFile('/tmp/x.mindlane', file, null)
       const restored = editor2['store'].getState().nodes.find((n) => n.id === nodeId)!
       expect((restored.data as { collapsed?: boolean }).collapsed).toBe(true)
@@ -340,7 +337,7 @@ describe('MindmapEditor XML integration', () => {
       expect(parsed.assets).toHaveLength(1)
       expect(parsed.mindmap.nodes).toHaveLength(3)
 
-      const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
+      const editor2 = new MindmapEditor(createMindmapStore())
       editor2.loadFile('/tmp/x.mindlane', parsed, null)
       const state2 = editor2['store'].getState()
       expect(state2.assets).toHaveLength(1)
@@ -427,7 +424,7 @@ describe('MindmapEditor XML integration', () => {
       const { deserializeMindLaneFile } = await import('@contracts/mindmapXml')
       const parsed = await deserializeMindLaneFile(xml)
 
-      const editor2 = new MindmapEditor(createMindmapStore(), new MindmapHistory())
+      const editor2 = new MindmapEditor(createMindmapStore())
       editor2.loadFile('/tmp/order.mindlane', parsed, null)
       const state2 = editor2['store'].getState()
       const labelOf = (id: string) =>

@@ -9,3 +9,9 @@ import { registerXmlDomParser } from './contracts/mindmapXml/parser'
 if (typeof (globalThis as { DOMParser?: unknown }).DOMParser !== 'function') {
   registerXmlDomParser(LinkedomDOMParser)
 }
+
+// Renderer tests drive the real main-process document service through an
+// in-memory loopback instead of the Electron bridge (same intent -> versioned
+// state seam, no window).
+import { installDocumentLoopback } from './src/features/mindmap/model/documentLoopback.testutil'
+installDocumentLoopback()

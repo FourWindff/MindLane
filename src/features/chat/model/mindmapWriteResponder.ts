@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
-import type { MindmapCommand } from '@/features/mindmap/model/types'
+import type { MindmapCommand, MindmapDocumentNode } from '@contracts/mindmapDocument/types'
 import { CHILD_OFFSET_X, findParentId, newId } from '@/features/mindmap/model/mindmapTree'
 import {
   MindmapXmlError,
@@ -76,6 +76,9 @@ export function createMindmapWriteResponder(deps: MindmapWriteResponderDependenc
         return
       }
       const data = await applyWriteAction(request.action, request.args, editor, deps.warn)
+      // The ack (and the follow-up save) must observe the landed document: the
+      // renderer only projects the versioned state the main process pushes back.
+      await editor.whenSettled()
       deps.persistFile(request.fileUuid)
       await safeRespond({
         requestId: request.requestId,
@@ -167,7 +170,10 @@ function clearProcessingCommands(sourceNodeIds: string[]): MindmapCommand[] {
   return sourceNodeIds.map((nodeId) => ({
     type: 'updateNode' as const,
     nodeId,
-    patch: (node: Node) => ({ ...node, data: { ...node.data, processing: undefined } }),
+    patch: ((node: Node) => ({
+      ...node,
+      data: { ...node.data, processing: undefined },
+    })) as unknown as (node: MindmapDocumentNode) => MindmapDocumentNode,
   }))
 }
 
@@ -331,10 +337,10 @@ async function applyPalaceLanding(
       {
         type: 'updateNode',
         nodeId: placeholder.id,
-        patch: (node: Node) => ({
+        patch: ((node: Node) => ({
           ...node,
           data: { ...node.data, ...clearedFlags, ...landedData },
-        }),
+        })) as unknown as (node: MindmapDocumentNode) => MindmapDocumentNode,
       },
       ...clearProcessingCommands(sourceNodeIds),
     ])
