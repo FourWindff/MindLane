@@ -11,12 +11,8 @@ function createState(partial: Partial<PalaceSubgraphStateType> = {}): PalaceSubg
     palaceResponse: '',
     palaceInputText: '',
     palaceInputNodes: [],
-    memoryItems: [],
     palace: null,
-    imagePrompt: '',
-    imageUrls: [],
-    imageError: undefined,
-    detectedCoords: [],
+    imageUrl: undefined,
     memoryRoute: [],
     ...partial,
   } as PalaceSubgraphStateType

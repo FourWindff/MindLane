@@ -18,7 +18,12 @@ export type PalaceRunPayload =
       ok: true
       label: string
       stations: PalaceStationPayload[]
-      imageUrl: string
+      /**
+       * Optional palace artwork, as a single image data URL (CONTEXT.md "palace
+       * artwork"): landing materializes it into one image asset. Absent = a
+       * palace without artwork, which is a successful run.
+       */
+      imageUrl?: string
       sourceNodeIds: string[]
     }
   | { ok: false; error: string }

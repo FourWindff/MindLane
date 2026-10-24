@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { createEmptyFile, type MindLaneFile } from '../fileFormat.js'
 import type { MindmapXmlEdge, MindmapXmlNode } from './types.js'
-import { serializeMindLaneFile, serializeMindmapSection } from './serializer'
+import {
+  serializeMindLaneFile,
+  serializeMindmapSection,
+  serializePalaceNodeXml,
+} from './serializer'
 import { deserializeMindLaneFile, parseXmlFragment } from './deserializer'
 
 function makeNodes(
@@ -333,5 +337,54 @@ describe('visual sibling order (edge order may diverge)', () => {
     // child order on disk follows visual order, so the reloaded edge order matches it
     const rootEdges = reloaded.mindmap.edges.filter((e) => e.source === 'root')
     expect(rootEdges.map((e) => e.target)).toEqual(['a', 'above', 'b'])
+  })
+})
+
+describe('serializePalaceNodeXml (deterministic landing)', () => {
+  const stations = [
+    {
+      order: 1,
+      content: 'First stop',
+      anchorVisual: 'Lighthouse',
+      association: 'A lighthouse marks the opening idea',
+      x: 0.05,
+      y: 0.34,
+      linkedNodeId: 'n1',
+    },
+    {
+      order: 2,
+      content: 'Second stop',
+      anchorVisual: 'Bell tower',
+      x: 0.95,
+      y: 0.34,
+      linkedNodeId: 'n2',
+    },
+  ]
+
+  it('keeps the single optional artwork reference when there is one', () => {
+    const xml = serializePalaceNodeXml({
+      label: 'Palace',
+      imageUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      stations,
+      sourceNodeIds: ['n1', 'n2'],
+    })
+
+    expect(xml).toContain('imageUrl="data:image/png;base64,iVBORw0KGgo="')
+    expect(xml).toContain('sourceNodeIds="n1,n2"')
+  })
+
+  it('omits the artwork field and round-trips the canonical coordinates unchanged', async () => {
+    const xml = serializePalaceNodeXml({ label: 'Palace', stations, sourceNodeIds: ['n1', 'n2'] })
+    expect(xml).not.toContain('imageUrl')
+
+    const parsed = await parseXmlFragment(xml)
+    const data = parsed.nodes[0]!.data as {
+      label: string
+      stations: typeof stations
+      sourceNodeIds: string[]
+    }
+    expect(data.label).toBe('Palace')
+    expect(data.sourceNodeIds).toEqual(['n1', 'n2'])
+    expect(data.stations).toEqual(stations)
   })
 })

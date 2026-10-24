@@ -91,7 +91,6 @@ const STREAM_STEPS = [
   'finalizing',
   'planning-stations',
   'generating-image',
-  'locating-stations',
 ] as const
 export type StreamStep = (typeof STREAM_STEPS)[number]
 

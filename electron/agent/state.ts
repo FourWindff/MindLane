@@ -225,11 +225,8 @@ const PalaceStateAnnotations = {
     reducer: replaceReducer,
     default: () => null,
   }),
-  imageUrls: Annotation<string[]>({
-    reducer: replaceReducer,
-    default: () => [],
-  }),
-  imageError: Annotation<string | undefined>({
+  /** At most one artwork image (data URL); absent = a palace without artwork. */
+  imageUrl: Annotation<string | undefined>({
     reducer: replaceReducer,
     default: () => undefined,
   }),

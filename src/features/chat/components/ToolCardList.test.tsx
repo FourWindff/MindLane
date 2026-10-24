@@ -106,18 +106,14 @@ describe('ToolCardList rendering', () => {
     expect(html).not.toContain('chat-message-list__tool-card__stage')
   })
 
-  it('shows a running palace subgraph card expanded with the three palace stages', () => {
+  it('shows a running palace subgraph card expanded with its two stages', () => {
     const html = ReactDOMServer.renderToString(
       <ToolCardList
         cards={[
           card({
             name: 'generatePalace',
             status: 'running',
-            stages: [
-              { step: 'planning-stations' },
-              { step: 'generating-image' },
-              { step: 'locating-stations' },
-            ],
+            stages: [{ step: 'planning-stations' }, { step: 'generating-image' }],
           }),
         ]}
       />,
@@ -128,8 +124,7 @@ describe('ToolCardList rendering', () => {
     expect(html).toContain('aria-expanded="true"')
     expect(html).toContain('Planning stations')
     expect(html).toContain('Generating image')
-    expect(html).toContain('Locating stations')
-    expect((html.match(/chat-message-list__tool-card__stage">/g) ?? []).length).toBe(3)
+    expect((html.match(/chat-message-list__tool-card__stage">/g) ?? []).length).toBe(2)
   })
 
   it('keeps a stage-less palace card single-line (subgraph failed before emitting a stage)', () => {
@@ -155,11 +150,7 @@ describe('ToolCardList rendering', () => {
           card({
             name: 'generatePalace',
             status: 'success',
-            steps: [
-              { step: 'planning-stations' },
-              { step: 'generating-image' },
-              { step: 'locating-stations' },
-            ],
+            steps: [{ step: 'planning-stations' }, { step: 'generating-image' }],
           }),
         ]}
       />,
@@ -270,11 +261,7 @@ describe('ToolCardList manual expand/collapse', () => {
             card({
               name: 'generatePalace',
               status: 'success',
-              steps: [
-                { step: 'planning-stations' },
-                { step: 'generating-image' },
-                { step: 'locating-stations' },
-              ],
+              steps: [{ step: 'planning-stations' }, { step: 'generating-image' }],
             }),
           ]}
         />,
@@ -285,7 +272,6 @@ describe('ToolCardList manual expand/collapse', () => {
     clickToggle()
     expect(window.document.body.textContent).toContain('Planning stations')
     expect(window.document.body.textContent).toContain('Generating image')
-    expect(window.document.body.textContent).toContain('Locating stations')
     clickToggle()
     expect(window.document.body.textContent).not.toContain('Planning stations')
   })

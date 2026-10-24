@@ -159,8 +159,7 @@ describe('MainGraphState', () => {
       .addNode('test', async (state) => {
         expect(state.mindmapInputSource).toEqual({ type: 'pdf', path: '/test.pdf' })
         expect(state.palaceInputText).toBe(' palace text')
-        expect(state.imageUrls).toEqual([])
-        expect(state.imageError).toBeUndefined()
+        expect(state.imageUrl).toBeUndefined()
         return {}
       })
       .addEdge('__start__', 'test')
@@ -182,8 +181,7 @@ describe('MainGraphState', () => {
       palaceInputText: ' palace text',
       palaceInputNodes: [],
       palace: null,
-      imageUrls: [],
-      imageError: undefined,
+      imageUrl: undefined,
       memoryRoute: [],
     })
   })
@@ -213,7 +211,7 @@ describe('MainGraphState', () => {
       palaceInputText: '',
       palaceInputNodes: [],
       palace: null,
-      imageUrls: [],
+      imageUrl: undefined,
       memoryRoute: [],
     })
 
@@ -240,18 +238,18 @@ describe('Subgraph channels and main graph channels', () => {
 
   it('private keys written by a subgraph are still readable after crossing graphs (guards against another silent drop)', async () => {
     const palaceSubgraph = new StateGraph(PalaceSubgraphState)
-      .addNode('writeImageUrls', async () => ({ imageUrls: ['https://example.test/a.png'] }))
-      .addEdge('__start__', 'writeImageUrls')
-      .addEdge('writeImageUrls', '__end__')
+      .addNode('writeImageUrl', async () => ({ imageUrl: 'https://example.test/a.png' }))
+      .addEdge('__start__', 'writeImageUrl')
+      .addEdge('writeImageUrl', '__end__')
       .compile()
 
-    let seenInMainGraph: string[] | undefined
+    let seenInMainGraph: string | undefined
     const mainGraph = new StateGraph(MainGraphState)
       // Mounted the way AgentOrchestrator does it: the compiled subgraph is a
       // node of the main graph and its writes land in the main graph's channels.
       .addNode('palaceSubgraph', palaceSubgraph)
       .addNode('afterSubgraph', async (state) => {
-        seenInMainGraph = state.imageUrls
+        seenInMainGraph = state.imageUrl
         return {}
       })
       .addEdge('__start__', 'palaceSubgraph')
@@ -261,6 +259,6 @@ describe('Subgraph channels and main graph channels', () => {
 
     await mainGraph.invoke({ messages: [], context: null })
 
-    expect(seenInMainGraph).toEqual(['https://example.test/a.png'])
+    expect(seenInMainGraph).toBe('https://example.test/a.png')
   })
 })

@@ -109,7 +109,7 @@ export function isPalaceNodeData(data: unknown): data is PalaceNodeData {
   const record = data as Record<string, unknown>
   return (
     typeof record.label === 'string' &&
-    typeof record.imageUrl === 'string' &&
+    (record.imageUrl === undefined || typeof record.imageUrl === 'string') &&
     Array.isArray(record.stations) &&
     Array.isArray(record.sourceNodeIds)
   )

@@ -14,7 +14,6 @@ export { formatXmlError } from './errors.js'
 export { escapeXml } from './escape.js'
 export { normalizeSelfClosingTags } from './normalize.js'
 export { parseXmlTolerant, topLevelElements } from './parser.js'
-export { isValidSvgArtwork } from './svg.js'
 export {
   serializeMindLaneFile,
   serializeMindmapSection,
