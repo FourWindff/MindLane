@@ -10,7 +10,7 @@ import { SessionManager } from './sessionManager.js'
 import { LLMProvider, ProviderCapability } from '../providers/base.js'
 import { MemoryExtractor, createExtractionCallback } from '../memory/memoryExtractor.js'
 import { MemoryManager } from '../memory/memoryManager.js'
-import { EditLogStore } from '../memory/editLogStore.js'
+import { openInternalStore, type InternalStateStore } from '../../store/internalStore.js'
 
 class FakeProvider extends LLMProvider {
   constructor(model: BaseChatModel) {
@@ -381,6 +381,7 @@ describe('Consolidator extraction callback seam', () => {
   let tmpDir: string
   let manager: SessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
+  let stores: InternalStateStore[]
   const workspaceUuid = 'workspace-uuid-1'
   const fileUuid = 'file-uuid-1'
 
@@ -399,6 +400,14 @@ describe('Consolidator extraction callback seam', () => {
   /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
   const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
 
+  /** The real internal store (SQLite), so edit-log read/clear is exercised end to end. */
+  function openStore(): InternalStateStore {
+    const opened = openInternalStore(path.join(tmpDir, 'internal-state.db'))
+    if (!opened.ok) throw new Error(opened.error)
+    stores.push(opened.store)
+    return opened.store
+  }
+
   /** Summary calls carry the rolling-summary prompt; every other call (extraction) returns JSON. */
   function makeExtractionAwareModel(): BaseChatModel {
     const model = new FakeListChatModel({ responses: ['summary'] })
@@ -415,6 +424,7 @@ describe('Consolidator extraction callback seam', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-seam-'))
     manager = new SessionManager()
     await manager.init(tmpDir)
+    stores = []
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -424,6 +434,7 @@ describe('Consolidator extraction callback seam', () => {
 
   afterEach(() => {
     manager.close()
+    for (const store of stores) store.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -480,17 +491,23 @@ describe('Consolidator extraction callback seam', () => {
       expect(onArchived).not.toHaveBeenCalled()
     }))
 
-  it('deletes the editlog and writes memory after a successful extraction', async () =>
+  it("clears the extracted file's edits and writes memory after a successful extraction", async () =>
     inWs(async () => {
       const sessionId = 'extract-success'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
 
-      const editLogStore = new EditLogStore(tmpDir)
-      await editLogStore.append(workspaceUuid, fileUuid, {
+      const internalStore = openStore()
+      internalStore.appendEditLog(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
         before: 'written by the AI',
         after: 'edited by the user',
+      })
+      internalStore.appendEditLog(workspaceUuid, 'another-file', {
+        ts: 2,
+        nodeId: 'n2',
+        before: 'keep me',
+        after: 'still keep me',
       })
 
       const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
@@ -503,7 +520,7 @@ describe('Consolidator extraction callback seam', () => {
           getToolDefinitions: () => [],
           onArchived: createExtractionCallback({
             extractor,
-            editLogStore,
+            internalStore,
             provider,
             workspaceUuid,
             fileUuid,
@@ -516,9 +533,11 @@ describe('Consolidator extraction callback seam', () => {
       expect(changed).toBe(true)
 
       // The extraction callback is fire-and-forget: wait for it to land, then assert on its output
-      await vi.waitFor(async () => {
-        expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
+      await vi.waitFor(() => {
+        expect(internalStore.readEditLog(workspaceUuid, fileUuid)).toEqual([])
       })
+      // Clearing is scoped to the extracted fileUuid
+      expect(internalStore.readEditLog(workspaceUuid, 'another-file')).toHaveLength(1)
       const memoryContent = fs.readFileSync(
         path.join(tmpDir, 'mindlanememory', 'MEMORY.md'),
         'utf-8',
@@ -526,13 +545,13 @@ describe('Consolidator extraction callback seam', () => {
       expect(memoryContent).toContain('the user prefers modular design')
     }))
 
-  it('compression is unaffected and the editlog is kept when the extraction callback throws', async () =>
+  it('compression is unaffected and the edits are kept when the extraction callback throws', async () =>
     inWs(async () => {
       const sessionId = 'extract-failure'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
 
-      const editLogStore = new EditLogStore(tmpDir)
-      await editLogStore.append(workspaceUuid, fileUuid, {
+      const internalStore = openStore()
+      internalStore.appendEditLog(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
         before: 'written by the AI',
@@ -553,7 +572,7 @@ describe('Consolidator extraction callback seam', () => {
           getToolDefinitions: () => [],
           onArchived: createExtractionCallback({
             extractor: failingExtractor as never,
-            editLogStore,
+            internalStore,
             provider,
             workspaceUuid,
             fileUuid,
@@ -570,7 +589,7 @@ describe('Consolidator extraction callback seam', () => {
       // Artifacts of the main compression path are intact
       const meta = manager.getSessionMeta(sessionId)
       expect(meta?._lastSummary).toBe('summary')
-      // Extraction failed: the editlog evidence is kept
-      expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
+      // Extraction failed: the edit evidence is kept
+      expect(internalStore.readEditLog(workspaceUuid, fileUuid)).toHaveLength(1)
     }))
 })

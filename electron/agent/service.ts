@@ -4,7 +4,7 @@ import { CheckpointerManager } from './memory/checkpointer.js'
 import { SessionManager } from './context/sessionManager.js'
 import { MemoryManager } from './memory/memoryManager.js'
 import { MemoryExtractor } from './memory/memoryExtractor.js'
-import { EditLogStore } from './memory/editLogStore.js'
+import { openInternalStore, type InternalStateStore } from '../store/internalStore.js'
 
 /**
  * Assembly result of the agent-side services. All five are non-optional: the
@@ -16,7 +16,11 @@ export interface AgentServices {
   checkpointer: CheckpointerManager
   memoryManager: MemoryManager
   memoryExtractor: MemoryExtractor
-  editLogStore: EditLogStore
+  /**
+   * The shared SQLite store for app-internal state. Node edit history lives in
+   * its `edit_log` table; there is no directory of per-file edit-log files.
+   */
+  internalStore: InternalStateStore
 }
 
 /**
@@ -37,9 +41,23 @@ export async function initAgentServices(userDataPath: string): Promise<AgentServ
   await checkpointer.initWithDbPath(dbPath)
   sessionManager.setCheckpointer(checkpointer)
 
+  // The internal store shares the database file with the checkpointer; it owns
+  // the app's own tables (sessions, file identity, node edit log). A failed
+  // open must fail the whole assembly, matching the all-or-nothing contract.
+  const opened = openInternalStore(dbPath)
+  if (!opened.ok) {
+    checkpointer.close()
+    throw new Error(opened.error)
+  }
+
   const memoryManager = new MemoryManager(userDataPath)
   const memoryExtractor = new MemoryExtractor(memoryManager)
-  const editLogStore = new EditLogStore(userDataPath)
 
-  return { sessionManager, checkpointer, memoryManager, memoryExtractor, editLogStore }
+  return {
+    sessionManager,
+    checkpointer,
+    memoryManager,
+    memoryExtractor,
+    internalStore: opened.store,
+  }
 }

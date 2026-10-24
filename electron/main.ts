@@ -353,7 +353,7 @@ app.whenReady().then(async () => {
   const ctx: HandlerContext = {
     fsService,
     sessionManager: services?.sessionManager ?? null,
-    editLogStore: services?.editLogStore ?? null,
+    internalStore: services?.internalStore ?? null,
     getWindow: () => win,
     mindmapReadRequester,
     mindmapWriteRequester,

@@ -162,6 +162,13 @@ describe('IPC seam contract', () => {
     expect(preload).not.toContain('window.ipcRenderer')
   })
 
+  it('reports node edits from the manual text-commit path only (AI edits never reach the bridge)', () => {
+    const callers = rendererFiles
+      .filter((file) => /editlog\??\.append\s*\(/.test(fs.readFileSync(file, 'utf-8')))
+      .map((file) => path.relative(repoRoot, file).split(path.sep).join('/'))
+    expect(callers).toEqual(['src/features/mindmap/nodes/text/TextNodeComponent.tsx'])
+  })
+
   it('has no orphan IPC enum members', () => {
     const usages = collectEnumUsages(mainProcessFiles)
     const orphans = [...enumMembers].filter((m) => !usages.has(m))

@@ -87,7 +87,7 @@ describe('workspace identity in the run context', () => {
       sessionManager,
       memoryManager: undefined,
       memoryExtractor: {},
-      editLogStore: {},
+      internalStore: {},
     } as unknown as AgentServices
     const state = {
       messages: [new HumanMessage('hi')],

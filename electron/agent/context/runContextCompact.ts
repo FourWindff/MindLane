@@ -62,14 +62,14 @@ export async function runContextCompact(
   const getToolDefinitions = () => toolRegistry.allTools
 
   // Memory extraction hooks into compression: the archived slice plus
-  // the file's editlog are the extraction input (fire-and-forget).
-  // Complete after assembly: memoryExtractor / editLogStore are non-optional; only fileUuid
+  // the file's edit history are the extraction input (fire-and-forget).
+  // Complete after assembly: memoryExtractor / internalStore are non-optional; only fileUuid
   // decides whether extraction fires.
   const fileUuid = state.context?.fileUuid
   const onArchived = fileUuid
     ? createExtractionCallback({
         extractor: services.memoryExtractor,
-        editLogStore: services.editLogStore,
+        internalStore: services.internalStore,
         provider,
         workspaceUuid: requireWorkspaceUuid('memory extraction'),
         fileUuid,

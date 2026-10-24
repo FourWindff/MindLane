@@ -24,6 +24,7 @@ describe('initAgentServices assembly', () => {
   afterEach(() => {
     services.sessionManager.close()
     services.checkpointer.close()
+    services.internalStore.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -32,7 +33,7 @@ describe('initAgentServices assembly', () => {
     expect(services.checkpointer).toBeDefined()
     expect(services.memoryManager).toBeDefined()
     expect(services.memoryExtractor).toBeDefined()
-    expect(services.editLogStore).toBeDefined()
+    expect(services.internalStore).toBeDefined()
   })
 
   it('creates the memory directory', () => {
@@ -54,5 +55,19 @@ describe('initAgentServices assembly', () => {
 
   it('checkpointer adapter is ready', () => {
     expect(services.checkpointer.getAdapter()).toBeDefined()
+  })
+
+  it('keeps node edit history in the internal store, not in an editlog directory', () => {
+    services.internalStore.appendEditLog('workspace-uuid-assembly', 'file-uuid-a', {
+      ts: 1,
+      nodeId: 'node-1',
+      before: 'written by the AI',
+      after: 'edited by the user',
+    })
+
+    expect(services.internalStore.readEditLog('workspace-uuid-assembly', 'file-uuid-a')).toEqual([
+      { ts: 1, nodeId: 'node-1', before: 'written by the AI', after: 'edited by the user' },
+    ])
+    expect(fs.existsSync(path.join(tmpDir, 'memory', 'editlog'))).toBe(false)
   })
 })
