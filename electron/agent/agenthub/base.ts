@@ -6,13 +6,13 @@ import type { MainGraphStateType, PalaceSubgraphStateType } from '../state.js'
  *
  * Architectural principles:
  * - Only MindLaneAgent owns memory, context management, and tool binding.
- * - Other agents (Analyze, ImageGen, Vision) do not touch persistent memory.
+ * - Other agents (Analyze, Artwork) do not touch persistent memory.
  * - Every agent performs its task through the unified invoke(state) interface.
  * - MindLaneAgent declares its own route(state) method (the base declares and calls nothing).
  *
  * State types:
  * - MindLaneAgent: MainGraphStateType
- * - Analyze/ImageGen/Vision: PalaceSubgraphStateType
+ * - Analyze/Artwork: PalaceSubgraphStateType
  */
 export abstract class BaseAgent {
   constructor(protected provider: LLMProvider) {}
@@ -27,7 +27,7 @@ export abstract class BaseAgent {
 
 /**
  * Base class for palace-subgraph agents.
- * Used by agents in the palace subgraph such as Analyze, ImageGen, and Vision.
+ * Used by the palace subgraph's Analyze and Artwork agents.
  */
 export abstract class PalaceAgent {
   constructor(protected provider: LLMProvider) {}

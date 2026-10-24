@@ -83,12 +83,12 @@ afterEach(() => {
 })
 
 describe('MindmapWriteResponder', () => {
-  it('materializes palace SVG data URLs as assets before insert and update writes', async () => {
+  it('materializes palace artwork data URLs as assets before insert and update writes', async () => {
     const { editor, store } = createRealEditor()
     const { send, respond, stop } = setupResponder({ 'file-a': editor })
-    const imageUrl = svgDataUrl(
-      '<svg viewBox="0 0 1000 1000"><g data-station="1"><circle cx="100" cy="100" r="20" /></g></svg>',
-    )
+    // No viewBox and no station markers: artwork is decoration, so there is no
+    // validity gate left to fail.
+    const imageUrl = svgDataUrl('<svg><circle cx="100" cy="100" r="20" /></svg>')
 
     send({
       requestId: 'palace-insert',
@@ -108,9 +108,7 @@ describe('MindmapWriteResponder', () => {
     expect(palace?.data).toMatchObject({ assetId: state.assets[0]!.id })
     expect(palace?.data).not.toHaveProperty('imageUrl')
 
-    const updatedImageUrl = svgDataUrl(
-      '<svg viewBox="0 0 1000 1000"><g data-station="1"><rect width="200" height="200" /></g></svg>',
-    )
+    const updatedImageUrl = svgDataUrl('<svg><rect width="200" height="200" /></svg>')
     respond.mockClear()
     send({
       requestId: 'palace-update',
@@ -130,21 +128,17 @@ describe('MindmapWriteResponder', () => {
     stop()
   })
 
-  it('drops malformed palace SVG artwork, inserts an artwork-less palace, and logs a warning', async () => {
+  it('lands a palace without artwork when the image reference cannot be read, logging only a warning', async () => {
     const { editor, store } = createRealEditor()
     const { send, respond, warn, stop } = setupResponder({ 'file-a': editor })
-    const imageUrl = svgDataUrl('<svg><g data-station="1" /></svg>').replace(
-      'image/svg+xml',
-      'image/SVG+XML',
-    )
 
     send({
-      requestId: 'palace-invalid-svg',
+      requestId: 'palace-unreadable-artwork',
       fileUuid: 'file-a',
       action: 'insertXmlFragment',
       args: {
         targetId: 'root',
-        xml: `<node type="palace" content="Palace" imageUrl="${imageUrl}"><station order="1">Entrance</station></node>`,
+        xml: `<node type="palace" content="Palace" imageUrl="https://example.com/palace.png"><station order="1">Entrance</station></node>`,
       },
     })
     await vi.waitFor(() => expect(respond).toHaveBeenCalled())
@@ -155,6 +149,12 @@ describe('MindmapWriteResponder', () => {
     expect(palace).toBeDefined()
     expect(palace?.data).not.toHaveProperty('assetId')
     expect(palace?.data).not.toHaveProperty('imageUrl')
+    expect(respond).toHaveBeenCalledWith({
+      requestId: 'palace-unreadable-artwork',
+      ok: true,
+      action: 'insertXmlFragment',
+      data: { nodeCount: 1, targetId: 'root', position: 'child' },
+    })
     expect(warn).toHaveBeenCalledOnce()
     stop()
   })
@@ -753,9 +753,13 @@ describe('MindmapWriteResponder landPalace', () => {
 
     const state = store.getState()
     expect(state.assets).toHaveLength(0)
-    expect(state.nodes.find((node) => node.type === 'palace')?.data).toMatchObject({
+    const palace = state.nodes.find((node) => node.type === 'palace')
+    expect(palace?.data).toMatchObject({
       label: 'Palace without image',
+      stations: [station(1, 'First station')],
     })
+    expect(palace?.data).not.toHaveProperty('assetId')
+    expect(palace?.data).not.toHaveProperty('imageUrl')
     expect(respond).toHaveBeenCalledWith(expect.objectContaining({ ok: true }))
     stop()
   })

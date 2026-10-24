@@ -1,9 +1,7 @@
 import { StateGraph, START, END, getWriter } from '@langchain/langgraph'
 import type { LLMProvider } from '../providers/index.js'
 import { AnalyzeAgent } from '../agenthub/analyzeAgent.js'
-import { ImageGenAgent } from '../agenthub/imageGenAgent.js'
-import { AnchorAgent } from '../agenthub/anchorAgent.js'
-import { SvgAgent } from '../agenthub/svgArtwork.js'
+import { ArtworkAgent } from '../agenthub/artworkAgent.js'
 import {
   PalaceSubgraphState,
   type MemoryPalaceStation,
@@ -20,10 +18,9 @@ import {
 import type { ChatToolCallStep } from '../../../contracts/fileFormat.js'
 import { serializePalaceNodeXml } from '../../../contracts/mindmapXml/index.js'
 import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
+import { applyCanonicalLayout, buildFallbackSummary } from '../agenthub/palaceLayout.js'
 
 import { resolvePalaceInput } from './palaceGraph/inputResolver.js'
-import { normalizePalaceImageUrls } from './palaceGraph/normalizeImageUrls.js'
-import { resolveArtworkStyle } from '../../../contracts/palaceArtworkStyle.js'
 import { buildSubgraphToolMessage } from '../subgraphRouter.js'
 
 const log = logger.withContext('palace')
@@ -67,7 +64,7 @@ export function buildPalacePayload(state: {
   palaceLandingError: string
   palace: { theme: string } | null
   memoryRoute: MemoryPalaceStation[]
-  imageUrls: string[]
+  imageUrl?: string
   palaceInputNodes: { id: string }[]
 }): PalaceRunPayload {
   if (state.palaceError) {
@@ -89,9 +86,8 @@ export function buildPalacePayload(state: {
       y: s.y,
       linkedNodeId: s.linkedNodeId ?? '',
     })),
-    // The palace subgraph normalizes remote URLs to data URLs inside the
-    // graph, so the first entry is already the persistable payload.
-    imageUrl: state.imageUrls[0] ?? '',
+    // At most one artwork image; a palace without artwork is still a success.
+    ...(state.imageUrl ? { imageUrl: state.imageUrl } : {}),
     sourceNodeIds: state.palaceInputNodes.map((n) => n.id),
   }
 }
@@ -176,7 +172,11 @@ async function buildOutputNode(
 
 /**
  * Build the Palace Subgraph
- * Flow: START -> resolve_input -> analyze -> (svgGen | imageGen -> normalizeImages -> vision) -> build_output -> END
+ * Flow: START -> resolve_input -> analyze -> artwork -> layout -> build_output -> END
+ *
+ * The artwork node is optional decoration: it can only add one image, never
+ * coordinates, and never fails the run. `layout` is the single producer of
+ * station coordinates (canonical layout), shared by every trigger surface.
  *
  * Compiled without a checkpointer and without its own stream: the host graph
  * owns persistence and the run context (this graph is mounted as its node).
@@ -185,9 +185,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   const { provider, writeProxy } = options
 
   const analyze = new AnalyzeAgent(provider)
-  const imageGen = new ImageGenAgent(provider)
-  const vision = new AnchorAgent(provider)
-  const svgGen = new SvgAgent(provider)
+  const artwork = new ArtworkAgent(provider)
 
   // Use the state type dedicated to the Palace subgraph
   const graph = new StateGraph(PalaceSubgraphState)
@@ -232,50 +230,32 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
       )
       return { ...result, palaceToolSteps: toolSteps }
     })
-    .addNode('svgGen', async (state) => {
+    .addNode('artwork', async (state) => {
       const toolSteps = beginStage(state, 'generating-image')
       const start = Date.now()
-      const result = await svgGen.invoke(state)
+      const result = await artwork.invoke(state)
       log.info(
-        'svgGen finished: artwork %s, %ss',
-        result.imageUrls?.length ? 'available' : 'missing',
+        'artwork finished: %s, %ss',
+        result.imageUrl ? 'available' : 'missing',
         ((Date.now() - start) / 1000).toFixed(1),
       )
       return { ...result, palaceToolSteps: toolSteps }
     })
-    .addNode('imageGen', async (state) => {
-      const toolSteps = beginStage(state, 'generating-image')
-      const start = Date.now()
-      const result = await imageGen.invoke(state)
-      const urls = (result as { imageUrls?: string[] }).imageUrls
-      const imageError = (result as { imageError?: string }).imageError
-      if (imageError) log.warn('imageGen failed: %s', imageError)
-      else
-        log.info(
-          'imageGen finished: %d images generated, %ss',
-          urls?.length ?? 0,
-          ((Date.now() - start) / 1000).toFixed(1),
-        )
-      return { ...result, palaceToolSteps: toolSteps }
-    })
-    .addNode('normalizeImages', (state) => normalizePalaceImageUrls(state))
-    .addNode('vision', async (state) => {
-      const toolSteps = beginStage(state, 'locating-stations')
-      const start = Date.now()
-      const result = await vision.invoke(state)
-      const route = (result as { memoryRoute?: unknown[] }).memoryRoute
-      log.info(
-        'vision finished: %d stations located, %ss',
-        route?.length ?? 0,
-        ((Date.now() - start) / 1000).toFixed(1),
-      )
+    .addNode('layout', (state) => {
+      if (!state.palace || state.palaceError) return {}
 
+      // Canonical Layout is the only coordinate producer: the same route for the
+      // manual trigger, the AI trigger and every artwork carrier.
+      const memoryRoute = applyCanonicalLayout(state.palace.stations, state.palace.routeStyle)
       log.info(
-        'done: %d stations produced, %d model calls',
-        route?.length ?? 0,
+        'layout finished: %d stations on the canonical route, %d model calls',
+        memoryRoute.length,
         takeModelCallCount(currentStreamId() ?? ''),
       )
-      return { ...result, palaceToolSteps: toolSteps }
+      return {
+        memoryRoute,
+        palaceResponse: buildFallbackSummary(memoryRoute, Boolean(state.imageUrl)),
+      }
     })
     .addNode('build_output', (state: PalaceSubgraphStateType) => buildOutputNode(state, writeProxy))
 
@@ -288,13 +268,11 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
   )
   graph.addConditionalEdges(
     'analyze',
-    (state) => resolveArtworkStyle(state.artworkStyle, provider.capabilities),
-    { vector: 'svgGen', raster: 'imageGen' },
+    (state) => (state.palaceError ? 'build_output' : 'artwork'),
+    ['artwork', 'build_output'],
   )
-  graph.addEdge('svgGen', 'build_output')
-  graph.addEdge('imageGen', 'normalizeImages')
-  graph.addEdge('normalizeImages', 'vision')
-  graph.addEdge('vision', 'build_output')
+  graph.addEdge('artwork', 'layout')
+  graph.addEdge('layout', 'build_output')
   graph.addEdge('build_output', END)
 
   return graph

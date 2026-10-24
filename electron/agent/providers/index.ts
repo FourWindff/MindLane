@@ -2,7 +2,6 @@ export {
   LLMProvider,
   ProviderCapability,
   DEFAULT_CONTEXT_WINDOW,
-  type DetectedAnchor,
   type ModelOption,
   urlToDataUrl,
 } from './base.js'

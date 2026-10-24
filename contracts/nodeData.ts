@@ -55,9 +55,10 @@ export type ImageNodeData = {
 
 export type PalaceNodeData = {
   label: string
-  /** Embedded image asset id (<assets> section); old files whose download failed keep imageUrl during migration */
+  /** Embedded artwork asset id (<assets> section); absent = a palace without artwork */
   assetId?: string
-  imageUrl: string
+  /** Migration-only fallback for old files whose artwork download failed; new nodes never store it */
+  imageUrl?: string
   stations: PalaceStation[]
   sourceNodeIds: string[]
   expanded?: boolean

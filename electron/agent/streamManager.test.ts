@@ -186,7 +186,7 @@ function createRuntime(options?: {
             ],
             response: options?.token ?? 'hello',
             memoryRoute: [],
-            imageUrls: [],
+            imageUrl: undefined,
           },
         }
       }),
@@ -745,7 +745,6 @@ describe('StreamManager + Runner', () => {
       ok: true,
       label: 'Palace',
       stations: [],
-      imageUrl: '',
       sourceNodeIds: [],
     })
     setRuntimeFactory(() =>

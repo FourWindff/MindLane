@@ -119,7 +119,8 @@ export function serializePalaceNodeXml(input: PalaceNodePayload): string {
     position: { x: 0, y: 0 },
     data: {
       label: input.label,
-      imageUrl: input.imageUrl,
+      // Artwork is optional decoration: a palace without a picture still lands.
+      ...(input.imageUrl ? { imageUrl: input.imageUrl } : {}),
       stations: input.stations,
       sourceNodeIds: input.sourceNodeIds,
     },

@@ -82,32 +82,3 @@ export function buildImagePromptGeneratorMessages(input: {
     },
   ]
 }
-
-export function buildSummaryMessages(input: {
-  theme: string
-  hasImage: boolean
-  memoryRoute: PalaceStationPromptInput[]
-}): WorkflowPromptMessage[] {
-  return [
-    {
-      role: 'system',
-      content: [
-        'You are a memory palace walkthrough assistant.',
-        'Explain in concise English how to recall along the route.',
-        'Each station must mention: position order, content, and mnemonic technique.',
-        'Keep it to 6-12 sentences; do not use tables.',
-      ].join('\n'),
-    },
-    {
-      role: 'user',
-      content: [
-        `Scene theme: ${input.theme}`,
-        `Image generated: ${input.hasImage ? 'yes' : 'no'}`,
-        ...input.memoryRoute.map(
-          (station) =>
-            `Station ${station.order}: content=${station.content}; visual=${station.anchorVisual ?? ''}; mnemonic=${station.mnemonicMethod ?? ''}; association=${station.association ?? ''}`,
-        ),
-      ].join('\n'),
-    },
-  ]
-}

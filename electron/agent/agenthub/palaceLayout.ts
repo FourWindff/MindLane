@@ -51,6 +51,12 @@ export const ROUTE_STYLES = [
   'stairs',
 ] as const satisfies readonly RouteStyle[]
 
+/**
+ * Canonical Layout (CONTEXT.md): route style + station order deterministically
+ * produce every station coordinate; the minimum-distance pass keeps pins apart.
+ * This is the only coordinate producer for both trigger surfaces and for both
+ * artwork carriers.
+ */
 export function applyCanonicalLayout(
   stations: StationDesign[],
   routeStyle?: string,
@@ -99,34 +105,6 @@ export function applyCanonicalLayout(
   })
 
   return enforceMinDistance(raw)
-}
-
-/**
- * Route built from station designs plus located coordinates, shared by the vision and SVG
- * agents. Missing coordinates fall back to the centre of the canvas.
- */
-export function buildRouteFromCoordinates(
-  stations: StationDesign[],
-  coordinates: readonly { order: number; x: number; y: number }[],
-): MemoryPalaceStation[] {
-  const byOrder = new Map(coordinates.map((coordinate) => [coordinate.order, coordinate]))
-  const route = [...stations]
-    .sort((a, b) => a.order - b.order)
-    .map((station) => {
-      const coordinate = byOrder.get(station.order)
-      return {
-        order: station.order,
-        content: station.content,
-        x: coordinate?.x ?? 0.5,
-        y: coordinate?.y ?? 0.5,
-        anchorVisual: station.anchorVisual,
-        mnemonicMethod: station.mnemonicMethod,
-        association: station.association,
-        linkedNodeId: station.linkedNodeId,
-      }
-    })
-
-  return enforceMinDistance(route)
 }
 
 export function buildFallbackSummary(route: MemoryPalaceStation[], hasImage: boolean): string {

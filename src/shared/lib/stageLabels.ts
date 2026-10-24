@@ -11,7 +11,6 @@ const STAGE_LABELS: Record<string, string> = {
   finalizing: 'Finalizing',
   'planning-stations': 'Planning stations',
   'generating-image': 'Generating image',
-  'locating-stations': 'Locating stations',
 }
 
 export function stageDisplayName(step: string, completed?: number, total?: number): string {

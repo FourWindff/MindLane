@@ -51,7 +51,7 @@ const PALACE: NodeTypeDescriptor<PalaceNodeData> = {
     return {
       label: data.label,
       ...(data.assetId != null && { assetId: data.assetId }),
-      imageUrl: data.imageUrl,
+      ...(data.imageUrl != null && { imageUrl: data.imageUrl }),
       stations: data.stations,
       sourceNodeIds: data.sourceNodeIds,
     }

@@ -20,13 +20,6 @@ export type ModelOption = { id: string; displayName: string; contextWindow?: num
 /** Conservative fallback window (32k tokens) for models without a declared contextWindow */
 export const DEFAULT_CONTEXT_WINDOW = 32_768
 
-export type DetectedAnchor = {
-  order: number
-  anchorVisual: string
-  x: number
-  y: number
-}
-
 export abstract class LLMProvider {
   /**
    * Single static source of truth for the provider catalog and capabilities:

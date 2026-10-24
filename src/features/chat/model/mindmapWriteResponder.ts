@@ -6,13 +6,12 @@ import {
   MindmapXmlError,
   buildValidationContext,
   formatXmlError,
-  isValidSvgArtwork,
   parseXmlFragment,
   serializeMindmapSection,
   type MindLaneAsset,
   validateMove,
 } from '@contracts/mindmapXml'
-import { assetFromDataUrl, parseDataUrl } from '@contracts/mindmapXml/asset'
+import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
 import type {
   MindmapWriteRequest,
   MindmapWriteResponse,
@@ -117,16 +116,6 @@ const INSERT_POSITIONS = new Set(['root', 'child', 'after', 'before'])
 const MOVE_POSITIONS = new Set(['child', 'after', 'before'])
 const PALACE_TYPE = 'palace'
 
-function decodeBase64Utf8(data: string): string | null {
-  try {
-    const binary = atob(data)
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0))
-    return new TextDecoder().decode(bytes)
-  } catch {
-    return null
-  }
-}
-
 async function materializePalaceArtwork(
   xml: string,
   editor: MindmapEditor,
@@ -140,23 +129,18 @@ async function materializePalaceArtwork(
     if (node.type !== PALACE_TYPE) continue
     const data = node.data as Record<string, unknown>
     if (typeof data.assetId === 'string' && data.assetId) continue
-    if (typeof data.imageUrl !== 'string') continue
+    if (typeof data.imageUrl !== 'string' || !data.imageUrl) continue
 
-    const dataUrl = parseDataUrl(data.imageUrl)
-    if (!dataUrl) continue
-    if (dataUrl.mime.toLowerCase() === 'image/svg+xml') {
-      const svg = decodeBase64Utf8(dataUrl.data)
-      const stationCount = Array.isArray(data.stations) ? data.stations.length : 0
-      if (!svg || !isValidSvgArtwork(svg, stationCount)) {
-        delete data.imageUrl
-        changed = true
-        warn('Palace artwork failed the gate; using a palace without an image')
-        continue
-      }
+    // Artwork is decoration: whatever cannot be read as an image simply means
+    // "no artwork", never a failed landing.
+    const asset = await assetFromDataUrl(data.imageUrl)
+    if (!asset) {
+      delete data.imageUrl
+      changed = true
+      warn('Palace artwork could not be read; landing the palace without an image')
+      continue
     }
 
-    const asset = await assetFromDataUrl(data.imageUrl)
-    if (!asset) continue
     const existingAsset = [...editor.getState().assets, ...assets].find(
       (candidate) => candidate.sha256 === asset.sha256,
     )
@@ -304,7 +288,8 @@ function findPalacePlaceholder(editor: MindmapEditor, sourceNodeIds: string[]): 
  * subgraph payload (the model never repeats the image data URL). The placeholder
  * node is updated in place by sourceNodeIds; without a placeholder a new node is
  * created and the parent edges are rewired as "new palace → selected nodes". Image
- * assets are materialized here (the same gate as insertXmlFragment).
+ * assets are materialized here (the same path as insertXmlFragment); a palace
+ * without artwork lands without an asset.
  */
 async function applyPalaceLanding(
   editor: MindmapEditor,
