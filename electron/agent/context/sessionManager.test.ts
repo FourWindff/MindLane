@@ -1,31 +1,37 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages'
 import { SessionManager } from './sessionManager.js'
+import { createTestSessionManager, type TestSessionManager } from './sessionManager.testutil.js'
+import type { InternalStateStore } from '../../store/internalStore.js'
+import { logger } from '../../shared/logger.js'
 
 describe('SessionManager', () => {
   let manager: SessionManager
+  let stateStore: InternalStateStore
+  let harness: TestSessionManager
   let tmpDir: string
   const fileUuid = 'file-uuid-1'
   const workspaceUuid = 'workspace-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-manager-'))
-    manager = new SessionManager()
-    await manager.init(tmpDir)
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
+    stateStore = harness.stateStore
   })
 
   /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
   const inWs = <T>(fn: () => T, ws: string = workspaceUuid): T => manager.runInWorkspace(ws, fn)
 
   afterEach(() => {
-    manager.close()
+    harness.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  /** Fixture: uses the same shared append path as the runner (BaseMessage[] on disk). */
+  /** Fixture: uses the same shared append path as the runner. */
   const appendMessages = (
     sessionId: string,
     messages: BaseMessage[],
@@ -216,5 +222,95 @@ describe('SessionManager', () => {
     inWs(async () => {
       const loaded = await manager.loadSessionBaseMessages('non-existent-session')
       expect(loaded).toHaveLength(0)
+    }))
+
+  it('reads the session list and messages from the database, not the file log', async () =>
+    inWs(async () => {
+      await appendMessages('session-db-only', [new HumanMessage('db is authoritative')])
+      // The rollback mirror is gone: reads must still succeed from the store alone.
+      fs.rmSync(path.join(tmpDir, 'memory', 'sessions'), { recursive: true, force: true })
+
+      await expect(manager.listSessions({ fileUuid })).resolves.toMatchObject([
+        { id: 'session-db-only', messageCount: 1 },
+      ])
+      await expect(manager.loadSessionMessages('session-db-only')).resolves.toMatchObject([
+        { role: 'user', content: 'db is authoritative' },
+      ])
+    }))
+
+  it('appends only the new suffix when a batch repeats the stored tail', async () =>
+    inWs(async () => {
+      await appendMessages('session-dedupe', [new HumanMessage('question')])
+      await appendMessages('session-dedupe', [
+        new HumanMessage('question'),
+        new AIMessage('answer'),
+      ])
+
+      const messages = await manager.loadMessages('session-dedupe')
+      expect(messages.map((message) => message.getType())).toEqual(['human', 'ai'])
+      await expect(manager.listSessions()).resolves.toMatchObject([{ messageCount: 2 }])
+    }))
+
+  it('keeps the database correct and warns when the rollback file log cannot be written', async () =>
+    inWs(async () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
+      try {
+        // Turn the mirror directory into a file: every file-side write fails, the store write must not.
+        const sessionsDir = path.join(tmpDir, 'memory', 'sessions')
+        fs.mkdirSync(sessionsDir, { recursive: true })
+        fs.rmSync(sessionsDir, { recursive: true, force: true })
+        fs.writeFileSync(sessionsDir, 'not a directory')
+
+        await expect(
+          appendMessages('session-mirror-broken', [new HumanMessage('still persisted')]),
+        ).resolves.toBeUndefined()
+
+        await expect(manager.loadSessionMessages('session-mirror-broken')).resolves.toMatchObject([
+          { role: 'user', content: 'still persisted' },
+        ])
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringContaining('file-side session log failed'),
+          'save messages',
+          expect.any(Error),
+        )
+      } finally {
+        warn.mockRestore()
+      }
+    }))
+
+  it('reads the rolling summary and compaction cursor back after a restart', async () => {
+    await inWs(async () => {
+      await appendMessages('session-restart', [new HumanMessage('first'), new AIMessage('reply')])
+      const meta = manager.getSessionMeta('session-restart')!
+      await manager.updateSessionMeta('session-restart', {
+        ...meta,
+        lastConsolidated: 1,
+        _lastSummary: 'the user greeted the assistant',
+      })
+    })
+
+    harness.close()
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
+
+    await inWs(async () => {
+      expect(manager.getSessionMeta('session-restart')).toMatchObject({
+        lastConsolidated: 1,
+        _lastSummary: 'the user greeted the assistant',
+        messageCount: 2,
+      })
+      await expect(manager.loadSessionMessages('session-restart')).resolves.toHaveLength(2)
+    })
+  })
+
+  it('deleteSession clears the active-session mapping that restore reads', async () =>
+    inWs(async () => {
+      await appendMessages('session-active', [new HumanMessage('hello')])
+      stateStore.setActiveSession(workspaceUuid, fileUuid, 'session-active')
+
+      await manager.deleteSession('session-active')
+
+      expect(stateStore.getActiveSession(workspaceUuid, fileUuid)).toBeNull()
+      await expect(manager.listSessions()).resolves.toEqual([])
     }))
 })

@@ -10,6 +10,16 @@ import {
 import { logger } from '../../shared/logger.js'
 import { atomicWrite } from '../../fs/atomicWrite.js'
 
+/** Title of a session the user has not named yet; the database writer and the JSONL mirror share this format. */
+export function defaultSessionTitle(now = new Date()): string {
+  return `New chat ${now.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
+}
+
 export interface SessionMeta {
   id: string
   fileUuid: string
@@ -215,12 +225,7 @@ export class SessionMessageStore {
     return {
       id: sessionId,
       fileUuid,
-      title: `New chat ${new Date().toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })}`,
+      title: defaultSessionTitle(),
       createdAt: now,
       updatedAt: now,
       messageCount: 0,

@@ -6,6 +6,7 @@ import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from '@langc
 import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { Consolidator } from './consolidator.js'
 import { SessionManager } from './sessionManager.js'
+import { createTestSessionManager, type TestSessionManager } from './sessionManager.testutil.js'
 import { LLMProvider, ProviderCapability } from '../providers/base.js'
 
 class FakeProvider extends LLMProvider {
@@ -37,20 +38,21 @@ function makeMessages(count: number): BaseMessage[] {
 describe('Consolidator integration', () => {
   let tmpDir: string
   let manager: SessionManager
+  let harness: TestSessionManager
   const fileUuid = 'file-uuid-1'
   const workspaceUuid = 'workspace-uuid-1'
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-int-'))
-    manager = new SessionManager()
-    await manager.init(tmpDir)
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
   })
 
   /** Production only enters the workspace context inside a run (Runner.run wraps runInWorkspace); tests enter it the same way. */
   const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
 
   afterEach(() => {
-    manager.close()
+    harness.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 

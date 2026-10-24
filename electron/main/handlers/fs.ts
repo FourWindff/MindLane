@@ -5,7 +5,10 @@ import crypto from 'node:crypto'
 import type { MindLaneFile } from '../../../contracts/fileFormat.js'
 import { IPC } from '../../ipc.js'
 import { detectDocumentType, documentTypeByExtension } from '../documentType.js'
-import { getWorkspaceSessionForService } from '../workspaceSession.js'
+import {
+  getWorkspaceSessionForService,
+  persistActiveSessionForService,
+} from '../workspaceSession.js'
 import type { HandlerContext } from './context.js'
 import { isWithinWorkspace } from '../../fs/paths.js'
 
@@ -192,7 +195,7 @@ export function registerFsHandlers(ctx: HandlerContext): void {
   })
 
   ipcMain.handle(IPC.WorkspaceGetSession, async () => {
-    return getWorkspaceSessionForService(ctx.fsService)
+    return getWorkspaceSessionForService(ctx.fsService, ctx.stateStore)
   })
 
   ipcMain.handle(
@@ -220,7 +223,9 @@ export function registerFsHandlers(ctx: HandlerContext): void {
     ) => {
       const activeSession = payload.activeSession
       if (activeSession !== undefined) {
-        const result = await ctx.fsService.workspace.setActiveSessionId(
+        const result = await persistActiveSessionForService(
+          ctx.fsService,
+          ctx.stateStore,
           payload.workspacePath,
           activeSession.fileUuid,
           activeSession.sessionId,

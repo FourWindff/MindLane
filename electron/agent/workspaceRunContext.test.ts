@@ -16,6 +16,10 @@ import { FakeListChatModel } from '@langchain/core/utils/testing'
 import { AgentOrchestrator } from './orchestrator.js'
 import { runContextCompact } from './context/runContextCompact.js'
 import { SessionManager } from './context/sessionManager.js'
+import {
+  createTestSessionManager,
+  type TestSessionManager,
+} from './context/sessionManager.testutil.js'
 import { createExtractionCallback } from './memory/memoryExtractor.js'
 import { requireWorkspaceUuid, runWithRunContext, type RunWorkspace } from '../shared/runContext.js'
 import { LLMProvider, ProviderCapability } from './providers/base.js'
@@ -49,6 +53,7 @@ const fileUuid = 'file-uuid-1'
 describe('workspace identity in the run context', () => {
   let tmpDir: string
   let workspace: RunWorkspace
+  let sessionHarness: TestSessionManager | null = null
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workspace-run-context-'))
@@ -57,6 +62,8 @@ describe('workspace identity in the run context', () => {
   })
 
   afterEach(() => {
+    sessionHarness?.close()
+    sessionHarness = null
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -81,8 +88,8 @@ describe('workspace identity in the run context', () => {
   })
 
   it('runContextCompact passes the run workspace uuid to memory extraction', async () => {
-    const sessionManager = new SessionManager()
-    await sessionManager.init(tmpDir)
+    sessionHarness = await createTestSessionManager(tmpDir)
+    const sessionManager: SessionManager = sessionHarness.manager
     const services = {
       sessionManager,
       memoryManager: undefined,
