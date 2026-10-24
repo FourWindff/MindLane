@@ -38,8 +38,8 @@ type AssistantMessage = NonNullable<StreamResponse['messages']>[number]
 
 interface AgentOrchestratorOptions {
   userDataPath?: string
-  /** On-demand mindmap snapshot provider: injected by main-process assembly (pulled from the renderer over reverse IPC). */
-  mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
+  /** On-demand mindmap reader: injected by main-process assembly, reads the authoritative in-process document. */
+  mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => string
   /** Local write executor: the document write service (validation + landing in the main process). */
   mindmapWrite?: MindmapWrite
 }
@@ -108,8 +108,8 @@ export class AgentOrchestrator {
     // switching workspaces takes effect without rebuilding the registry.
     this.toolRegistry.registerTool(createReadFileTool(() => currentWorkspacePath() ?? ''))
 
-    // On-demand mindmap read: pulled live when the model needs the whole tree
-    // (beyond the current selection).
+    // On-demand mindmap read: read directly from the main-process document when
+    // the model needs the whole tree (beyond the current selection).
     const mindmapReadProvider = this.options.mindmapReadProvider
     if (mindmapReadProvider) {
       this.toolRegistry.registerTool(createReadMindmapTool(mindmapReadProvider))

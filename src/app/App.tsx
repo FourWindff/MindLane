@@ -27,7 +27,6 @@ import {
 import { connectAiWritingProjection } from '@/features/chat/model/aiWritingProjection'
 import { connectChatWorkspaceSync } from '@/features/chat/model/workspaceSync'
 import { usePalaceGeneration } from '@/features/chat/model/usePalaceGeneration'
-import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { backfillEntryFileTitle } from '@/features/chat/lib/entryConversation'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
@@ -166,9 +165,6 @@ function AppContent() {
     // writes in the main process, so a tree change is all it takes to re-pull the
     // capsule query. The workspace store no longer pokes chat back.
     const disconnectWorkspaceSync = connectChatWorkspaceSync()
-    // On-demand mindmap read responder: when the main process pulls the live mindmap over the
-    // reverse channel, look the editor up by fileUuid and reply.
-    const disconnectMindmapReadResponder = connectMindmapReadResponder()
     const stopToolRouter = createMindmapEndEffects({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
@@ -182,7 +178,6 @@ function AppContent() {
       disconnectWorkspaceSync()
       disconnectAiWriting()
       disconnectAiStore()
-      disconnectMindmapReadResponder()
     }
   }, [])
 

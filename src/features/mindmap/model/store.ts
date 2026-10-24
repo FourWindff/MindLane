@@ -26,6 +26,17 @@ interface EdgeViewState {
   className?: string
 }
 
+/**
+ * The versioned document value the save protocol persists. It is the
+ * projection pushed by the document service - no drag previews, editing flags
+ * or selection - so a save can never write view state into the file.
+ */
+export interface MindmapDocumentSnapshot {
+  version: number
+  nodes: MindmapDocumentNode[]
+  edges: MindmapDocumentEdge[]
+}
+
 export interface OpenFileState {
   /** Projection of the authoritative document (positions included, computed by the main process). */
   nodes: Node[]
@@ -96,7 +107,12 @@ export interface OpenFileState {
   previewNodePosition: (nodeId: string, position: { x: number; y: number }) => void
   setEdgeClassName: (edgeId: string, className: string | undefined) => void
 
-  markClean: () => void
+  /**
+   * Clear dirty only when the given document version is still the shown one
+   * (the save guard). A change that landed mid-save advanced the version, so
+   * the document stays dirty for the next autosave.
+   */
+  markClean: (version: number) => void
   setFilePath: (filePath: string) => void
   /** Rename the document title (metadata.title); marking dirty lets autosave persist it. */
   setFileTitle: (title: string) => void
@@ -107,7 +123,10 @@ export interface OpenFileState {
   setStyle: (partial: Partial<MindmapStyleState>) => void
 
   loadFile: (filePath: string, data: MindLaneFile, workspacePath: string | null) => void
-  toMindLaneFile: () => MindLaneFile
+  /** The versioned document value at this instant (the save protocol's only input). */
+  documentSnapshot: () => MindmapDocumentSnapshot
+  /** Serialize the file from a document snapshot (defaults to the current one). */
+  toMindLaneFile: (snapshot?: MindmapDocumentSnapshot) => MindLaneFile
   addDocumentRef: (ref: DocumentRef) => void
 }
 
@@ -474,9 +493,13 @@ export function createMindmapStore(): MindmapStore {
         markLocalDirty()
       },
 
-      markClean: () => {
+      markClean: (version) => {
+        // Version guard: only the persisted version can clear dirty. The
+        // document service re-checks the same version, so a save whose
+        // document changed underneath stays dirty in both places.
+        if (get().documentVersion !== version) return
         set({ localDirty: false, documentDirty: false, dirty: false })
-        ensureClient().markSaved(get().fileUuid, get().documentVersion)
+        ensureClient().markSaved(get().fileUuid, version)
       },
 
       loadFile: (filePath, data, workspacePath) => {
@@ -518,18 +541,17 @@ export function createMindmapStore(): MindmapStore {
         ensureClient().open(data.metadata.fileUuid, document, style.structureType, data.assets)
       },
 
-      toMindLaneFile: (): MindLaneFile => {
-        const {
-          nodes,
-          edges,
-          fileUuid,
-          fileTitle,
-          fileCreatedAt,
-          viewport,
-          assets,
-          documentRefs,
-          style,
-        } = get()
+      documentSnapshot: () => {
+        const { documentVersion, documentNodes, documentEdges } = get()
+        return { version: documentVersion, nodes: documentNodes, edges: documentEdges }
+      },
+
+      toMindLaneFile: (snapshot): MindLaneFile => {
+        const { fileUuid, fileTitle, fileCreatedAt, viewport, assets, documentRefs, style } = get()
+        // The file carries the document, never the view projection: positions
+        // are the layout's, and transient flags/selection/drag previews are
+        // view-only state.
+        const { nodes, edges } = snapshot ?? get().documentSnapshot()
         const now = new Date().toISOString()
         return {
           version: '1.0',

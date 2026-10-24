@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EDITOR_STATE_TAG, serializeTurnState, stripTurnState } from './ipc.js'
-import type { ChatContext, MindmapReadRequest, MindmapReadResponse } from './ipc.js'
+import type { ChatContext } from './ipc.js'
 
 /** Minimal context: file identity + empty selection. */
 function baseContext(overrides: Partial<ChatContext> = {}): ChatContext {
@@ -222,22 +222,5 @@ describe('stripTurnState', () => {
   it('does not strip a block that is not anchored at the very end', () => {
     const text = `Question\n${serializeTurnState(baseContext())}\nFollow-up`
     expect(stripTurnState(text)).toBe(text)
-  })
-})
-
-describe('MindmapRead bridge types', () => {
-  it('correlates request and response by requestId', () => {
-    const request: MindmapReadRequest = { requestId: 'req-1', fileUuid: 'file-a' }
-    const okResponse: MindmapReadResponse = { requestId: 'req-1', ok: true, summary: 'Tree' }
-    const errorResponse: MindmapReadResponse = {
-      requestId: 'req-1',
-      ok: false,
-      error: 'File not open',
-    }
-
-    expect(request.requestId).toBe(okResponse.requestId)
-    expect(errorResponse.requestId).toBe(okResponse.requestId)
-    expect(okResponse.ok).toBe(true)
-    expect(errorResponse.ok).toBe(false)
   })
 })

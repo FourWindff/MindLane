@@ -39,7 +39,7 @@ import { registerWindowHandlers } from './main/handlers/window.js'
 import { registerDocumentHandlers } from './main/handlers/document.js'
 import { MindmapDocumentService } from './main/document/documentService.js'
 import { createMindmapWrite } from './main/document/writeService.js'
-import { buildMindmapReadRequest, createMindmapReadRequester } from './main/mindmapRequesters.js'
+import { readMindmapSection } from './main/document/readMindmap.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -313,11 +313,8 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
-  // Main process -> renderer mindmap read requester: `win` is a module-level mutable
-  // reference (the window can be recreated) injected via a getter, so a request fails
-  // immediately instead of hanging once the window is destroyed. Writes have no channel:
-  // they land in the document service directly, whether or not the window is alive.
-  const mindmapReadRequester = createMindmapReadRequester(() => win)
+  // The document service lives in this process: read tools read it directly and write
+  // tools land in it directly, so neither direction needs a reverse channel.
   const mindmapWrite = createMindmapWrite({
     documentService,
     warn: (message) => appLog.warn('%s', message),
@@ -341,8 +338,9 @@ app.whenReady().then(async () => {
           // Lazy creation only happens after the readiness gate passes, so services is non-null.
           chatOrchestrator = new AgentOrchestrator(provider, services!, {
             userDataPath,
+            // The doc service lives in this process: the read tool needs no round trip.
             mindmapReadProvider: (fileUuid, query) =>
-              mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
+              readMindmapSection(documentService, fileUuid, query),
             mindmapWrite,
           })
         } else {
@@ -361,7 +359,6 @@ app.whenReady().then(async () => {
     sessionManager: services?.sessionManager ?? null,
     stateStore: services?.stateStore ?? null,
     getWindow: () => win,
-    mindmapReadRequester,
     getStreamManager: () => streamManager,
     getMcpManager: () => mcpManager,
     isAiServiceReady: () => aiServiceReady,

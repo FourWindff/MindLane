@@ -246,6 +246,17 @@ describe('IPC seam contract', () => {
     expect(offenders).toEqual([])
   })
 
+  it('has no reverse read channel: AI reads read the document service directly', () => {
+    // The read tools read the in-process document, so no request/response channel,
+    // no responder and no timeout may exist anywhere.
+    const pattern =
+      /AiMindmapRead|MindmapReadRequest|MindmapReadResponse|MindmapReadResponder|onMindmapReadRequest|respondMindmapRead|RendererRequester<MindmapRead/
+    const offenders = [...mainProcessFiles, ...rendererFiles]
+      .filter((file) => pattern.test(fs.readFileSync(file, 'utf-8')))
+      .map((file) => path.relative(repoRoot, file).split(path.sep).join('/'))
+    expect(offenders).toEqual([])
+  })
+
   it('declares Window.mindlane as the same type as MindLaneBridge', () => {
     expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindLaneBridge>()
     expectTypeOf<MindLaneBridge>().toMatchTypeOf<Window['mindlane']>()

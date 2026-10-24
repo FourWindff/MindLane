@@ -5,8 +5,6 @@ import type {
   ChatContext,
   ChatStreamEvent,
   EphemeralRunRequest,
-  MindmapReadRequest,
-  MindmapReadResponse,
 } from '../contracts/ipc.js'
 import type {
   MindmapDocumentCommandResult,
@@ -22,8 +20,6 @@ export enum IPC {
   AiChatStream = 'ai:chat-stream',
   AiChatStreamStop = 'ai:chat-stream-stop',
   AiChatStreamEvent = 'ai:chat-stream-event',
-  AiMindmapReadRequest = 'ai:mindmap-read-request',
-  AiMindmapReadRespond = 'ai:mindmap-read-respond',
   AiGetProviders = 'ai:get-providers',
   AiIsReady = 'ai:is-ready',
 
@@ -185,10 +181,6 @@ export interface MindLaneBridge {
     >
     /** Read-only bare boolean: AI service readiness (whether assembly succeeded), not wrapped in an IpcResult envelope. */
     isReady: () => Promise<boolean>
-    /** Main process -> renderer: on-demand mindmap read request (correlated by requestId). */
-    onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
-    /** Renderer -> main process: mindmap read response. */
-    respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
   }
   file: {
     open: () => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>

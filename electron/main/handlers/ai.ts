@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import crypto from 'node:crypto'
 import { getRegisteredProviders } from '../../agent/providers/index.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
-import type { ChatContext, EphemeralRunRequest, MindmapReadResponse } from '../../ipc.js'
+import type { ChatContext, EphemeralRunRequest } from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { recordNodeEdit, type EditLogAppendPayload } from '../editLogRecord.js'
@@ -87,13 +87,6 @@ export function registerAiHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(IPC.AiChatStreamStop, (_e, payload: { streamId: string }) => {
     return { ok: ctx.getStreamManager()?.stopStream(payload.streamId) ?? false }
-  })
-
-  // Renderer -> main process: mindmap read response (the invoke side of the reverse channel).
-  // The renderer passes the requestId back verbatim; the requester resolves the pending
-  // request with it; an unknown requestId (already timed out / answered) is a no-op.
-  ipcMain.handle(IPC.AiMindmapReadRespond, (_e, payload: MindmapReadResponse) => {
-    ctx.mindmapReadRequester.respond(payload)
   })
 
   // One-way (send, not invoke): renderer never awaits. Resolve workspaceUuid

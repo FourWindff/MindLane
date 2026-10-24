@@ -50,17 +50,6 @@ export interface MindmapReadQuery {
   maxDepth?: number
 }
 
-/** Main process → renderer: on-demand mindmap read request (requestId correlates concurrent runners). */
-export interface MindmapReadRequest {
-  requestId: string
-  fileUuid: string
-  query?: MindmapReadQuery
-}
-
-/** Renderer → main process: mindmap read response. */
-export type MindmapReadResponse =
-  { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
-
 /** Steps the main process may emit as `step` events: mindmap subgraph + palace subgraph. */
 const STREAM_STEPS = [
   'generating-map',
