@@ -1,11 +1,10 @@
 /**
  * Serializable command shape: what actually crosses the bridge.
  *
- * The pure command layer carries one function (`updateNode.patch`); functions
- * cannot be cloned over IPC, so the renderer expresses the same operation as a
- * data merge plus an optional position. `toMindmapCommand` is the single
- * translation point, so the structural semantics still live only in
- * `commands.ts`.
+ * This is the renderer's entire document vocabulary: it can state an intent in
+ * this shape and nothing else (no function-valued patches cross the bridge).
+ * `toMindmapCommand` is the single translation point back into the pure command
+ * layer, so the structural semantics still live only in `commands.ts`.
  */
 
 import { TRANSIENT_NODE_DATA_FLAGS, stripTransientNodeData } from './types.js'

@@ -14,19 +14,16 @@ import {
   newId,
 } from '@/features/mindmap/model/mindmapTree'
 import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
-import type { MindmapCommand } from '@/features/mindmap/model/types'
-import type { MindmapDocumentNode } from '@contracts/mindmapDocument/types'
-
-type MindmapCommandNodePatch = (node: MindmapDocumentNode) => MindmapDocumentNode
+import type { MindmapWireCommand } from '@contracts/mindmapDocument/wire'
 import type { OpenFileState } from '@/features/mindmap/model/store'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 
 /**
  * Simulation panel for agent writes (dev/debug only): the four write buttons go through the
- * exact same editor entry points as the AI write tools (insertFromXml / replaceNodeFromXml /
- * moveSubtree / deleteSubtree), so the cascade entrance / particles / glide animations can be
- * eyeballed without calling a real AI. Nothing but history is touched (animation flags are
- * transient, same as real writes).
+ * same document intents as the AI write tools (fragment inserts, node replacement, subtree
+ * moves and deletes), so the cascade entrance / particles / glide animations can be eyeballed
+ * without calling a real AI. The landing itself is the renderer's own intent channel here —
+ * a real AI write lands in the main-process document service instead.
  *
  * The fifth button, "Simulate palace", replays the whole "Generate memory palace" user
  * operation: a placeholder node goes where the selection was, the selected nodes hang under
@@ -237,7 +234,7 @@ export async function simulatePalaceInsert({
       generating: true,
     },
   }
-  const commands: MindmapCommand[] = [
+  const commands: MindmapWireCommand[] = [
     {
       type: 'addNode',
       node: placeholderNode,
@@ -285,39 +282,33 @@ export async function simulatePalaceInsert({
     {
       type: 'updateNode',
       nodeId: palaceId,
-      patch: (node) => ({
-        ...node,
-        data: {
-          label: PALACE_SIM_LABEL,
-          assetId,
-          imageUrl: '',
-          // One station per selected node; anchor visuals cycle over the three landmarks
-          // the fixture scene actually draws.
-          stations: selectedNodes.map((selected, index) => {
-            const fixture = PALACE_SIM_STATIONS[index % PALACE_SIM_STATIONS.length]
-            return {
-              order: index + 1,
-              linkedNodeId: selected.id,
-              content: selected.label || fixture.content,
-              anchorVisual: fixture.anchorVisual,
-              association: fixture.association,
-              x: fixture.x,
-              y: fixture.y,
-            }
-          }),
-          sourceNodeIds: selectedIds,
-          expanded: true,
-          generating: undefined,
-        },
-      }),
+      data: {
+        label: PALACE_SIM_LABEL,
+        assetId,
+        imageUrl: '',
+        // One station per selected node; anchor visuals cycle over the three landmarks
+        // the fixture scene actually draws.
+        stations: selectedNodes.map((selected, index) => {
+          const fixture = PALACE_SIM_STATIONS[index % PALACE_SIM_STATIONS.length]
+          return {
+            order: index + 1,
+            linkedNodeId: selected.id,
+            content: selected.label || fixture.content,
+            anchorVisual: fixture.anchorVisual,
+            association: fixture.association,
+            x: fixture.x,
+            y: fixture.y,
+          }
+        }),
+        sourceNodeIds: selectedIds,
+        expanded: true,
+        generating: undefined,
+      },
     },
     ...selectedIds.map((nodeId) => ({
       type: 'updateNode' as const,
       nodeId,
-      patch: ((node: Node) => ({
-        ...node,
-        data: { ...node.data, processing: undefined },
-      })) as unknown as MindmapCommandNodePatch,
+      data: { processing: undefined },
     })),
   ])
   ai.reset()

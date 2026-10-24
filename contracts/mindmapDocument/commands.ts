@@ -2,9 +2,10 @@
  * Pure command application: old document + command(s) → new document + result
  * envelope. Nothing here touches the DOM, Electron, or any host state.
  *
- * The renderer editor and (later) the main-process document service both call
- * these functions, so the structural semantics only exist once. Hosts remain
- * responsible for history recording, layout and store writes.
+ * The main-process document service is the only host: it applies commands, keeps
+ * the history stack and asks for layout. The renderer never calls these functions
+ * — it sends `MindmapWireCommand` values down the one document command channel,
+ * so the structural semantics have exactly one writer.
  */
 
 import { collectSubtreeIds } from './tree.js'

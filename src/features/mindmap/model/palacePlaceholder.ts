@@ -1,6 +1,5 @@
 import { planPalacePlaceholder } from '@contracts/mindmapDocument/palace'
 import type { MindmapDocumentEdge, MindmapDocumentNode } from '@contracts/mindmapDocument/types'
-import { toMindmapCommands } from '@contracts/mindmapDocument/wire'
 import type { MindmapEditor } from './editor'
 
 /**
@@ -25,6 +24,6 @@ export function insertPalacePlaceholder(
     sourceNodeIds,
   )
   for (const nodeId of sourceNodeIds) editor.setNodeFlag(nodeId, 'processing', true)
-  editor.batch(toMindmapCommands(plan.commands))
+  editor.batch(plan.commands)
   return { nodeId: plan.nodeId }
 }

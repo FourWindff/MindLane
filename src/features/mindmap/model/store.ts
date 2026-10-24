@@ -79,8 +79,12 @@ export interface OpenFileState {
    */
   applyDocumentState: (state: MindmapDocumentState) => boolean
 
-  /** @internal One command channel into the document. */
-  applyCommands: (commands: MindmapWireCommand[]) => void
+  /**
+   * @internal Send one batch of document commands down the one channel. The
+   * store never applies them: the document service does, and pushes the state
+   * back through `applyDocumentState`.
+   */
+  sendCommands: (commands: MindmapWireCommand[]) => void
   undo: () => void
   redo: () => void
   /** @internal Ask the document to recompute layout (style switch, measured sizes). */
@@ -334,7 +338,7 @@ export function createMindmapStore(): MindmapStore {
         return true
       },
 
-      applyCommands: (commands) => {
+      sendCommands: (commands) => {
         if (commands.length === 0) return
         ensureClient().apply(get().fileUuid, commands)
       },
