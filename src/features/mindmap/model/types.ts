@@ -1,4 +1,9 @@
 import type { Edge, Node } from '@xyflow/react'
+import type { MindmapCommand } from '@contracts/mindmapDocument/types'
+
+// Command semantics live in the contracts layer (pure, shared with the future
+// document service). Re-exported here so the renderer keeps its import surface.
+export type { MindmapCommand } from '@contracts/mindmapDocument/types'
 
 /**
  * A point-in-time structural snapshot of the mindmap, holding only nodes and edges.
@@ -8,19 +13,6 @@ export interface MindmapSnapshot {
   nodes: Node[]
   edges: Edge[]
 }
-
-/**
- * A command describing one structural operation. Every command is executed by
- * {@link MindmapEditor} and recorded in history.
- */
-export type MindmapCommand =
-  | { type: 'addNode'; node: Node; edge?: Edge }
-  | { type: 'updateNode'; nodeId: string; patch: (node: Node) => Node }
-  | { type: 'deleteSubtree'; rootId: string }
-  | { type: 'moveNode'; nodeId: string; position: { x: number; y: number } }
-  | { type: 'addEdge'; edge: Edge; index?: number }
-  | { type: 'removeEdge'; edgeId: string }
-  | { type: 'batch'; commands: MindmapCommand[] }
 
 /**
  * One history entry: the snapshot taken before execution, the executed command (or command
