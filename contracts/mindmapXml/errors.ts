@@ -5,8 +5,8 @@ import { MindmapXmlError } from './types.js'
  * Recovery strategy lives in the `<MINDLANE_XML_CONTRACT>` system-prompt section, so it is
  * deliberately not repeated on every tool result.
  *
- * Shared by the main process tool layer and the renderer live-apply responder so both speak
- * the same vocabulary.
+ * The main-process write service formats every landing failure with this, so the model
+ * reads one vocabulary regardless of which write path failed.
  */
 export function formatXmlError(err: unknown): string {
   if (err instanceof MindmapXmlError) {

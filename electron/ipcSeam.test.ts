@@ -235,6 +235,17 @@ describe('IPC seam contract', () => {
     }>().toMatchTypeOf<MindLaneBridge['mindmap']>()
   })
 
+  it('has no reverse write channel: AI writes call the document service directly', () => {
+    // The write tools land in the main process, so no request/ack channel, no
+    // responder, no per-file queue and no timeout may exist anywhere.
+    const pattern =
+      /AiMindmapWrite|MindmapWriteRequest|MindmapWriteResponse|MindmapWriteResponder|onMindmapWriteRequest|respondMindmapWrite|RendererRequester<MindmapWrite/
+    const offenders = [...mainProcessFiles, ...rendererFiles]
+      .filter((file) => pattern.test(fs.readFileSync(file, 'utf-8')))
+      .map((file) => path.relative(repoRoot, file).split(path.sep).join('/'))
+    expect(offenders).toEqual([])
+  })
+
   it('declares Window.mindlane as the same type as MindLaneBridge', () => {
     expectTypeOf<Window['mindlane']>().toMatchTypeOf<MindLaneBridge>()
     expectTypeOf<MindLaneBridge>().toMatchTypeOf<Window['mindlane']>()

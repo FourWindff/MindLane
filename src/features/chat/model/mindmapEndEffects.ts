@@ -9,9 +9,9 @@ import type { MindmapEditor } from '@/features/mindmap/model/editor'
  *   applied successfully do we attach the doc reference produced by the
  *   subgraph product, to avoid dangling references;
  * - generated-title backfill: the map title lands on the file it was generated for.
- * Batch persistence was removed — write tools are applied instantly through
- * the write responder during the stream; this module no longer touches editor
- * write operations.
+ * Batch persistence was removed — write tools land in the authoritative
+ * document while the stream runs; this module no longer touches editor write
+ * operations.
  */
 interface MindmapEndEffectsDependencies {
   /** Subscribe to stream events (returns an unsubscribe function). */

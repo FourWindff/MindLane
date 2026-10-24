@@ -34,6 +34,11 @@ export interface ChatContext {
   workspacePath?: string
   attachedDocument?: DocumentRef
   linkedDocuments?: DocumentRef[]
+  /**
+   * The manual palace run's placeholder node. The deterministic landing updates
+   * it in place; absent for an AI-triggered palace (a new node is created).
+   */
+  palacePlaceholderNodeId?: string
 }
 
 /** Mindmap read query parameters (PRD 6.2: tree query, not row addressing). */
@@ -56,40 +61,6 @@ export interface MindmapReadRequest {
 export type MindmapReadResponse =
   { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
 
-/** Argument shape of each write action (the IPC boundary stays Record<string,unknown>; the renderer parses per this shape). */
-export interface WriteActionArgs {
-  insertXmlFragment: {
-    xml: string
-    /** Anchor node: the parent when position=child, the sibling when position=after/before. */
-    targetId?: string
-    position?: 'root' | 'child' | 'after' | 'before'
-  }
-  updateMindmapNode: { xml: string }
-  moveMindmapNode: { nodeId: string; targetId?: string; position?: 'child' | 'after' | 'before' }
-  deleteMindmapNode: { nodeId: string; confirmDeleteSubtree?: boolean }
-  /**
-   * Palace landing (CONTEXT.md "deterministic landing"): code serializes the subgraph
-   * payload to a palace XML fragment and both trigger surfaces land through
-   * this one action — the model never repeats the image data URL.
-   */
-  landPalace: { xml: string }
-}
-
-/** Write action name = key of the argument-shape map (the action list and argument shapes are declared in one place, no hand-copied vocabulary). */
-export type WriteAction = keyof WriteActionArgs
-
-/** Main process → renderer: persist request (requestId-correlated, reusing the mindmap-read channel pattern). */
-export interface MindmapWriteRequest {
-  requestId: string
-  fileUuid: string
-  action: WriteAction
-  args: Record<string, unknown>
-}
-
-/** Renderer → main process: persist response ({ok, action, data} or error; an unknown requestId is a no-op). */
-export type MindmapWriteResponse =
-  | { requestId: string; ok: true; action: string; data: unknown }
-  | { requestId: string; ok: false; error: string }
 /** Steps the main process may emit as `step` events: mindmap subgraph + palace subgraph. */
 const STREAM_STEPS = [
   'generating-map',

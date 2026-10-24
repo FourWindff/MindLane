@@ -173,7 +173,7 @@ const PalaceScalarAnnotations = {
     default: () => '',
   }),
   /**
-   * Result of the landing responder (empty = success): when palace generation
+   * Result of the deterministic landing (empty = success): when palace generation
    * succeeded but the write action failed, the subgraph close-out writes it into
    * the ToolMessage and the run's `end` payload, and the renderer marks the
    * placeholder node as pending.

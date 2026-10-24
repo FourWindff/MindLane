@@ -1,9 +1,5 @@
-import type { Edge, Node } from '@xyflow/react'
-import { getChildIdsOrdered } from '@/features/mindmap/model/mindmapTree'
-
 /**
- * Pure cascade-timing math for agent write fragments (model layer, unit-testable
- * in node).
+ * Pure cascade-timing math for agent write fragments.
  *
  * - Enter: DFS pre-order (parent before child, siblings in layout order), each
  *   root subtree counting independently from 0.
@@ -11,7 +7,13 @@ import { getChildIdsOrdered } from '@/features/mindmap/model/mindmapTree'
  * - Tick = min(fixed tick, budget / node count): large trees compress to stay
  *   under the total budget, a single node always gets 0ms delay (identical
  *   entrance feel to a manual `addNode`).
+ *
+ * Lives in the contracts layer because the main-process document write path
+ * stamps the same delays as the renderer's fragment landing.
  */
+
+import { getChildIdsOrdered } from './tree.js'
+import type { MindmapXmlEdge, MindmapXmlNode } from '../mindmapXml/types.js'
 
 /** Fixed tick: the stagger step between consecutive nodes. */
 const CASCADE_BASE_TICK_MS = 100
@@ -25,7 +27,11 @@ const CASCADE_EXIT_BUDGET_MS = 1000
  * layout (y) order. Ordering only depends on relative positions, never on the
  * global offset.
  */
-function dfsPreOrderSequences(roots: string[], nodes: Node[], edges: Edge[]): string[][] {
+function dfsPreOrderSequences(
+  roots: string[],
+  nodes: MindmapXmlNode[],
+  edges: MindmapXmlEdge[],
+): string[][] {
   return roots.map((root) => {
     const seq: string[] = []
     const stack = [root]
@@ -51,8 +57,8 @@ function compressTick(count: number, budgetMs: number): number {
  */
 export function computeEnterDelays(
   roots: string[],
-  nodes: Node[],
-  edges: Edge[],
+  nodes: MindmapXmlNode[],
+  edges: MindmapXmlEdge[],
 ): Map<string, number> {
   const delays = new Map<string, number>()
   for (const seq of dfsPreOrderSequences(roots, nodes, edges)) {
@@ -69,8 +75,8 @@ export function computeEnterDelays(
  */
 export function computeExitDelays(
   roots: string[],
-  nodes: Node[],
-  edges: Edge[],
+  nodes: MindmapXmlNode[],
+  edges: MindmapXmlEdge[],
 ): Map<string, number> {
   const delays = new Map<string, number>()
   for (const seq of dfsPreOrderSequences(roots, nodes, edges)) {

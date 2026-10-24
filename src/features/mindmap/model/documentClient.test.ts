@@ -73,6 +73,20 @@ describe('renderer document seam', () => {
     expect(store.getState().nodes.find((node) => node.id === nodeId)?.data.editing).toBe(true)
   })
 
+  it('opens the document with the file assets, so a later write can reference them', () => {
+    const file = createEmptyFile('Assets')
+    file.assets = [{ id: 'a1', mime: 'image/png', sha256: 'sha-a1', data: 'REVGRQ==' }]
+    const store = createMindmapStore()
+    const editor = new MindmapEditor(store)
+    editor.loadFile('/tmp/assets.mindlane', file, null)
+
+    expect(
+      getDocumentLoopbackService()
+        .getAssets(file.metadata.fileUuid)
+        .map((asset) => asset.id),
+    ).toEqual(['a1'])
+  })
+
   it('discards a stale version and warns, so the newer truth is never rolled back', () => {
     const { store } = createStore()
     const current = store.getState()

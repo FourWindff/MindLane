@@ -17,7 +17,7 @@ import {
 } from '../../ipc.js'
 import type { ChatToolCallStep } from '../../../contracts/fileFormat.js'
 import { serializePalaceNodeXml } from '../../../contracts/mindmapXml/index.js'
-import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
+import type { MindmapWrite } from '../../../contracts/mindmapDocument/writeAction.js'
 import { applyCanonicalLayout, buildFallbackSummary } from '../agenthub/palaceLayout.js'
 
 import { resolvePalaceInput } from './palaceGraph/inputResolver.js'
@@ -30,12 +30,12 @@ const log = logger.withContext('palace')
 interface PalaceSubgraphOptions {
   provider: LLMProvider
   /**
-   * Landing proxy (main process -> renderer landing responder): the palace
-   * payload is serialized to XML by code and landed through the added
-   * `landPalace` write action. Manual runs and AI triggers both go through
-   * here, with the same shape.
+   * Landing executor (the main-process document write service): the palace
+   * payload is serialized to XML by code and landed through the `landPalace`
+   * write action. Manual runs and AI triggers both go through here, with the
+   * same shape.
    */
-  writeProxy?: MindmapWriteProxy
+  write?: MindmapWrite
 }
 
 // ===== Subgraph builder =====
@@ -99,23 +99,23 @@ function landingFailureText(error: string): string {
 
 /**
  * Landing: serialize the successful payload into XML and land it in the
- * renderer through the `landPalace` write action. Returns the error text (empty
- * string = success); a missing proxy counts as a landing failure and is never
- * silently skipped.
+ * authoritative document through the `landPalace` write action. Returns the
+ * error text (empty string = success); a missing executor counts as a landing
+ * failure and is never silently skipped.
  */
 async function requestPalaceLanding(
-  writeProxy: MindmapWriteProxy | undefined,
+  write: MindmapWrite | undefined,
   fileUuid: string,
   payload: PalaceRunPayload & { ok: true },
+  placeholderNodeId: string | undefined,
 ): Promise<string> {
-  if (!writeProxy) return 'Landing channel unavailable'
+  if (!write) return 'Landing channel unavailable'
   try {
-    const ack = (await writeProxy(fileUuid, 'landPalace', {
+    const ack = await write(fileUuid, 'landPalace', {
       xml: serializePalaceNodeXml(payload),
-    })) as { ok?: unknown; error?: unknown } | undefined
-    if (ack?.ok === false) {
-      return typeof ack.error === 'string' ? ack.error : 'Landing request rejected'
-    }
+      ...(placeholderNodeId ? { placeholderNodeId } : {}),
+    })
+    if (ack.ok === false) return ack.error || 'Landing request rejected'
     return ''
   } catch (error) {
     return error instanceof Error ? error.message : String(error)
@@ -145,13 +145,18 @@ function toModelPalacePayload(payload: PalaceRunPayload): Record<string, unknown
  */
 async function buildOutputNode(
   state: PalaceSubgraphStateType,
-  writeProxy: MindmapWriteProxy | undefined,
+  write: MindmapWrite | undefined,
 ): Promise<Partial<PalaceSubgraphStateType>> {
   // A previous run's landing outcome must not decide this run's payload: rebuild
   // the generated payload with the landing key cleared, then land for real.
   const generated = buildPalacePayload({ ...state, palaceLandingError: '' })
   const landingError = generated.ok
-    ? await requestPalaceLanding(writeProxy, state.context?.fileUuid ?? '', generated)
+    ? await requestPalaceLanding(
+        write,
+        state.context?.fileUuid ?? '',
+        generated,
+        state.context?.palacePlaceholderNodeId,
+      )
     : ''
   const payload = landingError
     ? ({ ok: false, error: landingFailureText(landingError) } as const)
@@ -182,7 +187,7 @@ async function buildOutputNode(
  * owns persistence and the run context (this graph is mounted as its node).
  */
 export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
-  const { provider, writeProxy } = options
+  const { provider, write } = options
 
   const analyze = new AnalyzeAgent(provider)
   const artwork = new ArtworkAgent(provider)
@@ -257,7 +262,7 @@ export function buildPalaceSubgraph(options: PalaceSubgraphOptions) {
         palaceResponse: buildFallbackSummary(memoryRoute, Boolean(state.imageUrl)),
       }
     })
-    .addNode('build_output', (state: PalaceSubgraphStateType) => buildOutputNode(state, writeProxy))
+    .addNode('build_output', (state: PalaceSubgraphStateType) => buildOutputNode(state, write))
 
   // Base edges
   graph.addEdge(START, 'resolve_input')

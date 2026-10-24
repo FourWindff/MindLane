@@ -196,7 +196,8 @@ interface PalaceSimInput {
  * Replays the memory palace user operation (no main process, no API key): same order as the
  * real flow — insert the placeholder → re-hang the selected nodes + processing flags +
  * busy/analyzing → fake subgraph waits 2.4s → embed the picture → commit the expand. The real
- * flow's placeholder and landing live in the persist responder (the `landPalace` write action);
+ * flow's placeholder is the shared palace landing plan and the landing itself runs in the
+ * main process (the `landPalace` write action);
  * this panel keeps an independent copy so it can be demoed without the main process; stations
  * and picture are generated from the selected nodes, station content comes from node labels.
  */

@@ -5,7 +5,7 @@ import { ProviderCapability, type LLMProvider } from '../providers/index.js'
 import type { ChatContext } from '../../ipc.js'
 import { GENERATE_PALACE_TOOL } from '../tools/subgraphRoutingTools.js'
 import { applyCanonicalLayout } from '../agenthub/palaceLayout.js'
-import type { MindmapWriteProxy } from '../tools/mindmapActions.js'
+import type { MindmapWrite } from '../../../contracts/mindmapDocument/writeAction.js'
 import type { StationDesign, PalaceSubgraphStateType } from '../state.js'
 
 // The subgraph nodes key their per-run bookkeeping by the Runner's run context
@@ -119,13 +119,13 @@ function scriptedProvider(options: {
 interface RunOptions {
   provider: LLMProvider
   artworkStyle?: 'vector' | 'raster'
-  writeProxy?: MindmapWriteProxy
+  write?: MindmapWrite
 }
 
 async function runPalace(options: RunOptions) {
   const graph = buildPalaceSubgraph({
     provider: options.provider,
-    writeProxy: options.writeProxy,
+    write: options.write,
   }).compile()
 
   const steps: string[] = []
@@ -207,15 +207,15 @@ describe('buildPalaceSubgraph', () => {
     const { provider } = scriptedProvider({
       artwork: async () => ({ content: 'Sorry, I cannot draw that.' }),
     })
-    const writeProxy = vi.fn(async () => ({ ok: true, action: 'landPalace', data: {} }))
+    const write = vi.fn<MindmapWrite>(async () => ({ ok: true, action: 'landPalace', data: {} }))
 
-    const { result } = await runPalace({ provider, writeProxy })
+    const { result } = await runPalace({ provider, write })
 
     expect(result.palaceError).toBe('')
     expect(result.imageUrl).toBeUndefined()
     expect(result.memoryRoute).toHaveLength(3)
-    expect(writeProxy).toHaveBeenCalledTimes(1)
-    const xml = (writeProxy.mock.calls[0] as unknown as [string, string, { xml: string }])[2].xml
+    expect(write).toHaveBeenCalledTimes(1)
+    const xml = (write.mock.calls[0] as unknown as [string, string, { xml: string }])[2].xml
     expect(xml).toContain('type="palace"')
     expect(xml).not.toContain('imageUrl')
     expect(xml).toContain('<station order="1"')
@@ -241,13 +241,13 @@ describe('buildPalaceSubgraph', () => {
         throw new Error('the drawing call failed')
       },
     })
-    const writeProxy = vi.fn(async () => ({ ok: true, action: 'landPalace', data: {} }))
+    const write = vi.fn<MindmapWrite>(async () => ({ ok: true, action: 'landPalace', data: {} }))
 
-    const { result } = await runPalace({ provider, writeProxy })
+    const { result } = await runPalace({ provider, write })
 
     expect(result.palaceError).toBe('')
     expect(result.memoryRoute).toHaveLength(3)
-    const [fileUuid, action, args] = writeProxy.mock.calls[0] as unknown as [
+    const [fileUuid, action, args] = write.mock.calls[0] as unknown as [
       string,
       string,
       { xml: string },
@@ -266,15 +266,15 @@ describe('buildPalaceSubgraph', () => {
     ;(provider.generateImage as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       urls: [imageUrl],
     })
-    const writeProxy = vi.fn(async () => ({ ok: true, action: 'landPalace', data: {} }))
+    const write = vi.fn<MindmapWrite>(async () => ({ ok: true, action: 'landPalace', data: {} }))
 
-    const { result } = await runPalace({ provider, artworkStyle: 'raster', writeProxy })
+    const { result } = await runPalace({ provider, artworkStyle: 'raster', write })
 
     // Deterministic landing: the payload is serialized to XML by code and lands
     // through the shared write action; the image data URL rides the request, not
     // the model context.
-    expect(writeProxy).toHaveBeenCalledTimes(1)
-    const [fileUuid, action, args] = writeProxy.mock.calls[0] as unknown as [
+    expect(write).toHaveBeenCalledTimes(1)
+    const [fileUuid, action, args] = write.mock.calls[0] as unknown as [
       string,
       string,
       { xml: string },
@@ -321,9 +321,12 @@ describe('buildPalaceSubgraph', () => {
 
   it('writes the reason into the ToolMessage and the landing error channel when the landing request fails', async () => {
     const { provider } = scriptedProvider({ artwork: async () => ({ content: SVG_REPLY }) })
-    const writeProxy = vi.fn(async () => ({ ok: false, error: 'File is not open, cannot land' }))
+    const write = vi.fn<MindmapWrite>(async () => ({
+      ok: false,
+      error: 'File is not open, cannot land',
+    }))
 
-    const { result } = await runPalace({ provider, writeProxy })
+    const { result } = await runPalace({ provider, write })
 
     expect(result.palaceLandingError).toBe('File is not open, cannot land')
     const toolMessage = result.messages[0] as ToolMessage

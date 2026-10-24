@@ -120,8 +120,8 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
     {
       // Read-only mindmap access for the mixed tool + subgraph round.
       mindmapReadProvider: async () => '<node id="root">root</node>',
-      // Fake landing proxy: records what each run asks the renderer to land.
-      mindmapWriteProxy: async (fileUuid, action, args) => {
+      // Fake landing executor: records what each run asks the document to land.
+      mindmapWrite: async (fileUuid, action, args) => {
         writeRequests.push({ fileUuid, action, args })
         return { ok: true, action, data: { nodeId: 'landed-palace' } }
       },

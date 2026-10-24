@@ -3,8 +3,8 @@
  *
  * The renderer never writes the document: it sends intents through this client
  * and applies the versioned states that come back. Every intent is counted so
- * callers that must observe their own write (the AI write responder) can await
- * `whenSettled` instead of racing the round-trip.
+ * callers that must observe their own write can await `whenSettled` instead of
+ * racing the round-trip.
  */
 
 import type {
@@ -14,6 +14,7 @@ import type {
   MindmapNodeSizeUpdate,
 } from '@contracts/mindmapDocument/state'
 import type { MindmapDocument, MindmapStructureType } from '@contracts/mindmapDocument/types'
+import type { MindLaneAsset } from '@contracts/fileFormat'
 import type { MindmapWireCommand } from '@contracts/mindmapDocument/wire'
 
 /** Transport used by the bridge in production and by an in-memory loopback in tests. */
@@ -81,12 +82,18 @@ export class MindmapDocumentClient {
     }
   }
 
-  open(fileUuid: string, document: MindmapDocument, structureType: MindmapStructureType): void {
+  open(
+    fileUuid: string,
+    document: MindmapDocument,
+    structureType: MindmapStructureType,
+    assets: MindLaneAsset[] = [],
+  ): void {
     this.sendPrepared(
       {
         type: 'open',
         fileUuid,
         document,
+        assets,
         structureType,
       },
       false,
@@ -95,6 +102,16 @@ export class MindmapDocumentClient {
 
   apply(fileUuid: string, commands: MindmapWireCommand[]): void {
     this.sendPrepared({ type: 'apply', fileUuid, commands }, true)
+  }
+
+  /**
+   * Register embedded images with the document (it owns the file's assets
+   * section). No version is awaited: an already-known asset is a no-op, and the
+   * store meanwhile projects the image from its own cache.
+   */
+  addAssets(fileUuid: string, assets: MindLaneAsset[]): void {
+    if (assets.length === 0) return
+    this.sendPrepared({ type: 'addAssets', fileUuid, assets }, false)
   }
 
   undo(fileUuid: string): void {

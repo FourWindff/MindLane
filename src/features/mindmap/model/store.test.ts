@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { createMindmapStore } from './store'
 import { createEmptyFile } from '@contracts/fileFormat'
 import { assetFromDataUrl } from '@contracts/mindmapXml/asset'
+import type { MindmapDocumentState } from '@contracts/mindmapDocument/state'
+import { getDocumentLoopbackService } from './documentLoopback.testutil'
 
 describe('store.viewport', () => {
   let store: ReturnType<typeof createMindmapStore>
@@ -172,5 +174,92 @@ describe('store.assets', () => {
 
     expect(id1).toBe(id2)
     expect(store.getState().assets).toHaveLength(1)
+  })
+})
+
+describe('store.assets (document projection)', () => {
+  it('registers a locally added asset with the document, so AI writes can reference it', async () => {
+    const store = createMindmapStore()
+    const file = createEmptyFile('Assets')
+    store.getState().loadFile('/test/assets.mindlane', file, null)
+    const asset = (await assetFromDataUrl('data:image/png;base64,QUJDRA=='))!
+
+    const assetId = store.getState().addAsset(asset)
+
+    // The document owns the file's asset section; the renderer keeps the projection.
+    const documentAssets = getDocumentLoopbackService().getAssets(file.metadata.fileUuid)
+    expect(documentAssets.map((entry) => entry.id)).toEqual([assetId])
+    expect(store.getState().assets.map((entry) => entry.id)).toEqual([assetId])
+  })
+
+  it('merges assets pushed with the state and never duplicates them', () => {
+    const store = createMindmapStore()
+    const file = createEmptyFile('Assets push')
+    store.getState().loadFile('/test/assets-push.mindlane', file, null)
+    const current = store.getState()
+    const pushed = { id: 'pushed', mime: 'image/png', sha256: 'sha-pushed', data: 'REVGRQ==' }
+
+    const withAsset: MindmapDocumentState = {
+      fileUuid: current.fileUuid,
+      version: current.documentVersion + 1,
+      nodes: current.documentNodes,
+      edges: current.documentEdges,
+      structureType: 'logic',
+      canUndo: false,
+      canRedo: false,
+      dirty: true,
+      addedAssets: [pushed],
+    }
+    expect(store.getState().applyDocumentState(withAsset)).toBe(true)
+    expect(store.getState().assets).toEqual([pushed])
+
+    const again: MindmapDocumentState = { ...withAsset, version: withAsset.version + 1 }
+    expect(store.getState().applyDocumentState(again)).toBe(true)
+    expect(store.getState().assets).toEqual([pushed])
+  })
+})
+
+describe('store.viewState (landed palace)', () => {
+  it('retires the run flags, opens a landed palace and clears the selection marker', () => {
+    const store = createMindmapStore()
+    const file = createEmptyFile('Palace')
+    store.getState().loadFile('/test/palace.mindlane', file, null)
+    const current = store.getState()
+    // The manual run: a placeholder with progress, its source nodes busy.
+    store.getState().setNodeFlag('palace-1', 'generating', true)
+    store.getState().setNodeFlag('palace-1', 'runStage', 'planning-stations')
+    store.getState().setNodeFlag('source-1', 'processing', true)
+
+    const landed: MindmapDocumentState = {
+      fileUuid: current.fileUuid,
+      version: current.documentVersion + 1,
+      nodes: [
+        ...current.documentNodes,
+        {
+          id: 'palace-1',
+          type: 'palace',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Landed',
+            stations: [{ order: 1, content: 'Station' }],
+            sourceNodeIds: ['source-1'],
+          },
+        },
+      ],
+      edges: [],
+      structureType: 'logic',
+      canUndo: true,
+      canRedo: false,
+      dirty: true,
+    }
+    expect(store.getState().applyDocumentState(landed)).toBe(true)
+
+    const palace = store.getState().nodes.find((node) => node.id === 'palace-1') as unknown as {
+      data: Record<string, unknown>
+    }
+    // The landing runs in the main process, so the view reconciles the run flags.
+    expect(palace.data.generating).toBeUndefined()
+    expect(palace.data.runStage).toBeUndefined()
+    expect(palace.data.expanded).toBe(true)
   })
 })

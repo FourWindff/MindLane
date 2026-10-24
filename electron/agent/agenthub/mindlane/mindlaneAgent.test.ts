@@ -37,10 +37,10 @@ function createTestRegistry(
 ): ToolRegistry {
   const registry = new ToolRegistry()
 
-  const actionTools = createMindmapActionTools(async () => ({
-    nodeIds: ['root'],
-    assetIds: [],
-    parents: {},
+  const actionTools = createMindmapActionTools(async (_fileUuid, action) => ({
+    ok: true,
+    action,
+    data: {},
   }))
   registry.registerTool(actionTools.insertXmlFragmentTool)
   registry.registerTool(actionTools.updateNodeTool)

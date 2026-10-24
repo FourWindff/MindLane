@@ -22,7 +22,11 @@ import type {
   MindmapSnapshot,
   MindmapStructureType,
 } from '../../../contracts/mindmapDocument/types.js'
-import { toMindmapCommands } from '../../../contracts/mindmapDocument/wire.js'
+import type { MindLaneAsset } from '../../../contracts/mindmapXml/types.js'
+import {
+  stripTransientWireCommands,
+  toMindmapCommands,
+} from '../../../contracts/mindmapDocument/wire.js'
 import type {
   MindmapDocumentCommandResult,
   MindmapDocumentIntent,
@@ -34,6 +38,8 @@ import { DocumentHistory } from './history.js'
 interface DocumentInstance {
   fileUuid: string
   document: MindmapDocument
+  /** Embedded images (the file's assets section); nodes reference them by id. */
+  assets: MindLaneAsset[]
   history: DocumentHistory
   version: number
   dirty: boolean
@@ -82,9 +88,15 @@ export class MindmapDocumentService {
     return instance ? this.toState(instance) : null
   }
 
-  /** The authoritative document value of one open file (AI tools read from here later). */
+  /** The authoritative document value of one open file (the read tools read from here). */
   getDocument(fileUuid: string): MindmapDocument | null {
     return this.instances.get(fileUuid)?.document ?? null
+  }
+
+  /** The embedded assets of one open file (empty when the file is not open). */
+  getAssets(fileUuid: string): MindLaneAsset[] {
+    const instance = this.instances.get(fileUuid)
+    return instance ? [...instance.assets] : []
   }
 
   /**
@@ -97,6 +109,8 @@ export class MindmapDocumentService {
         return this.open(intent)
       case 'apply':
         return this.apply(intent.fileUuid, intent.commands)
+      case 'addAssets':
+        return this.addAssets(intent.fileUuid, intent.assets)
       case 'undo':
         return this.undo(intent.fileUuid)
       case 'redo':
@@ -134,6 +148,7 @@ export class MindmapDocumentService {
     const instance: DocumentInstance = {
       fileUuid: intent.fileUuid,
       document: { nodes, edges: intent.document.edges },
+      assets: intent.assets ?? [],
       history: new DocumentHistory(),
       version: 0,
       dirty: false,
@@ -151,7 +166,9 @@ export class MindmapDocumentService {
     if (!instance.ok) return instance.failure
     if (wireCommands.length === 0) return { ok: true, state: this.toState(instance.value) }
 
-    const commands = toMindmapCommands(wireCommands)
+    // View-only flags never enter the document: the service, not the caller,
+    // guarantees the authoritative value carries content only.
+    const commands = toMindmapCommands(stripTransientWireCommands(wireCommands))
     const before = snapshotOf(instance.value.document)
     const outcome = applyDocumentCommands(instance.value.document, commands)
     if (!outcome.ok) return outcome
@@ -171,6 +188,28 @@ export class MindmapDocumentService {
     }
     instance.value.version += 1
     return { ok: true, state: this.emit(instance.value) }
+  }
+
+  /**
+   * Append embedded assets. Content-identical assets (same sha256) are the same
+   * asset: the first id wins, so a re-landed picture never duplicates bytes.
+   */
+  private addAssets(fileUuid: string, assets: MindLaneAsset[]): MindmapDocumentCommandResult {
+    const instance = this.requireInstance(fileUuid)
+    if (!instance.ok) return instance.failure
+    const added: MindLaneAsset[] = []
+    for (const asset of assets) {
+      const existing = instance.value.assets.find(
+        (candidate) => candidate.sha256 === asset.sha256 || candidate.id === asset.id,
+      )
+      if (existing) continue
+      instance.value.assets.push(asset)
+      added.push(asset)
+    }
+    if (added.length === 0) return { ok: true, state: this.toState(instance.value) }
+    instance.value.dirty = true
+    instance.value.version += 1
+    return { ok: true, state: this.emit(instance.value, added) }
   }
 
   private undo(fileUuid: string): MindmapDocumentCommandResult {
@@ -287,8 +326,10 @@ export class MindmapDocumentService {
     }
   }
 
-  private emit(instance: DocumentInstance): MindmapDocumentState {
-    const state = this.toState(instance)
+  private emit(instance: DocumentInstance, addedAssets?: MindLaneAsset[]): MindmapDocumentState {
+    const state = addedAssets?.length
+      ? { ...this.toState(instance), addedAssets }
+      : this.toState(instance)
     for (const listener of this.listeners) listener(state)
     return state
   }

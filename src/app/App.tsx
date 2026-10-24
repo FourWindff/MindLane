@@ -28,12 +28,11 @@ import { connectAiWritingProjection } from '@/features/chat/model/aiWritingProje
 import { connectChatWorkspaceSync } from '@/features/chat/model/workspaceSync'
 import { usePalaceGeneration } from '@/features/chat/model/usePalaceGeneration'
 import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
-import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { backfillEntryFileTitle } from '@/features/chat/lib/entryConversation'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { saveOpenFile } from '@/features/mindmap/model/saveOpenFile'
-import { reportRendererError, reportRendererWarning } from '@/shared/lib/reportRendererError'
+import { reportRendererError } from '@/shared/lib/reportRendererError'
 import './styles/app-shell.css'
 import '@/features/workspace/workspace.css'
 import '@/features/mindmap/styles/mindmap.css'
@@ -170,24 +169,6 @@ function AppContent() {
     // On-demand mindmap read responder: when the main process pulls the live mindmap over the
     // reverse channel, look the editor up by fileUuid and reply.
     const disconnectMindmapReadResponder = connectMindmapReadResponder()
-    // Persist responder: the main process forwards write-tool params, and here we serialize
-    // validation plus applying the map by fileUuid and ack back.
-    const stopWriteResponder = createMindmapWriteResponder({
-      subscribe: (listener) => window.mindlane?.ai.onMindmapWriteRequest(listener) ?? (() => {}),
-      resolveEditor: (fileUuid) => openFileRegistry.getByFileUuid(fileUuid)?.editor,
-      persistFile: (fileUuid) => {
-        const instance = openFileRegistry.getByFileUuid(fileUuid)
-        if (!instance) return
-        void saveOpenFile(instance.store, {
-          syncAfterFileSaved: useWorkspaceStore.getState().syncAfterFileSaved,
-          // A write-tool persist failure is reported per file: errors have no
-          // renderer UI anymore, they only enter the diagnostic log.
-          onError: (message) => reportRendererError(`[${fileUuid}] ${message}`),
-        })
-      },
-      respond: (payload) => void window.mindlane?.ai.respondMindmapWrite(payload),
-      warn: reportRendererWarning,
-    }).start()
     const stopToolRouter = createMindmapEndEffects({
       subscribe: subscribeToChatStreamEvents,
       resolveFileUuid: (sessionId) => useAiStore.getState().sessionFileUuids[sessionId],
@@ -198,7 +179,6 @@ function AppContent() {
     }).start()
     return () => {
       stopToolRouter()
-      stopWriteResponder()
       disconnectWorkspaceSync()
       disconnectAiWriting()
       disconnectAiStore()

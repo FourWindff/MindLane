@@ -7,7 +7,7 @@
  * a renderer can discard anything older than what it already shows.
  */
 
-import type { MindmapXmlErrorCode } from '../mindmapXml/types.js'
+import type { MindLaneAsset, MindmapXmlErrorCode } from '../mindmapXml/types.js'
 import type {
   MindmapDocument,
   MindmapDocumentEdge,
@@ -28,6 +28,12 @@ export interface MindmapDocumentState {
   canRedo: boolean
   /** The document has unsaved structural changes. */
   dirty: boolean
+  /**
+   * Assets added since the previous state of this file (append-only, absent when
+   * nothing was added). Asset bytes are large, so they ride once instead of
+   * inside every versioned state; the renderer merges them by id.
+   */
+  addedAssets?: MindLaneAsset[]
 }
 
 /** Measured node size reported by the renderer; a layout input, never persisted. */
@@ -38,8 +44,10 @@ export interface MindmapNodeSizeUpdate {
 }
 
 /**
- * Every request the renderer may send. `apply` is the only path that mutates
- * the document; human edits and AI writes use it identically.
+ * Every request that may enter the document service. `apply` is the only path
+ * that changes the tree; human edits and AI writes use it identically.
+ * `addAssets` appends embedded images, which are document content too (they
+ * live in the file's assets section), so the same owner validates both.
  */
 export type MindmapDocumentIntent =
   | {
@@ -47,9 +55,12 @@ export type MindmapDocumentIntent =
       fileUuid: string
       /** Initial document value (read from the file by the caller). */
       document: MindmapDocument
+      /** The file's embedded assets: the document owns them, writes validate against them. */
+      assets?: MindLaneAsset[]
       structureType: MindmapStructureType
     }
   | { type: 'apply'; fileUuid: string; commands: MindmapWireCommand[] }
+  | { type: 'addAssets'; fileUuid: string; assets: MindLaneAsset[] }
   | { type: 'undo'; fileUuid: string }
   | { type: 'redo'; fileUuid: string }
   | {

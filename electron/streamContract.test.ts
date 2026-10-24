@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type {
-  ChatStreamEvent,
-  MindmapWriteRequest,
-  MindmapWriteResponse,
-  StreamStepPayload,
-} from './ipc.js'
+import type { ChatStreamEvent, StreamStepPayload } from './ipc.js'
 import { isStreamStep } from './ipc.js'
 
 /**
@@ -108,61 +103,5 @@ describe('ChatStreamEvent contract: step payload is { step, callId?, completed?,
       payload: { step: 'generating-map' },
     }
     expect(guardStep(bare)).toBe(true)
-  })
-})
-
-describe('MindmapWrite request/response payload shapes', () => {
-  it('declares the request shape: requestId + fileUuid + action + args', () => {
-    const request: MindmapWriteRequest = {
-      requestId: 'req-1',
-      fileUuid: 'file-a',
-      action: 'insertXmlFragment',
-      args: { xml: '<node/>', targetId: 'root' },
-    }
-    expect(request.requestId).toBe('req-1')
-    expect(request.fileUuid).toBe('file-a')
-    expect(request.action).toBe('insertXmlFragment')
-    expect(request.args).toEqual({ xml: '<node/>', targetId: 'root' })
-  })
-
-  it('declares the ok response shape: {ok, action, data}', () => {
-    const response: MindmapWriteResponse = {
-      requestId: 'req-1',
-      ok: true,
-      action: 'insertXmlFragment',
-      data: { nodeCount: 1 },
-    }
-    expect(response.requestId).toBe('req-1')
-    expect(response.ok).toBe(true)
-    expect(response.action).toBe('insertXmlFragment')
-    expect(response.data).toEqual({ nodeCount: 1 })
-  })
-
-  it('declares the error response shape: {ok: false, error}', () => {
-    const response: MindmapWriteResponse = {
-      requestId: 'req-1',
-      ok: false,
-      error: '[block_not_found] …',
-    }
-    expect(response.ok).toBe(false)
-    expect(response.error).toContain('block_not_found')
-  })
-
-  it('correlates request and response by requestId', () => {
-    const request: MindmapWriteRequest = {
-      requestId: 'req-1',
-      fileUuid: 'file-a',
-      action: 'insertXmlFragment',
-      args: {},
-    }
-    const ok: MindmapWriteResponse = {
-      requestId: 'req-1',
-      ok: true,
-      action: 'insertXmlFragment',
-      data: null,
-    }
-    const error: MindmapWriteResponse = { requestId: 'req-1', ok: false, error: 'e' }
-    expect(ok.requestId).toBe(request.requestId)
-    expect(error.requestId).toBe(request.requestId)
   })
 })

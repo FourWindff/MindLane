@@ -147,6 +147,58 @@ function composeEdges(
   })
 }
 
+/** Merge assets pushed by the document into the local cache (append-only, deduplicated). */
+function mergeAssets(current: MindLaneAsset[], added: MindLaneAsset[]): MindLaneAsset[] {
+  const merged = [...current]
+  for (const asset of added) {
+    if (merged.some((candidate) => candidate.id === asset.id || candidate.sha256 === asset.sha256))
+      continue
+    merged.push(asset)
+  }
+  return merged
+}
+
+const PALACE_RUN_FLAGS = ['generating', 'runStage', 'runStopped'] as const
+
+/**
+ * A palace that carries stations is a landed palace. Landing runs in the main
+ * process, so the run's view flags retire here: the placeholder stops showing
+ * progress, a freshly landed palace opens itself, and the selection it collected
+ * stops showing the processing marker.
+ */
+function projectLandedPalaces(
+  nodes: MindmapDocumentNode[],
+  nodeViews: Record<string, NodeViewState>,
+  previousIds: Set<string>,
+): void {
+  for (const node of nodes) {
+    if (node.type !== 'palace') continue
+    const stations = Array.isArray(node.data.stations) ? node.data.stations : []
+    if (stations.length === 0) continue
+
+    const view = nodeViews[node.id] ?? { flags: {} }
+    const flags = { ...view.flags }
+    let landed = !previousIds.has(node.id)
+    for (const flag of PALACE_RUN_FLAGS) {
+      if (flags[flag] === undefined) continue
+      flags[flag] = undefined
+      landed = true
+    }
+    if (landed && flags.expanded !== true) flags.expanded = true
+    nodeViews[node.id] = { ...view, flags }
+    // Only the landing itself retires the selection marker: a later run that
+    // collects the same nodes must be free to show its own progress.
+    if (!landed) continue
+    const sourceNodeIds = Array.isArray(node.data.sourceNodeIds) ? node.data.sourceNodeIds : []
+    for (const id of sourceNodeIds) {
+      if (typeof id !== 'string' || id === 'root') continue
+      const source = nodeViews[id]
+      if (source?.flags.processing === undefined) continue
+      nodeViews[id] = { ...source, flags: { ...source.flags, processing: undefined } }
+    }
+  }
+}
+
 function withNodeView(
   nodeViews: Record<string, NodeViewState>,
   nodeId: string,
@@ -241,6 +293,7 @@ export function createMindmapStore(): MindmapStore {
         )
         const selectedIds = get().selectedIds.filter((id) => liveIds.has(id))
         const selectedEdges = get().selectedEdges.filter((id) => edgeIds.has(id))
+        projectLandedPalaces(state.nodes, nodeViews, new Set(get().documentNodes.map((n) => n.id)))
         set({
           documentNodes: state.nodes,
           documentEdges: state.edges,
@@ -251,6 +304,9 @@ export function createMindmapStore(): MindmapStore {
           documentVersion: state.version,
           canUndo: state.canUndo,
           canRedo: state.canRedo,
+          assets: state.addedAssets?.length
+            ? mergeAssets(get().assets, state.addedAssets)
+            : get().assets,
           documentDirty: state.dirty,
           dirty: state.dirty || get().localDirty,
           nodes: composeNodes(state.nodes, nodeViews, selectedIds),
@@ -400,6 +456,10 @@ export function createMindmapStore(): MindmapStore {
         if (existing) return existing.id
         set({ assets: [...get().assets, asset] })
         markLocalDirty()
+        // The document owns the file's asset section: registering the image here
+        // is what lets a later AI write reference it (and what makes it survive a
+        // save driven by the document).
+        if (get().fileUuid) ensureClient().addAssets(get().fileUuid, [asset])
         return asset.id
       },
 
@@ -455,7 +515,7 @@ export function createMindmapStore(): MindmapStore {
           nodes: data.mindmap.nodes as MindmapDocumentNode[],
           edges: data.mindmap.edges as MindmapDocumentEdge[],
         }
-        ensureClient().open(data.metadata.fileUuid, document, style.structureType)
+        ensureClient().open(data.metadata.fileUuid, document, style.structureType, data.assets)
       },
 
       toMindLaneFile: (): MindLaneFile => {
