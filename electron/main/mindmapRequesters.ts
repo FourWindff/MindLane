@@ -4,22 +4,19 @@ import {
   type MindmapReadQuery,
   type MindmapReadRequest,
   type MindmapReadResponse,
-  type MindmapWriteRequest,
-  type MindmapWriteResponse,
-  type WriteAction,
 } from '../ipc.js'
 import { RendererRequester } from './rendererRequester.js'
 
 const REQUEST_TIMEOUT_MS = 3000
 
 /**
- * Main-process → renderer requesters for the live-apply reverse channels.
+ * Main-process → renderer requester for the live-apply reverse channel.
  *
- * Only the `readMindmap` tool uses the read channel (returns a mindmap-section
- * XML fragment); only live-apply write tools use the write channel (the ack
- * `{ok, action, data}` is passed through as-is). `win` is a module-level mutable
- * reference (the window can be recreated), so both take a getter: a destroyed
- * window fails the request immediately instead of hanging.
+ * Only the `readMindmap` tool uses it (it returns a mindmap-section XML
+ * fragment). Writes are local: they call the document service directly, so
+ * there is no write channel, no ack and no timeout on that side. `win` is a
+ * module-level mutable reference (the window can be recreated), so the getter
+ * fails a destroyed window's request immediately instead of hanging.
  */
 export function createMindmapReadRequester(
   getWindow: () => BrowserWindow | null,
@@ -34,31 +31,10 @@ export function createMindmapReadRequester(
   )
 }
 
-export function createMindmapWriteRequester(
-  getWindow: () => BrowserWindow | null,
-): RendererRequester<MindmapWriteRequest, MindmapWriteResponse> {
-  return new RendererRequester<MindmapWriteRequest, MindmapWriteResponse>(
-    getWindow,
-    (window, request) => window.webContents.send(IPC.AiMindmapWriteRequest, request),
-    REQUEST_TIMEOUT_MS,
-    'Save to disk',
-    'ack',
-    (payload) => ({ ok: true as const, action: payload.action, data: payload.data }),
-  )
-}
-
 /** Read request body; an empty query is omitted so the renderer defaults to summary mode. */
 export function buildMindmapReadRequest(
   fileUuid: string,
   query: MindmapReadQuery = {},
 ): Omit<MindmapReadRequest, 'requestId'> {
   return { fileUuid, ...(query && Object.keys(query).length > 0 ? { query } : {}) }
-}
-
-export function buildMindmapWriteRequest(
-  fileUuid: string,
-  action: WriteAction,
-  args: Record<string, unknown>,
-): Omit<MindmapWriteRequest, 'requestId'> {
-  return { fileUuid, action, args }
 }

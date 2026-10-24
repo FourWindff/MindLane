@@ -6,8 +6,6 @@ import type {
   EphemeralRunRequest,
   MindmapReadRequest,
   MindmapReadResponse,
-  MindmapWriteRequest,
-  MindmapWriteResponse,
 } from '../contracts/ipc.js'
 import type {
   MindmapDocumentCommandResult,
@@ -25,8 +23,6 @@ export enum IPC {
   AiChatStreamEvent = 'ai:chat-stream-event',
   AiMindmapReadRequest = 'ai:mindmap-read-request',
   AiMindmapReadRespond = 'ai:mindmap-read-respond',
-  AiMindmapWriteRequest = 'ai:mindmap-write-request',
-  AiMindmapWriteRespond = 'ai:mindmap-write-respond',
   AiGetProviders = 'ai:get-providers',
   AiIsReady = 'ai:is-ready',
 
@@ -194,10 +190,6 @@ export interface MindLaneBridge {
     onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
     /** Renderer -> main process: mindmap read response. */
     respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
-    /** Main process -> renderer: save-to-disk request (correlated by requestId, reusing the mindmap-read pattern). */
-    onMindmapWriteRequest: (callback: (request: MindmapWriteRequest) => void) => () => void
-    /** Renderer -> main process: save-to-disk response (unknown requestId is a no-op). */
-    respondMindmapWrite: (payload: MindmapWriteResponse) => Promise<void>
   }
   file: {
     open: () => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>

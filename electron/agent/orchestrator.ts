@@ -15,7 +15,7 @@ import { MainGraphState } from './state.js'
 import { MindLaneAgent } from './agenthub/mindlane/mindlaneAgent.js'
 import { buildPalacePayload, buildPalaceSubgraph } from './graphs/palaceGraph.js'
 import { buildMindmapSubgraph } from './graphs/mindmapGraph/index.js'
-import { createMindmapActionTools, type MindmapWriteProxy } from './tools/mindmapActions.js'
+import { createMindmapActionTools } from './tools/mindmapActions.js'
 import { createReadFileTool } from './tools/readFile.js'
 import { currentWorkspacePath } from '../shared/runContext.js'
 import { createReadMindmapTool, type MindmapReadQuery } from './tools/mindmapRead.js'
@@ -26,6 +26,7 @@ import { getToolSchemas } from './subgraphRouter.js'
 import { checkpointMessagesToSessionMessages } from './memory/checkpointer.js'
 import type { StreamRuntime } from './streamManager.js'
 import { splitCurrentTurn, type PalaceArtworkStyle, type StreamResponse } from '../ipc.js'
+import type { MindmapWrite } from '../../contracts/mindmapDocument/writeAction.js'
 import {
   runContextCompact,
   type RunContextAssemblyDeps,
@@ -39,8 +40,8 @@ interface AgentOrchestratorOptions {
   userDataPath?: string
   /** On-demand mindmap snapshot provider: injected by main-process assembly (pulled from the renderer over reverse IPC). */
   mindmapReadProvider?: (fileUuid: string, query: MindmapReadQuery) => Promise<string>
-  /** Write-tool renderer proxy: forwards args and returns the renderer's write ack (as-is). */
-  mindmapWriteProxy?: MindmapWriteProxy
+  /** Local write executor: the document write service (validation + landing in the main process). */
+  mindmapWrite?: MindmapWrite
 }
 
 export class AgentOrchestrator {
@@ -95,7 +96,7 @@ export class AgentOrchestrator {
    * The XML write tools (fixed set of 4) go first, then the routing tools.
    */
   private registerDefaultTools(): void {
-    const actionTools = createMindmapActionTools(this.getWriteProxy())
+    const actionTools = createMindmapActionTools(this.getWrite())
 
     this.toolRegistry.registerTool(actionTools.insertXmlFragmentTool)
     this.toolRegistry.registerTool(actionTools.updateNodeTool)
@@ -158,25 +159,26 @@ export class AgentOrchestrator {
     if (!this.compiledPalaceSubgraph) {
       this.compiledPalaceSubgraph = buildPalaceSubgraph({
         provider: this.provider,
-        // The palace subgraph lands its own payload through the same write
-        // responder the model's write tools use (CONTEXT.md "Deterministic
+        // The palace subgraph lands its own payload through the same local
+        // write path the model's write tools use (CONTEXT.md "Deterministic
         // Landing").
-        writeProxy: this.getWriteProxy(),
+        write: this.getWrite(),
       }).compile()
     }
     return this.compiledPalaceSubgraph
   }
 
-  /** Write-tool renderer proxy: forwards args to the renderer's write responder; calling it with no proxy wired in throws. */
-  private getWriteProxy(): MindmapWriteProxy {
+  /** Local write executor; calling it with no service wired in fails the tool instead of silently dropping the write. */
+  private getWrite(): MindmapWrite {
     return (fileUuid, action, args) => {
-      const proxy = this.options.mindmapWriteProxy
-      if (!proxy) {
-        return Promise.reject(
-          new Error('Write channel unavailable, cannot execute write operations'),
-        )
+      const write = this.options.mindmapWrite
+      if (!write) {
+        return Promise.resolve({
+          ok: false as const,
+          error: 'The document write service is unavailable, cannot execute write operations',
+        })
       }
-      return proxy(fileUuid, action, args)
+      return write(fileUuid, action, args)
     }
   }
 

@@ -38,12 +38,8 @@ import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
 import { registerDocumentHandlers } from './main/handlers/document.js'
 import { MindmapDocumentService } from './main/document/documentService.js'
-import {
-  buildMindmapReadRequest,
-  buildMindmapWriteRequest,
-  createMindmapReadRequester,
-  createMindmapWriteRequester,
-} from './main/mindmapRequesters.js'
+import { createMindmapWrite } from './main/document/writeService.js'
+import { buildMindmapReadRequest, createMindmapReadRequester } from './main/mindmapRequesters.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -314,11 +310,15 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
-  // Main process -> renderer mindmap read/save requesters: `win` is a module-level mutable
+  // Main process -> renderer mindmap read requester: `win` is a module-level mutable
   // reference (the window can be recreated) injected via a getter, so a request fails
-  // immediately instead of hanging once the window is destroyed.
+  // immediately instead of hanging once the window is destroyed. Writes have no channel:
+  // they land in the document service directly, whether or not the window is alive.
   const mindmapReadRequester = createMindmapReadRequester(() => win)
-  const mindmapWriteRequester = createMindmapWriteRequester(() => win)
+  const mindmapWrite = createMindmapWrite({
+    documentService,
+    warn: (message) => appLog.warn('%s', message),
+  })
 
   // StreamManager is constructed only after assembly succeeds: its input is narrowed to sessionManager.
   if (services) {
@@ -340,8 +340,7 @@ app.whenReady().then(async () => {
             userDataPath,
             mindmapReadProvider: (fileUuid, query) =>
               mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
-            mindmapWriteProxy: (fileUuid, action, args) =>
-              mindmapWriteRequester.request(() => buildMindmapWriteRequest(fileUuid, action, args)),
+            mindmapWrite,
           })
         } else {
           // The reused orchestrator still runs the model it was built with.
@@ -360,7 +359,6 @@ app.whenReady().then(async () => {
     stateStore: services?.stateStore ?? null,
     getWindow: () => win,
     mindmapReadRequester,
-    mindmapWriteRequester,
     getStreamManager: () => streamManager,
     getMcpManager: () => mcpManager,
     isAiServiceReady: () => aiServiceReady,

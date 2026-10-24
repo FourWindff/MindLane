@@ -1,23 +1,24 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createMindmapActionTools, type MindmapWriteProxy } from './mindmapActions.js'
+import { createMindmapActionTools } from './mindmapActions.js'
+import type { MindmapWrite } from '../../../contracts/mindmapDocument/writeAction.js'
 
-/** Fake renderer client: records forwarded args and, by default, acks with `{ok: true, action, data}` as-is. */
-function fakeProxy(overrides: { fail?: string } = {}): {
+/** Fake local write executor: records the call and, by default, acks with `{ok: true, action, data}`. */
+function fakeWrite(overrides: { fail?: string } = {}): {
   tools: ReturnType<typeof createMindmapActionTools>
-  proxy: ReturnType<typeof vi.fn<MindmapWriteProxy>>
+  write: ReturnType<typeof vi.fn<MindmapWrite>>
 } {
-  const proxy = vi.fn<MindmapWriteProxy>(async (_fileUuid, action, args) => {
+  const write = vi.fn<MindmapWrite>(async (_fileUuid, action, args) => {
     if (overrides.fail) {
       throw new Error(overrides.fail)
     }
     return { ok: true, action, data: args }
   })
-  return { tools: createMindmapActionTools(proxy), proxy }
+  return { tools: createMindmapActionTools(write), write }
 }
 
 describe('createMindmapActionTools (fixed 4 write tools)', () => {
   it('registers exactly the 4 write tools', () => {
-    const { tools: t } = fakeProxy()
+    const { tools: t } = fakeWrite()
     expect(Object.keys(t).sort()).toEqual([
       'deleteNodeTool',
       'insertXmlFragmentTool',
@@ -27,9 +28,9 @@ describe('createMindmapActionTools (fixed 4 write tools)', () => {
   })
 })
 
-describe('insertXmlFragment (renderer proxy)', () => {
-  it('forwards args to the write channel and returns the renderer ack as-is', async () => {
-    const { tools: t, proxy } = fakeProxy()
+describe('insertXmlFragment (local write)', () => {
+  it('calls the local write executor and returns its ack as-is', async () => {
+    const { tools: t, write } = fakeWrite()
     const result = await t.insertXmlFragmentTool.invoke({
       fileUuid: 'file-a',
       xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
@@ -37,13 +38,13 @@ describe('insertXmlFragment (renderer proxy)', () => {
       position: 'child',
     })
 
-    expect(proxy).toHaveBeenCalledTimes(1)
-    expect(proxy).toHaveBeenCalledWith('file-a', 'insertXmlFragment', {
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(write).toHaveBeenCalledWith('file-a', 'insertXmlFragment', {
       xml: `<node type="text" content="branch"><node type="text" content="child" /></node>`,
       targetId: 'n1',
       position: 'child',
     })
-    // The renderer ack is returned as-is as the tool result (model-facing contract: {ok, action, data})
+    // The document write ack is returned as-is as the tool result (model-facing contract: {ok, action, data})
     expect(result).toEqual({
       ok: true,
       action: 'insertXmlFragment',
@@ -56,21 +57,21 @@ describe('insertXmlFragment (renderer proxy)', () => {
   })
 
   it('forwards an empty fileUuid when absent', async () => {
-    const { tools: t, proxy } = fakeProxy()
+    const { tools: t, write } = fakeWrite()
     await t.insertXmlFragmentTool.invoke({ xml: '<node type="text" content="x" />' })
-    expect(proxy).toHaveBeenCalledWith('', 'insertXmlFragment', expect.anything())
+    expect(write).toHaveBeenCalledWith('', 'insertXmlFragment', expect.anything())
   })
 })
 
-describe('updateMindmapNode (renderer proxy)', () => {
+describe('updateMindmapNode (local write)', () => {
   it('forwards xml to the update action', async () => {
-    const { tools: t, proxy } = fakeProxy()
+    const { tools: t, write } = fakeWrite()
     const result = await t.updateNodeTool.invoke({
       fileUuid: 'file-a',
       xml: `<node id="n1" type="text" content="new content" />`,
     })
 
-    expect(proxy).toHaveBeenCalledWith('file-a', 'updateMindmapNode', {
+    expect(write).toHaveBeenCalledWith('file-a', 'updateMindmapNode', {
       xml: `<node id="n1" type="text" content="new content" />`,
     })
     expect(result).toEqual({
@@ -81,9 +82,9 @@ describe('updateMindmapNode (renderer proxy)', () => {
   })
 })
 
-describe('moveMindmapNode (renderer proxy)', () => {
-  it('forwards nodeId/targetId/position to the move action', async () => {
-    const { tools: t, proxy } = fakeProxy()
+describe('moveMindmapNode (local write)', () => {
+  it('calls the move action with nodeId/targetId/position', async () => {
+    const { tools: t, write } = fakeWrite()
     const result = await t.moveNodeTool.invoke({
       fileUuid: 'file-a',
       nodeId: 'n1',
@@ -91,7 +92,7 @@ describe('moveMindmapNode (renderer proxy)', () => {
       position: 'after',
     })
 
-    expect(proxy).toHaveBeenCalledWith('file-a', 'moveMindmapNode', {
+    expect(write).toHaveBeenCalledWith('file-a', 'moveMindmapNode', {
       nodeId: 'n1',
       targetId: 'n2',
       position: 'after',
@@ -100,16 +101,16 @@ describe('moveMindmapNode (renderer proxy)', () => {
   })
 })
 
-describe('deleteMindmapNode (renderer proxy)', () => {
-  it('forwards to the deleteMindmapNode action the renderer responder applies', async () => {
-    const { tools: t, proxy } = fakeProxy()
+describe('deleteMindmapNode (local write)', () => {
+  it('calls the deleteMindmapNode action', async () => {
+    const { tools: t, write } = fakeWrite()
     const result = await t.deleteNodeTool.invoke({
       fileUuid: 'file-a',
       nodeId: 'n1',
       confirmDeleteSubtree: true,
     })
 
-    expect(proxy).toHaveBeenCalledWith('file-a', 'deleteMindmapNode', {
+    expect(write).toHaveBeenCalledWith('file-a', 'deleteMindmapNode', {
       nodeId: 'n1',
       confirmDeleteSubtree: true,
     })
@@ -117,9 +118,9 @@ describe('deleteMindmapNode (renderer proxy)', () => {
   })
 })
 
-describe('renderer unresponsive / ok:false / window unavailable (tool failure paths)', () => {
-  it('returns the renderer error as a tool failure result with the long-content correction', async () => {
-    const { tools: t } = fakeProxy({
+describe('landing failure / ok:false / unexpected executor error (tool failure paths)', () => {
+  it('returns the landing error as a tool failure result with the long-content correction', async () => {
+    const { tools: t } = fakeWrite({
       fail: '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
     })
     const result = await t.insertXmlFragmentTool.invoke({
@@ -135,8 +136,8 @@ describe('renderer unresponsive / ok:false / window unavailable (tool failure pa
     expect(failure.error).toContain('generateMindmapFragment')
   })
 
-  it('appends the long-content correction to a renderer ok:false ack', async () => {
-    const proxy = vi.fn<MindmapWriteProxy>(async () => ({
+  it('appends the long-content correction to an ok:false ack', async () => {
+    const proxy = vi.fn<MindmapWrite>(async () => ({
       ok: false,
       error:
         '[xml_parse_error] The tag on line 1 is not closed. Recovery: rewrite the XML and retry',
@@ -153,7 +154,7 @@ describe('renderer unresponsive / ok:false / window unavailable (tool failure pa
   })
 
   it('does not add the correction to the other write tools', async () => {
-    const proxy = vi.fn<MindmapWriteProxy>(async () => ({
+    const proxy = vi.fn<MindmapWrite>(async () => ({
       ok: false,
       error:
         '[block_not_found] Node "ghost" not found. Recovery: call readMindmap to re-locate it, then retry',
@@ -171,7 +172,7 @@ describe('renderer unresponsive / ok:false / window unavailable (tool failure pa
   })
 
   it('converts non-Error rejections to a string error', async () => {
-    const proxy = vi.fn<MindmapWriteProxy>(async () => {
+    const proxy = vi.fn<MindmapWrite>(async () => {
       throw 'boom'
     })
     const tools = createMindmapActionTools(proxy)

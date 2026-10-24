@@ -3,7 +3,7 @@ import { selectCurrentChatBusy, useAiStore } from './aiStore'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { reportRendererError } from '@/shared/lib/reportRendererError'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
-import { insertPalacePlaceholder } from './mindmapWriteResponder'
+import { insertPalacePlaceholder } from '@/features/mindmap/model/palacePlaceholder'
 import { startPalaceRun } from '@/features/mindmap/model/palaceRun'
 import { buildChatContext } from '@/features/chat/lib/buildChatContext'
 import type { MindmapSelectedTopic } from '@/features/mindmap/hooks/useMindmapView'
@@ -14,9 +14,9 @@ import type { MindmapSelectedTopic } from '@/features/mindmap/hooks/useMindmapVi
  *
  * The orchestration — turn context, placeholder, run start — lives in chat; the
  * mindmap UI only emits the topic selection through a callback wired by the
- * composition root. Placeholder insertion (`insertPalacePlaceholder`) and the
- * landing (`landPalace`) both stay in the write responder, shared with the AI
- * trigger, so this hook only owns the gates, the context and the run start.
+ * composition root. The placeholder is a mindmap-side insertion; the landing
+ * (`landPalace`) happens in the main process, shared with the AI trigger, so this
+ * hook only owns the gates, the context and the run start.
  */
 export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void {
   const aiBusy = useAiStore(selectCurrentChatBusy)
@@ -61,7 +61,8 @@ export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void 
       const settle = () => useAiStore.getState().setFileBusy(fileUuid, false)
       let started: { ok: true } | { ok: false; error: string }
       try {
-        // The palace subgraph reads its input from the turn state's selection.
+        // The palace subgraph reads its input from the turn state's selection; the
+        // placeholder id lets the deterministic landing update it in place.
         const context = {
           ...buildChatContext(),
           selectedNodes: topics.map((topic) => ({
@@ -69,6 +70,7 @@ export function usePalaceGeneration(): (topics: MindmapSelectedTopic[]) => void 
             type: 'text' as const,
             label: topic.label,
           })),
+          palacePlaceholderNodeId: palaceId,
         }
         started = await startPalaceRun({
           fileUuid,

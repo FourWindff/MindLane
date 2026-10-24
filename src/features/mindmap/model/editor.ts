@@ -1,21 +1,18 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import type { MindLaneFile, MindLaneAsset } from '@contracts/fileFormat'
 import { shouldRecordHistory } from '@contracts/mindmapDocument/commands'
-import { layoutInitial } from '@contracts/mindmapDocument/layout'
 import { defaultNodeSize } from '@contracts/mindmapDocument/nodeSize'
+import { planFragmentInsert, planNodeReplacement } from '@contracts/mindmapDocument/fragment'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   stripTransientNodeData,
   type MindmapCommand,
+  type MindmapDocument,
+  type MindmapDocumentEdge,
   type MindmapDocumentNode,
 } from '@contracts/mindmapDocument/types'
-import type { MindmapWireCommand } from '@contracts/mindmapDocument/wire'
-import {
-  MindmapXmlError,
-  parseXmlFragment,
-  validateFragmentForInsert,
-  buildValidationContext,
-} from '@contracts/mindmapXml'
+import { toMindmapCommands, type MindmapWireCommand } from '@contracts/mindmapDocument/wire'
+import { parseXmlFragment } from '@contracts/mindmapXml'
 import {
   CHILD_GAP_Y,
   CHILD_OFFSET_X,
@@ -25,7 +22,7 @@ import {
   getChildIdsOrdered,
   newId,
 } from '@/features/mindmap/model/mindmapTree'
-import { computeEnterDelays, computeExitDelays, totalExitDuration } from './cascadeTiming'
+import { computeExitDelays, totalExitDuration } from '@contracts/mindmapDocument/cascade'
 import type { OpenFileState, MindmapStore } from './store'
 
 const NODE_EXIT_MS = 300
@@ -36,6 +33,14 @@ const GLIDE_MS = 1000
 export type SiblingInsertMode = 'end' | 'above' | 'below'
 
 type ViewFlags = Array<{ nodeId: string; flags: Record<string, unknown> }>
+
+/** The projected nodes/edges in the authoritative document shape (the plan layer's input). */
+function documentOf(state: OpenFileState): MindmapDocument {
+  return {
+    nodes: state.nodes as MindmapDocumentNode[],
+    edges: state.edges as MindmapDocumentEdge[],
+  }
+}
 
 /** View-only data flags carried by a node's data (stripped before the command leaves the renderer). */
 function pickTransientFlags(data: Record<string, unknown>): Record<string, unknown> {
@@ -616,10 +621,10 @@ export class MindmapEditor {
   // ─── AI batch insert ───
 
   /**
-   * Parse and insert an XML fragment (one of the unified entry points for AI write actions).
-   * A failed validation throws MindmapXmlError (the error code goes back to the AI) and mounts nothing partially.
-   * position: child=attach under parentId (default); after/before=insert before/after parentId's sibling;
-   * root=attach to the root node.
+   * Parse and insert an XML fragment (the simulator's agent-write entry, and the
+   * renderer half of the landing rules). Validation and command planning come
+   * from the shared plan layer, so the main-process write service and this path
+   * land a fragment the same way.
    */
   async insertFromXml(
     xml: string,
@@ -627,273 +632,37 @@ export class MindmapEditor {
     pendingAssets: MindLaneAsset[] = [],
   ): Promise<void> {
     const parsed = await parseXmlFragment(xml)
-    const { ctx } = buildValidationContext(this.state.nodes, this.state.edges, [
-      ...this.state.assets,
-      ...pendingAssets,
-    ])
-    validateFragmentForInsert(parsed, ctx)
-
-    const position = options.position ?? 'child'
-    if ((position === 'after' || position === 'before') && !options.parentId?.trim()) {
-      throw new MindmapXmlError(
-        'block_not_found',
-        `Inserting at position "${position}" requires an anchor node`,
-      )
-    }
-    if (position !== 'root' && options.parentId && !ctx.nodeIds.has(options.parentId)) {
-      throw new MindmapXmlError(
-        'block_not_found',
-        `Anchor node "${options.parentId}" does not exist`,
-      )
-    }
+    const commands = planFragmentInsert(
+      parsed,
+      documentOf(this.state),
+      [...this.state.assets, ...pendingAssets],
+      {
+        targetId: options.parentId,
+        position: options.position,
+        selectedId: this.state.nodes.find((node) => node.selected)?.id,
+      },
+    )
     // Pending assets become live only after parsing and structural validation succeed.
     for (const asset of pendingAssets) this.state.addAsset(asset)
-    if (position === 'after' || position === 'before') {
-      this.insertParsedFragmentSibling(parsed, {
-        siblingId: options.parentId ?? '',
-        before: position === 'before',
-      })
-      await this.whenSettled()
-      return
-    }
-    const parentId = position === 'root' ? 'root' : options.parentId
-    this.insertParsedFragment(parsed, { parentId })
+    this.batch(toMindmapCommands(commands))
     await this.whenSettled()
   }
 
   /**
-   * Replace a whole node (including its subtree, the updateMindmapNode front end):
-   * delete the old subtree, then reattach the fragment (same root id) under the old
-   * parent as one batch history entry.
+   * Replace a whole node (including its subtree, the updateMindmapNode front
+   * end): delete the old subtree, then reattach the fragment (same root id)
+   * under the old parent as one batch history entry.
    */
   async replaceNodeFromXml(xml: string, pendingAssets: MindLaneAsset[] = []): Promise<void> {
     const parsed = await parseXmlFragment(xml)
-    if (parsed.rootIds.length !== 1) {
-      throw new MindmapXmlError(
-        'tree_invalid',
-        'updateMindmapNode must provide exactly one root <node> (including its subtree)',
-      )
-    }
-    const nodeId = parsed.rootIds[0]!
-    if (nodeId === 'root') {
-      throw new MindmapXmlError('tree_invalid', 'root is the mindmap anchor and cannot be replaced')
-    }
-    const nodes = this.state.nodes
-    const edges = this.state.edges
-    if (!nodes.some((n) => n.id === nodeId)) {
-      throw new MindmapXmlError(
-        'block_not_found',
-        `Node "${nodeId}" does not exist; call readMindmap to locate it again`,
-      )
-    }
-    const { ctx } = buildValidationContext(nodes, edges, [...this.state.assets, ...pendingAssets])
-    validateFragmentForInsert(parsed, ctx, new Set([nodeId]))
-
+    const commands = planNodeReplacement(parsed, documentOf(this.state), [
+      ...this.state.assets,
+      ...pendingAssets,
+    ])
     // Keep materialization in the same validated write operation as the replacement.
     for (const asset of pendingAssets) this.state.addAsset(asset)
-
-    // Order preservation: record the old position and the old parent edge index before
-    // deleting. On reattach the root node restores its old position (otherwise (0,0)
-    // drifts in the y reorder) and the parent edge goes back at its old index (otherwise
-    // the edges order, which is the XML serialization/save order, puts the node last).
-    const oldParentId = findParentId(edges, nodeId)
-    const oldNode = nodes.find((n) => n.id === nodeId)
-    const oldEdgeIndex = edges.findIndex((e) => e.target === nodeId)
-    // The replacement subtree cascades in parent-first, same as fragments (the
-    // single-root constraint here rules out multi-root independence).
-    const enterDelays = computeEnterDelays([nodeId], parsed.nodes, parsed.edges)
-    const commands: MindmapCommand[] = [{ type: 'deleteSubtree', rootId: nodeId }]
-    for (const n of parsed.nodes) {
-      commands.push({
-        type: 'addNode',
-        node: {
-          ...n,
-          position: n.id === nodeId && oldNode?.position ? oldNode.position : n.position,
-          data: {
-            ...n.data,
-            justAdded: true,
-            cascadeDelay: enterDelays.get(n.id) ?? 0,
-          },
-        },
-      })
-    }
-    if (oldParentId) {
-      commands.push({
-        type: 'addEdge',
-        edge: {
-          id: `e-${oldParentId}-${nodeId}`,
-          source: oldParentId,
-          target: nodeId,
-          type: 'mindmap',
-          className: 'mindmap-edge mindmap-edge--enter',
-        },
-        index: oldEdgeIndex >= 0 ? oldEdgeIndex : undefined,
-      })
-    }
-    for (const e of parsed.edges) {
-      commands.push({
-        type: 'addEdge',
-        edge: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          type: e.type ?? 'mindmap',
-          className: 'mindmap-edge mindmap-edge--enter',
-        },
-      })
-    }
-    this.runBatch(commands)
+    this.batch(toMindmapCommands(commands))
     await this.whenSettled()
-  }
-
-  /**
-   * The map-landing logic behind insertFromXml (layout/aggregation/history/fallback chain aligned).
-   * Fallback chain: explicit parentId -> selected node -> root node.
-   */
-  private insertParsedFragment(
-    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
-    options: { parentId?: string },
-  ): void {
-    const nodes = this.state.nodes
-    const edges = this.state.edges
-
-    const targetParentId =
-      options.parentId ??
-      nodes.find((n) => n.selected)?.id ??
-      findRootNode(nodes, edges)?.id ??
-      nodes[0]?.id
-
-    if (!targetParentId) {
-      console.warn('[insertParsedFragment] cannot determine the parent node')
-      return
-    }
-
-    const parentNode = nodes.find((n) => n.id === targetParentId)
-    if (!parentNode) {
-      console.warn('[insertParsedFragment] parent node does not exist:', targetParentId)
-      return
-    }
-
-    const anchorX = parentNode.position.x + CHILD_OFFSET_X
-    this.insertParsedFragmentAt(parsed, targetParentId, anchorX, parentNode.position.y)
-  }
-
-  /**
-   * Sibling-anchored insert (after/before): the target parent is the sibling's parent and the
-   * fragment is aligned vertically above/below the sibling.
-   */
-  private insertParsedFragmentSibling(
-    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
-    options: { siblingId: string; before: boolean },
-  ): void {
-    const nodes = this.state.nodes
-    const edges = this.state.edges
-    const sibling = nodes.find((n) => n.id === options.siblingId)
-    if (!sibling) {
-      console.warn('[insertParsedFragmentSibling] sibling node does not exist:', options.siblingId)
-      return
-    }
-    const parentId = findParentId(edges, options.siblingId) ?? findRootNode(nodes, edges)?.id
-    if (!parentId) {
-      console.warn('[insertParsedFragmentSibling] cannot determine the sibling parent node')
-      return
-    }
-    const parentNode = nodes.find((n) => n.id === parentId)
-    if (!parentNode) return
-
-    const siblingH = sibling.measured?.height ?? defaultNodeSize(sibling.type).height
-    const firstH = defaultNodeSize(parsed.nodes[0]?.type ?? 'text').height
-    const anchorX = parentNode.position.x + CHILD_OFFSET_X
-    const anchorY = options.before
-      ? sibling.position.y - CHILD_GAP_Y - firstH
-      : sibling.position.y + siblingH + CHILD_GAP_Y
-    this.insertParsedFragmentAt(parsed, parentId, anchorX, anchorY)
-  }
-
-  /**
-   * Shared fragment-landing core: dagre initial layout -> translate to align the anchor ->
-   * batch commands -> one history entry.
-   */
-  private insertParsedFragmentAt(
-    parsed: { nodes: Node[]; edges: Edge[]; rootIds: string[] },
-    targetParentId: string,
-    anchorX: number,
-    anchorY: number,
-  ): void {
-    const laidOut = layoutInitial(parsed.nodes as MindmapDocumentNode[], parsed.edges) as Node[]
-
-    const subRootIds = parsed.rootIds
-    if (subRootIds.length === 0) {
-      console.warn('[insertParsedFragment] cannot find the subtree root node')
-      return
-    }
-
-    const firstSubRoot = laidOut.find((n) => n.id === subRootIds[0])
-    if (!firstSubRoot) {
-      console.warn('[insertParsedFragment] the subtree root node is not in the layout result')
-      return
-    }
-
-    const offsetX = anchorX - firstSubRoot.position.x
-    const offsetY = anchorY - firstSubRoot.position.y
-
-    // Cascade entrance: DFS pre-order (parent before child, siblings in layout
-    // order) computes a per-node delay; multi-root fragments keep subtrees
-    // independent. Stamped into the addNode commands so it lands with the
-    // fragment (a view-only marker, moved to the renderer view state).
-    const enterDelays = computeEnterDelays(subRootIds, laidOut, parsed.edges)
-
-    const commands: MindmapCommand[] = []
-
-    for (const n of laidOut) {
-      const shifted = {
-        ...n,
-        position: {
-          x: n.position.x + offsetX,
-          y: n.position.y + offsetY,
-        },
-        data: {
-          ...n.data,
-          justAdded: true,
-          // Always written (including 0): cascadeDelay present = this node came
-          // from an agent write path; the view uses it to tell manual inserts
-          // (no cascade/particles) apart from agent fragments.
-          cascadeDelay: enterDelays.get(n.id) ?? 0,
-        },
-      }
-      const node: Node = shifted as Node
-      commands.push({ type: 'addNode', node })
-    }
-
-    for (const e of parsed.edges) {
-      commands.push({
-        type: 'addEdge',
-        edge: {
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          type: e.type ?? 'mindmap',
-          className: 'mindmap-edge mindmap-edge--enter',
-        },
-      })
-    }
-
-    for (const subRootId of subRootIds) {
-      commands.push({
-        type: 'addEdge',
-        edge: {
-          id: `e-${targetParentId}-${subRootId}`,
-          source: targetParentId,
-          target: subRootId,
-          type: 'mindmap',
-          className: 'mindmap-edge mindmap-edge--enter',
-        },
-      })
-    }
-
-    // Reflow happens in the document service; the renderer only provides the
-    // anchored command inputs.
-    this.runBatch(commands)
   }
 
   // ─── ReactFlow native change forwarding ───

@@ -1,20 +1,32 @@
 import { describe, expect, it } from 'vitest'
 import { MindmapDocumentService } from './documentService.js'
 import { createInitialDocument } from '../../../contracts/mindmapDocument/initial.js'
-import type { MindmapDocumentState } from '../../../contracts/mindmapDocument/state.js'
 import type { MindmapWireCommand } from '../../../contracts/mindmapDocument/wire.js'
-import type { MindmapDocumentCommandResult } from '../../../contracts/mindmapDocument/state.js'
+import type {
+  MindmapDocumentCommandResult,
+  MindmapDocumentState,
+} from '../../../contracts/mindmapDocument/state.js'
+import type { MindLaneAsset } from '../../../contracts/mindmapXml/types.js'
 
 const FILE = 'file-1'
 
-function open(service: MindmapDocumentService, fileUuid = FILE): MindmapDocumentState {
+function open(
+  service: MindmapDocumentService,
+  fileUuid = FILE,
+  assets: MindLaneAsset[] = [],
+): MindmapDocumentState {
   const result = service.handle({
     type: 'open',
     fileUuid,
     document: createInitialDocument(),
+    assets,
     structureType: 'logic',
   })
   return stateOf(result)
+}
+
+function asset(id: string, sha256 = id): MindLaneAsset {
+  return { id, mime: 'image/png', sha256, data: 'REVGRQ==' }
 }
 
 function stateOf(result: MindmapDocumentCommandResult): MindmapDocumentState {
@@ -203,6 +215,61 @@ describe('MindmapDocumentService', () => {
   it('reports an unknown document instead of silently applying', () => {
     const service = new MindmapDocumentService()
     const result = service.handle({ type: 'apply', fileUuid: 'missing', commands: [] })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw new Error('expected failure')
+    expect(result.code).toBe('document_not_found')
+  })
+})
+
+describe('MindmapDocumentService assets', () => {
+  it('opens with the file assets and exposes them for write validation', () => {
+    const service = new MindmapDocumentService()
+    open(service, FILE, [asset('a1')])
+
+    expect(service.getAssets(FILE).map((entry) => entry.id)).toEqual(['a1'])
+  })
+
+  it('adds an asset once per content, marks the document dirty and bumps the version', () => {
+    const service = new MindmapDocumentService()
+    open(service)
+
+    const first = service.handle({
+      type: 'addAssets',
+      fileUuid: FILE,
+      assets: [asset('a1', 'sha-1')],
+    })
+    expect(first.ok).toBe(true)
+    const added = stateOf(first)
+    expect(added.version).toBe(1)
+    expect(added.dirty).toBe(true)
+    expect(added.addedAssets?.map((entry) => entry.id)).toEqual(['a1'])
+
+    // The same bytes again: no second asset, no state change.
+    const duplicate = service.handle({
+      type: 'addAssets',
+      fileUuid: FILE,
+      assets: [asset('a2', 'sha-1')],
+    })
+    expect(stateOf(duplicate).version).toBe(1)
+    expect(service.getAssets(FILE).map((entry) => entry.id)).toEqual(['a1'])
+  })
+
+  it('pushes newly added assets once, then keeps them out of later states', () => {
+    const service = new MindmapDocumentService()
+    const states: MindmapDocumentState[] = []
+    service.subscribe((state) => states.push(state))
+    open(service)
+    service.handle({ type: 'addAssets', fileUuid: FILE, assets: [asset('a1')] })
+    service.handle({ type: 'apply', fileUuid: FILE, commands: [addChild('child')] })
+
+    expect(states[1]!.addedAssets?.map((entry) => entry.id)).toEqual(['a1'])
+    expect(states[2]!.addedAssets).toBeUndefined()
+  })
+
+  it('reports an unknown document instead of adding assets to nothing', () => {
+    const service = new MindmapDocumentService()
+    const result = service.handle({ type: 'addAssets', fileUuid: 'missing', assets: [asset('a1')] })
+
     expect(result.ok).toBe(false)
     if (result.ok) throw new Error('expected failure')
     expect(result.code).toBe('document_not_found')

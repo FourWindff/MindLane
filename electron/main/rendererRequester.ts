@@ -18,9 +18,8 @@ interface RequesterResponse {
 }
 
 /**
- * Generic main-process → renderer request/ack bridge, shared by the read and
- * write live-apply channels so the pending-map, timeout, and correlation logic
- * lives in exactly one place.
+ * Generic main-process → renderer request/ack bridge (the remaining read
+ * channel) so the pending-map, timeout and correlation logic lives in one place.
  *
  * The request is sent via `webContents.send`; the ack is received via
  * `ipcMain.handle`. requestId correlates concurrent runners; a timeout or an

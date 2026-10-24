@@ -175,8 +175,8 @@ function handleRunEvent(run: ActiveRun, event: ChatStreamEvent): void {
     case 'end': {
       const payload = event.payload.palaceData
       forgetStream(run)
-      // ok = the subgraph's `landPalace` write request already updated the
-      // placeholder through the write responder; nothing to apply here.
+      // ok = the subgraph's `landPalace` write already updated the placeholder in
+      // the authoritative document; the state push is the only thing left to see.
       if (payload?.ok) {
         forgetRun(run)
         run.handlers.settle()
