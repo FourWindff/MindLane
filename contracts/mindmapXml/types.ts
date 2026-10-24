@@ -8,7 +8,7 @@
  */
 
 /** Parse/validation error codes (PRD 5.4). */
-type MindmapXmlErrorCode =
+export type MindmapXmlErrorCode =
   | 'xml_parse_error'
   | 'empty_xml'
   | 'block_not_found'

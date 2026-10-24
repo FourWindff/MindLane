@@ -1,6 +1,7 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import { applyNodeChanges, applyEdgeChanges } from '@xyflow/react'
 import { type MindLaneFile, type MindLaneAsset } from '@contracts/fileFormat'
+import { applyDocumentCommands, shouldRecordHistory } from '@contracts/mindmapDocument/commands'
 import {
   MindmapXmlError,
   parseXmlFragment,
@@ -74,22 +75,16 @@ export class MindmapEditor {
     this.cancelPendingDeletes()
     const transaction = this.history.redo()
     if (!transaction) return
-    const { nodes: appliedNodes, edges: appliedEdges } = this.applyCommand(
-      transaction.before.nodes,
-      transaction.before.edges,
-      {
-        type: 'batch',
-        commands: transaction.commands,
-      },
-    )
-    const nodes = this.shouldReflowAfter(transaction.commands)
-      ? layoutReflow(appliedNodes, appliedEdges, this.state.style.structureType)
-      : appliedNodes
+    const outcome = applyDocumentCommands(transaction.before, transaction.commands)
+    if (!outcome.ok) return
+    const nodes = outcome.reflow
+      ? layoutReflow(outcome.document.nodes, outcome.document.edges, this.state.style.structureType)
+      : outcome.document.nodes
     // redo is time travel: strip entrance/exit/cascade markers baked into the
     // replayed commands (the undo snapshot is already stripped), so redo never
     // replays a "whole fragment at once" entrance.
     const strippedNodes = this.stripTransientFlags(nodes)
-    const strippedEdges = this.stripEdgeAnimClasses(appliedEdges)
+    const strippedEdges = this.stripEdgeAnimClasses(outcome.document.edges)
     this.state.setNodes(strippedNodes)
     this.state.setEdges(strippedEdges)
     this.syncHistoryState()
@@ -114,27 +109,34 @@ export class MindmapEditor {
   }
 
   private runBatch(commands: MindmapCommand[], skipReflow: boolean): void {
-    if (commands.length === 0) return
+    if (!shouldRecordHistory(commands)) return
     this.cancelPendingDeletes()
     const before = this.takeSnapshot()
-    let nodes = this.state.nodes
-    let edges = this.state.edges
-    for (const command of commands) {
-      const result = this.applyCommand(nodes, edges, command)
-      nodes = result.nodes
-      edges = result.edges
+    const outcome = applyDocumentCommands(
+      { nodes: this.state.nodes, edges: this.state.edges },
+      commands,
+    )
+    if (!outcome.ok) {
+      // Renderer-built commands are structurally valid; a rejection means a
+      // caller raced a structural change. Keep the current state untouched.
+      console.warn(`[MindmapEditor] command rejected (${outcome.code}): ${outcome.message}`)
+      return
     }
-    if (!skipReflow && this.shouldReflowAfter(commands)) {
+    let nodes = outcome.document.nodes
+    const edges = outcome.document.edges
+    if (!skipReflow && outcome.reflow) {
       nodes = layoutReflow(nodes, edges, this.state.style.structureType)
     }
     this.state.setNodes(nodes)
     this.state.setEdges(edges)
-    this.history.record({
-      id: crypto.randomUUID(),
-      before,
-      commands,
-      timestamp: Date.now(),
-    })
+    if (outcome.recordHistory) {
+      this.history.record({
+        id: crypto.randomUUID(),
+        before,
+        commands,
+        timestamp: Date.now(),
+      })
+    }
     this.syncHistoryState()
   }
 
@@ -428,7 +430,7 @@ export class MindmapEditor {
         return { ...n, data: { ...n.data, gliding: true, glideFrom: from } }
       }),
     )
-    // runBatch reflows inline (removeEdge/addEdge both trigger shouldReflowAfter)
+    // runBatch reflows inline (removeEdge/addEdge both require a layout pass)
     this.runBatch(commands, false)
     setTimeout(() => {
       this.state.setNodesTransient((ns) =>
@@ -1016,68 +1018,6 @@ export class MindmapEditor {
       }
       return { ...n, data, selected: undefined }
     })
-  }
-
-  private shouldReflowAfter(commands: MindmapCommand[]): boolean {
-    return commands.some((c) => {
-      if (c.type === 'moveNode') return false
-      if (c.type === 'batch') return this.shouldReflowAfter(c.commands)
-      return true
-    })
-  }
-
-  private applyCommand(
-    nodes: Node[],
-    edges: Edge[],
-    command: MindmapCommand,
-  ): { nodes: Node[]; edges: Edge[] } {
-    switch (command.type) {
-      case 'addNode':
-        return {
-          nodes: [...nodes, command.node],
-          edges: command.edge ? [...edges, command.edge] : edges,
-        }
-      case 'updateNode':
-        return {
-          nodes: nodes.map((n) => (n.id === command.nodeId ? command.patch(n) : n)),
-          edges,
-        }
-      case 'deleteSubtree': {
-        const ids = collectSubtreeIds(edges, command.rootId)
-        return {
-          nodes: nodes.filter((n) => !ids.has(n.id)),
-          edges: edges.filter((e) => !ids.has(e.source) && !ids.has(e.target)),
-        }
-      }
-      case 'moveNode':
-        return {
-          nodes: nodes.map((n) =>
-            n.id === command.nodeId ? { ...n, position: command.position } : n,
-          ),
-          edges,
-        }
-      case 'addEdge':
-        // Optional index: insert in place (order-preserving cases such as the replaceNodeFromXml
-        // reattach); omitted, it appends at the end.
-        if (command.index !== undefined && command.index >= 0 && command.index <= edges.length) {
-          return {
-            nodes,
-            edges: [...edges.slice(0, command.index), command.edge, ...edges.slice(command.index)],
-          }
-        }
-        return { nodes, edges: [...edges, command.edge] }
-      case 'removeEdge':
-        return { nodes, edges: edges.filter((e) => e.id !== command.edgeId) }
-      case 'batch': {
-        let result = { nodes, edges }
-        for (const c of command.commands) {
-          result = this.applyCommand(result.nodes, result.edges, c)
-        }
-        return result
-      }
-      default:
-        return { nodes, edges }
-    }
   }
 
   private syncHistoryState(): void {

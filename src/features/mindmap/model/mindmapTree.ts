@@ -1,5 +1,5 @@
 import { defaultNodeSize } from './layout/nodeSize'
-import { findRootIds, getChildIdsOrdered } from '@contracts/mindmapXml/serializer'
+import { getChildIdsOrdered } from '@contracts/mindmapDocument/tree'
 import type { Edge, Node, Position as XyflowPosition } from '@xyflow/react'
 
 /**
@@ -16,10 +16,19 @@ export const Position = {
   Right: 'right' as Position,
 }
 
-export const CHILD_OFFSET_X = 200
-export const CHILD_GAP_Y = 12
-
-export { newId } from '@contracts/ids'
+// Single source for the pure tree queries lives in the contracts layer (the
+// document command semantics rely on the same traversals). Re-exported here so
+// the renderer keeps its existing import surface.
+export {
+  CHILD_GAP_Y,
+  CHILD_OFFSET_X,
+  collectDescendantIds,
+  collectSubtreeIds,
+  findParentId,
+  findRootNode,
+  getChildIdsOrdered,
+  newId,
+} from '@contracts/mindmapDocument/tree'
 
 export function createInitialNodes(): Node[] {
   return [
@@ -36,42 +45,8 @@ export function createInitialEdges(): Edge[] {
   return []
 }
 
-export function findParentId(edges: Edge[], nodeId: string): string | null {
-  const e = edges.find((x) => x.target === nodeId)
-  return e?.source ?? null
-}
-
 function getChildIds(edges: Edge[], parentId: string): string[] {
   return edges.filter((e) => e.source === parentId).map((e) => e.target)
-}
-
-export function collectSubtreeIds(edges: Edge[], rootId: string): Set<string> {
-  const ids = new Set<string>()
-  const stack = [rootId]
-  while (stack.length) {
-    const id = stack.pop()!
-    ids.add(id)
-    getChildIds(edges, id).forEach((c) => stack.push(c))
-  }
-  return ids
-}
-
-/**
- * Collect every descendant id of a subtree (excluding rootId itself).
- * Used when rendering a collapsed node to hide all of its descendants while the collapsed
- * node itself stays visible (its expand button remains).
- */
-export function collectDescendantIds(edges: Edge[], rootId: string): Set<string> {
-  const ids = collectSubtreeIds(edges, rootId)
-  ids.delete(rootId)
-  return ids
-}
-
-export { getChildIdsOrdered }
-
-export function findRootNode(nodes: Node[], edges: Edge[]): Node | undefined {
-  const rootId = findRootIds(nodes, edges)[0]
-  return nodes.find((n) => n.id === rootId)
 }
 
 function nodeHeight(nodeId: string, nodes: Node[]): number {
