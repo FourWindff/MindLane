@@ -5,12 +5,7 @@ import type { InternalStateStore } from '../../store/internalStore.js'
 import type { FileSystemService } from '../../fs/index.js'
 import type { AppSettings } from '../../fs/types.js'
 import type { McpManager } from '../../agent/mcp/mcpManager.js'
-import type {
-  MindmapReadRequest,
-  MindmapReadResponse,
-  MindmapWriteRequest,
-  MindmapWriteResponse,
-} from '../../ipc.js'
+import type { MindmapWriteRequest, MindmapWriteResponse } from '../../ipc.js'
 import type { RendererRequester } from '../rendererRequester.js'
 
 /**
@@ -26,8 +21,6 @@ export interface HandlerContext {
   /** Shared internal state store (sessions, active-session mappings, node edit history); null when AI assembly fails. */
   stateStore: InternalStateStore | null
   getWindow: () => BrowserWindow | null
-  /** Main process -> renderer mindmap read requester (requestId correlation + timeout), created at assembly time. */
-  mindmapReadRequester: RendererRequester<MindmapReadRequest, MindmapReadResponse>
   /** Main process -> renderer save-to-disk requester (requestId correlation + timeout), created at assembly time. */
   mindmapWriteRequester: RendererRequester<MindmapWriteRequest, MindmapWriteResponse>
   getStreamManager: () => StreamManager | null

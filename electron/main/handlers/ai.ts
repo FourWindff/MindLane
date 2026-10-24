@@ -2,12 +2,7 @@ import { ipcMain } from 'electron'
 import crypto from 'node:crypto'
 import { getRegisteredProviders } from '../../agent/providers/index.js'
 import type { StreamRequest } from '../../agent/streamManager.js'
-import type {
-  ChatContext,
-  EphemeralRunRequest,
-  MindmapReadResponse,
-  MindmapWriteResponse,
-} from '../../ipc.js'
+import type { ChatContext, EphemeralRunRequest, MindmapWriteResponse } from '../../ipc.js'
 import { IPC } from '../../ipc.js'
 import { logger } from '../../shared/logger.js'
 import { recordNodeEdit, type EditLogAppendPayload } from '../editLogRecord.js'
@@ -94,16 +89,8 @@ export function registerAiHandlers(ctx: HandlerContext): void {
     return { ok: ctx.getStreamManager()?.stopStream(payload.streamId) ?? false }
   })
 
-  // Renderer -> main process: mindmap read response (the invoke side of the reverse channel).
-  // The renderer passes the requestId back verbatim; the requester resolves the pending
-  // request with it; an unknown requestId (already timed out / answered) is a no-op.
-  ipcMain.handle(IPC.AiMindmapReadRespond, (_e, payload: MindmapReadResponse) => {
-    ctx.mindmapReadRequester.respond(payload)
-  })
-
-  // Renderer -> main process: save-to-disk response (the invoke side of the reverse channel,
-  // same pattern as mindmap read).
-  // An unknown requestId (already timed out / answered) is a no-op.
+  // Renderer -> main process: save-to-disk response (the invoke side of the reverse
+  // channel). An unknown requestId (already timed out / answered) is a no-op.
   ipcMain.handle(IPC.AiMindmapWriteRespond, (_e, payload: MindmapWriteResponse) => {
     ctx.mindmapWriteRequester.respond(payload)
   })

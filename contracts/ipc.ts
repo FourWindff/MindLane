@@ -37,17 +37,6 @@ export interface MindmapReadQuery {
   maxDepth?: number
 }
 
-/** Main process → renderer: on-demand mindmap read request (requestId correlates concurrent runners). */
-export interface MindmapReadRequest {
-  requestId: string
-  fileUuid: string
-  query?: MindmapReadQuery
-}
-
-/** Renderer → main process: mindmap read response. */
-export type MindmapReadResponse =
-  { requestId: string; ok: true; summary: string } | { requestId: string; ok: false; error: string }
-
 /** Argument shape of each write action (the IPC boundary stays Record<string,unknown>; the renderer parses per this shape). */
 export interface WriteActionArgs {
   insertXmlFragment: {
@@ -70,7 +59,7 @@ export interface WriteActionArgs {
 /** Write action name = key of the argument-shape map (the action list and argument shapes are declared in one place, no hand-copied vocabulary). */
 export type WriteAction = keyof WriteActionArgs
 
-/** Main process → renderer: persist request (requestId-correlated, reusing the mindmap-read channel pattern). */
+/** Main process → renderer: persist request (requestId-correlated reverse channel). */
 export interface MindmapWriteRequest {
   requestId: string
   fileUuid: string

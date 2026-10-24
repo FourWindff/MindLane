@@ -27,7 +27,6 @@ import {
 import { connectAiWritingProjection } from '@/features/chat/model/aiWritingProjection'
 import { connectChatWorkspaceSync } from '@/features/chat/model/workspaceSync'
 import { usePalaceGeneration } from '@/features/chat/model/usePalaceGeneration'
-import { connectMindmapReadResponder } from '@/features/chat/model/mindmapReadResponder'
 import { createMindmapWriteResponder } from '@/features/chat/model/mindmapWriteResponder'
 import { createMindmapEndEffects } from '@/features/chat/model/mindmapEndEffects'
 import { backfillEntryFileTitle } from '@/features/chat/lib/entryConversation'
@@ -166,9 +165,6 @@ function AppContent() {
     // Workspace and open-file changes are observed and re-projected by chat itself: the
     // workspace store no longer pokes chat back.
     const disconnectWorkspaceSync = connectChatWorkspaceSync(openFileRegistry)
-    // On-demand mindmap read responder: when the main process pulls the live mindmap over the
-    // reverse channel, look the editor up by fileUuid and reply.
-    const disconnectMindmapReadResponder = connectMindmapReadResponder()
     // Persist responder: the main process forwards write-tool params, and here we serialize
     // validation plus applying the map by fileUuid and ack back.
     const stopWriteResponder = createMindmapWriteResponder({
@@ -201,7 +197,6 @@ function AppContent() {
       disconnectWorkspaceSync()
       disconnectAiWriting()
       disconnectAiStore()
-      disconnectMindmapReadResponder()
     }
   }, [])
 

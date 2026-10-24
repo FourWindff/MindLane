@@ -26,6 +26,7 @@ export function useMindmapAutoSave({
   const aiBusy = useActiveFileAiWriting()
   const autoSaveIntervalMs = useSettingsStore((state) => state.autoSaveIntervalMs)
   const dirty = useActiveMindmapStore((state) => state.dirty)
+  const documentVersion = useActiveMindmapStore((state) => state.documentVersion)
   const filePath = useActiveMindmapStore((state) => state.filePath)
   const hasDocumentOpen = useActiveMindmapStore((state) => state.hasDocumentOpen)
   const hiddenFlowRef = useRef<HTMLDivElement>(null)
@@ -70,7 +71,9 @@ export function useMindmapAutoSave({
     const store = activeInstance.store.getState()
     if (!store.filePath) {
       // Unsaved document: the main process turns a null filePath into the
-      // save-as dialog; this flow is outside the save protocol.
+      // save-as dialog; this flow is outside the save protocol, but the same
+      // version guard applies so a change during the dialog stays dirty.
+      const version = store.documentVersion
       try {
         const data = store.toMindLaneFile()
         const result = await window.mindlane?.file.save({ filePath: null, data })
@@ -80,7 +83,7 @@ export function useMindmapAutoSave({
         }
 
         store.setFilePath(result.data.filePath)
-        store.markClean()
+        store.markClean(version)
         await syncAfterFileSaved(result.data.filePath)
 
         void generateThumbnail(result.data.filePath).then((previewUrl) => {
@@ -115,7 +118,11 @@ export function useMindmapAutoSave({
       void save()
     }, autoSaveIntervalMs)
     return () => window.clearTimeout(timer)
-  }, [aiBusy, autoSaveIntervalMs, dirty, filePath, hasDocumentOpen, save])
+    // The document version is a dependency on purpose: when the save guard
+    // rejects a save (the document changed underneath it), dirty stays true but
+    // no transition re-arms the timer - the version bump does, so autosave is
+    // the fallback and the protocol itself never retries.
+  }, [aiBusy, autoSaveIntervalMs, dirty, documentVersion, filePath, hasDocumentOpen, save])
 
   return { save, hiddenFlowRef, hiddenRfInstanceRef }
 }

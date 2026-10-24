@@ -38,12 +38,8 @@ import { registerShellHandlers } from './main/handlers/shell.js'
 import { registerWindowHandlers } from './main/handlers/window.js'
 import { registerDocumentHandlers } from './main/handlers/document.js'
 import { MindmapDocumentService } from './main/document/documentService.js'
-import {
-  buildMindmapReadRequest,
-  buildMindmapWriteRequest,
-  createMindmapReadRequester,
-  createMindmapWriteRequester,
-} from './main/mindmapRequesters.js'
+import { readMindmapSection } from './main/document/readMindmap.js'
+import { buildMindmapWriteRequest, createMindmapWriteRequester } from './main/mindmapRequesters.js'
 import type { HandlerContext } from './main/handlers/context.js'
 
 const appLog = logger.withContext('app')
@@ -314,10 +310,9 @@ app.whenReady().then(async () => {
     win?.webContents.send(IPC.AiChatStreamEvent, event)
   }
 
-  // Main process -> renderer mindmap read/save requesters: `win` is a module-level mutable
-  // reference (the window can be recreated) injected via a getter, so a request fails
-  // immediately instead of hanging once the window is destroyed.
-  const mindmapReadRequester = createMindmapReadRequester(() => win)
+  // Main process -> renderer save requester: `win` is a module-level mutable reference
+  // (the window can be recreated) injected via a getter, so a request fails immediately
+  // instead of hanging once the window is destroyed.
   const mindmapWriteRequester = createMindmapWriteRequester(() => win)
 
   // StreamManager is constructed only after assembly succeeds: its input is narrowed to sessionManager.
@@ -338,8 +333,9 @@ app.whenReady().then(async () => {
           // Lazy creation only happens after the readiness gate passes, so services is non-null.
           chatOrchestrator = new AgentOrchestrator(provider, services!, {
             userDataPath,
+            // The doc service lives in this process: the read tool needs no round trip.
             mindmapReadProvider: (fileUuid, query) =>
-              mindmapReadRequester.request(() => buildMindmapReadRequest(fileUuid, query)),
+              readMindmapSection(documentService, fileUuid, query),
             mindmapWriteProxy: (fileUuid, action, args) =>
               mindmapWriteRequester.request(() => buildMindmapWriteRequest(fileUuid, action, args)),
           })
@@ -359,7 +355,6 @@ app.whenReady().then(async () => {
     sessionManager: services?.sessionManager ?? null,
     stateStore: services?.stateStore ?? null,
     getWindow: () => win,
-    mindmapReadRequester,
     mindmapWriteRequester,
     getStreamManager: () => streamManager,
     getMcpManager: () => mcpManager,

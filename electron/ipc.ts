@@ -4,8 +4,6 @@ import type {
   ChatContext,
   ChatStreamEvent,
   EphemeralRunRequest,
-  MindmapReadRequest,
-  MindmapReadResponse,
   MindmapWriteRequest,
   MindmapWriteResponse,
 } from '../contracts/ipc.js'
@@ -23,8 +21,6 @@ export enum IPC {
   AiChatStream = 'ai:chat-stream',
   AiChatStreamStop = 'ai:chat-stream-stop',
   AiChatStreamEvent = 'ai:chat-stream-event',
-  AiMindmapReadRequest = 'ai:mindmap-read-request',
-  AiMindmapReadRespond = 'ai:mindmap-read-respond',
   AiMindmapWriteRequest = 'ai:mindmap-write-request',
   AiMindmapWriteRespond = 'ai:mindmap-write-respond',
   AiGetProviders = 'ai:get-providers',
@@ -190,11 +186,7 @@ export interface MindLaneBridge {
     >
     /** Read-only bare boolean: AI service readiness (whether assembly succeeded), not wrapped in an IpcResult envelope. */
     isReady: () => Promise<boolean>
-    /** Main process -> renderer: on-demand mindmap read request (correlated by requestId). */
-    onMindmapReadRequest: (callback: (request: MindmapReadRequest) => void) => () => void
-    /** Renderer -> main process: mindmap read response. */
-    respondMindmapRead: (payload: MindmapReadResponse) => Promise<void>
-    /** Main process -> renderer: save-to-disk request (correlated by requestId, reusing the mindmap-read pattern). */
+    /** Main process -> renderer: save-to-disk request (correlated by requestId). */
     onMindmapWriteRequest: (callback: (request: MindmapWriteRequest) => void) => () => void
     /** Renderer -> main process: save-to-disk response (unknown requestId is a no-op). */
     respondMindmapWrite: (payload: MindmapWriteResponse) => Promise<void>

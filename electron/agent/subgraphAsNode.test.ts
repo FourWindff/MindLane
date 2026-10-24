@@ -118,8 +118,9 @@ function createHarness(provider: LLMProvider, withCheckpointer = true): Harness 
       sessionManager,
     } as unknown as AgentServices,
     {
-      // Read-only mindmap access for the mixed tool + subgraph round.
-      mindmapReadProvider: async () => '<node id="root">root</node>',
+      // Read-only mindmap access for the mixed tool + subgraph round (the real
+      // reader is the in-process document service; this fake keeps the unit test local).
+      mindmapReadProvider: () => '<node id="root">root</node>',
       // Fake landing proxy: records what each run asks the renderer to land.
       mindmapWriteProxy: async (fileUuid, action, args) => {
         writeRequests.push({ fileUuid, action, args })

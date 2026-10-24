@@ -12,8 +12,15 @@ function formatError(error: unknown): string {
 
 /**
  * The single save protocol shared by every mindmap save path:
- * dirty-check -> guard snapshot -> serialize -> IPC save -> conditional
- * markClean -> syncAfterFileSaved -> afterSave.
+ * dirty-check -> document snapshot -> IPC save -> version-guarded markClean ->
+ * syncAfterFileSaved -> afterSave.
+ *
+ * The input is the document snapshot (version + document value), never the
+ * renderer's view projection: drag previews, editing flags and selection stay
+ * out of the file. The save guard compares document versions, so a change that
+ * lands while saving keeps the document dirty for the next autosave - the
+ * protocol never retries on its own. The document service re-checks the same
+ * version when acknowledging the save.
  *
  * Only covers saving to a known filePath; null-filePath branches (save-as
  * dialog, silent workspace create) stay with the callers. Error routing is
@@ -32,14 +39,12 @@ export async function saveOpenFile(
   }
 
   try {
-    // Save guard: snapshot references before the IPC round-trip; only
-    // markClean if nodes/edges/documentRefs are untouched afterwards.
-    const savedNodes = state.nodes
-    const savedEdges = state.edges
-    const savedDocumentRefs = state.documentRefs
+    // Snapshot before the IPC round-trip: the guard only clears dirty when the
+    // document still shows this version afterwards.
+    const snapshot = state.documentSnapshot()
     const result = await window.mindlane?.file.save({
       filePath: state.filePath,
-      data: state.toMindLaneFile(),
+      data: state.toMindLaneFile(snapshot),
     })
     if (!result?.ok) {
       onError(result?.error ?? 'Save failed')
@@ -47,13 +52,7 @@ export async function saveOpenFile(
     }
     const latest = store.getState()
     latest.setFilePath(result.data.filePath)
-    if (
-      latest.nodes === savedNodes &&
-      latest.edges === savedEdges &&
-      latest.documentRefs === savedDocumentRefs
-    ) {
-      latest.markClean()
-    }
+    latest.markClean(snapshot.version)
     await options.syncAfterFileSaved(result.data.filePath)
     options?.afterSave?.(result.data.filePath)
     return true
