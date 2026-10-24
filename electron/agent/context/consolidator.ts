@@ -54,8 +54,8 @@ interface GetMessagesForContextOptions {
 /**
  * Session context compactor.
  *
- * Rolls the old messages after the cursor (`lastConsolidated`) in
- * `session.jsonl` into a rolling summary within the prompt token budget: each
+ * Rolls the old messages after the cursor (`lastConsolidated`) of the stored
+ * session into a rolling summary within the prompt token budget: each
  * round an LLM merges "previous rolling summary + new slice" into one cumulative
  * summary, written to the session meta's `_lastSummary`, and the cursor
  * advances. The summary is read by the contextCompact node into
@@ -219,8 +219,8 @@ export class Consolidator {
   }
 
   /**
-   * Read the uncompressed messages from `session.jsonl`, trim them by message count and token
-   * budget, and return them.
+   * Read the session's uncompressed messages from the store, trim them by message count and
+   * token budget, and return them.
    */
   async getMessagesForContext(
     sessionId: string,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -6,7 +6,6 @@ import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from '@langcha
 import { SessionManager } from './sessionManager.js'
 import { createTestSessionManager, type TestSessionManager } from './sessionManager.testutil.js'
 import type { InternalStateStore } from '../../store/internalStore.js'
-import { logger } from '../../shared/logger.js'
 
 describe('SessionManager', () => {
   let manager: SessionManager
@@ -38,7 +37,7 @@ describe('SessionManager', () => {
     uuid: string = fileUuid,
   ): Promise<void> => manager.saveMessages(sessionId, messages, uuid)
 
-  it('appends UI messages and writes the session file metadata', async () =>
+  it('appends UI messages and reads the session metadata back', async () =>
     inWs(async () => {
       await appendMessages('session-1', [
         new HumanMessage({
@@ -56,11 +55,15 @@ describe('SessionManager', () => {
       expect(sessions[0].id).toBe('session-1')
       expect(sessions[0].fileUuid).toBe('file-uuid-1')
       expect(sessions[0].messageCount).toBe(2)
-      expect(
-        fs.existsSync(
-          path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1', 'session-1.jsonl'),
-        ),
-      ).toBe(true)
+    }))
+
+  it('never creates a session directory: the store is the only persistence', async () =>
+    inWs(async () => {
+      await appendMessages('session-store-only', [new HumanMessage('only the store')])
+      await manager.listSessions()
+      await manager.deleteSession('session-store-only')
+
+      expect(fs.existsSync(path.join(tmpDir, 'memory', 'sessions'))).toBe(false)
     }))
 
   it('listSessions returns only sessions bound to the requested file UUID', async () =>
@@ -224,20 +227,6 @@ describe('SessionManager', () => {
       expect(loaded).toHaveLength(0)
     }))
 
-  it('reads the session list and messages from the database, not the file log', async () =>
-    inWs(async () => {
-      await appendMessages('session-db-only', [new HumanMessage('db is authoritative')])
-      // The rollback mirror is gone: reads must still succeed from the store alone.
-      fs.rmSync(path.join(tmpDir, 'memory', 'sessions'), { recursive: true, force: true })
-
-      await expect(manager.listSessions({ fileUuid })).resolves.toMatchObject([
-        { id: 'session-db-only', messageCount: 1 },
-      ])
-      await expect(manager.loadSessionMessages('session-db-only')).resolves.toMatchObject([
-        { role: 'user', content: 'db is authoritative' },
-      ])
-    }))
-
   it('appends only the new suffix when a batch repeats the stored tail', async () =>
     inWs(async () => {
       await appendMessages('session-dedupe', [new HumanMessage('question')])
@@ -249,33 +238,6 @@ describe('SessionManager', () => {
       const messages = await manager.loadMessages('session-dedupe')
       expect(messages.map((message) => message.getType())).toEqual(['human', 'ai'])
       await expect(manager.listSessions()).resolves.toMatchObject([{ messageCount: 2 }])
-    }))
-
-  it('keeps the database correct and warns when the rollback file log cannot be written', async () =>
-    inWs(async () => {
-      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
-      try {
-        // Turn the mirror directory into a file: every file-side write fails, the store write must not.
-        const sessionsDir = path.join(tmpDir, 'memory', 'sessions')
-        fs.mkdirSync(sessionsDir, { recursive: true })
-        fs.rmSync(sessionsDir, { recursive: true, force: true })
-        fs.writeFileSync(sessionsDir, 'not a directory')
-
-        await expect(
-          appendMessages('session-mirror-broken', [new HumanMessage('still persisted')]),
-        ).resolves.toBeUndefined()
-
-        await expect(manager.loadSessionMessages('session-mirror-broken')).resolves.toMatchObject([
-          { role: 'user', content: 'still persisted' },
-        ])
-        expect(warn).toHaveBeenCalledWith(
-          expect.stringContaining('file-side session log failed'),
-          'save messages',
-          expect.any(Error),
-        )
-      } finally {
-        warn.mockRestore()
-      }
     }))
 
   it('reads the rolling summary and compaction cursor back after a restart', async () => {

@@ -305,6 +305,25 @@ describe('Workspace', () => {
     expect(stateStore.getFilePath(loaded.data.workspaceUuid, 'file-b')).toBe(fileB)
   })
 
+  it('keeps only the two live fields in state.json, dropping leftovers', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
+    fs.mkdirSync(path.dirname(statePath), { recursive: true })
+    // Older workspace files carried extra keys; the path index and the active
+    // sessions now live in the store, so any leftover is dropped on the next write.
+    fs.writeFileSync(
+      statePath,
+      JSON.stringify({ workspaceUuid: 'ws-uuid', lastOpenedFilePath: null, recentFiles: [] }),
+    )
+
+    await workspace.clearLastOpenedFile(workspacePath)
+
+    expect(JSON.parse(fs.readFileSync(statePath, 'utf-8'))).toEqual({
+      workspaceUuid: 'ws-uuid',
+      lastOpenedFilePath: null,
+    })
+  })
+
   it('does not rewrite state.json when the workspace identity is unchanged', async () => {
     const indexedWorkspace = new Workspace(new AppState(path.join(tmpDir, 'userData')))
     const workspacePath = path.join(tmpDir, 'workspace')

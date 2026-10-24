@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import path from 'node:path'
 import {
   mapChatMessagesToStoredMessages,
   mapStoredMessageToChatMessage,
@@ -8,11 +7,6 @@ import {
 } from '@langchain/core/messages'
 import type { CheckpointerManager } from '../memory/checkpointer.js'
 import { checkpointMessagesToSessionMessages } from '../memory/checkpointer.js'
-import {
-  SessionMessageStore,
-  defaultSessionTitle,
-  type SessionMeta,
-} from './sessionMessageStore.js'
 import { logger } from '../../shared/logger.js'
 import type {
   CapsuleFileRecord,
@@ -21,16 +15,27 @@ import type {
 } from '../../store/internalStore.js'
 import type { ChatMessage } from '../../../contracts/fileFormat.js'
 
-/**
- * File-side session log kept as a rollback copy for one commit cycle. The
- * database is the only read source; issue 05 removes this mirror entirely.
- */
-export interface SessionFileLog {
-  runInWorkspace<T>(workspaceUuid: string, action: () => T): T
-  saveMessage(sessionId: string, message: BaseMessage, fileUuid: string): Promise<void>
-  saveMessages(sessionId: string, messages: BaseMessage[], fileUuid: string): Promise<void>
-  deleteSession(sessionId: string): Promise<void>
-  updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void>
+/** Title of a session the user has not named yet. */
+export function defaultSessionTitle(now = new Date()): string {
+  return `New chat ${now.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
+}
+
+export interface SessionMeta {
+  id: string
+  fileUuid: string
+  title: string
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  /** Message line index archived up to (0 means nothing archived) */
+  lastConsolidated?: number
+  /** History summary produced by the last archive round, injected into the system prompt */
+  _lastSummary?: string
 }
 
 function toSessionMeta(record: SessionRecord): SessionMeta {
@@ -47,7 +52,7 @@ function toSessionMeta(record: SessionRecord): SessionMeta {
   }
 }
 
-/** Number of leading batch messages already stored at the end of the session log. */
+/** Number of leading batch messages already stored at the end of the session's rows. */
 function countDuplicateAppendPrefix(
   existing: readonly string[],
   appended: readonly string[],
@@ -69,21 +74,18 @@ function countDuplicateAppendPrefix(
 /**
  * Chat history manager.
  *
- * Reads (session list, session messages, rolling summary and compaction
- * cursor) come from the internal state store only. Writes go to the store
- * first and then mirror to the JSONL session log, whose failures are logged
- * and never affect correctness (the mirror is a rollback copy until issue 05
- * deletes it).
+ * The internal state store is the only persistence: session metadata, message
+ * rows, the rolling summary and the compaction cursor all live in it, so there
+ * is no second copy to mirror, compare or repair.
  *
  * Responsibilities:
- * 1. Persist each session's metadata and messages (database first, file mirror)
+ * 1. Persist each session's metadata and messages
  * 2. Provide history to LangGraph as BaseMessage[]
  * 3. Provide history to the UI as ChatMessage[]
  * 4. Provide message compaction / truncation policies
  * 5. Support session CRUD operations
  */
 export class SessionManager {
-  private fileLog: SessionFileLog | null = null
   private stateStore: InternalStateStore | null = null
   private checkpointer: CheckpointerManager | null = null
   private readonly workspaceContext = new AsyncLocalStorage<string>()
@@ -93,12 +95,8 @@ export class SessionManager {
    * `initAgentServices` and shared with the other state consumers; this
    * manager never closes it.
    */
-  async init(userDataPath: string, stateStore: InternalStateStore): Promise<void> {
+  init(stateStore: InternalStateStore): void {
     this.stateStore = stateStore
-    const baseDir = path.join(userDataPath, 'memory', 'sessions')
-    const fileLog = new SessionMessageStore()
-    await fileLog.init(baseDir)
-    this.fileLog = fileLog
   }
 
   /**
@@ -109,15 +107,9 @@ export class SessionManager {
     this.checkpointer = cp
   }
 
-  /**
-   * Enter the workspace context for a run: the store partitions sessions by
-   * workspace UUID and the file mirror keys its directory off the same value.
-   */
+  /** Enter the workspace context for a run: the store partitions sessions by workspace UUID. */
   runInWorkspace<T>(workspaceUuid: string, action: () => T): T {
-    return this.workspaceContext.run(workspaceUuid, () => {
-      const fileLog = this.fileLog
-      return fileLog ? fileLog.runInWorkspace(workspaceUuid, action) : action()
-    })
+    return this.workspaceContext.run(workspaceUuid, action)
   }
 
   /**
@@ -159,20 +151,15 @@ export class SessionManager {
     return record ? toSessionMeta(record) : null
   }
 
-  /**
-   * Update session metadata in the database, then mirror it into the rollback copy.
-   */
+  /** Update session metadata in the store. */
   async updateSessionMeta(sessionId: string, meta: SessionMeta): Promise<void> {
     this.requireScopedSession(sessionId)
-    const updated = this.requireStateStore().updateSessionMeta(sessionId, {
+    this.requireStateStore().updateSessionMeta(sessionId, {
       title: meta.title,
       ...(meta.lastConsolidated !== undefined ? { lastConsolidated: meta.lastConsolidated } : {}),
       ...(meta._lastSummary !== undefined ? { summary: meta._lastSummary } : {}),
       updatedAt: meta.updatedAt,
     })
-    await this.mirrorFile('update session meta', (fileLog) =>
-      fileLog.updateSessionMeta(sessionId, toSessionMeta(updated)),
-    )
   }
 
   /**
@@ -234,8 +221,8 @@ export class SessionManager {
   }
 
   /**
-   * Delete a session (database row, messages, active-session mappings, file
-   * mirror and checkpoint thread).
+   * Delete a session: one store transaction drops the session row, its messages
+   * and its active-session mapping; the checkpoint thread follows.
    */
   async deleteSession(sessionId: string): Promise<void> {
     const store = this.requireStateStore()
@@ -244,7 +231,6 @@ export class SessionManager {
     if (record && record.workspaceUuid === workspaceUuid) {
       store.deleteSession(sessionId)
     }
-    await this.mirrorFile('delete session', (fileLog) => fileLog.deleteSession(sessionId))
     await this.checkpointer?.deleteThread(sessionId)
   }
 
@@ -269,7 +255,6 @@ export class SessionManager {
    * this manager, and stays open for the other consumers.
    */
   close(): void {
-    this.fileLog = null
     this.stateStore = null
     this.checkpointer = null
   }
@@ -297,12 +282,6 @@ export class SessionManager {
         )
       : payloads
     if (appended.length > 0) store.appendMessages(sessionId, appended)
-
-    await this.mirrorFile(dedupePrefix ? 'save messages' : 'save message', (fileLog) =>
-      dedupePrefix
-        ? fileLog.saveMessages(sessionId, messages, fileUuid)
-        : fileLog.saveMessage(sessionId, messages[0]!, fileUuid),
-    )
   }
 
   /** Create the session row on first write; sessions are identified by the renderer. */
@@ -349,23 +328,5 @@ export class SessionManager {
       )
     }
     return workspaceUuid
-  }
-
-  /** Mirrors to the rollback copy; a mirror failure is logged and never propagates. */
-  private async mirrorFile(
-    operation: string,
-    action: (fileLog: SessionFileLog) => Promise<void>,
-  ): Promise<void> {
-    const fileLog = this.fileLog
-    if (!fileLog) return
-    try {
-      await action(fileLog)
-    } catch (err) {
-      logger.warn(
-        '[SessionManager] file-side session log failed to %s (database is authoritative):',
-        operation,
-        err,
-      )
-    }
   }
 }

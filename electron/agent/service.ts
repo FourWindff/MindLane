@@ -48,7 +48,7 @@ export async function initAgentServices(userDataPath: string): Promise<AgentServ
 
   try {
     const sessionManager = new SessionManager()
-    await sessionManager.init(userDataPath, stateStore)
+    sessionManager.init(stateStore)
 
     const checkpointer = new CheckpointerManager()
     await checkpointer.initWithDbPath(dbPath)
