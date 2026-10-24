@@ -7,6 +7,7 @@ import { FakeListChatModel } from '@langchain/core/utils/testing'
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import { Consolidator } from './consolidator.js'
 import { SessionManager } from './sessionManager.js'
+import { createTestSessionManager, type TestSessionManager } from './sessionManager.testutil.js'
 import { LLMProvider, ProviderCapability } from '../providers/base.js'
 import { MemoryExtractor, createExtractionCallback } from '../memory/memoryExtractor.js'
 import { MemoryManager } from '../memory/memoryManager.js'
@@ -37,6 +38,7 @@ function makeMessages(count: number): BaseMessage[] {
 describe('Consolidator', () => {
   let tmpDir: string
   let manager: SessionManager
+  let harness: TestSessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   let getToolDefinitions: () => []
   const fileUuid = 'file-uuid-1'
@@ -44,8 +46,8 @@ describe('Consolidator', () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-'))
-    manager = new SessionManager()
-    await manager.init(tmpDir)
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -58,7 +60,7 @@ describe('Consolidator', () => {
   const inWs = <T>(fn: () => T): T => manager.runInWorkspace(workspaceUuid, fn)
 
   afterEach(() => {
-    manager.close()
+    harness.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -290,6 +292,7 @@ describe('Consolidator', () => {
 describe('Consolidator turn-state stripping', () => {
   let tmpDir: string
   let manager: SessionManager
+  let harness: TestSessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   const fileUuid = 'file-uuid-1'
 
@@ -308,8 +311,8 @@ describe('Consolidator turn-state stripping', () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-strip-'))
-    manager = new SessionManager()
-    await manager.init(tmpDir)
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -318,7 +321,7 @@ describe('Consolidator turn-state stripping', () => {
   })
 
   afterEach(() => {
-    manager.close()
+    harness.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
@@ -380,6 +383,7 @@ describe('Consolidator turn-state stripping', () => {
 describe('Consolidator extraction callback seam', () => {
   let tmpDir: string
   let manager: SessionManager
+  let harness: TestSessionManager
   let buildMessages: (messages: BaseMessage[], lastSummary?: string) => Promise<BaseMessage[]>
   const workspaceUuid = 'workspace-uuid-1'
   const fileUuid = 'file-uuid-1'
@@ -413,8 +417,8 @@ describe('Consolidator extraction callback seam', () => {
 
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'consolidator-seam-'))
-    manager = new SessionManager()
-    await manager.init(tmpDir)
+    harness = await createTestSessionManager(tmpDir)
+    manager = harness.manager
 
     buildMessages = async (messages, lastSummary) => [
       new SystemMessage(lastSummary ? `Summary: ${lastSummary}` : 'system'),
@@ -423,7 +427,7 @@ describe('Consolidator extraction callback seam', () => {
   })
 
   afterEach(() => {
-    manager.close()
+    harness.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 

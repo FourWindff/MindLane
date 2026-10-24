@@ -2,6 +2,8 @@ import type { WorkspaceState } from '../fs/types.js'
 import { DEFAULT_SETTINGS } from '../fs/types.js'
 import { DEFAULT_WORKSPACE_STATE } from '../fs/workspace.js'
 import type { FileSystemService } from '../fs/index.js'
+import type { InternalStateStore } from '../store/internalStore.js'
+import { logger } from '../shared/logger.js'
 
 /** Default workspace with no user traces: no file was ever opened, so migrating the legacy global keys is safe. */
 function isDefaultWorkspaceState(state: WorkspaceState): boolean {
@@ -11,7 +13,15 @@ function isDefaultWorkspaceState(state: WorkspaceState): boolean {
 /** Workspaces whose session file index has already been pruned (once per process, so getSession does not write to disk every time). */
 const prunedFileUuidPathWorkspaces = new Set<string>()
 
-export async function getWorkspaceSessionForService(service: FileSystemService) {
+/**
+ * Workspace session payload for the renderer. Active sessions are read from
+ * the internal state store only; the `state.json` copy is a rollback mirror
+ * written by `persistActiveSessionForService` and is never consulted here.
+ */
+export async function getWorkspaceSessionForService(
+  service: FileSystemService,
+  stateStore: InternalStateStore | null = null,
+) {
   const launchResult = await service.appState.getLaunchSession()
   if (!launchResult.ok) {
     return {
@@ -56,8 +66,14 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     if (finalResult.ok) workspaceState = finalResult.data
 
     lastOpenedFilePath = workspaceState.lastOpenedFilePath
-    activeSessionIds = workspaceState.activeSessionIds
     fileUuidPaths = workspaceState.fileUuidPaths
+    if (stateStore && workspaceState.workspaceUuid) {
+      activeSessionIds = Object.fromEntries(
+        stateStore
+          .listActiveSessions(workspaceState.workspaceUuid)
+          .map((row) => [row.fileUuid, row.sessionId]),
+      )
+    }
   }
 
   return {
@@ -68,4 +84,34 @@ export async function getWorkspaceSessionForService(service: FileSystemService) 
     fileUuidPaths,
     restoreLastWorkspaceOnLaunch,
   }
+}
+
+/**
+ * Persist one file's active session: database first (the read source), then the
+ * `state.json` rollback mirror. A mirror failure is logged and never fails the
+ * caller, because correctness no longer depends on that file.
+ */
+export async function persistActiveSessionForService(
+  service: FileSystemService,
+  stateStore: InternalStateStore | null,
+  workspacePath: string,
+  fileUuid: string,
+  sessionId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const workspaceState = await service.workspace.load(workspacePath)
+  if (!workspaceState.ok) return workspaceState
+  if (!workspaceState.data.workspaceUuid) {
+    return { ok: false, error: 'Workspace is missing a stable identity' }
+  }
+
+  stateStore?.setActiveSession(workspaceState.data.workspaceUuid, fileUuid, sessionId)
+
+  const mirror = await service.workspace.setActiveSessionId(workspacePath, fileUuid, sessionId)
+  if (!mirror.ok) {
+    logger.warn(
+      '[workspaceSession] state.json active-session mirror failed (database is authoritative): %s',
+      mirror.error,
+    )
+  }
+  return { ok: true }
 }

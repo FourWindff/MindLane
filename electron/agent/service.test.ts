@@ -24,15 +24,17 @@ describe('initAgentServices assembly', () => {
   afterEach(() => {
     services.sessionManager.close()
     services.checkpointer.close()
+    services.stateStore.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('assembles 5 non-optional services', () => {
+  it('assembles 6 non-optional services', () => {
     expect(services.sessionManager).toBeDefined()
     expect(services.checkpointer).toBeDefined()
     expect(services.memoryManager).toBeDefined()
     expect(services.memoryExtractor).toBeDefined()
     expect(services.editLogStore).toBeDefined()
+    expect(services.stateStore).toBeDefined()
   })
 
   it('creates the memory directory', () => {
@@ -54,5 +56,19 @@ describe('initAgentServices assembly', () => {
 
   it('checkpointer adapter is ready', () => {
     expect(services.checkpointer.getAdapter()).toBeDefined()
+  })
+
+  it('fails the whole assembly with the store error when the state database is corrupt', async () => {
+    const corruptDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aiservice-corrupt-'))
+    try {
+      fs.mkdirSync(path.join(corruptDir, 'memory'), { recursive: true })
+      fs.writeFileSync(path.join(corruptDir, 'memory', 'state.db'), 'not a database')
+
+      await expect(initAgentServices(corruptDir)).rejects.toThrow(
+        /Internal state store unavailable/,
+      )
+    } finally {
+      fs.rmSync(corruptDir, { recursive: true, force: true })
+    }
   })
 })

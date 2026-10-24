@@ -354,6 +354,7 @@ app.whenReady().then(async () => {
     fsService,
     sessionManager: services?.sessionManager ?? null,
     editLogStore: services?.editLogStore ?? null,
+    stateStore: services?.stateStore ?? null,
     getWindow: () => win,
     mindmapReadRequester,
     mindmapWriteRequester,

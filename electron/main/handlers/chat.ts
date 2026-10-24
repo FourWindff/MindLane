@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../ipc.js'
+import { logger } from '../../shared/logger.js'
 import { aiNotReadyResponse } from './helpers.js'
 import type { HandlerContext } from './context.js'
 import type { ChatMessage } from '../../../contracts/fileFormat.js'
@@ -77,12 +78,20 @@ export function registerChatHandlers(ctx: HandlerContext): void {
           },
         )
         if (sessionMeta?.fileUuid) {
-          await fsService.workspace.setActiveSessionId(
+          // The database delete already dropped the mapping this restore reads;
+          // clear the state.json rollback copy too, but never fail on it.
+          const mirror = await fsService.workspace.setActiveSessionId(
             payload.workspacePath,
             sessionMeta.fileUuid,
             null,
             payload.sessionId,
           )
+          if (!mirror.ok) {
+            logger.warn(
+              '[chat] state.json active-session cleanup failed (database is authoritative): %s',
+              mirror.error,
+            )
+          }
         }
         return { ok: true }
       } catch (err) {

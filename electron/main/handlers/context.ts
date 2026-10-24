@@ -12,6 +12,7 @@ import type {
   MindmapWriteResponse,
 } from '../../ipc.js'
 import type { RendererRequester } from '../rendererRequester.js'
+import type { InternalStateStore } from '../../store/internalStore.js'
 
 /**
  * The dependency carrier shared by all handler modules. Modules construct no services
@@ -24,6 +25,8 @@ export interface HandlerContext {
   sessionManager: SessionManager | null
   /** Nullable narrow field: null when AI service assembly fails. */
   editLogStore: EditLogStore | null
+  /** Shared internal state store (sessions, active-session mappings, ...); null when AI assembly fails. */
+  stateStore: InternalStateStore | null
   getWindow: () => BrowserWindow | null
   /** Main process -> renderer mindmap read requester (requestId correlation + timeout), created at assembly time. */
   mindmapReadRequester: RendererRequester<MindmapReadRequest, MindmapReadResponse>
