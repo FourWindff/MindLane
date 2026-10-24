@@ -61,6 +61,7 @@ export enum IPC {
   ShellOpenExternal = 'shell:open-external',
   ShellLogError = 'shell:log-error',
   ShellLogWarning = 'shell:log-warning',
+  ShellLogDebug = 'shell:log-debug',
 
   EditlogAppend = 'editlog:append',
 
@@ -151,12 +152,14 @@ export type { PalaceArtworkStyle } from '../contracts/palaceArtworkStyle.js'
 export interface MindLaneBridge {
   ai: {
     chatStream: (payload: {
+      /** Renderer-chosen stream identity: the main process echoes it on every event. */
+      streamId: string
       threadId: string
       message: string
       context: ChatContext
       /** Present = ephemeral run: no session IO, private thread, entry marker. */
       ephemeral?: EphemeralRunRequest
-    }) => Promise<{ ok: true; streamId: string } | { ok: false; error: string }>
+    }) => Promise<{ ok: true } | { ok: false; error: string }>
     stopStream: (streamId: string) => Promise<{ ok: boolean }>
     onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void
     getProviders: () => Promise<
@@ -301,6 +304,8 @@ export interface MindLaneBridge {
     logError: (message: string) => void
     /** Fire-and-forget recoverable renderer warning written to the diagnostic log. */
     logWarning: (message: string) => void
+    /** Fire-and-forget renderer debug line written to the diagnostic log. */
+    logDebug: (message: string) => void
   }
   editlog: {
     /** Fire-and-forget report of a user node-text edit; the renderer never awaits a result. */

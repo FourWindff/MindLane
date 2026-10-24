@@ -11,16 +11,13 @@ import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
 import { activateFile } from '@/__testutils__/chatHarness'
 
-type ChatStreamResult = { ok: true; streamId: string } | { ok: false; error: string }
+type ChatStreamResult = { ok: true } | { ok: false; error: string }
 
 let emitStreamEvent: (event: ChatStreamEvent) => void = () => {}
 
 function installStreamApi() {
   let streamListener: ((event: ChatStreamEvent) => void) | undefined
-  const chatStream = vi.fn(async (): Promise<ChatStreamResult> => ({
-    ok: true as const,
-    streamId: 'stream-1',
-  }))
+  const chatStream = vi.fn(async (): Promise<ChatStreamResult> => ({ ok: true as const }))
   Object.defineProperty(globalThis, 'window', { configurable: true, value: globalThis })
   Object.defineProperty(globalThis.window, 'mindlane', {
     configurable: true,
@@ -97,10 +94,11 @@ describe('AI writing projection', () => {
     const instance = activateFile('file-a')
 
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(true)
+    const streamId = useAiStore.getState().activeStreamIds['session-a']!
     expect(instance.isAiWriting()).toBe(true)
 
     emitStreamEvent({
-      streamId: 'stream-1',
+      streamId,
       sessionId: 'session-a',
       type: 'end',
       payload: { content: 'ok' },
@@ -112,8 +110,9 @@ describe('AI writing projection', () => {
     const instance = activateFile('file-a')
 
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(true)
+    const streamId = useAiStore.getState().activeStreamIds['session-a']!
     emitStreamEvent({
-      streamId: 'stream-1',
+      streamId,
       sessionId: 'session-a',
       type: 'error',
       payload: 'boom',
@@ -125,11 +124,12 @@ describe('AI writing projection', () => {
     const instance = activateFile('file-a')
 
     expect(await useAiStore.getState().sendChatMessage('hello')).toBe(true)
+    const streamId = useAiStore.getState().activeStreamIds['session-a']!
     useAiStore.getState().markStreamStopping('session-a')
     expect(instance.isAiWriting()).toBe(true)
 
     emitStreamEvent({
-      streamId: 'stream-1',
+      streamId,
       sessionId: 'session-a',
       type: 'end',
       payload: { content: '' },

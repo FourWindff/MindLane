@@ -16,8 +16,9 @@ import type { MindmapEditor } from './editor'
  * routes the run's events away from the chat history, shows progress on the
  * placeholder node and keeps the private thread resumable — it never lands.
  *
- * Events can arrive before `chatStream` resolves with the streamId, so they wait
- * in a buffer keyed by the correlation id (same handshake as a chat send).
+ * The run chooses its streamId (one per start attempt) and registers it before
+ * the request leaves, so its events are routed by id from the first one on — no
+ * buffering, no pairing, no replay once the invoke resolves.
  */
 
 interface PalaceRunHandlers {
@@ -43,16 +44,16 @@ interface ActiveRun {
   sessionId: string
   context: ChatContext
   handlers: PalaceRunHandlers
+  /** Id of the current start attempt; fresh per attempt so a resume never reuses a stream. */
   streamId: string | null
+  /** True from the start request until the run's terminal event. */
+  running: boolean
   /** True while the start invoke is in flight (a second click must not re-send). */
   starting: boolean
 }
 
 const runsByNode = new Map<string, ActiveRun>()
 const runsByStream = new Map<string, ActiveRun>()
-const runsBySession = new Map<string, ActiveRun>()
-/** Events that arrived before the run's streamId was known, keyed by sessionId. */
-const pendingEvents = new Map<string, ChatStreamEvent[]>()
 
 function runKey(fileUuid: string, nodeId: string): string {
   return `${fileUuid}\0${nodeId}`
@@ -85,7 +86,15 @@ async function sendRun(
     return { ok: false, error: 'IPC channel unavailable; make sure you are running in Electron' }
   }
 
+  // The stream id is chosen here and the dispatch entry is in place before the
+  // request is sent, so the first event already knows its run.
+  const streamId = crypto.randomUUID()
+  run.streamId = streamId
+  run.running = true
+  runsByStream.set(streamId, run)
+
   const result = await api.chatStream({
+    streamId,
     threadId: run.sessionId,
     message: '',
     context: run.context,
@@ -97,14 +106,6 @@ async function sendRun(
   if (!result.ok) {
     forgetRun(run)
     return { ok: false, error: result.error }
-  }
-
-  run.streamId = result.streamId
-  runsByStream.set(result.streamId, run)
-  const buffered = pendingEvents.get(run.sessionId) ?? []
-  pendingEvents.delete(run.sessionId)
-  for (const event of buffered) {
-    if (event.streamId === result.streamId) handleRunEvent(run, event)
   }
   return { ok: true }
 }
@@ -121,10 +122,10 @@ export async function startPalaceRun(
     context: options.context,
     handlers: options.handlers,
     streamId: null,
+    running: false,
     starting: false,
   }
   runsByNode.set(runKey(run.fileUuid, run.nodeId), run)
-  runsBySession.set(run.sessionId, run)
   return startRun(run)
 }
 
@@ -134,7 +135,7 @@ export async function startPalaceRun(
  */
 export async function resumePalaceRun(fileUuid: string, nodeId: string): Promise<void> {
   const run = runsByNode.get(runKey(fileUuid, nodeId))
-  if (!run || run.streamId || run.starting) return
+  if (!run || run.running || run.starting) return
   const editor = editorOf(run)
   editor?.clearNodeFlag(nodeId, 'runStage')
   editor?.clearNodeFlag(nodeId, 'runStopped')
@@ -148,7 +149,7 @@ export async function resumePalaceRun(fileUuid: string, nodeId: string): Promise
 /** Stop the run's stream; the node keeps its placeholder for a later resume. */
 export function stopPalaceRun(fileUuid: string, nodeId: string): void {
   const run = runsByNode.get(runKey(fileUuid, nodeId))
-  if (run?.streamId) void window.mindlane?.ai.stopStream(run.streamId)
+  if (run?.running && run.streamId) void window.mindlane?.ai.stopStream(run.streamId)
 }
 
 /**
@@ -157,12 +158,8 @@ export function stopPalaceRun(fileUuid: string, nodeId: string): void {
  */
 export function handlePalaceRunEvent(event: ChatStreamEvent): boolean {
   const run = runsByStream.get(event.streamId)
-  if (run) {
-    handleRunEvent(run, event)
-    return true
-  }
-  if (!runsBySession.has(event.sessionId)) return false
-  pendingEvents.set(event.sessionId, [...(pendingEvents.get(event.sessionId) ?? []), event])
+  if (!run) return false
+  handleRunEvent(run, event)
   return true
 }
 
@@ -202,13 +199,12 @@ function handleRunEvent(run: ActiveRun, event: ChatStreamEvent): void {
 function forgetStream(run: ActiveRun): void {
   if (run.streamId) runsByStream.delete(run.streamId)
   run.streamId = null
+  run.running = false
 }
 
 function forgetRun(run: ActiveRun): void {
   forgetStream(run)
   runsByNode.delete(runKey(run.fileUuid, run.nodeId))
-  runsBySession.delete(run.sessionId)
-  pendingEvents.delete(run.sessionId)
 }
 
 /** Keep the placeholder and offer a resume: the private thread stays resumable. */

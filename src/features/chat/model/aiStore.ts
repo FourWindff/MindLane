@@ -10,7 +10,7 @@ import { createEntryFile } from '@/features/chat/lib/entryConversation'
 import { isSubgraphTool } from '@/features/chat/lib/chatUtils'
 import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
-import { reportRendererError } from '@/shared/lib/reportRendererError'
+import { reportRendererDebug, reportRendererError } from '@/shared/lib/reportRendererError'
 import { splitCurrentTurn, stripTurnState } from '@contracts/turnState'
 import type { ChatStreamEvent, StreamStep } from '@contracts/ipc'
 
@@ -472,6 +472,8 @@ export const useAiStore = create<AiState>((set, get) => ({
       fileUuidPaths: { ...state.fileUuidPaths, [fileUuid]: filePath },
     })),
 
+  // Recorded before the send reaches the main process, so every event of this
+  // stream already has a file to land in when it arrives.
   registerStream: (fileUuid, sessionId, streamId) => {
     set((state) => {
       const current = state.fileChats[fileUuid] ?? createFileChatState(sessionId)
@@ -489,11 +491,6 @@ export const useAiStore = create<AiState>((set, get) => ({
         activeStreamIds: { ...state.activeStreamIds, [sessionId]: streamId },
       }
     })
-    const pending = pendingStreamEvents.get(sessionId) ?? []
-    pendingStreamEvents.delete(sessionId)
-    for (const event of pending) {
-      if (event.streamId === streamId) dispatchStreamEvent(event)
-    }
   },
   markStreamStopping: (sessionId) => {
     set((state) => {
@@ -509,9 +506,10 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
   },
 
-  // Owns the send handshake: await chatStream for the streamId first, then
-  // registerStream with the origin ids captured before the await. All guards
-  // read fresh state via get() instead of render-time snapshots.
+  // The renderer owns the stream identity: it is generated and registered with
+  // the origin file/session before the request leaves, so event routing never
+  // depends on the order in which the invoke response and events arrive. All
+  // guards read fresh state via get() instead of render-time snapshots.
   sendChatMessage: async (text) => {
     const doc = get().attachedDocument
     const fileUuid = get().currentFileUuid
@@ -561,30 +559,32 @@ export const useAiStore = create<AiState>((set, get) => ({
 
     get().setBusy(true)
 
+    // Origin ids are captured once, before the request: a file switch while the
+    // turn is in flight must not redirect this stream's events.
     const context = buildChatContext()
     const originFileUuid = get().currentFileUuid
     const originSessionId = currentChat(get())?.activeSessionId ?? ''
+    const streamId = crypto.randomUUID()
     get().setAttachedDocument(null)
+    if (originFileUuid) get().registerStream(originFileUuid, originSessionId, streamId)
 
     const result = await api.chatStream({
+      streamId,
       threadId: originSessionId,
       message,
       context,
     })
-    if (result.ok) {
-      if (originFileUuid) {
-        get().registerStream(originFileUuid, originSessionId, result.streamId)
-      }
-    } else if (originFileUuid) {
+    if (!result.ok) {
       // Errors have no renderer UI: log the text and clear busy. The old
       // per-file error state used to clear busy as a side effect; without it a
       // failed startup invoke would leave the file stuck in `busy`.
       reportRendererError(result.error)
-      set((state) =>
-        state.fileChats[originFileUuid]
-          ? patchFileChat(state, originFileUuid, { busy: false })
-          : state,
-      )
+      set((state) => {
+        const activeStreamIds = { ...state.activeStreamIds }
+        delete activeStreamIds[originSessionId]
+        const patch = originFileUuid ? patchFileChat(state, originFileUuid, { busy: false }) : {}
+        return { ...patch, activeStreamIds }
+      })
     }
     return true
   },
@@ -843,39 +843,30 @@ export function reduceStreamEvent(chat: FileChatState, event: ChatStreamEvent): 
 
 function routeStreamEvent(event: ChatStreamEvent): boolean {
   const currentState = useAiStore.getState()
-  const pendingFileUuid = currentState.sessionFileUuids[event.sessionId]
-  if (
-    pendingFileUuid &&
-    !currentState.activeStreamIds[event.sessionId] &&
-    currentState.fileChats[pendingFileUuid]?.busy
-  ) {
-    pendingStreamEvents.set(event.sessionId, [
-      ...(pendingStreamEvents.get(event.sessionId) ?? []),
-      event,
-    ])
+  const fileUuid = currentState.sessionFileUuids[event.sessionId]
+  const current = fileUuid ? currentState.fileChats[fileUuid] : undefined
+  if (!fileUuid || !current || currentState.activeStreamIds[event.sessionId] !== event.streamId) {
+    // An event whose ids match no live stream (late tail of a settled run, or a
+    // stream this renderer never started) is dropped once and never retried.
+    reportRendererDebug(
+      `dropped ${event.type} event for stream ${event.streamId} (session ${event.sessionId}): no active stream matches`,
+    )
     return false
   }
-  let accepted = false
-  useAiStore.setState((state) => {
-    const fileUuid = state.sessionFileUuids[event.sessionId]
-    if (!fileUuid || state.activeStreamIds[event.sessionId] !== event.streamId) return state
-    const current = state.fileChats[fileUuid]
-    if (!current) return state
-    accepted = true
-    let activeStreamIds = state.activeStreamIds
-    if (event.type === 'end' || event.type === 'error') {
-      activeStreamIds = { ...activeStreamIds }
-      delete activeStreamIds[event.sessionId]
-    }
-    const fileChats = { ...state.fileChats, [fileUuid]: reduceStreamEvent(current, event) }
-    return { fileChats, activeStreamIds }
+  let activeStreamIds = currentState.activeStreamIds
+  if (event.type === 'end' || event.type === 'error') {
+    activeStreamIds = { ...activeStreamIds }
+    delete activeStreamIds[event.sessionId]
+  }
+  useAiStore.setState({
+    fileChats: { ...currentState.fileChats, [fileUuid]: reduceStreamEvent(current, event) },
+    activeStreamIds,
   })
-  return accepted
+  return true
 }
 
 let disconnectStore: (() => void) | null = null
 const streamEventListeners = new Set<(event: ChatStreamEvent) => void>()
-const pendingStreamEvents = new Map<string, ChatStreamEvent[]>()
 
 export function subscribeToChatStreamEvents(
   listener: (event: ChatStreamEvent) => void,
