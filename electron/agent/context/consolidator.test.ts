@@ -11,7 +11,6 @@ import { createTestSessionManager, type TestSessionManager } from './sessionMana
 import { LLMProvider, ProviderCapability } from '../providers/base.js'
 import { MemoryExtractor, createExtractionCallback } from '../memory/memoryExtractor.js'
 import { MemoryManager } from '../memory/memoryManager.js'
-import { EditLogStore } from '../memory/editLogStore.js'
 
 class FakeProvider extends LLMProvider {
   constructor(model: BaseChatModel) {
@@ -484,17 +483,23 @@ describe('Consolidator extraction callback seam', () => {
       expect(onArchived).not.toHaveBeenCalled()
     }))
 
-  it('deletes the editlog and writes memory after a successful extraction', async () =>
+  it("clears the extracted file's edits and writes memory after a successful extraction", async () =>
     inWs(async () => {
       const sessionId = 'extract-success'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
 
-      const editLogStore = new EditLogStore(tmpDir)
-      await editLogStore.append(workspaceUuid, fileUuid, {
+      const stateStore = harness.stateStore
+      stateStore.appendEditLog(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
         before: 'written by the AI',
         after: 'edited by the user',
+      })
+      stateStore.appendEditLog(workspaceUuid, 'another-file', {
+        ts: 2,
+        nodeId: 'n2',
+        before: 'keep me',
+        after: 'still keep me',
       })
 
       const extractor = new MemoryExtractor(new MemoryManager(tmpDir))
@@ -507,7 +512,7 @@ describe('Consolidator extraction callback seam', () => {
           getToolDefinitions: () => [],
           onArchived: createExtractionCallback({
             extractor,
-            editLogStore,
+            stateStore,
             provider,
             workspaceUuid,
             fileUuid,
@@ -520,9 +525,11 @@ describe('Consolidator extraction callback seam', () => {
       expect(changed).toBe(true)
 
       // The extraction callback is fire-and-forget: wait for it to land, then assert on its output
-      await vi.waitFor(async () => {
-        expect(await editLogStore.read(workspaceUuid, fileUuid)).toEqual([])
+      await vi.waitFor(() => {
+        expect(stateStore.readEditLog(workspaceUuid, fileUuid)).toEqual([])
       })
+      // Clearing is scoped to the extracted fileUuid
+      expect(stateStore.readEditLog(workspaceUuid, 'another-file')).toHaveLength(1)
       const memoryContent = fs.readFileSync(
         path.join(tmpDir, 'mindlanememory', 'MEMORY.md'),
         'utf-8',
@@ -530,13 +537,13 @@ describe('Consolidator extraction callback seam', () => {
       expect(memoryContent).toContain('the user prefers modular design')
     }))
 
-  it('compression is unaffected and the editlog is kept when the extraction callback throws', async () =>
+  it('compression is unaffected and the edits are kept when the extraction callback throws', async () =>
     inWs(async () => {
       const sessionId = 'extract-failure'
       await manager.saveMessages(sessionId, makeMessages(20), fileUuid)
 
-      const editLogStore = new EditLogStore(tmpDir)
-      await editLogStore.append(workspaceUuid, fileUuid, {
+      const stateStore = harness.stateStore
+      stateStore.appendEditLog(workspaceUuid, fileUuid, {
         ts: 1,
         nodeId: 'n1',
         before: 'written by the AI',
@@ -557,7 +564,7 @@ describe('Consolidator extraction callback seam', () => {
           getToolDefinitions: () => [],
           onArchived: createExtractionCallback({
             extractor: failingExtractor as never,
-            editLogStore,
+            stateStore,
             provider,
             workspaceUuid,
             fileUuid,
@@ -574,7 +581,7 @@ describe('Consolidator extraction callback seam', () => {
       // Artifacts of the main compression path are intact
       const meta = manager.getSessionMeta(sessionId)
       expect(meta?._lastSummary).toBe('summary')
-      // Extraction failed: the editlog evidence is kept
-      expect((await editLogStore.read(workspaceUuid, fileUuid)).length).toBe(1)
+      // Extraction failed: the edit evidence is kept
+      expect(stateStore.readEditLog(workspaceUuid, fileUuid)).toHaveLength(1)
     }))
 })

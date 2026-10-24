@@ -4,11 +4,10 @@ import { CheckpointerManager } from './memory/checkpointer.js'
 import { SessionManager } from './context/sessionManager.js'
 import { MemoryManager } from './memory/memoryManager.js'
 import { MemoryExtractor } from './memory/memoryExtractor.js'
-import { EditLogStore } from './memory/editLogStore.js'
 import { openInternalStore, type InternalStateStore } from '../store/internalStore.js'
 
 /**
- * Assembly result of the agent-side services. All six are non-optional: the
+ * Assembly result of the agent-side services. All five are non-optional: the
  * assembly function either succeeds as a whole or fails as a whole (callers
  * degrade on failure); there is no "partially ready" in-between state.
  */
@@ -17,8 +16,11 @@ export interface AgentServices {
   checkpointer: CheckpointerManager
   memoryManager: MemoryManager
   memoryExtractor: MemoryExtractor
-  editLogStore: EditLogStore
-  /** Shared internal state store: queries never leak SQL past this handle. */
+  /**
+   * The shared SQLite store for app-internal state: sessions, active-session
+   * mappings and node edit history (its `edit_log` table). There is no
+   * directory of per-file edit-log files.
+   */
   stateStore: InternalStateStore
 }
 
@@ -27,7 +29,7 @@ export interface AgentServices {
  * Fixed assembly order: create the memory directory → open the internal state
  * store → sessionManager.init(stateStore) → checkpointer.initWithDbPath →
  * sessionManager.setCheckpointer(checkpointer) (cross-wiring) → construct the
- * three memory components.
+ * two memory components.
  *
  * A store that cannot be opened (corrupt file, unsupported schema) fails the
  * whole assembly with the explicit store error, so the caller degrades AI
@@ -38,6 +40,8 @@ export async function initAgentServices(userDataPath: string): Promise<AgentServ
   await fs.promises.mkdir(dbDir, { recursive: true })
   const dbPath = path.join(dbDir, 'app.db')
 
+  // Opened exactly once: the same handle carries sessions, active-session
+  // mappings and node edit history, and never leaks SQL past this point.
   const opened = openInternalStore(path.join(dbDir, 'state.db'))
   if (!opened.ok) throw new Error(opened.error)
   const stateStore = opened.store
@@ -52,14 +56,12 @@ export async function initAgentServices(userDataPath: string): Promise<AgentServ
 
     const memoryManager = new MemoryManager(userDataPath)
     const memoryExtractor = new MemoryExtractor(memoryManager)
-    const editLogStore = new EditLogStore(userDataPath)
 
     return {
       sessionManager,
       checkpointer,
       memoryManager,
       memoryExtractor,
-      editLogStore,
       stateStore,
     }
   } catch (error) {

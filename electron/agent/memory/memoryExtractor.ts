@@ -1,7 +1,7 @@
 import { SystemMessage, type BaseMessage } from '@langchain/core/messages'
 import type { LLMProvider } from '../providers/index.js'
 import { MemoryManager } from './memoryManager.js'
-import type { EditLogEntry, EditLogStore } from './editLogStore.js'
+import type { EditLogEntry, InternalStateStore } from '../../store/internalStore.js'
 import { logger } from '../../shared/logger.js'
 import { messageContentToString } from '../utils.js'
 import { stripTurnState } from '../../ipc.js'
@@ -121,26 +121,27 @@ Output the full consolidated fact list.`
 }
 
 /**
- * Build the Consolidator `onArchived` callback: reads the file's editlog,
- * runs extraction on the archived slice, and deletes the editlog only after
- * a successful extraction (kept on failure so evidence is not lost).
+ * Build the Consolidator `onArchived` callback: reads the file's edit history
+ * from the internal store, runs extraction on the archived slice, and clears
+ * the file's edit rows only after a successful extraction (kept on failure so
+ * evidence is not lost).
  */
 export function createExtractionCallback(deps: {
   extractor: MemoryExtractor
-  editLogStore: EditLogStore
+  stateStore: InternalStateStore
   provider: LLMProvider
   workspaceUuid: string
   fileUuid: string
 }): (messages: BaseMessage[]) => Promise<void> {
   return async (messages) => {
-    const editlogEntries = await deps.editLogStore.read(deps.workspaceUuid, deps.fileUuid)
+    const editlogEntries = deps.stateStore.readEditLog(deps.workspaceUuid, deps.fileUuid)
     await deps.extractor.extractAndPersist({
       provider: deps.provider,
       messages,
       editlogEntries,
     })
     if (editlogEntries.length > 0) {
-      await deps.editLogStore.delete(deps.workspaceUuid, deps.fileUuid)
+      deps.stateStore.clearEditLog(deps.workspaceUuid, deps.fileUuid)
     }
   }
 }

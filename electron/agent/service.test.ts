@@ -28,12 +28,11 @@ describe('initAgentServices assembly', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('assembles 6 non-optional services', () => {
+  it('assembles 5 non-optional services', () => {
     expect(services.sessionManager).toBeDefined()
     expect(services.checkpointer).toBeDefined()
     expect(services.memoryManager).toBeDefined()
     expect(services.memoryExtractor).toBeDefined()
-    expect(services.editLogStore).toBeDefined()
     expect(services.stateStore).toBeDefined()
   })
 
@@ -56,6 +55,20 @@ describe('initAgentServices assembly', () => {
 
   it('checkpointer adapter is ready', () => {
     expect(services.checkpointer.getAdapter()).toBeDefined()
+  })
+
+  it('keeps node edit history in the state store, not in an editlog directory', () => {
+    services.stateStore.appendEditLog('workspace-uuid-assembly', 'file-uuid-a', {
+      ts: 1,
+      nodeId: 'node-1',
+      before: 'written by the AI',
+      after: 'edited by the user',
+    })
+
+    expect(services.stateStore.readEditLog('workspace-uuid-assembly', 'file-uuid-a')).toEqual([
+      { ts: 1, nodeId: 'node-1', before: 'written by the AI', after: 'edited by the user' },
+    ])
+    expect(fs.existsSync(path.join(tmpDir, 'memory', 'editlog'))).toBe(false)
   })
 
   it('fails the whole assembly with the store error when the state database is corrupt', async () => {
