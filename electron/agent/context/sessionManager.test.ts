@@ -303,6 +303,22 @@ describe('SessionManager', () => {
     })
   })
 
+  it('lists capsule files only when both a session and an identity path exist', async () =>
+    inWs(async () => {
+      await appendMessages('session-a', [new HumanMessage('A')], 'file-a')
+      await appendMessages('session-b', [new HumanMessage('B')], 'file-b')
+      stateStore.setFilePath(workspaceUuid, 'file-a', '/ws/a.mindlane')
+      // file-b has a session but no path row: it cannot be opened, so it is not a capsule.
+
+      expect(manager.listCapsuleFiles()).toEqual([
+        { fileUuid: 'file-a', filePath: '/ws/a.mindlane', lastActivityAt: expect.any(String) },
+      ])
+    }))
+
+  it('refuses to list capsule files without a workspace context', () => {
+    expect(() => manager.listCapsuleFiles()).toThrow(/workspace context/)
+  })
+
   it('deleteSession clears the active-session mapping that restore reads', async () =>
     inWs(async () => {
       await appendMessages('session-active', [new HumanMessage('hello')])

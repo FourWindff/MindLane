@@ -1,6 +1,7 @@
 import type { ChatMessage, DocumentRef, MindLaneFile } from '../contracts/fileFormat.js'
 
 import type {
+  CapsuleFileMeta,
   ChatContext,
   ChatStreamEvent,
   EphemeralRunRequest,
@@ -14,7 +15,7 @@ import type {
   MindmapDocumentIntent,
   MindmapDocumentState,
 } from '../contracts/mindmapDocument/state.js'
-import type { AppSettings, WorkspaceState } from './fs/types.js'
+import type { AppSettings } from './fs/types.js'
 import type { McpServerStatusInfo } from './agent/mcp/types.js'
 
 export enum IPC {
@@ -52,9 +53,9 @@ export enum IPC {
   WorkspaceCreateSubfolder = 'workspace:create-subfolder',
   WorkspaceDeleteItem = 'workspace:delete-item',
   WorkspaceRenameItem = 'workspace:rename-item',
-  WorkspaceUpdateFileUuidPath = 'workspace:update-file-uuid-path',
 
   ChatListSessions = 'chat:list-sessions',
+  ChatListCapsuleFiles = 'chat:list-capsule-files',
   ChatLoadSession = 'chat:load-session',
   ChatDeleteSession = 'chat:delete-session',
 
@@ -123,8 +124,6 @@ interface SelectedDocumentInfo {
 interface WorkspaceSession {
   workspacePath: string | null
   activeSessionIds: Record<string, string>
-  /** Session file index: fileUuid -> filePath, used by the renderer's capsule bar across launches. */
-  fileUuidPaths: Record<string, string>
   recentWorkspacePaths: string[]
   lastOpenedFilePath: string | null
   restoreLastWorkspaceOnLaunch: boolean
@@ -226,17 +225,9 @@ export interface MindLaneBridge {
       filePath: string
     }) => Promise<IpcResult<{ filePath: string; data: MindLaneFile }>>
     getSession: () => Promise<WorkspaceSession>
-    updateState: (
-      payload: {
-        workspacePath: string
-        activeSession?: { fileUuid: string; sessionId: string }
-      } & Partial<WorkspaceState>,
-    ) => Promise<{ ok: true } | { ok: false; error: string }>
-    /** Update one session file index mapping (used to fix the path after a rename/move). */
-    updateFileUuidPath: (payload: {
+    updateState: (payload: {
       workspacePath: string
-      fileUuid: string
-      filePath: string
+      activeSession?: { fileUuid: string; sessionId: string }
     }) => Promise<{ ok: true } | { ok: false; error: string }>
     switchDirectory: (payload: {
       workspacePath: string
@@ -265,6 +256,10 @@ export interface MindLaneBridge {
       limit?: number
       offset?: number
     }) => Promise<IpcResult<{ sessions: ChatSessionMeta[] }>>
+    /** Capsule bar input: membership, path and ordering in one query. */
+    listCapsuleFiles: (payload: {
+      workspacePath: string
+    }) => Promise<IpcResult<{ files: CapsuleFileMeta[] }>>
     loadSession: (payload: {
       workspacePath: string
       sessionId: string

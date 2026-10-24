@@ -4,19 +4,32 @@ import path from 'node:path'
 import os from 'node:os'
 import { Workspace } from './workspace.js'
 import { AppState } from './appState.js'
+import { openInternalStore, type InternalStateStore } from '../store/internalStore.js'
 
 describe('Workspace', () => {
   let tmpDir: string
   let workspace: Workspace
+  let stateStore: InternalStateStore
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-workspace-'))
-    workspace = new Workspace()
+    const opened = openInternalStore(path.join(tmpDir, 'state.db'))
+    if (!opened.ok) throw new Error(opened.error)
+    stateStore = opened.store
+    workspace = new Workspace(undefined, stateStore)
   })
 
   afterEach(() => {
+    stateStore.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
+
+  /** Load a fresh workspace and return its stable identity. */
+  async function loadWorkspaceUuid(workspacePath: string): Promise<string> {
+    const state = await workspace.load(workspacePath)
+    if (!state.ok || !state.data.workspaceUuid) throw new Error('workspace identity missing')
+    return state.data.workspaceUuid
+  }
 
   it('returns defaults when state file is missing', async () => {
     const workspacePath = path.join(tmpDir, 'workspace')
@@ -30,7 +43,6 @@ describe('Workspace', () => {
     expect(result.data.workspaceUuid).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     )
-    expect(result.data.activeSessionIds).toEqual({})
     expect(fs.existsSync(path.join(workspacePath, '.mindlane', 'state.json'))).toBe(true)
   })
 
@@ -119,7 +131,7 @@ describe('Workspace', () => {
     expect(corrected.lastOpenedFilePath).toBeNull()
   })
 
-  it('openFile updates lastOpenedFilePath', async () => {
+  it('openFile records the last opened path and the file identity row', async () => {
     const workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
     const filePath = path.join(workspacePath, 'note.mindlane')
@@ -133,7 +145,82 @@ describe('Workspace', () => {
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
     expect(loaded.data.lastOpenedFilePath).toBe(filePath)
-    expect(loaded.data.fileUuidPaths['file-a']).toBe(filePath)
+    expect(stateStore.getFilePath(loaded.data.workspaceUuid, 'file-a')).toBe(filePath)
+  })
+
+  it('renames a file through one identity update and keeps its session history', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const oldPath = path.join(workspacePath, 'old.mindlane')
+    const newPath = path.join(workspacePath, 'new.mindlane')
+    fs.writeFileSync(oldPath, '{}')
+
+    const workspaceUuid = await loadWorkspaceUuid(workspacePath)
+    await workspace.openFile(workspacePath, oldPath, 'file-a')
+    stateStore.createSession({
+      sessionId: 'session-a',
+      workspaceUuid,
+      fileUuid: 'file-a',
+      title: 'Chat',
+    })
+    stateStore.setActiveSession(workspaceUuid, 'file-a', 'session-a')
+
+    workspace.moveFilePath(oldPath, newPath)
+
+    expect(stateStore.getFilePath(workspaceUuid, 'file-a')).toBe(newPath)
+    expect(stateStore.getActiveSession(workspaceUuid, 'file-a')).toBe('session-a')
+    expect(
+      stateStore.listSessions({ workspaceUuid, fileUuid: 'file-a' }).map((row) => row.sessionId),
+    ).toEqual(['session-a'])
+  })
+
+  it('save-as is a new identity: its own row and no inherited session history', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const originalPath = path.join(workspacePath, 'original.mindlane')
+    const copyPath = path.join(workspacePath, 'copy.mindlane')
+    fs.writeFileSync(originalPath, '{}')
+    fs.writeFileSync(copyPath, '{}')
+
+    const workspaceUuid = await loadWorkspaceUuid(workspacePath)
+    await workspace.openFile(workspacePath, originalPath, 'file-original')
+    stateStore.createSession({
+      sessionId: 'session-original',
+      workspaceUuid,
+      fileUuid: 'file-original',
+      title: 'Chat',
+    })
+
+    // Save-as mints a fresh fileUuid in the main process and opens the copy.
+    await workspace.openFile(workspacePath, copyPath, 'file-copy')
+
+    expect(stateStore.getFilePath(workspaceUuid, 'file-copy')).toBe(copyPath)
+    expect(stateStore.getFilePath(workspaceUuid, 'file-original')).toBe(originalPath)
+    expect(stateStore.listSessions({ workspaceUuid, fileUuid: 'file-copy' })).toEqual([])
+    expect(stateStore.listSessions({ workspaceUuid, fileUuid: 'file-original' })).toHaveLength(1)
+  })
+
+  it('delete drops the identity row and active mapping while keeping the session', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
+    const filePath = path.join(workspacePath, 'gone.mindlane')
+    fs.writeFileSync(filePath, '{}')
+
+    const workspaceUuid = await loadWorkspaceUuid(workspacePath)
+    await workspace.openFile(workspacePath, filePath, 'file-a')
+    stateStore.createSession({
+      sessionId: 'session-a',
+      workspaceUuid,
+      fileUuid: 'file-a',
+      title: 'Chat',
+    })
+    stateStore.setActiveSession(workspaceUuid, 'file-a', 'session-a')
+
+    workspace.deleteFileIdentitiesAtPath(filePath)
+
+    expect(stateStore.getFilePath(workspaceUuid, 'file-a')).toBeNull()
+    expect(stateStore.getActiveSession(workspaceUuid, 'file-a')).toBeNull()
+    expect(stateStore.getSession('session-a')).not.toBeNull()
   })
 
   it('falls back to defaults when state file is corrupt', async () => {
@@ -193,7 +280,7 @@ describe('Workspace', () => {
     expect(loaded.data.lastOpenedFilePath).toBe(existingFile)
   })
 
-  it('serializes concurrent saves so no update is lost', async () => {
+  it('serializes concurrent state saves so no update is lost', async () => {
     const workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
 
@@ -201,133 +288,21 @@ describe('Workspace', () => {
     const fileB = path.join(workspacePath, 'b.mindlane')
     fs.writeFileSync(fileA, '{}')
     fs.writeFileSync(fileB, '{}')
+    // Establish the workspace identity once, as a real launch does, so the two
+    // concurrent saves share it.
+    await loadWorkspaceUuid(workspacePath)
 
     await Promise.all([
-      workspace.openFile(workspacePath, fileA),
-      workspace.setActiveSessionId(workspacePath, 'file-a', 'session-a'),
+      workspace.openFile(workspacePath, fileA, 'file-a'),
+      workspace.openFile(workspacePath, fileB, 'file-b'),
     ])
 
     const loaded = await workspace.load(workspacePath)
     expect(loaded.ok).toBe(true)
     if (!loaded.ok) return
-    expect(loaded.data.lastOpenedFilePath).toBe(fileA)
-    expect(loaded.data.activeSessionIds).toEqual({ 'file-a': 'session-a' })
-  })
-
-  it('atomically merges concurrent active session updates', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    fs.mkdirSync(workspacePath, { recursive: true })
-
-    await Promise.all([
-      workspace.setActiveSessionId(workspacePath, 'file-a', 'session-a'),
-      workspace.setActiveSessionId(workspacePath, 'file-b', 'session-b'),
-    ])
-
-    const loaded = await workspace.load(workspacePath)
-    expect(loaded.ok).toBe(true)
-    if (!loaded.ok) return
-    expect(loaded.data.activeSessionIds).toEqual({
-      'file-a': 'session-a',
-      'file-b': 'session-b',
-    })
-  })
-
-  it('updateFileUuidPath persists the mapping and load round-trips it', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    fs.mkdirSync(workspacePath, { recursive: true })
-    const filePath = path.join(workspacePath, 'note.mindlane')
-    fs.writeFileSync(filePath, '{}')
-
-    const result = await workspace.updateFileUuidPath(workspacePath, 'file-a', filePath)
-    expect(result.ok).toBe(true)
-
-    const loaded = await workspace.load(workspacePath)
-    expect(loaded.ok).toBe(true)
-    if (!loaded.ok) return
-    expect(loaded.data.fileUuidPaths).toEqual({ 'file-a': filePath })
-  })
-
-  it('updateFileUuidPath overwrites an existing entry and keeps unrelated entries', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    fs.mkdirSync(workspacePath, { recursive: true })
-    const firstPath = path.join(workspacePath, 'first.mindlane')
-    const renamedPath = path.join(workspacePath, 'renamed.mindlane')
-    const otherPath = path.join(workspacePath, 'other.mindlane')
-    fs.writeFileSync(firstPath, '{}')
-    fs.writeFileSync(renamedPath, '{}')
-    fs.writeFileSync(otherPath, '{}')
-
-    await workspace.updateFileUuidPath(workspacePath, 'file-a', firstPath)
-    await workspace.updateFileUuidPath(workspacePath, 'file-b', otherPath)
-    await workspace.updateFileUuidPath(workspacePath, 'file-a', renamedPath)
-
-    const loaded = await workspace.load(workspacePath)
-    expect(loaded.ok).toBe(true)
-    if (!loaded.ok) return
-    expect(loaded.data.fileUuidPaths).toEqual({
-      'file-a': renamedPath,
-      'file-b': otherPath,
-    })
-  })
-
-  it('updateFileUuidPath skips silently when fileUuid or filePath is empty', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    fs.mkdirSync(workspacePath, { recursive: true })
-
-    const result = await workspace.updateFileUuidPath(workspacePath, '', '/a.mindlane')
-    expect(result.ok).toBe(true)
-
-    const loaded = await workspace.load(workspacePath)
-    expect(loaded.ok).toBe(true)
-    if (!loaded.ok) return
-    expect(loaded.data.fileUuidPaths).toEqual({})
-  })
-
-  it('load drops invalid fileUuidPaths entries (non-string values, empty keys, non-.mindlane paths)', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    const statePath = path.join(workspacePath, '.mindlane', 'state.json')
-    const docPath = path.join(workspacePath, 'doc.mindlane')
-    fs.mkdirSync(path.dirname(statePath), { recursive: true })
-    fs.writeFileSync(docPath, '{}')
-    fs.writeFileSync(
-      statePath,
-      JSON.stringify({
-        fileUuidPaths: {
-          'file-valid': docPath,
-          'file-empty-key': '',
-          'file-non-string': 42,
-          'file-wrong-ext': '/tmp/other.txt',
-          'file-missing-value': undefined,
-        },
-      }),
-    )
-
-    const result = await workspace.load(workspacePath)
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.data.fileUuidPaths).toEqual({ 'file-valid': docPath })
-  })
-
-  it('pruneFileUuidPaths removes entries whose files no longer exist', async () => {
-    const workspacePath = path.join(tmpDir, 'workspace')
-    fs.mkdirSync(workspacePath, { recursive: true })
-    const keptFile = path.join(workspacePath, 'kept.mindlane')
-    const goneFile = path.join(workspacePath, 'gone.mindlane')
-    fs.writeFileSync(keptFile, '{}')
-    fs.writeFileSync(goneFile, '{}')
-
-    await workspace.updateFileUuidPath(workspacePath, 'file-kept', keptFile)
-    await workspace.updateFileUuidPath(workspacePath, 'file-gone', goneFile)
-    fs.unlinkSync(goneFile)
-
-    const pruned = await workspace.pruneFileUuidPaths(workspacePath)
-    expect(pruned.ok).toBe(true)
-
-    const loaded = await workspace.load(workspacePath)
-    expect(loaded.ok).toBe(true)
-    if (!loaded.ok) return
-    expect(loaded.data.fileUuidPaths).toEqual({ 'file-kept': keptFile })
+    expect([fileA, fileB]).toContain(loaded.data.lastOpenedFilePath)
+    expect(stateStore.getFilePath(loaded.data.workspaceUuid, 'file-a')).toBe(fileA)
+    expect(stateStore.getFilePath(loaded.data.workspaceUuid, 'file-b')).toBe(fileB)
   })
 
   it('does not rewrite state.json when the workspace identity is unchanged', async () => {

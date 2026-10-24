@@ -7,7 +7,6 @@ import {
   getWorkspaceSessionForService,
   persistActiveSessionForService,
 } from './workspaceSession.js'
-import { logger } from '../shared/logger.js'
 import { openInternalStore, type InternalStateStore } from '../store/internalStore.js'
 
 vi.mock('electron', () => ({
@@ -97,8 +96,6 @@ describe('getWorkspaceSessionForService', () => {
     const store = openTestStore()
     try {
       store.setActiveSession(workspaceUuid, 'file-uuid', 'session-uuid')
-      // The state.json mirror is stale on purpose: restore must read the store only.
-      await fsService.workspace.setActiveSessionId(workspacePath, 'file-uuid', 'stale-session')
 
       const session = await getWorkspaceSessionForService(fsService, store)
 
@@ -135,7 +132,7 @@ describe('getWorkspaceSessionForService', () => {
     }
   })
 
-  it('persists an active session to the store and mirrors it into state.json', async () => {
+  it('persists an active session to the store only', async () => {
     const workspacePath = path.join(tmpDir, 'workspace')
     fs.mkdirSync(workspacePath, { recursive: true })
     const workspaceState = await fsService.workspace.load(workspacePath)
@@ -155,47 +152,24 @@ describe('getWorkspaceSessionForService', () => {
 
       expect(result).toEqual({ ok: true })
       expect(store.getActiveSession(workspaceUuid, 'file-uuid')).toBe('session-uuid')
-      const mirrored = await fsService.workspace.load(workspacePath)
-      expect(mirrored.ok).toBe(true)
-      if (!mirrored.ok) return
-      expect(mirrored.data.activeSessionIds).toEqual({ 'file-uuid': 'session-uuid' })
     } finally {
       store.close()
     }
   })
 
-  it('keeps the store mapping when the state.json mirror cannot be written', async () => {
-    const store = openTestStore()
-    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {})
-    try {
-      const brokenService = {
-        workspace: {
-          load: async () => ({
-            ok: true,
-            data: { workspaceUuid: 'workspace-uuid', activeSessionIds: {}, fileUuidPaths: {} },
-          }),
-          setActiveSessionId: async () => ({ ok: false, error: 'disk is full' }),
-        },
-      } as unknown as FileSystemService
+  it('reports an explicit error when the state store is unavailable', async () => {
+    const workspacePath = path.join(tmpDir, 'workspace')
+    fs.mkdirSync(workspacePath, { recursive: true })
 
-      const result = await persistActiveSessionForService(
-        brokenService,
-        store,
-        '/workspace',
-        'file-uuid',
-        'session-uuid',
-      )
+    const result = await persistActiveSessionForService(
+      fsService,
+      null,
+      workspacePath,
+      'file-uuid',
+      'session-uuid',
+    )
 
-      expect(result).toEqual({ ok: true })
-      expect(store.getActiveSession('workspace-uuid', 'file-uuid')).toBe('session-uuid')
-      expect(warn).toHaveBeenCalledWith(
-        expect.stringContaining('active-session mirror failed'),
-        'disk is full',
-      )
-    } finally {
-      warn.mockRestore()
-      store.close()
-    }
+    expect(result).toEqual({ ok: false, error: 'Internal state store is unavailable' })
   })
 
   function openTestStore(): InternalStateStore {

@@ -28,11 +28,9 @@ function installBridge() {
       workspace: {
         createFile,
         renameItem,
-        updateFileUuidPath: vi.fn(async () => ({ ok: true as const })),
         listTree: vi.fn(async () => ({ ok: true, data: [] })),
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
-          workspaceUuid: 'workspace-uuid',
           activeSessionIds: {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: null,

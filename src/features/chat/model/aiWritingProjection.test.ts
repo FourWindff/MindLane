@@ -32,13 +32,15 @@ function installStreamApi() {
           }
         }),
       },
-      chat: { listSessions: vi.fn(async () => ({ ok: true, data: { sessions: [] } })) },
+      chat: {
+        listSessions: vi.fn(async () => ({ ok: true, data: { sessions: [] } })),
+        listCapsuleFiles: vi.fn(async () => ({ ok: true, data: { files: [] } })),
+      },
       shell: { logError: vi.fn() },
       workspace: {
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
           activeSessionIds: {},
-          fileUuidPaths: {},
           recentWorkspacePaths: ['/workspace'],
           lastOpenedFilePath: null,
           restoreLastWorkspaceOnLaunch: true,
