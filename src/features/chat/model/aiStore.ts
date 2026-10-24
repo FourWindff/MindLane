@@ -388,15 +388,14 @@ export const useAiStore = create<AiState>((set, get) => ({
       sessionId,
     })
     if (!result?.ok) return
-    const sessionsResult = await window.mindlane?.chat?.listSessions({
-      workspacePath: state.workspacePath,
-      fileUuid,
-      limit: 20,
-      offset: 0,
-    })
-    const sessions = sessionsResult?.ok ? sessionsResult.data.sessions : []
     let replacementSessionId: string | null = null
     set((current) => {
+      // The delete is one store transaction, so the list the renderer already
+      // holds only loses the removed row; re-reading the same page would just
+      // fetch back what is known here.
+      const sessions = (current.fileChats[fileUuid]?.sessions ?? []).filter(
+        (session) => session.id !== sessionId,
+      )
       const deletedActiveSession = current.fileChats[fileUuid]?.activeSessionId === sessionId
       replacementSessionId = deletedActiveSession ? generateSessionId() : null
       const patch = replacementSessionId
@@ -419,7 +418,8 @@ export const useAiStore = create<AiState>((set, get) => ({
     })
     if (replacementSessionId)
       await persistActiveSession(state.workspacePath, fileUuid, replacementSessionId)
-    // Deleting a session may remove the file's last session: re-pull the full list to refresh the capsule bar.
+    // Membership is the capsule query's call: deleting the file's last session
+    // drops its row, so the query is re-issued once.
     void useAiStore.getState().refreshCapsuleData()
   },
 

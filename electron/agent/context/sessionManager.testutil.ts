@@ -11,13 +11,14 @@ export interface TestSessionManager {
 
 /**
  * Test harness for the session persistence seam: a real internal state store in
- * the temp directory plus the production JSONL rollback mirror underneath.
+ * the temp directory and nothing else — the production session manager has no
+ * file-side copy.
  */
 export async function createTestSessionManager(tmpDir: string): Promise<TestSessionManager> {
   const opened = openInternalStore(path.join(tmpDir, 'memory', 'state.db'))
   if (!opened.ok) throw new Error(opened.error)
   const manager = new SessionManager()
-  await manager.init(tmpDir, opened.store)
+  manager.init(opened.store)
   return {
     manager,
     stateStore: opened.store,

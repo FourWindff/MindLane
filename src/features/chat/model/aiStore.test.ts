@@ -444,6 +444,37 @@ describe('aiStore per-file chat state', () => {
     expect(useAiStore.getState().fileChats['file-a']?.activeSessionId).toBe('session-new')
   })
 
+  it('drops the deleted session from the file list without re-pulling it', async () => {
+    const session = (id: string, messageCount: number): ChatSession => ({
+      id,
+      fileUuid: 'file-a',
+      title: id,
+      createdAt: '2026-06-18T00:00:00.000Z',
+      updatedAt: '2026-06-18T00:01:00.000Z',
+      messageCount,
+    })
+    const { chat } = installApis()
+    useAiStore.setState({
+      workspacePath: '/workspace',
+      currentFileUuid: 'file-a',
+      fileChats: {
+        'file-a': {
+          ...createFileChatState('session-b'),
+          sessions: [session('session-b', 2), session('session-a', 1)],
+        },
+      },
+    })
+
+    await useAiStore.getState().deleteSession('session-a')
+
+    // The delete is one store transaction: the list loses exactly the removed
+    // row, so no second read of the same list is issued.
+    expect(useAiStore.getState().fileChats['file-a']?.sessions.map((s) => s.id)).toEqual([
+      'session-b',
+    ])
+    expect(chat.listSessions).not.toHaveBeenCalled()
+  })
+
   it('tracks active session status from generating through stopping to idle', () => {
     const { emit } = installApis()
     const harness = createRegistryHarness()

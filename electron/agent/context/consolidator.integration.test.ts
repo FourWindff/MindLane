@@ -101,10 +101,6 @@ describe('Consolidator integration', () => {
       expect(meta?.lastConsolidated).toBeGreaterThan(0)
       expect(meta?._lastSummary).toContain('AI assistant project')
 
-      // No {sessionId}.history.jsonl is written anymore: the summary lives only in the session meta
-      const sessionsDir = path.join(tmpDir, 'memory', 'sessions', 'workspace-uuid-1')
-      expect(fs.readdirSync(sessionsDir).some((f) => f.endsWith('.history.jsonl'))).toBe(false)
-
       const contextMessages = await consolidator.getMessagesForContext(sessionId, {
         maxMessages: 120,
       })

@@ -308,11 +308,6 @@ describe('InternalStateStore', () => {
     const corruptPath = path.join(tmpDir, 'corrupt.db')
     fs.writeFileSync(corruptPath, 'this is not a sqlite database')
 
-    // A leftover file-based session store must not influence the degradation decision.
-    const legacyDir = path.join(tmpDir, 'memory', 'sessions', WS)
-    fs.mkdirSync(legacyDir, { recursive: true })
-    fs.writeFileSync(path.join(legacyDir, 'legacy.jsonl'), '{"id":"legacy"}\n')
-
     // Mindmap editing keeps working: the failure is contained to the store and never touches the file.
     const mindlanePath = path.join(tmpDir, 'untouched.mindlane')
     fs.writeFileSync(mindlanePath, '<mindlane><node id="root" /></mindlane>')
