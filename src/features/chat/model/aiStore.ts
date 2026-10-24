@@ -12,7 +12,7 @@ import { handlePalaceRunEvent } from '@/features/mindmap/model/palaceRun'
 import { selectChatReady, useSettingsStore } from '@/features/settings/model/settingsStore'
 import { reportRendererDebug, reportRendererError } from '@/shared/lib/reportRendererError'
 import { splitCurrentTurn, stripTurnState } from '@contracts/turnState'
-import type { ChatStreamEvent, StreamStep } from '@contracts/ipc'
+import type { CapsuleFileMeta, ChatStreamEvent, StreamStep } from '@contracts/ipc'
 
 function generateSessionId(): string {
   return crypto.randomUUID()
@@ -62,10 +62,11 @@ export type { ChatStreamEvent }
 
 export interface ChatCapsuleEntry {
   fileUuid: string
+  /** Basename of the identity path: derived at read time, never stored a second time. */
   fileName: string
+  /** Identity path from the capsule query; the live open instance overrides it when loaded. */
+  filePath: string
   status: 'generating' | 'stopping' | 'idle'
-  /** updatedAt (ms) of the file's most recent session; capsule sort key; 0 when none. */
-  lastActivityAt: number
 }
 
 interface ActiveFileInfo {
@@ -83,11 +84,10 @@ interface AiState {
   currentFileUuid: string | null
   currentFilePath: string | null
   fileChats: Record<string, FileChatState>
+  /** Live paths of the files open in this launch (freshest after a rename or move). */
   filePaths: Record<string, string>
-  /** Session-file index (persisted mapping): fileUuid -> filePath, used across restarts to render the capsule bar. */
-  fileUuidPaths: Record<string, string>
-  /** Full session list of the current workspace (pull without fileUuid); capsule bar membership and sort key. */
-  allSessions: ChatSession[]
+  /** Capsule bar's single persistent input: files with a session and a path, newest activity first. */
+  capsuleFiles: CapsuleFileMeta[]
   loadedFileChats: Record<string, boolean>
   sessionFileUuids: Record<string, string>
   activeStreamIds: Record<string, string>
@@ -117,13 +117,11 @@ interface AiState {
   setAttachedDocument: (document: DocumentRef | null) => void
   setInputDraft: (text: string) => void
   loadFileChat: (fileUuid: string) => Promise<void>
-  /** Sync the in-memory and persisted mapping after rename/move (caller persists via the bridge). */
-  updateFileUuidPath: (fileUuid: string, filePath: string) => void
   registerStream: (fileUuid: string, sessionId: string, streamId: string) => void
   markStreamStopping: (sessionId: string) => void
   sendChatMessage: (text: string) => Promise<boolean>
   stopChatStream: () => void
-  /** Re-pull the capsule bar's persisted inputs (full session list + mapping) after workspace restore/switch or deleteSession. */
+  /** Re-pull the capsule bar's single persistent input after workspace restore/switch or deleteSession. */
   refreshCapsuleData: () => Promise<void>
 }
 
@@ -228,60 +226,59 @@ function stripTurnStateFromMessages(messages: ChatMessage[]): ChatMessage[] {
   })
 }
 
+/** Ephemeral capsule inputs: this launch's live state, never persisted. */
+export interface CapsuleLiveState {
+  fileChats: Record<string, FileChatState>
+  filePaths: Record<string, string>
+  currentFileUuid: string | null
+  currentFilePath: string | null
+}
+
+function toCapsuleEntry(
+  fileUuid: string,
+  filePath: string,
+  chat: FileChatState | undefined,
+): ChatCapsuleEntry {
+  return {
+    fileUuid,
+    fileName: pathBasename(filePath) ?? fileUuid,
+    filePath,
+    status: chat?.stopRequested ? 'stopping' : chat?.busy ? 'generating' : 'idle',
+  }
+}
+
 /**
- * Capsule-bar read projection: members = files with session records (whose
- * mapping has a path) ∪ streaming in-progress ∪ current file;
- * sort = current file first, then by that file's most recent session updatedAt
- * descending. The in-memory `fileChats` holds only projected state
- * (busy/stopping/generating); it no longer decides membership on its own.
+ * Capsule-bar read projection. The persistent input is one query result
+ * (`capsuleFiles`, already ordered by latest session activity, and never
+ * containing a file without a path). The only other inputs are this launch's
+ * live state: the current file and files streaming right now may not have a
+ * session row yet, so they are overlaid here. The current file is pinned first;
+ * everything else keeps the query's order.
  */
 export function deriveChatCapsuleEntries(
-  fileChats: Record<string, FileChatState>,
-  filePaths: Record<string, string>,
-  fileUuidPaths: Record<string, string>,
-  allSessions: ChatSession[],
-  currentFileUuid: string | null,
-  currentFilePath: string | null,
+  capsuleFiles: readonly CapsuleFileMeta[],
+  live: CapsuleLiveState,
 ): ChatCapsuleEntry[] {
-  const sessionsByFile = new Map<string, ChatSession[]>()
-  for (const session of allSessions) {
-    const list = sessionsByFile.get(session.fileUuid) ?? []
-    list.push(session)
-    sessionsByFile.set(session.fileUuid, list)
+  const entries = capsuleFiles.map((file) =>
+    toCapsuleEntry(file.fileUuid, file.filePath, live.fileChats[file.fileUuid]),
+  )
+  const known = new Set(capsuleFiles.map((file) => file.fileUuid))
+  for (const fileUuid of [...Object.keys(live.fileChats), live.currentFileUuid ?? '']) {
+    if (!fileUuid || known.has(fileUuid)) continue
+    const chat = live.fileChats[fileUuid]
+    const isCurrent = fileUuid === live.currentFileUuid
+    if (!isCurrent && !chat?.busy && !chat?.stopRequested) continue
+    const filePath = live.filePaths[fileUuid] ?? (isCurrent ? live.currentFilePath : null)
+    if (!filePath) continue
+    known.add(fileUuid)
+    entries.push(toCapsuleEntry(fileUuid, filePath, chat))
   }
-  const mostRecentSessionAt = (fileUuid: string): number => {
-    const list = sessionsByFile.get(fileUuid) ?? []
-    return list.reduce((max, session) => {
-      const at = Date.parse(session.updatedAt) || 0
-      return at > max ? at : max
-    }, 0)
+  const currentIndex = entries.findIndex((entry) => entry.fileUuid === live.currentFileUuid)
+  if (currentIndex > 0) {
+    const [current] = entries.splice(currentIndex, 1)
+    entries.unshift(current!)
   }
-
-  const candidateKeys = new Set([...Object.keys(fileChats), ...sessionsByFile.keys()])
-  if (currentFileUuid) candidateKeys.add(currentFileUuid)
-
-  const entries: ChatCapsuleEntry[] = []
-  for (const fileUuid of candidateKeys) {
-    const chat = fileChats[fileUuid]
-    const isCurrent = fileUuid === currentFileUuid
-    const isStreaming = Boolean(chat?.busy || chat?.stopRequested)
-    // Files with sessions but no mapped path (deleted / never opened before the upgrade) stay hidden.
-    const hasSessionWithPath = Boolean(sessionsByFile.has(fileUuid) && fileUuidPaths[fileUuid])
-    if (!(isCurrent || isStreaming || hasSessionWithPath)) continue
-    const filePath =
-      fileUuidPaths[fileUuid] ?? filePaths[fileUuid] ?? (isCurrent ? currentFilePath : null)
-    entries.push({
-      fileUuid,
-      fileName: pathBasename(filePath) ?? fileUuid,
-      status: chat?.stopRequested ? 'stopping' : chat?.busy ? 'generating' : 'idle',
-      lastActivityAt: mostRecentSessionAt(fileUuid),
-    })
-  }
-  return entries.sort((a, b) => {
-    if (a.fileUuid === currentFileUuid) return -1
-    if (b.fileUuid === currentFileUuid) return 1
-    return b.lastActivityAt - a.lastActivityAt
-  })
+  return entries
 }
 
 function patchFileChat(
@@ -300,8 +297,7 @@ export const useAiStore = create<AiState>((set, get) => ({
   currentFilePath: null,
   fileChats: {},
   filePaths: {},
-  fileUuidPaths: {},
-  allSessions: [],
+  capsuleFiles: [],
   loadedFileChats: {},
   sessionFileUuids: {},
   activeStreamIds: {},
@@ -442,35 +438,23 @@ export const useAiStore = create<AiState>((set, get) => ({
   refreshCapsuleData: async () => {
     const workspaceSession = await window.mindlane?.workspace.getSession()
     const workspacePath = workspaceSession?.workspacePath ?? null
-    const fileUuidPaths = workspaceSession?.fileUuidPaths ?? {}
-    let allSessions: ChatSession[] = []
-    if (workspacePath) {
-      const result = await window.mindlane?.chat?.listSessions({
-        workspacePath,
-      })
-      if (result?.ok) {
-        retryCounts.delete('capsule')
-        allSessions = result.data.sessions
-      } else {
-        // The main-process AI service may not be assembled yet: persist the
-        // mapping first and retry the session pull later; never clear data that
-        // is already ready (allSessions keeps its old value).
-        useAiStore.setState({ workspacePath, fileUuidPaths })
-        scheduleRetry('capsule', () => {
-          void useAiStore.getState().refreshCapsuleData()
-        })
-        return
-      }
+    if (!workspacePath) {
+      useAiStore.setState({ workspacePath: null, capsuleFiles: [] })
+      return
     }
-    useAiStore.setState({ workspacePath, fileUuidPaths, allSessions })
+    const result = await window.mindlane?.chat?.listCapsuleFiles({ workspacePath })
+    if (!result?.ok) {
+      // The main-process AI service may not be assembled yet: keep the rows we
+      // already have and retry later.
+      useAiStore.setState({ workspacePath })
+      scheduleRetry('capsule', () => {
+        void useAiStore.getState().refreshCapsuleData()
+      })
+      return
+    }
+    retryCounts.delete('capsule')
+    useAiStore.setState({ workspacePath, capsuleFiles: result.data.files })
   },
-  /** Persisted mapping + in-memory path updated together (called by workspaceSync after rename/move). */
-  updateFileUuidPath: (fileUuid, filePath) =>
-    set((state) => ({
-      ...(state.currentFileUuid === fileUuid ? { currentFilePath: filePath } : {}),
-      filePaths: { ...state.filePaths, [fileUuid]: filePath },
-      fileUuidPaths: { ...state.fileUuidPaths, [fileUuid]: filePath },
-    })),
 
   // Recorded before the send reaches the main process, so every event of this
   // stream already has a file to land in when it arrives.
@@ -927,10 +911,7 @@ export function connectAiStore(registry: AiStoreRegistry): () => void {
         return
       }
       const workspacePath = workspaceSession?.workspacePath ?? null
-      useAiStore.setState({
-        workspacePath,
-        fileUuidPaths: workspaceSession?.fileUuidPaths ?? {},
-      })
+      useAiStore.setState({ workspacePath })
       if (workspacePath && shouldLoadFileChat) {
         await useAiStore.getState().loadFileChat(active.fileUuid)
       }

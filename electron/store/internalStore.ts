@@ -63,6 +63,13 @@ export interface ActiveSessionRecord {
   sessionId: string
 }
 
+export interface CapsuleFileRecord {
+  fileUuid: string
+  filePath: string
+  /** ISO timestamp of the file's most recent session; the capsule bar's only sort key. */
+  lastActivityAt: string
+}
+
 export interface EditLogEntry {
   ts: number
   nodeId: string
@@ -100,8 +107,25 @@ export interface InternalStateStore {
   setFilePath(workspaceUuid: string, fileUuid: string, filePath: string): void
   getFilePath(workspaceUuid: string, fileUuid: string): string | null
   listFilePaths(workspaceUuid: string): FilePathRecord[]
+  /**
+   * Re-point the path index after a rename or move. One UPDATE: a file path is
+   * replaced, every path under a renamed folder is rewritten with the same prefix.
+   */
+  moveFilePath(oldPath: string, newPath: string): void
+  /**
+   * Drop the identity row and active-session mapping at a deleted path (a file,
+   * or every file under a deleted folder). Session data is retained.
+   */
+  deleteFileIdentitiesAtPath(targetPath: string): void
   /** Drops the path index and active-session mapping; sessions and files stay untouched. */
   deleteFileIdentity(workspaceUuid: string, fileUuid: string): void
+
+  /**
+   * Capsule bar input in one query: files that have both a session and a path,
+   * newest session activity first. Membership and ordering are the query's, not
+   * the caller's to stitch together.
+   */
+  listCapsuleFiles(workspaceUuid: string): CapsuleFileRecord[]
 
   appendEditLog(workspaceUuid: string, fileUuid: string, entry: EditLogEntry): void
   readEditLog(workspaceUuid: string, fileUuid: string): EditLogEntry[]
@@ -206,6 +230,12 @@ interface FilePathRow {
   file_uuid: string
   path: string
   updated_at: string
+}
+
+interface CapsuleFileRow {
+  file_uuid: string
+  path: string
+  last_activity_at: string
 }
 
 interface ActiveSessionRow {
@@ -450,6 +480,56 @@ class SqliteInternalStateStore implements InternalStateStore {
       fileUuid: row.file_uuid,
       path: row.path,
       updatedAt: row.updated_at,
+    }))
+  }
+
+  moveFilePath(oldPath: string, newPath: string): void {
+    const from = requireId(oldPath, 'old path')
+    const to = requireId(newPath, 'new path')
+    // `substr(path, 1, length(from) + 1)` compares exact prefixes, so a sibling
+    // like `notes-2` never matches the `notes` folder rename and LIKE wildcards
+    // in file names cannot leak into the match.
+    this.db
+      .prepare(
+        `UPDATE file_paths
+         SET path = ? || substr(path, length(?) + 1), updated_at = ?
+         WHERE path = ? OR substr(path, 1, length(?) + 1) IN (? || '/', ? || '\\')`,
+      )
+      .run(to, from, this.now(), from, from, from, from)
+  }
+
+  deleteFileIdentitiesAtPath(targetPath: string): void {
+    const target = requireId(targetPath, 'target path')
+    const match = `path = ? OR substr(path, 1, length(?) + 1) IN (? || '/', ? || '\\')`
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `DELETE FROM active_sessions WHERE file_uuid IN (
+             SELECT file_uuid FROM file_paths WHERE ${match}
+           )`,
+        )
+        .run(target, target, target, target)
+      this.db.prepare(`DELETE FROM file_paths WHERE ${match}`).run(target, target, target, target)
+    })()
+  }
+
+  listCapsuleFiles(workspaceUuid: string): CapsuleFileRecord[] {
+    const ws = requireId(workspaceUuid, 'workspace UUID')
+    const rows = this.db
+      .prepare(
+        `SELECT p.file_uuid AS file_uuid, p.path AS path, MAX(s.updated_at) AS last_activity_at
+         FROM sessions s
+         JOIN file_paths p
+           ON p.workspace_uuid = s.workspace_uuid AND p.file_uuid = s.file_uuid
+         WHERE s.workspace_uuid = ?
+         GROUP BY p.file_uuid, p.path
+         ORDER BY last_activity_at DESC, p.path ASC`,
+      )
+      .all(ws) as CapsuleFileRow[]
+    return rows.map((row) => ({
+      fileUuid: row.file_uuid,
+      filePath: row.path,
+      lastActivityAt: row.last_activity_at,
     }))
   }
 

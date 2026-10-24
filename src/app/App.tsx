@@ -163,9 +163,10 @@ function AppContent() {
     // per-file busy state and projects it into the open file from one place; the mindmap reads
     // the file, not chat.
     const disconnectAiWriting = connectAiWritingProjection(openFileRegistry)
-    // Workspace and open-file changes are observed and re-projected by chat itself: the
-    // workspace store no longer pokes chat back.
-    const disconnectWorkspaceSync = connectChatWorkspaceSync(openFileRegistry)
+    // Workspace changes are observed by chat itself: rename/move/delete are database
+    // writes in the main process, so a tree change is all it takes to re-pull the
+    // capsule query. The workspace store no longer pokes chat back.
+    const disconnectWorkspaceSync = connectChatWorkspaceSync()
     // On-demand mindmap read responder: when the main process pulls the live mindmap over the
     // reverse channel, look the editor up by fileUuid and reply.
     const disconnectMindmapReadResponder = connectMindmapReadResponder()

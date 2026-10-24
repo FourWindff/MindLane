@@ -60,6 +60,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
       },
       chat: {
         listSessions: vi.fn(async () => ({ ok: true, data: { sessions: [] } })),
+        listCapsuleFiles: vi.fn(async () => ({ ok: true, data: { files: [] } })),
       },
       shell: { logError, logDebug },
       workspace: {
@@ -99,8 +100,7 @@ describe('sendChatMessage stream registration', () => {
       currentFilePath: null,
       fileChats: {},
       filePaths: {},
-      fileUuidPaths: {},
-      allSessions: [],
+      capsuleFiles: [],
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},
@@ -161,14 +161,13 @@ describe('sendChatMessage stream registration', () => {
     expect(request.streamId).toBeTruthy()
     expect(useAiStore.getState().activeStreamIds['session-a']).toBe(request.streamId)
     expect(useAiStore.getState().sessionFileUuids['session-a']).toBe('file-a')
-    const entries = deriveChatCapsuleEntries(
-      useAiStore.getState().fileChats,
-      useAiStore.getState().filePaths,
-      useAiStore.getState().fileUuidPaths,
-      useAiStore.getState().allSessions,
-      useAiStore.getState().currentFileUuid,
-      useAiStore.getState().currentFilePath,
-    )
+    const state = useAiStore.getState()
+    const entries = deriveChatCapsuleEntries(state.capsuleFiles, {
+      fileChats: state.fileChats,
+      filePaths: state.filePaths,
+      currentFileUuid: state.currentFileUuid,
+      currentFilePath: state.currentFilePath,
+    })
     expect(entries[0]?.status).toBe('generating')
     expect(entries[0]?.fileName).toBe('file-a.mindlane')
 
@@ -285,8 +284,7 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       currentFilePath: null,
       fileChats: {},
       filePaths: {},
-      fileUuidPaths: {},
-      allSessions: [],
+      capsuleFiles: [],
       loadedFileChats: {},
       sessionFileUuids: {},
       activeStreamIds: {},

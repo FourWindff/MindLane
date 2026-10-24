@@ -22,8 +22,6 @@ function installWorkspaceApis(overrides: WorkspaceApiOverrides = {}) {
     switchDirectory: vi.fn(async () => ({ ok: true as const, data: { workspacePath: '/ws' } })),
     getSession: vi.fn(async () => ({
       workspacePath: '/ws',
-      workspaceUuid: null,
-      activeSessionIds: {},
       recentWorkspacePaths: ['/ws'],
       lastOpenedFilePath: null,
       restoreLastWorkspaceOnLaunch: true,
@@ -201,10 +199,9 @@ describe('file deletion capsule cleanup', () => {
     resetRegistry()
     useWorkspaceStore.setState({ busy: false, lastError: null })
     useAiStore.setState({
-      fileUuidPaths: {},
+      capsuleFiles: [],
       filePaths: {},
       fileChats: {},
-      allSessions: [],
       currentFileUuid: null,
       currentFilePath: null,
     })
@@ -217,47 +214,34 @@ describe('file deletion capsule cleanup', () => {
     disconnectWorkspaceSync()
   })
 
-  it('drops the deleted file from the capsule projection once the mapping is pruned', async () => {
-    const session = {
-      id: 'session-a',
-      fileUuid: 'file-a',
-      title: 'A',
-      createdAt: '2026-06-18T00:00:00.000Z',
-      updatedAt: '2026-06-18T00:01:00.000Z',
-      messageCount: 1,
-    }
-    const api = installWorkspaceApis({
-      // The main process prunes after a successful delete: the mapping returned by getSession no
-      // longer contains the deleted path.
-      getSession: vi.fn(async () => ({
-        workspacePath: '/ws',
-        workspaceUuid: null,
-        activeSessionIds: {},
-        fileUuidPaths: {},
-        recentWorkspacePaths: ['/ws'],
-        lastOpenedFilePath: null,
-        restoreLastWorkspaceOnLaunch: true,
-      })),
-    })
+  it('drops the deleted file from the capsule projection once the query stops returning it', async () => {
+    const api = installWorkspaceApis()
     const chat = {
-      listSessions: vi.fn(async () => ({ ok: true as const, data: { sessions: [session] } })),
+      // The main process deleted the identity row, so the capsule query no
+      // longer returns the file; its session data stays in the store.
+      listCapsuleFiles: vi.fn(async () => ({ ok: true as const, data: { files: [] } })),
     }
     vi.stubGlobal('window', { mindlane: { workspace: api, chat } })
     useWorkspaceStore.setState({ workspacePath: '/ws' })
-    // Before deletion: the session and the mapping are still there → the capsule is visible.
+    // Before deletion: the query returned the file, so the capsule is visible.
     useAiStore.setState({
-      fileUuidPaths: { 'file-a': '/ws/a.mindlane' },
-      allSessions: [session],
+      capsuleFiles: [
+        {
+          fileUuid: 'file-a',
+          filePath: '/ws/a.mindlane',
+          lastActivityAt: '2026-06-18T00:01:00.000Z',
+        },
+      ],
     })
-    const derive = () =>
-      deriveChatCapsuleEntries(
-        useAiStore.getState().fileChats,
-        useAiStore.getState().filePaths,
-        useAiStore.getState().fileUuidPaths,
-        useAiStore.getState().allSessions,
-        useAiStore.getState().currentFileUuid,
-        useAiStore.getState().currentFilePath,
-      )
+    const derive = () => {
+      const state = useAiStore.getState()
+      return deriveChatCapsuleEntries(state.capsuleFiles, {
+        fileChats: state.fileChats,
+        filePaths: state.filePaths,
+        currentFileUuid: state.currentFileUuid,
+        currentFilePath: state.currentFilePath,
+      })
+    }
     expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeDefined()
 
     const ok = await useWorkspaceStore.getState().deleteItem('/ws/a.mindlane')
@@ -267,10 +251,8 @@ describe('file deletion capsule cleanup', () => {
       targetPath: '/ws/a.mindlane',
       workspacePath: '/ws',
     })
-    await vi.waitFor(() => expect(useAiStore.getState().fileUuidPaths).toEqual({}))
-    // After deletion: the mapping was pruned, the session stays but has no mapping → the capsule
-    // is hidden.
+    await vi.waitFor(() => expect(useAiStore.getState().capsuleFiles).toEqual([]))
     expect(derive().find((entry) => entry.fileUuid === 'file-a')).toBeUndefined()
-    expect(chat.listSessions).toHaveBeenCalledWith({ workspacePath: '/ws' })
+    expect(chat.listCapsuleFiles).toHaveBeenCalledWith({ workspacePath: '/ws' })
   })
 })

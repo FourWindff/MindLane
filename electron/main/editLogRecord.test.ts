@@ -22,8 +22,6 @@ function fakeWorkspace(workspaceUuid = WORKSPACE_UUID): Pick<Workspace, 'load'> 
             ok: true,
             data: {
               workspaceUuid,
-              activeSessionIds: {},
-              fileUuidPaths: {},
               lastOpenedFilePath: null,
             },
           }

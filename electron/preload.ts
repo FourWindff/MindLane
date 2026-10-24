@@ -46,7 +46,6 @@ const api: MindLaneBridge = {
     openFilePath: (payload) => ipcRenderer.invoke(IPC.WorkspaceOpenFilePath, payload),
     getSession: () => ipcRenderer.invoke(IPC.WorkspaceGetSession),
     updateState: (payload) => ipcRenderer.invoke(IPC.WorkspaceUpdateState, payload),
-    updateFileUuidPath: (payload) => ipcRenderer.invoke(IPC.WorkspaceUpdateFileUuidPath, payload),
     switchDirectory: (payload) => ipcRenderer.invoke(IPC.WorkspaceSwitch, payload),
     listTree: (payload) => ipcRenderer.invoke(IPC.WorkspaceListTree, payload),
     createSubfolder: (payload) => ipcRenderer.invoke(IPC.WorkspaceCreateSubfolder, payload),
@@ -55,6 +54,7 @@ const api: MindLaneBridge = {
   },
   chat: {
     listSessions: (payload) => ipcRenderer.invoke(IPC.ChatListSessions, payload),
+    listCapsuleFiles: (payload) => ipcRenderer.invoke(IPC.ChatListCapsuleFiles, payload),
     loadSession: (payload) => ipcRenderer.invoke(IPC.ChatLoadSession, payload),
     deleteSession: (payload) => ipcRenderer.invoke(IPC.ChatDeleteSession, payload),
   },

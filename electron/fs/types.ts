@@ -27,9 +27,6 @@ export interface AppSettings {
 
 export interface WorkspaceState {
   workspaceUuid: string
-  activeSessionIds: Record<string, string>
-  /** Session file index: a persistent fileUuid -> filePath map, used by the renderer's capsule bar across launches. */
-  fileUuidPaths: Record<string, string>
   lastOpenedFilePath: string | null
 }
 

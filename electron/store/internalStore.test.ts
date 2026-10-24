@@ -113,6 +113,108 @@ describe('InternalStateStore', () => {
     expect(fs.readFileSync(originalPath, 'utf-8')).toBe('<mindlane />')
   })
 
+  it('moves a file path in one update and keeps its session and active mapping', () => {
+    const originalPath = path.join(tmpDir, 'a.mindlane')
+    const renamedPath = path.join(tmpDir, 'b.mindlane')
+    store.setFilePath(WS, 'file-a', originalPath)
+    seedSession('session-a', 'file-a')
+    store.setActiveSession(WS, 'file-a', 'session-a')
+
+    store.moveFilePath(originalPath, renamedPath)
+
+    expect(store.getFilePath(WS, 'file-a')).toBe(renamedPath)
+    expect(store.getActiveSession(WS, 'file-a')).toBe('session-a')
+    expect(store.listSessions({ workspaceUuid: WS, fileUuid: 'file-a' })).toHaveLength(1)
+  })
+
+  it('moves every indexed path under a renamed folder and leaves lookalike paths alone', () => {
+    const folder = path.join(tmpDir, 'notes')
+    const movedFolder = path.join(tmpDir, 'archive')
+    const lookalike = path.join(tmpDir, 'notes-2.mindlane')
+    store.setFilePath(WS, 'file-a', path.join(folder, 'a.mindlane'))
+    store.setFilePath(WS, 'file-b', path.join(folder, 'deep', 'b.mindlane'))
+    store.setFilePath(WS, 'file-lookalike', lookalike)
+
+    store.moveFilePath(folder, movedFolder)
+
+    expect(
+      store
+        .listFilePaths(WS)
+        .map((row) => row.path)
+        .sort(),
+    ).toEqual(
+      [
+        path.join(movedFolder, 'a.mindlane'),
+        path.join(movedFolder, 'deep', 'b.mindlane'),
+        lookalike,
+      ].sort(),
+    )
+  })
+
+  it('clears identity rows and active mappings at a deleted path, keeping sessions', () => {
+    const deletedPath = path.join(tmpDir, 'gone.mindlane')
+    const keptPath = path.join(tmpDir, 'kept.mindlane')
+    store.setFilePath(WS, 'file-gone', deletedPath)
+    store.setFilePath(WS, 'file-kept', keptPath)
+    seedSession('session-gone', 'file-gone')
+    seedSession('session-kept', 'file-kept')
+    store.setActiveSession(WS, 'file-gone', 'session-gone')
+    store.setActiveSession(WS, 'file-kept', 'session-kept')
+
+    store.deleteFileIdentitiesAtPath(deletedPath)
+
+    expect(store.getFilePath(WS, 'file-gone')).toBeNull()
+    expect(store.getActiveSession(WS, 'file-gone')).toBeNull()
+    expect(store.getFilePath(WS, 'file-kept')).toBe(keptPath)
+    expect(store.getActiveSession(WS, 'file-kept')).toBe('session-kept')
+    // The session data itself is retained: deleting a file never deletes conversation history.
+    expect(store.getSession('session-gone')).not.toBeNull()
+  })
+
+  it('clears every identity under a deleted folder', () => {
+    const folder = path.join(tmpDir, 'notes')
+    const keptPath = path.join(tmpDir, 'kept.mindlane')
+    store.setFilePath(WS, 'file-a', path.join(folder, 'a.mindlane'))
+    store.setFilePath(WS, 'file-b', path.join(folder, 'deep', 'b.mindlane'))
+    store.setFilePath(WS, 'file-kept', keptPath)
+    store.setActiveSession(WS, 'file-a', 'session-a')
+    store.setActiveSession(WS, 'file-b', 'session-b')
+    store.setActiveSession(WS, 'file-kept', 'session-kept')
+
+    store.deleteFileIdentitiesAtPath(folder)
+
+    expect(store.listFilePaths(WS).map((row) => row.path)).toEqual([keptPath])
+    expect(store.listActiveSessions(WS)).toEqual([
+      { fileUuid: 'file-kept', sessionId: 'session-kept' },
+    ])
+  })
+
+  it('lists capsule files with one query: sessions joined to their path, newest activity first', () => {
+    store.setFilePath(WS, 'file-a', path.join(tmpDir, 'a.mindlane'))
+    store.setFilePath(WS, 'file-b', path.join(tmpDir, 'b.mindlane'))
+    // A path with no session and a session with no path both stay out: the query
+    // only returns files that can be opened and have a conversation.
+    store.setFilePath(WS, 'file-never-chatted', path.join(tmpDir, 'c.mindlane'))
+    seedSession('session-a1', 'file-a')
+    seedSession('session-b1', 'file-b')
+    seedSession('session-orphan', 'file-orphan')
+    store.appendMessages('session-a1', ['{"type":"human"}'])
+    store.appendMessages('session-orphan', ['{"type":"human"}'])
+
+    expect(store.listCapsuleFiles(WS)).toEqual([
+      {
+        fileUuid: 'file-a',
+        filePath: path.join(tmpDir, 'a.mindlane'),
+        lastActivityAt: expect.any(String),
+      },
+      {
+        fileUuid: 'file-b',
+        filePath: path.join(tmpDir, 'b.mindlane'),
+        lastActivityAt: expect.any(String),
+      },
+    ])
+  })
+
   it('stores messages as append-only rows in append order and keeps the session meta in step', () => {
     seedSession('session-a', 'file-a')
 

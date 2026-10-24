@@ -1,6 +1,5 @@
 import { ipcMain } from 'electron'
 import { IPC } from '../../ipc.js'
-import { logger } from '../../shared/logger.js'
 import { aiNotReadyResponse } from './helpers.js'
 import type { HandlerContext } from './context.js'
 import type { ChatMessage } from '../../../contracts/fileFormat.js'
@@ -36,6 +35,22 @@ export function registerChatHandlers(ctx: HandlerContext): void {
     },
   )
 
+  ipcMain.handle(IPC.ChatListCapsuleFiles, async (_e, payload: { workspacePath: string }) => {
+    if (!ctx.isAiServiceReady()) return aiNotReadyResponse()
+    const sessionManager = ctx.sessionManager
+    if (!sessionManager) return aiNotReadyResponse()
+    try {
+      const workspaceState = await fsService.workspace.load(payload.workspacePath)
+      if (!workspaceState.ok) return workspaceState
+      const files = await sessionManager.runInWorkspace(workspaceState.data.workspaceUuid, () =>
+        sessionManager.listCapsuleFiles(),
+      )
+      return { ok: true, data: { files } }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.handle(
     IPC.ChatLoadSession,
     async (_e, payload: { workspacePath: string; sessionId: string }) => {
@@ -69,30 +84,11 @@ export function registerChatHandlers(ctx: HandlerContext): void {
       try {
         const workspaceState = await fsService.workspace.load(payload.workspacePath)
         if (!workspaceState.ok) return workspaceState
-        const sessionMeta = await sessionManager.runInWorkspace(
-          workspaceState.data.workspaceUuid,
-          async () => {
-            const meta = sessionManager.getSessionMeta(payload.sessionId)
-            await sessionManager.deleteSession(payload.sessionId)
-            return meta
-          },
+        // The store's delete drops the session row, its messages and the
+        // active-session mapping in one transaction.
+        await sessionManager.runInWorkspace(workspaceState.data.workspaceUuid, () =>
+          sessionManager.deleteSession(payload.sessionId),
         )
-        if (sessionMeta?.fileUuid) {
-          // The database delete already dropped the mapping this restore reads;
-          // clear the state.json rollback copy too, but never fail on it.
-          const mirror = await fsService.workspace.setActiveSessionId(
-            payload.workspacePath,
-            sessionMeta.fileUuid,
-            null,
-            payload.sessionId,
-          )
-          if (!mirror.ok) {
-            logger.warn(
-              '[chat] state.json active-session cleanup failed (database is authoritative): %s',
-              mirror.error,
-            )
-          }
-        }
         return { ok: true }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }

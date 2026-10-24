@@ -6,26 +6,12 @@ import { fail } from './ipcResult.js'
 import { isMindLaneFile } from './constants.js'
 import type { IpcResult, WorkspaceState } from './types.js'
 import type { AppState } from './appState.js'
+import type { InternalStateStore } from '../store/internalStore.js'
+import { logger } from '../shared/logger.js'
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   workspaceUuid: '',
-  activeSessionIds: {},
-  fileUuidPaths: {},
   lastOpenedFilePath: null,
-}
-
-/** Coerce an untrusted value into a valid `fileUuidPaths` map. */
-function coerceFileUuidPaths(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).filter(
-      (entry): entry is [string, string] =>
-        entry[0] !== '' &&
-        typeof entry[1] === 'string' &&
-        entry[1] !== '' &&
-        isMindLaneFile(entry[1]),
-    ),
-  )
 }
 
 /** Coerce an untrusted value into a valid `lastOpenedFilePath` (string or null). */
@@ -39,7 +25,16 @@ const MINDLANE_DIR = '.mindlane'
 export class Workspace {
   private writeQueue = new Map<string, Promise<void>>()
 
-  constructor(private readonly appState?: AppState) {}
+  constructor(
+    private readonly appState?: AppState,
+    /**
+     * The file identity index (path per fileUuid) lives in the internal state
+     * store, never in `state.json`: rename/move is one UPDATE, delete clears the
+     * row, and nothing reconstructs it from the filesystem. Null when the state
+     * store is unavailable (AI degraded), which only costs the capsule bar.
+     */
+    private readonly stateStore?: InternalStateStore,
+  ) {}
 
   private statePath(workspacePath: string): string {
     return path.join(workspacePath, MINDLANE_DIR, STATE_FILE)
@@ -55,23 +50,22 @@ export class Workspace {
     return this.initializeIdentity(workspacePath, result.data)
   }
 
-  /** Record the last opened file, plus its session index entry in the same save. */
+  /** Record the last opened file; its identity path is a separate store row. */
   async openFile(
     workspacePath: string,
     filePath: string,
     fileUuid?: string,
   ): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => {
-      if (!fileUuid) return { lastOpenedFilePath: filePath }
-      const current = await this.loadFromDisk(workspacePath)
-      return {
-        lastOpenedFilePath: filePath,
-        fileUuidPaths: {
-          ...(current.ok ? current.data.fileUuidPaths : DEFAULT_WORKSPACE_STATE.fileUuidPaths),
-          [fileUuid]: filePath,
-        },
+    if (fileUuid) {
+      const state = await this.load(workspacePath)
+      if (state.ok && state.data.workspaceUuid) {
+        const workspaceUuid = state.data.workspaceUuid
+        this.writeIdentity('record opened file', (store) =>
+          store.setFilePath(workspaceUuid, fileUuid, filePath),
+        )
       }
-    })
+    }
+    return this.saveState(workspacePath, async () => ({ lastOpenedFilePath: filePath }))
   }
 
   async clearLastOpenedFile(workspacePath: string): Promise<IpcResult<void>> {
@@ -81,46 +75,39 @@ export class Workspace {
   }
 
   /**
-   * Write/update one session file index mapping (fileUuid -> filePath).
-   * Called by the open/new/save-as paths (main process) and the rename/move paths
-   * (renderer via the bridge). Silently skipped when fileUuid or filePath is empty;
-   * nothing is written to disk in that case.
+   * Rename/move: re-point the path index in one UPDATE. The fileUuid does not
+   * change, so sessions and the active-session mapping follow automatically.
    */
-  async updateFileUuidPath(
-    workspacePath: string,
-    fileUuid: string,
-    filePath: string,
-  ): Promise<IpcResult<void>> {
-    if (!fileUuid || !filePath) return { ok: true, data: undefined }
-    return this.saveState(workspacePath, async () => {
-      const current = await this.loadFromDisk(workspacePath)
-      return {
-        fileUuidPaths: {
-          ...(current.ok ? current.data.fileUuidPaths : DEFAULT_WORKSPACE_STATE.fileUuidPaths),
-          [fileUuid]: filePath,
-        },
-      }
-    })
+  moveFilePath(oldPath: string, newPath: string): void {
+    const resolvedOldPath = path.resolve(oldPath)
+    const resolvedNewPath = path.resolve(newPath)
+    this.writeIdentity('move path', (store) => store.moveFilePath(resolvedOldPath, resolvedNewPath))
   }
 
-  async setActiveSessionId(
-    workspacePath: string,
-    fileUuid: string,
-    sessionId: string | null,
-    expectedSessionId?: string,
-  ): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => {
-      const current = await this.loadFromDisk(workspacePath)
-      const activeSessionIds = {
-        ...(current.ok ? current.data.activeSessionIds : DEFAULT_WORKSPACE_STATE.activeSessionIds),
-      }
-      if (expectedSessionId !== undefined && activeSessionIds[fileUuid] !== expectedSessionId) {
-        return {}
-      }
-      if (sessionId === null) delete activeSessionIds[fileUuid]
-      else activeSessionIds[fileUuid] = sessionId
-      return { activeSessionIds }
-    })
+  /**
+   * Delete: drop the identity row and the active-session mapping at the removed
+   * path (a file, or every file inside a deleted folder). Session data stays.
+   */
+  deleteFileIdentitiesAtPath(targetPath: string): void {
+    const resolvedTargetPath = path.resolve(targetPath)
+    this.writeIdentity('delete identity', (store) =>
+      store.deleteFileIdentitiesAtPath(resolvedTargetPath),
+    )
+  }
+
+  /**
+   * Run one identity write. A database failure is logged and never turns a
+   * successful file operation into a failed one; the path is not repaired
+   * afterwards because the store is the only source.
+   */
+  private writeIdentity(operation: string, action: (store: InternalStateStore) => void): void {
+    const store = this.stateStore
+    if (!store) return
+    try {
+      action(store)
+    } catch (error) {
+      logger.warn('[Workspace] file identity write failed (%s):', operation, error)
+    }
   }
 
   /**
@@ -133,24 +120,6 @@ export class Workspace {
     partial: Partial<WorkspaceState>,
   ): Promise<IpcResult<void>> {
     return this.saveState(workspacePath, async () => partial)
-  }
-
-  /** Drop session file index entries whose path no longer exists, so stale paths do not linger. */
-  async pruneFileUuidPaths(workspacePath: string): Promise<IpcResult<void>> {
-    return this.saveState(workspacePath, async () => {
-      const current = await this.loadFromDisk(workspacePath)
-      const state = current.ok ? current.data : { ...DEFAULT_WORKSPACE_STATE }
-      const valid = Object.fromEntries(
-        Object.entries(state.fileUuidPaths).filter(([, filePath]) => {
-          try {
-            return fs.existsSync(filePath)
-          } catch {
-            return false
-          }
-        }),
-      )
-      return { fileUuidPaths: valid }
-    })
   }
 
   private async saveState(
@@ -198,15 +167,6 @@ export class Workspace {
         const corrected = lastOpenedFilePath !== rawLastOpenedFilePath
         const merged: WorkspaceState = {
           workspaceUuid: typeof parsed.workspaceUuid === 'string' ? parsed.workspaceUuid : '',
-          activeSessionIds:
-            parsed.activeSessionIds && typeof parsed.activeSessionIds === 'object'
-              ? Object.fromEntries(
-                  Object.entries(parsed.activeSessionIds).filter(
-                    (entry): entry is [string, string] => typeof entry[1] === 'string',
-                  ),
-                )
-              : {},
-          fileUuidPaths: coerceFileUuidPaths(parsed.fileUuidPaths),
           lastOpenedFilePath,
         }
         if (corrected) {

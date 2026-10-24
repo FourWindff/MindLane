@@ -18,6 +18,14 @@ export interface ContextNodeInfo {
   children?: ContextNodeInfo[]
 }
 
+/** One capsule bar row: a file that has both an indexed path and a session. */
+export interface CapsuleFileMeta {
+  fileUuid: string
+  filePath: string
+  /** ISO timestamp of the file's most recent session; the capsule bar's only sort key. */
+  lastActivityAt: string
+}
+
 export interface ChatContext {
   fileUuid: string
   selectedNodes?: ContextNodeInfo[]

@@ -14,7 +14,11 @@ import {
   type SessionMeta,
 } from './sessionMessageStore.js'
 import { logger } from '../../shared/logger.js'
-import type { InternalStateStore, SessionRecord } from '../../store/internalStore.js'
+import type {
+  CapsuleFileRecord,
+  InternalStateStore,
+  SessionRecord,
+} from '../../store/internalStore.js'
 import type { ChatMessage } from '../../../contracts/fileFormat.js'
 
 /**
@@ -217,6 +221,16 @@ export class SessionManager {
         offset: options.offset,
       })
       .map(toSessionMeta)
+  }
+
+  /**
+   * Capsule bar input in one query: files that have both a session and a path,
+   * newest session activity first. Membership and ordering are the query's, not
+   * the caller's to stitch together.
+   */
+  listCapsuleFiles(): CapsuleFileRecord[] {
+    const workspaceUuid = this.requireWorkspaceUuid('list capsule files')
+    return this.requireStateStore().listCapsuleFiles(workspaceUuid)
   }
 
   /**

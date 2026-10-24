@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ReactDOMServer from 'react-dom/server'
 import { ChatCapsuleBar, resolveCapsuleOpenPath } from './ChatCapsuleBar'
 import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
+import type { CapsuleFileMeta } from '@contracts/ipc'
 
 interface MockFileChat {
-  lastActivityAt: number
   busy: boolean
   stopRequested: boolean
 }
@@ -15,8 +15,7 @@ const mockAiState = vi.hoisted(() => ({
     currentFilePath: null as string | null,
     fileChats: {} as Record<string, MockFileChat>,
     filePaths: {} as Record<string, string>,
-    fileUuidPaths: {} as Record<string, string>,
-    allSessions: [] as { fileUuid: string; updatedAt: string }[],
+    capsuleFiles: [] as CapsuleFileMeta[],
     showSessionList: false,
     setShowSessionList: () => {},
   },
@@ -39,36 +38,32 @@ vi.mock('@/features/mindmap/model/openFileRegistry', () => ({
   },
 }))
 
-function renderCapsuleBar(
-  entries: {
-    fileUuid: string
-    fileName: string
-    status: 'generating' | 'stopping' | 'idle'
-    lastActivityAt: number
-  }[],
-  currentFileUuid: string | null,
-) {
+type CapsuleSpec = {
+  fileUuid: string
+  fileName: string
+  status: 'generating' | 'stopping' | 'idle'
+}
+
+function renderCapsuleBar(capsules: CapsuleSpec[], currentFileUuid: string | null) {
   mockAiState.current = {
     ...mockAiState.current,
     currentFileUuid,
     currentFilePath: currentFileUuid ? `/${currentFileUuid}.mindlane` : null,
     fileChats: Object.fromEntries(
-      entries.map((entry) => [
-        entry.fileUuid,
+      capsules.map((capsule) => [
+        capsule.fileUuid,
         {
-          lastActivityAt: entry.lastActivityAt,
-          busy: entry.status === 'generating',
-          stopRequested: entry.status === 'stopping',
+          busy: capsule.status === 'generating',
+          stopRequested: capsule.status === 'stopping',
         },
       ]),
     ),
-    filePaths: Object.fromEntries(entries.map((entry) => [entry.fileUuid, entry.fileName])),
-    fileUuidPaths: Object.fromEntries(
-      entries.map((entry) => [entry.fileUuid, `/${entry.fileName}`]),
-    ),
-    allSessions: entries.map((entry) => ({
-      fileUuid: entry.fileUuid,
-      updatedAt: new Date(entry.lastActivityAt).toISOString(),
+    filePaths: {},
+    capsuleFiles: capsules.map((capsule, index) => ({
+      fileUuid: capsule.fileUuid,
+      filePath: `/${capsule.fileName}.mindlane`,
+      // Query order is the capsule order; the projection must not re-sort.
+      lastActivityAt: new Date(2026, 0, 1, 0, capsules.length - index).toISOString(),
     })),
   }
   return ReactDOMServer.renderToString(
@@ -84,8 +79,7 @@ describe('ChatCapsuleBar', () => {
       currentFilePath: null,
       fileChats: {},
       filePaths: {},
-      fileUuidPaths: {},
-      allSessions: [],
+      capsuleFiles: [],
       showSessionList: false,
       setShowSessionList: () => {},
     }
@@ -94,9 +88,9 @@ describe('ChatCapsuleBar', () => {
   it('renders status classes for generating, stopping and idle capsules', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'A', status: 'generating', lastActivityAt: 100 },
-        { fileUuid: 'file-b', fileName: 'B', status: 'stopping', lastActivityAt: 200 },
-        { fileUuid: 'file-c', fileName: 'C', status: 'idle', lastActivityAt: 300 },
+        { fileUuid: 'file-a', fileName: 'A', status: 'generating' },
+        { fileUuid: 'file-b', fileName: 'B', status: 'stopping' },
+        { fileUuid: 'file-c', fileName: 'C', status: 'idle' },
       ],
       null,
     )
@@ -109,8 +103,8 @@ describe('ChatCapsuleBar', () => {
   it('places the current file first and marks it larger', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastActivityAt: 100 },
-        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastActivityAt: 200 },
+        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle' },
+        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle' },
       ],
       'file-b',
     )
@@ -122,12 +116,12 @@ describe('ChatCapsuleBar', () => {
     expect(currentIndex).toBeLessThan(otherIndex)
   })
 
-  it('sorts non-current capsules by lastActivityAt descending', () => {
+  it('keeps the query order for non-current capsules', () => {
     const html = renderCapsuleBar(
       [
-        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle', lastActivityAt: 100 },
-        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle', lastActivityAt: 300 },
-        { fileUuid: 'file-c', fileName: 'Gamma', status: 'idle', lastActivityAt: 200 },
+        { fileUuid: 'file-b', fileName: 'Beta', status: 'idle' },
+        { fileUuid: 'file-c', fileName: 'Gamma', status: 'idle' },
+        { fileUuid: 'file-a', fileName: 'Alpha', status: 'idle' },
       ],
       'file-current',
     )
@@ -139,27 +133,31 @@ describe('ChatCapsuleBar', () => {
     expect(gammaIndex).toBeLessThan(alphaIndex)
   })
 
-  it('resolves the open path from the persisted mapping when the file was not opened this launch', () => {
+  it('opens the identity path from the query when the file was not opened this launch', () => {
     vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue(undefined)
 
-    expect(resolveCapsuleOpenPath('file-x', { 'file-x': '/workspace/x.mindlane' })).toBe(
-      '/workspace/x.mindlane',
-    )
+    expect(
+      resolveCapsuleOpenPath({
+        fileUuid: 'file-x',
+        fileName: 'x.mindlane',
+        filePath: '/workspace/x.mindlane',
+        status: 'idle',
+      }),
+    ).toBe('/workspace/x.mindlane')
   })
 
-  it('prefers the loaded mindmap instance path over the persisted mapping', () => {
+  it('prefers the loaded instance path over the query path', () => {
     vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue({
       store: { getState: () => ({ filePath: '/workspace/renamed.mindlane' }) },
     } as never)
 
-    expect(resolveCapsuleOpenPath('file-x', { 'file-x': '/workspace/x.mindlane' })).toBe(
-      '/workspace/renamed.mindlane',
-    )
-  })
-
-  it('returns null when neither the registry nor the mapping knows the file', () => {
-    vi.mocked(openFileRegistry.getByFileUuid).mockReturnValue(undefined)
-
-    expect(resolveCapsuleOpenPath('file-ghost', {})).toBeNull()
+    expect(
+      resolveCapsuleOpenPath({
+        fileUuid: 'file-x',
+        fileName: 'x.mindlane',
+        filePath: '/workspace/x.mindlane',
+        status: 'idle',
+      }),
+    ).toBe('/workspace/renamed.mindlane')
   })
 })

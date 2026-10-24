@@ -199,20 +199,6 @@ export function registerFsHandlers(ctx: HandlerContext): void {
   })
 
   ipcMain.handle(
-    IPC.WorkspaceUpdateFileUuidPath,
-    async (_e, payload: { workspacePath: string; fileUuid: string; filePath: string }) => {
-      if (!payload.workspacePath || !payload.fileUuid || !payload.filePath) {
-        return { ok: false, error: 'Missing parameters' }
-      }
-      return ctx.fsService.workspace.updateFileUuidPath(
-        payload.workspacePath,
-        payload.fileUuid,
-        payload.filePath,
-      )
-    },
-  )
-
-  ipcMain.handle(
     IPC.WorkspaceUpdateState,
     async (
       _e,
@@ -271,8 +257,10 @@ export function registerFsHandlers(ctx: HandlerContext): void {
       if (!result.ok) return result
       // Clean up the thumbnail
       await ctx.fsService.thumbnails.delete(payload.targetPath).catch(() => {})
-      // Drop stale session file index mappings that point at the deleted path (files and folders are moved to the trash, so the path is invalid immediately).
-      await ctx.fsService.workspace.pruneFileUuidPaths(payload.workspacePath).catch(() => {})
+      // Drop the identity row and active-session mapping at the deleted path
+      // (files and folders are moved to the trash, so the path is invalid
+      // immediately). Session data is retained.
+      ctx.fsService.workspace.deleteFileIdentitiesAtPath(payload.targetPath)
       return { ok: true }
     },
   )
@@ -286,6 +274,8 @@ export function registerFsHandlers(ctx: HandlerContext): void {
         payload.workspacePath,
       )
       if (!result.ok) return result
+      // The fileUuid is stable: the new name is one UPDATE on its path row.
+      ctx.fsService.workspace.moveFilePath(payload.oldPath, result.data)
       return { ok: true, data: { newPath: result.data } }
     },
   )

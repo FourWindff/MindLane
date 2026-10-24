@@ -241,7 +241,25 @@ app.whenReady().then(async () => {
     process.arch,
   )
 
-  fsService = new FileSystemService(userDataPath)
+  // AI service assembly: success -> set the readiness gate; failure -> show a dialog about the
+  // degradation and keep running; non-AI features such as mindmap editing stay available
+  // (the renderer reads isReady over the bridge to show the disabled state).
+  try {
+    services = await initAgentServices(userDataPath)
+    aiServiceReady = true
+  } catch (err) {
+    appLog.error('AI service init failed:', err)
+    console.error('AI service init failed:', err)
+    dialog.showErrorBox(
+      'AI service initialization failed',
+      'Chat and memory are disabled; mindmap editing is unaffected. Restart the app to retry.',
+    )
+  }
+
+  // The file system service takes the shared state store: it owns the file
+  // identity index (path per fileUuid), so rename/move/delete are database
+  // writes and no bridge round trip repairs a path afterwards.
+  fsService = new FileSystemService(userDataPath, services?.stateStore)
   await fsService.initialize()
 
   // MCP: when safeStorage is unavailable credentials stay in memory only (McpCredentialStore logs a warning)
@@ -279,21 +297,6 @@ app.whenReady().then(async () => {
       mcpLog.warn('startup connect failed: %o', err)
     }
   })()
-
-  // AI service assembly: success -> set the readiness gate; failure -> show a dialog about the
-  // degradation and keep running; non-AI features such as mindmap editing stay available
-  // (the renderer reads isReady over the bridge to show the disabled state).
-  try {
-    services = await initAgentServices(userDataPath)
-    aiServiceReady = true
-  } catch (err) {
-    appLog.error('AI service init failed:', err)
-    console.error('AI service init failed:', err)
-    dialog.showErrorBox(
-      'AI service initialization failed',
-      'Chat and memory are disabled; mindmap editing is unaffected. Restart the app to retry.',
-    )
-  }
 
   // best-effort, independent of AI assembly: a single garbage-collection/redaction failure must not affect AI readiness.
   void (async () => {

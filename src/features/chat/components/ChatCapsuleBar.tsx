@@ -11,20 +11,13 @@ import { openFileRegistry } from '@/features/mindmap/model/openFileRegistry'
 import '../styles/chat-capsule-bar.css'
 
 /**
- * Resolve the file path to open when a capsule is clicked: prefer the currently
- * loaded instance (freshest after a rename or move), falling back to the
- * persisted `fileUuidPaths` map when the file was not opened in this launch.
+ * Resolve the path to open when a capsule is clicked: the instance already open
+ * in this launch is freshest after a rename/move, otherwise the path comes
+ * straight from the capsule query. No fallback chain.
  */
 // eslint-disable-next-line react-refresh/only-export-components -- exported for its unit test; the only cost is a full-page HMR refresh
-export function resolveCapsuleOpenPath(
-  fileUuid: string,
-  fileUuidPaths: Record<string, string>,
-): string | null {
-  return (
-    openFileRegistry.getByFileUuid(fileUuid)?.store.getState().filePath ??
-    fileUuidPaths[fileUuid] ??
-    null
-  )
+export function resolveCapsuleOpenPath(entry: ChatCapsuleEntry): string {
+  return openFileRegistry.getByFileUuid(entry.fileUuid)?.store.getState().filePath ?? entry.filePath
 }
 
 interface ChatCapsuleBarProps {
@@ -38,29 +31,25 @@ export function ChatCapsuleBar({ expanded, onToggleExpand }: ChatCapsuleBarProps
   const setShowSessionList = useAiStore((s) => s.setShowSessionList)
   const fileChats = useAiStore((s) => s.fileChats)
   const filePaths = useAiStore((s) => s.filePaths)
-  const fileUuidPaths = useAiStore((s) => s.fileUuidPaths)
-  const allSessions = useAiStore((s) => s.allSessions)
+  const capsuleFiles = useAiStore((s) => s.capsuleFiles)
   const currentFilePath = useAiStore((s) => s.currentFilePath)
 
   const entries = useMemo(
     () =>
-      deriveChatCapsuleEntries(
+      deriveChatCapsuleEntries(capsuleFiles, {
         fileChats,
         filePaths,
-        fileUuidPaths,
-        allSessions,
         currentFileUuid,
         currentFilePath,
-      ),
-    [fileChats, filePaths, fileUuidPaths, allSessions, currentFileUuid, currentFilePath],
+      }),
+    [capsuleFiles, fileChats, filePaths, currentFileUuid, currentFilePath],
   )
 
   const handleSelect = useCallback(
-    (fileUuid: string) => {
-      const filePath = resolveCapsuleOpenPath(fileUuid, fileUuidPaths)
-      if (filePath) void openWorkspaceFile(filePath)
+    (entry: ChatCapsuleEntry) => {
+      void openWorkspaceFile(resolveCapsuleOpenPath(entry))
     },
-    [openWorkspaceFile, fileUuidPaths],
+    [openWorkspaceFile],
   )
 
   return (
@@ -104,14 +93,14 @@ function Capsule({
 }: {
   entry: ChatCapsuleEntry
   current: boolean
-  onSelect: (fileUuid: string) => void
+  onSelect: (entry: ChatCapsuleEntry) => void
   onSwitchSession: () => void
 }) {
   return (
     <button
       type="button"
       className={`chat-capsule chat-capsule--${entry.status} ${current ? 'chat-capsule--current' : ''}`}
-      onClick={() => onSelect(entry.fileUuid)}
+      onClick={() => onSelect(entry)}
       title={entry.fileName}
     >
       <span className="chat-capsule__name">{entry.fileName.replace(/\.[^.]+$/, '')}</span>
