@@ -47,7 +47,7 @@ function addChild(
     CHILD_OFFSET_X,
     CHILD_GAP_Y,
     structureType,
-  )
+  ) as Node[]
   return { nodes, edges, newNodeId: childId }
 }
 
@@ -188,7 +188,14 @@ describe('mindmap layout left/right sides', () => {
 
 describe('mindmap layout root side collapse', () => {
   function reflow(tree: Tree): Node[] {
-    return reflowChildren('root', tree.nodes, tree.edges, CHILD_OFFSET_X, CHILD_GAP_Y, 'mindmap')
+    return reflowChildren(
+      'root',
+      tree.nodes,
+      tree.edges,
+      CHILD_OFFSET_X,
+      CHILD_GAP_Y,
+      'mindmap',
+    ) as Node[]
   }
 
   function buildTreeWithSides(): Tree {

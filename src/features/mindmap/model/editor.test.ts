@@ -1,19 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createMindmapStore } from './store'
-import { MindmapHistory } from './history'
 import { MindmapEditor } from './editor'
 import { getChildIdsOrdered } from '@/features/mindmap/model/mindmapTree'
 import { createEmptyFile } from '@contracts/fileFormat'
 
 describe('MindmapEditor', () => {
   let store: ReturnType<typeof createMindmapStore>
-  let history: MindmapHistory
   let editor: MindmapEditor
 
   beforeEach(() => {
     store = createMindmapStore()
-    history = new MindmapHistory()
-    editor = new MindmapEditor(store, history)
+    editor = new MindmapEditor(store)
     editor.loadFile('/tmp/x.mindlane', createEmptyFile('Test'), null)
   })
 

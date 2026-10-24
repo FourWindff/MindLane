@@ -9,6 +9,11 @@ import type {
   MindmapWriteRequest,
   MindmapWriteResponse,
 } from '../contracts/ipc.js'
+import type {
+  MindmapDocumentCommandResult,
+  MindmapDocumentIntent,
+  MindmapDocumentState,
+} from '../contracts/mindmapDocument/state.js'
 import type { AppSettings, WorkspaceState } from './fs/types.js'
 import type { McpServerStatusInfo } from './agent/mcp/types.js'
 
@@ -24,6 +29,9 @@ export enum IPC {
   AiMindmapWriteRespond = 'ai:mindmap-write-respond',
   AiGetProviders = 'ai:get-providers',
   AiIsReady = 'ai:is-ready',
+
+  MindmapDocumentCommand = 'mindmap:document-command',
+  MindmapDocumentState = 'mindmap:document-state',
 
   FileOpen = 'file:open',
   FileSave = 'file:save',
@@ -150,6 +158,12 @@ export * from '../contracts/turnState.js'
 export type { PalaceArtworkStyle } from '../contracts/palaceArtworkStyle.js'
 
 export interface MindLaneBridge {
+  mindmap: {
+    /** The one command channel into the authoritative document (human edits and AI writes alike). */
+    command: (intent: MindmapDocumentIntent) => Promise<MindmapDocumentCommandResult>
+    /** Versioned document state subscription; stale versions are the renderer's to discard. */
+    onDocumentState: (callback: (state: MindmapDocumentState) => void) => () => void
+  }
   ai: {
     chatStream: (payload: {
       /** Renderer-chosen stream identity: the main process echoes it on every event. */

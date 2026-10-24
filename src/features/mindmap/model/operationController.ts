@@ -6,7 +6,7 @@ import {
   findRootNode,
   getChildIdsOrdered,
 } from '@/features/mindmap/model/mindmapTree'
-import { defaultNodeSize } from './layout/nodeSize'
+import { defaultNodeSize } from '@contracts/mindmapDocument/nodeSize'
 import type { SiblingInsertMode } from './editor'
 
 type OperationEditor = Pick<

@@ -1,4 +1,5 @@
 import { openFileRegistry } from './openFileRegistry'
+import { resetDocumentLoopback } from './documentLoopback.testutil'
 
 /**
  * Test-only blank slate: dispose every instance held by the singleton registry
@@ -14,4 +15,5 @@ export function resetRegistry(): void {
   registry.instances.clear()
   registry.activeKey = null
   openFileRegistry.resetDefault()
+  resetDocumentLoopback()
 }

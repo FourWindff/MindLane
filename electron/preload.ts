@@ -9,6 +9,16 @@ import type {
 } from './ipc.js'
 
 const api: MindLaneBridge = {
+  mindmap: {
+    command: (intent) => ipcRenderer.invoke(IPC.MindmapDocumentCommand, intent),
+    onDocumentState: (callback) => {
+      const handler = (_event: unknown, state: Parameters<typeof callback>[0]) => callback(state)
+      ipcRenderer.on(IPC.MindmapDocumentState, handler)
+      return () => {
+        ipcRenderer.off(IPC.MindmapDocumentState, handler)
+      }
+    },
+  },
   ai: {
     chatStream: (payload) => ipcRenderer.invoke(IPC.AiChatStream, payload),
     stopStream: (streamId) => ipcRenderer.invoke(IPC.AiChatStreamStop, { streamId }),

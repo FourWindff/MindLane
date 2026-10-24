@@ -1,12 +1,10 @@
 import { createContext, useContext, useSyncExternalStore } from 'react'
-import type { MindmapHistory } from '@/features/mindmap/model/history'
 import type { MindmapEditor } from '@/features/mindmap/model/editor'
 import type { MindmapStore, OpenFileState } from '@/features/mindmap/model/store'
 
 export interface ActiveOpenFile {
   key: string
   store: MindmapStore
-  history: MindmapHistory
   editor: MindmapEditor
   isAiWriting(): boolean
   subscribeAiWriting(listener: () => void): () => void
