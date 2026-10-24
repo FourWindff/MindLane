@@ -57,6 +57,80 @@ function resolveImport(fromFile: string, specifier: string): string | null {
 
 const FEATURE_LAYERS = ['settings', 'mindmap', 'workspace', 'chat'] as const
 
+/** One production source file the boundary scans inspect (path is repo-relative). */
+interface ScannedSource {
+  file: string
+  source: string
+}
+
+function readSources(files: string[]): ScannedSource[] {
+  return files.map((file) => ({
+    file: path.relative(repoRoot, file).split(path.sep).join('/'),
+    source: fs.readFileSync(file, 'utf-8'),
+  }))
+}
+
+/**
+ * The document mutation vocabulary: pure command application, its history gate and
+ * the stateful service that owns them (ADR-0017 superseded decisions 1/2/4).
+ * The main process is the only writer, so none of these words may appear in the
+ * renderer — an import of any of them is a second writer, not a view.
+ */
+const DOCUMENT_MUTATION_VOCABULARY = [
+  'applyDocumentCommand',
+  'applyDocumentCommands',
+  'shouldRecordHistory',
+  'requiresLayoutAfter',
+  'DocumentHistory',
+  'MindmapDocumentService',
+  'MindmapCommand',
+] as const
+
+/** Files whose source names any document mutation symbol (the renderer must be absent). */
+function findDocumentMutationHosts(files: ScannedSource[]): string[] {
+  const offenders: string[] = []
+  for (const { file, source } of files) {
+    for (const symbol of DOCUMENT_MUTATION_VOCABULARY) {
+      if (new RegExp(`\\b${symbol}\\b`).test(source)) offenders.push(`${file}: ${symbol}`)
+    }
+  }
+  return offenders
+}
+
+/**
+ * Reverse-write residue: the renderer-proxy write channel, its responder, the
+ * per-file landing queue and the tool-end ack handshake. None of them has a
+ * reason to exist now that write tools call the document service directly.
+ */
+const REVERSE_WRITE_RESIDUE: Array<{ label: string; pattern: RegExp }> = [
+  {
+    label: 'reverse write request/ack channel',
+    pattern:
+      /AiMindmapWrite|MindmapWriteRequest|MindmapWriteResponse|MindmapWriteResponder|onMindmapWriteRequest|respondMindmapWrite/,
+  },
+  { label: 'renderer requester used for writes', pattern: /RendererRequester<\s*MindmapWrite/ },
+  {
+    label: 'per-file document/landing write queue',
+    pattern:
+      /(?:document|landing|mindmap)[A-Za-z]*WriteQueue|WriteQueue[A-Za-z]*(?:Document|Landing|Mindmap)|pendingDocumentWrites|enqueueDocumentWrite|flushDocumentWrites/i,
+  },
+  {
+    label: 'renderer ack handshake',
+    pattern: /onWriteAck|ackWrite|writeAcknowledged|waitForRendererAck|rendererWriteAck/,
+  },
+]
+
+/** Files whose source still speaks the reverse-write vocabulary (repo-wide must be empty). */
+function findReverseWriteResidue(files: ScannedSource[]): string[] {
+  const offenders: string[] = []
+  for (const { file, source } of files) {
+    for (const { label, pattern } of REVERSE_WRITE_RESIDUE) {
+      if (pattern.test(source)) offenders.push(`${file}: ${label}`)
+    }
+  }
+  return offenders
+}
+
 type ModuleLayer = 'app' | 'shared' | 'contracts' | 'electron' | `features/${string}`
 
 function moduleLayer(relativePath: string): ModuleLayer | null {
@@ -235,15 +309,32 @@ describe('IPC seam contract', () => {
     }>().toMatchTypeOf<MindLaneBridge['mindmap']>()
   })
 
-  it('has no reverse write channel: AI writes call the document service directly', () => {
+  it('has no reverse write channel and no document write queue anywhere', () => {
     // The write tools land in the main process, so no request/ack channel, no
-    // responder, no per-file queue and no timeout may exist anywhere.
-    const pattern =
-      /AiMindmapWrite|MindmapWriteRequest|MindmapWriteResponse|MindmapWriteResponder|onMindmapWriteRequest|respondMindmapWrite|RendererRequester<MindmapWrite/
-    const offenders = [...mainProcessFiles, ...rendererFiles]
-      .filter((file) => pattern.test(fs.readFileSync(file, 'utf-8')))
-      .map((file) => path.relative(repoRoot, file).split(path.sep).join('/'))
-    expect(offenders).toEqual([])
+    // responder, no per-file landing queue and no ack handshake may exist
+    // anywhere in the repo (`contracts/` included).
+    const contractsFiles = walkSourceFiles(path.join(repoRoot, 'contracts'))
+    const sources = readSources([...mainProcessFiles, ...rendererFiles, ...contractsFiles])
+    expect(sources.length).toBeGreaterThan(0)
+    expect(findReverseWriteResidue(sources)).toEqual([])
+  })
+
+  it('flags reverse-write residue: the scan is a source scan, not a promise', () => {
+    const residual = findReverseWriteResidue([
+      {
+        file: 'src/features/chat/model/mindmapWriteResponder.ts',
+        source:
+          'export function respondMindmapWrite(responder: MindmapWriteResponder) { queue.writeResponse() }',
+      },
+      {
+        file: 'electron/main/document/landing.ts',
+        source: 'const documentWriteQueue = new Map<string, Promise<void>>()',
+      },
+    ])
+    expect(residual).toEqual([
+      'src/features/chat/model/mindmapWriteResponder.ts: reverse write request/ack channel',
+      'electron/main/document/landing.ts: per-file document/landing write queue',
+    ])
   })
 
   it('has no reverse read channel: AI reads read the document service directly', () => {
@@ -287,8 +378,9 @@ describe('IPC seam contract', () => {
   })
 })
 
-// ---- Renderer module boundaries (ADR-0024 / ADR-0025) ----
-// Static assertions, not behavior tests: the layer table is the only guard against regressions.
+// ---- Renderer module boundaries (ADR-0024 / ADR-0025, document authority per PRD "one fact one owner") ----
+// Static assertions, not behavior tests: the layer table plus the document-authority
+// scans are the only guard against a second writer appearing outside the main process.
 
 describe('renderer module boundaries', () => {
   const sourceFiles = [
@@ -342,12 +434,41 @@ describe('renderer module boundaries', () => {
     expect(offenders).toEqual([])
   })
 
-  it('keeps the authoritative document service and its history in the main process', () => {
-    const offenders = walkSourceFiles(path.join(repoRoot, 'src')).filter((file) => {
-      const source = fs.readFileSync(file, 'utf-8')
-      return /MindmapDocumentService|class DocumentHistory|new DocumentHistory/.test(source)
-    })
-    expect(offenders.map((file) => path.relative(repoRoot, file))).toEqual([])
+  it('keeps document mutation in the main process: the renderer has no mutation surface', () => {
+    // The renderer may state intents (`MindmapWireCommand`) and read versioned
+    // state; it may not name the pure command layer, the history stack or the
+    // document service. Any of those in `src/` is a second writer.
+    const renderer = readSources(walkSourceFiles(path.join(repoRoot, 'src')))
+    expect(renderer.length).toBeGreaterThan(0)
+    expect(findDocumentMutationHosts(renderer)).toEqual([])
+  })
+
+  it('flags a renderer mutation surface: the scan goes red on a synthetic violation', () => {
+    const violations = findDocumentMutationHosts([
+      {
+        file: 'src/features/mindmap/model/editor.ts',
+        source:
+          "import { applyDocumentCommands } from '@contracts/mindmapDocument/commands'\nexport function run(commands: MindmapCommand[]) { return applyDocumentCommands(doc, commands) }",
+      },
+      {
+        file: 'src/features/mindmap/model/history.ts',
+        source: 'export class DocumentHistory { private stack = [] }',
+      },
+    ])
+    expect(violations).toEqual([
+      'src/features/mindmap/model/editor.ts: applyDocumentCommands',
+      'src/features/mindmap/model/editor.ts: MindmapCommand',
+      'src/features/mindmap/model/history.ts: DocumentHistory',
+    ])
+  })
+
+  it('opens the document channel in exactly one renderer module', () => {
+    // One command channel, one state subscription, one module that knows about
+    // them: every other renderer file goes through the store projection.
+    const offenders = readSources(walkSourceFiles(path.join(repoRoot, 'src')))
+      .filter(({ source }) => /mindlane\??\.mindmap/.test(source))
+      .map(({ file }) => file)
+    expect(offenders).toEqual(['src/features/mindmap/model/documentClient.ts'])
   })
 
   it('keeps shared free of app and feature knowledge', () => {

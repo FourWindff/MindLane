@@ -81,10 +81,7 @@ function TextNodeInner({
     const before = data.label
     const next = label.trim() || 'Untitled'
     setLabel(next)
-    editor.updateNode(id, (n) => ({
-      ...n,
-      data: { ...n.data, label: next, editing: undefined },
-    }))
+    editor.updateNodeData(id, { label: next, editing: undefined })
     // Report manual text edits as memory evidence (fire-and-forget). AI edits
     // never pass through this commit point, so they are never reported. Only
     // documents owned by a workspace qualify: the instance records its

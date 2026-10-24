@@ -153,7 +153,7 @@ describe('MindmapEditor', () => {
 
   describe('updateNode', () => {
     it('should update node label and allow undo/redo', () => {
-      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: 'Updated' } }))
+      editor.updateNodeData(rootId(), { label: 'Updated' })
 
       expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Updated')
 
@@ -286,36 +286,6 @@ describe('MindmapEditor', () => {
     })
   })
 
-  describe('moveNode', () => {
-    it('should move a node and allow undo/redo', () => {
-      const { nodeId } = editor.addChild(rootId())
-      const beforeX = store.getState().nodes.find((n) => n.id === nodeId)!.position.x
-
-      editor.moveNode(nodeId, { x: beforeX + 100, y: 0 })
-      expect(store.getState().nodes.find((n) => n.id === nodeId)!.position.x).toBe(beforeX + 100)
-
-      editor.undo()
-      expect(store.getState().nodes.find((n) => n.id === nodeId)!.position.x).toBe(beforeX)
-    })
-  })
-
-  describe('addEdge / removeEdge', () => {
-    it('should add and remove an edge', () => {
-      const { nodeId: a } = editor.addChild(rootId())
-      const { nodeId: b } = editor.addChild(rootId())
-      const edgeId = `e_${a}_${b}`
-
-      editor.addEdge({ id: edgeId, source: a, target: b, type: 'mindmap' })
-      expect(store.getState().edges.some((e) => e.id === edgeId)).toBe(true)
-
-      editor.removeEdge(edgeId)
-      expect(store.getState().edges.some((e) => e.id === edgeId)).toBe(false)
-
-      editor.undo()
-      expect(store.getState().edges.some((e) => e.id === edgeId)).toBe(true)
-    })
-  })
-
   describe('native change routing', () => {
     it('should record position changes as moveNode and allow undo', () => {
       const { nodeId } = editor.addChild(rootId())
@@ -416,14 +386,22 @@ describe('MindmapEditor', () => {
       expect(store.getState().nodes[0]!.data.editing).toBeUndefined()
     })
 
+    it('should keep a view-only data update out of the document and out of history', () => {
+      // The renderer lifts view flags out of the command before sending it, so a
+      // flag-only update never becomes a document change (nor an undo step).
+      editor.updateNodeData(rootId(), { editing: true })
+      expect(store.getState().nodes[0]!.data.editing).toBe(true)
+      expect(store.getState().canUndo).toBe(false)
+    })
+
     it('should commit label change as a recorded update and leave escape transient', () => {
       // Simulate Escape: clear the editing flag only, record no transaction
       editor.setNodeEditing(rootId(), true)
       editor.setNodeEditing(rootId(), false)
       expect(store.getState().canUndo).toBe(false)
 
-      // Simulate commit: updateNode records a transaction
-      editor.updateNode(rootId(), (n) => ({ ...n, data: { ...n.data, label: 'Committed' } }))
+      // Simulate commit: the label update records a transaction
+      editor.updateNodeData(rootId(), { label: 'Committed' })
       expect(store.getState().canUndo).toBe(true)
       expect((store.getState().nodes[0]!.data as { label: string }).label).toBe('Committed')
 

@@ -1,17 +1,15 @@
 import type { Edge, Node, NodeChange, EdgeChange } from '@xyflow/react'
 import type { MindLaneFile, MindLaneAsset } from '@contracts/fileFormat'
-import { shouldRecordHistory } from '@contracts/mindmapDocument/commands'
 import { defaultNodeSize } from '@contracts/mindmapDocument/nodeSize'
 import { planFragmentInsert, planNodeReplacement } from '@contracts/mindmapDocument/fragment'
 import {
   TRANSIENT_NODE_DATA_FLAGS,
   stripTransientNodeData,
-  type MindmapCommand,
   type MindmapDocument,
   type MindmapDocumentEdge,
   type MindmapDocumentNode,
 } from '@contracts/mindmapDocument/types'
-import { toMindmapCommands, type MindmapWireCommand } from '@contracts/mindmapDocument/wire'
+import type { MindmapWireCommand } from '@contracts/mindmapDocument/wire'
 import { parseXmlFragment } from '@contracts/mindmapXml'
 import {
   CHILD_GAP_Y,
@@ -51,28 +49,61 @@ function pickTransientFlags(data: Record<string, unknown>): Record<string, unkno
   return flags
 }
 
-function dataDiff(
-  before: Record<string, unknown>,
-  after: Record<string, unknown>,
-): { data: Record<string, unknown>; viewFlags: Record<string, unknown> } {
-  const data: Record<string, unknown> = {}
-  const viewFlags: Record<string, unknown> = {}
+/**
+ * Split a batch into the intents that reach the document and the view flags they
+ * carried. View-only data (animation markers, editing) belongs to the renderer,
+ * so it is lifted out here and applied to the local projection instead.
+ */
+function splitViewState(commands: MindmapWireCommand[]): {
+  commands: MindmapWireCommand[]
+  viewFlags: ViewFlags
+} {
   const transient = new Set<string>(TRANSIENT_NODE_DATA_FLAGS)
-  const keys = new Set([...Object.keys(before), ...Object.keys(after)])
-  for (const key of keys) {
-    if (Object.is(before[key], after[key])) continue
-    if (transient.has(key)) viewFlags[key] = after[key]
-    else data[key] = after[key]
+  const intents: MindmapWireCommand[] = []
+  const viewFlags: ViewFlags = []
+  for (const command of commands) {
+    switch (command.type) {
+      case 'addNode': {
+        const flags = pickTransientFlags(command.node.data)
+        intents.push({ ...command, node: stripTransientNodeData(command.node) })
+        if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.node.id, flags })
+        break
+      }
+      case 'updateNode': {
+        const flags = command.data ? pickTransientFlags(command.data) : {}
+        const data = command.data
+          ? Object.fromEntries(Object.entries(command.data).filter(([key]) => !transient.has(key)))
+          : undefined
+        const intent: MindmapWireCommand = {
+          type: 'updateNode',
+          nodeId: command.nodeId,
+          ...(data && Object.keys(data).length > 0 ? { data } : {}),
+          ...(command.position ? { position: command.position } : {}),
+        }
+        // A flag-only update changes nothing in the document: it is view state.
+        if (intent.data || intent.position) intents.push(intent)
+        if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.nodeId, flags })
+        break
+      }
+      case 'batch': {
+        const nested = splitViewState(command.commands)
+        if (nested.commands.length > 0) intents.push({ type: 'batch', commands: nested.commands })
+        viewFlags.push(...nested.viewFlags)
+        break
+      }
+      default:
+        intents.push(command)
+    }
   }
-  return { data, viewFlags }
+  return { commands: intents, viewFlags }
 }
 
 /**
- * The renderer's mindmap view facade: it builds document commands from the
- * projected state and sends them down the one command channel. It no longer
- * owns the document, the history stack, the layout or a write path — the
- * main-process document service does. What stays here is the view-side
- * bookkeeping: animation markers, selection, deletion timers.
+ * The renderer's mindmap view facade: it expresses what the user did as
+ * serializable document intents and sends them down the one command channel.
+ * It does not apply commands, hold the document, the history stack, the layout
+ * or a write path — the main-process document service does. What stays here is
+ * the view-side bookkeeping: animation markers, selection, deletion timers.
  */
 export class MindmapEditor {
   private pendingDeleteTimers = new Set<ReturnType<typeof setTimeout>>()
@@ -105,85 +136,19 @@ export class MindmapEditor {
     this.state.redo()
   }
 
-  get canUndo(): boolean {
-    return this.state.canUndo
-  }
-
-  get canRedo(): boolean {
-    return this.state.canRedo
-  }
-
-  // ─── Core command execution ───
-
-  execute(command: MindmapCommand): void {
-    this.runBatch([command])
-  }
-
-  batch(commands: MindmapCommand[]): void {
-    this.runBatch(commands)
-  }
-
-  private runBatch(commands: MindmapCommand[]): void {
-    if (!shouldRecordHistory(commands)) return
-    this.cancelPendingDeletes()
-    const projected = this.toWireCommands(commands)
-    this.state.applyCommands(projected.commands)
-    this.applyViewFlags(projected.viewFlags)
-  }
+  // ─── Document intents ───
 
   /**
-   * Translate the pure command values the renderer builds into the serializable
-   * shape. `updateNode` patches are materialised against the current projection;
-   * view-only data flags move to the renderer's own view state so they never
-   * enter the document.
+   * Send one batch of document intents. A batch that is pure view state after the
+   * split never reaches the document (and never cancels a pending delete).
    */
-  private toWireCommands(commands: MindmapCommand[]): {
-    commands: MindmapWireCommand[]
-    viewFlags: ViewFlags
-  } {
-    const wire: MindmapWireCommand[] = []
-    const viewFlags: ViewFlags = []
-    for (const command of commands) {
-      switch (command.type) {
-        case 'addNode': {
-          const flags = pickTransientFlags(command.node.data)
-          wire.push({ ...command, node: stripTransientNodeData(command.node) })
-          if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.node.id, flags })
-          break
-        }
-        case 'updateNode': {
-          const current = this.state.nodes.find((node) => node.id === command.nodeId)
-          if (!current) {
-            // Unknown ids are no-ops in the document; nothing to translate.
-            break
-          }
-          const next = command.patch(current as unknown as MindmapDocumentNode) as unknown as Node
-          const { data, viewFlags: flags } = dataDiff(
-            current.data as Record<string, unknown>,
-            next.data as Record<string, unknown>,
-          )
-          const position =
-            next.position && !Object.is(current.position, next.position) ? next.position : undefined
-          wire.push({
-            type: 'updateNode',
-            nodeId: command.nodeId,
-            ...(Object.keys(data).length > 0 ? { data } : {}),
-            ...(position ? { position } : {}),
-          })
-          if (Object.keys(flags).length > 0) viewFlags.push({ nodeId: command.nodeId, flags })
-          break
-        }
-        case 'batch': {
-          const nested = this.toWireCommands(command.commands)
-          wire.push({ type: 'batch', commands: nested.commands })
-          viewFlags.push(...nested.viewFlags)
-          break
-        }
-        default:
-          wire.push(command)
-      }
+  batch(commands: MindmapWireCommand[]): void {
+    const projected = splitViewState(commands)
+    if (projected.commands.length > 0) {
+      this.cancelPendingDeletes()
+      this.state.sendCommands(projected.commands)
     }
-    return { commands: wire, viewFlags }
+    this.applyViewFlags(projected.viewFlags)
   }
 
   private applyViewFlags(viewFlags: ViewFlags): void {
@@ -244,7 +209,7 @@ export class MindmapEditor {
           }
         : undefined
 
-    this.execute({ type: 'addNode', node, edge })
+    this.batch([{ type: 'addNode', node, edge }])
     return { nodeId }
   }
 
@@ -338,7 +303,7 @@ export class MindmapEditor {
           : {}),
       },
     }
-    const commands: MindmapCommand[] = [
+    const commands: MindmapWireCommand[] = [
       {
         type: 'addNode',
         node: newNode,
@@ -367,22 +332,9 @@ export class MindmapEditor {
     return { nodeId: newNodeId }
   }
 
-  updateNode(nodeId: string, patch: (node: Node) => Node): void {
-    this.execute({
-      type: 'updateNode',
-      nodeId,
-      patch: patch as unknown as (node: MindmapDocumentNode) => MindmapDocumentNode,
-    })
-  }
-
+  /** Merge data into a node (the document owns the node value; the renderer only states the change). */
   updateNodeData(nodeId: string, changes: Record<string, unknown>): void {
-    this.updateNode(nodeId, (n) => {
-      const merged = { ...n.data, ...changes }
-      return {
-        ...n,
-        data: merged,
-      }
-    })
+    this.batch([{ type: 'updateNode', nodeId, data: changes }])
   }
 
   /**
@@ -437,7 +389,7 @@ export class MindmapEditor {
     if (!newParentId || newParentId === nodeId) return
     if (position === 'child' && newParentId === oldParentId) return
 
-    const commands: MindmapCommand[] = []
+    const commands: MindmapWireCommand[] = []
     const incomingEdge = edges.find((e) => e.target === nodeId)
     if (incomingEdge) {
       commands.push({ type: 'removeEdge', edgeId: incomingEdge.id })
@@ -481,7 +433,7 @@ export class MindmapEditor {
     for (const [id, from] of oldPositions) {
       this.state.setNodeViewFlags(id, { gliding: true, glideFrom: from })
     }
-    this.runBatch(commands)
+    this.batch(commands)
     setTimeout(() => {
       for (const id of subtreeIds) {
         this.state.clearNodeFlag(id, 'gliding')
@@ -530,7 +482,7 @@ export class MindmapEditor {
     if (!parentId) return
 
     const node = nodes.find((n) => n.id === nodeId)!
-    const commands: MindmapCommand[] = []
+    const commands: MindmapWireCommand[] = []
     getChildIdsOrdered(nodes, edges, nodeId).forEach((childId, index) => {
       const incoming = edges.find((e) => e.target === childId)
       if (incoming) commands.push({ type: 'removeEdge', edgeId: incoming.id })
@@ -593,25 +545,12 @@ export class MindmapEditor {
   }
 
   /** Commit the delete batch after the exit animation; tracked so any later batch cancels it. */
-  private scheduleDelete(commands: MindmapCommand[], delay: number): void {
+  private scheduleDelete(commands: MindmapWireCommand[], delay: number): void {
     const timerId = setTimeout(() => {
       this.pendingDeleteTimers.delete(timerId)
       this.batch(commands)
     }, delay)
     this.pendingDeleteTimers.add(timerId)
-  }
-
-  moveNode(nodeId: string, position: { x: number; y: number }): void {
-    if (nodeId === 'root') return
-    this.execute({ type: 'moveNode', nodeId, position })
-  }
-
-  addEdge(edge: Edge): void {
-    this.execute({ type: 'addEdge', edge })
-  }
-
-  removeEdge(edgeId: string): void {
-    this.execute({ type: 'removeEdge', edgeId })
   }
 
   addDocumentRef(ref: import('@contracts/fileFormat').DocumentRef): void {
@@ -644,7 +583,7 @@ export class MindmapEditor {
     )
     // Pending assets become live only after parsing and structural validation succeed.
     for (const asset of pendingAssets) this.state.addAsset(asset)
-    this.batch(toMindmapCommands(commands))
+    this.batch(commands)
     await this.whenSettled()
   }
 
@@ -661,7 +600,7 @@ export class MindmapEditor {
     ])
     // Keep materialization in the same validated write operation as the replacement.
     for (const asset of pendingAssets) this.state.addAsset(asset)
-    this.batch(toMindmapCommands(commands))
+    this.batch(commands)
     await this.whenSettled()
   }
 
@@ -717,7 +656,7 @@ export class MindmapEditor {
   applyNativeEdgeChanges(changes: EdgeChange[]): void {
     for (const change of changes) {
       if (change.type === 'remove') {
-        this.removeEdge(change.id)
+        this.batch([{ type: 'removeEdge', edgeId: change.id }])
       } else if (change.type === 'select') {
         this.state.setEdgeSelection(change.id, change.selected)
       }
