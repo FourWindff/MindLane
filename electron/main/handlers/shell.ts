@@ -7,7 +7,7 @@ import { logger } from '../../shared/logger.js'
 import { resolveDocumentRef } from '../documentRef.js'
 import type { HandlerContext } from './context.js'
 
-/** Renderer-reported errors: fixed context, no streamId is guaranteed at the report site. */
+/** Renderer-reported diagnostics: fixed context, no streamId is guaranteed at the report site. */
 const rendererLog = logger.withContext('renderer')
 
 export function registerShellHandlers(ctx: HandlerContext): void {
@@ -49,6 +49,11 @@ export function registerShellHandlers(ctx: HandlerContext): void {
   ipcMain.on(IPC.ShellLogWarning, (_e, message: unknown) => {
     if (typeof message !== 'string' || message.length === 0) return
     rendererLog.warn('%s', message)
+  })
+
+  ipcMain.on(IPC.ShellLogDebug, (_e, message: unknown) => {
+    if (typeof message !== 'string' || message.length === 0) return
+    rendererLog.debug('%s', message)
   })
 
   ipcMain.handle(IPC.ShellOpenExternal, (_e, payload: { url: string }) => {

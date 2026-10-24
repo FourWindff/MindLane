@@ -28,6 +28,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
     async (
       _e,
       payload: {
+        streamId: string
         threadId: string
         message: string
         context: ChatContext
@@ -39,6 +40,12 @@ export function registerAiHandlers(ctx: HandlerContext): void {
       }
 
       try {
+        // The renderer owns the stream identity: the mapping is already in place
+        // when the first event leaves the main process, so the id must arrive here.
+        if (!payload.streamId) {
+          return { ok: false, error: 'Chat stream request is missing the stream id' }
+        }
+
         // Ephemeral runs (manual palace) may carry an empty message: the palace
         // subgraph takes its input from the selection, and a resume re-runs the
         // private thread with empty input.
@@ -62,6 +69,7 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         }
 
         const request: StreamRequest = {
+          streamId: payload.streamId,
           sessionId: payload.threadId || crypto.randomUUID(),
           message: payload.message ?? '',
           workspaceUuid,
@@ -73,10 +81,8 @@ export function registerAiHandlers(ctx: HandlerContext): void {
         const streamManager = ctx.getStreamManager()
         if (!streamManager) return aiNotReadyResponse()
 
-        return {
-          ok: true,
-          streamId: streamManager.startStream(request),
-        }
+        streamManager.startStream(request)
+        return { ok: true }
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) }
       }

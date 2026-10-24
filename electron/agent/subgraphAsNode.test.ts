@@ -7,7 +7,7 @@ import type { AgentServices } from './service.js'
 import { ProviderCapability, type LLMProvider } from './providers/index.js'
 import { AGENT_LIMITS } from './config.js'
 import { runWithRunContext } from '../shared/runContext.js'
-import { StreamManager } from './streamManager.js'
+import { StreamManager, type StreamRequest } from './streamManager.js'
 import type { SessionManager } from './context/sessionManager.js'
 import type { ChatStreamEvent } from '../ipc.js'
 
@@ -155,6 +155,13 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
   throw new Error('condition not reached')
 }
 
+/** The renderer owns the stream id; tests stand in for it with a unique value. */
+function startStream(manager: StreamManager, request: Omit<StreamRequest, 'streamId'>): string {
+  const streamId = `stream_${crypto.randomUUID()}`
+  manager.startStream({ ...request, streamId })
+  return streamId
+}
+
 function findToolMessage(messages: BaseMessage[] | undefined): ToolMessage | undefined {
   return messages?.find((message): message is ToolMessage => message.type === 'tool')
 }
@@ -253,7 +260,7 @@ describe('Manual palace: one ephemeral run', () => {
     const scripted = palaceRunProvider()
     const harness = createHarness(scripted.provider)
 
-    harness.manager.startStream(palaceRequest('palace-run-1', 'palace-thread-1'))
+    startStream(harness.manager, palaceRequest('palace-run-1', 'palace-thread-1'))
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     // Stage progress flows like any other run (same channel, same vocabulary).
@@ -302,12 +309,12 @@ describe('Manual palace: one ephemeral run', () => {
   it('both trigger paths emit palace write requests of the same shape (one landing code path)', async () => {
     // Manual trigger: one ephemeral entry run, same scripted palace stages.
     const manual = createHarness(palaceRunProvider().provider)
-    manual.manager.startStream(palaceRequest('palace-shape-manual', 'palace-thread-shape'))
+    startStream(manual.manager, palaceRequest('palace-shape-manual', 'palace-thread-shape'))
     await waitUntil(() => settledStreamIds(manual.events).length === 1)
 
     // AI trigger: the supervisor declares generatePalace, the same subgraph runs.
     const ai = createHarness(multiCallProvider([{ name: 'generatePalace', id: 'call-pl' }]))
-    ai.manager.startStream({
+    startStream(ai.manager, {
       sessionId: 'session-shape-ai',
       message: 'build a palace for the selected nodes',
       workspaceUuid: 'workspace-a',
@@ -342,7 +349,8 @@ describe('Manual palace: one ephemeral run', () => {
 
     // Run 1: stop while the artwork stage is in flight — the plan super-step has
     // already completed and is checkpointed on the private thread.
-    const firstStreamId = harness.manager.startStream(
+    const firstStreamId = startStream(
+      harness.manager,
       palaceRequest('palace-run-2', 'palace-thread-2'),
     )
     await waitUntil(() =>
@@ -363,7 +371,7 @@ describe('Manual palace: one ephemeral run', () => {
     ).toBe(true)
 
     // Resume: same private thread, empty input.
-    harness.manager.startStream(palaceRequest('palace-run-3', 'palace-thread-2', true))
+    startStream(harness.manager, palaceRequest('palace-run-3', 'palace-thread-2', true))
     await waitUntil(() => settledStreamIds(harness.events).length === 2)
 
     // The completed stage did not re-run (one plan call across both runs), the
@@ -474,7 +482,7 @@ describe('The main graph mounts both subgraphs as nodes', () => {
       },
     }
 
-    const streamId = harness.manager.startStream(request)
+    const streamId = startStream(harness.manager, request)
     await waitUntil(() => settledStreamIds(harness.events).length === 1)
 
     const steps = harness.events
@@ -529,7 +537,7 @@ describe('The main graph mounts both subgraphs as nodes', () => {
     const harness = createHarness(failingMindmapProvider())
     const sessionId = 'session-as-node-failed'
 
-    harness.manager.startStream({
+    startStream(harness.manager, {
       sessionId,
       message: 'turn this content into a mindmap',
       workspaceUuid: 'workspace-a',
@@ -611,7 +619,7 @@ describe('The main graph mounts both subgraphs as nodes', () => {
     )
     const sessionId = 'session-two-subgraphs'
 
-    harness.manager.startStream({
+    startStream(harness.manager, {
       sessionId,
       message: 'turn the document into a mindmap, then build a palace for the selected nodes',
       workspaceUuid: 'workspace-a',
@@ -694,7 +702,7 @@ describe('The main graph mounts both subgraphs as nodes', () => {
     )
     const sessionId = 'session-tool-plus-subgraph'
 
-    harness.manager.startStream({
+    startStream(harness.manager, {
       sessionId,
       message: 'read the mindmap first to orient, then build one from the document',
       workspaceUuid: 'workspace-a',

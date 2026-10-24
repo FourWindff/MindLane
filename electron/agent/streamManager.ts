@@ -70,6 +70,12 @@ function summarizeToolResult(output: string): string {
 }
 
 export interface StreamRequest {
+  /**
+   * Renderer-chosen stream identity. It exists before this request, so the
+   * renderer's stream-to-file mapping is already in place when the first event
+   * leaves the main process; the main process never generates or returns it.
+   */
+  streamId: string
   sessionId: string
   message: string
   /** Workspace of the run's session store; unused by ephemeral runs. */
@@ -521,8 +527,8 @@ export class StreamManager {
     return pending
   }
 
-  startStream(request: StreamRequest): string {
-    const streamId = `stream_${crypto.randomUUID()}`
+  startStream(request: StreamRequest): void {
+    const streamId = request.streamId
     const entry = {
       aborted: false,
       runner: null as Runner | null,
@@ -549,7 +555,7 @@ export class StreamManager {
         payload: error instanceof Error ? error.message : String(error),
       })
       this.runners.delete(streamId)
-      return streamId
+      return
     }
     void runtime
       .then(runWithRuntime)
@@ -564,7 +570,6 @@ export class StreamManager {
       .finally(() => {
         if (this.runners.get(streamId) === entry) this.runners.delete(streamId)
       })
-    return streamId
   }
 
   stopStream(streamId: string): boolean {

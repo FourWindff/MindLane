@@ -6,7 +6,7 @@ import {
   type BaseMessage,
 } from '@langchain/core/messages'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { StreamManager, type StreamRuntime } from './streamManager.js'
+import { StreamManager, type StreamRequest, type StreamRuntime } from './streamManager.js'
 import type { SessionManager } from './context/sessionManager.js'
 import { ToolRegistry } from './tools/registry.js'
 import { logger, type LogSink } from '../shared/logger.js'
@@ -218,16 +218,25 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
   throw new Error('condition not reached')
 }
 
+/** The renderer owns the stream id; tests stand in for it with a unique value. */
+function startStream(manager: StreamManager, request: Omit<StreamRequest, 'streamId'>): string {
+  const streamId = `stream_${crypto.randomUUID()}`
+  manager.startStream({ ...request, streamId })
+  return streamId
+}
+
 describe('StreamManager + Runner', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('returns a stream ID and emits identified events', async () => {
+  it('uses the renderer-provided stream ID and emits identified events', async () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime())
 
-    const streamId = manager.startStream({
+    const streamId = 'stream-from-renderer'
+    manager.startStream({
+      streamId,
       sessionId: 'session-a',
       message: 'question',
       workspaceUuid: 'workspace-a',
@@ -235,7 +244,6 @@ describe('StreamManager + Runner', () => {
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
-    expect(streamId).toMatch(/^stream_/)
     expect(events).toEqual(
       expect.arrayContaining([
         { streamId, sessionId: 'session-a', type: 'token', payload: 'hello' },
@@ -253,7 +261,7 @@ describe('StreamManager + Runner', () => {
       return runtime
     })
 
-    manager.startStream({
+    startStream(manager, {
       sessionId: 'session-raster',
       message: 'Generate a memory palace',
       ...defaultRequestFields,
@@ -268,7 +276,7 @@ describe('StreamManager + Runner', () => {
     const capturedInputs: Array<{ messages: BaseMessage[] }> = []
     setRuntimeFactory(() => createRuntime({ capturedInputs }))
 
-    manager.startStream({
+    startStream(manager, {
       sessionId: 'session-a',
       message: 'Please tidy up my mindmap',
       workspaceUuid: 'workspace-a',
@@ -304,7 +312,7 @@ describe('StreamManager + Runner', () => {
     const { manager, events, persisted, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime())
 
-    manager.startStream({
+    startStream(manager, {
       sessionId: 'session-empty',
       message: 'No nodes selected',
       workspaceUuid: 'workspace-a',
@@ -320,7 +328,7 @@ describe('StreamManager + Runner', () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime({ progressEvents: [{ step: 'extracting' }] }))
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -339,7 +347,7 @@ describe('StreamManager + Runner', () => {
     const { manager, events, setRuntimeFactory } = createHarness()
     setRuntimeFactory(() => createRuntime({ progressEvents: [{ step: 'planning-stations' }] }))
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -360,7 +368,7 @@ describe('StreamManager + Runner', () => {
       createRuntime({ progressEvents: [{ step: 'extracting', completed: 3, total: 8 }] }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -408,7 +416,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -461,7 +469,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -499,7 +507,7 @@ describe('StreamManager + Runner', () => {
         }),
       )
 
-      const streamId = manager.startStream({
+      const streamId = startStream(manager, {
         sessionId: 'session-a',
         message: 'question',
         ...defaultRequestFields,
@@ -552,7 +560,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -604,7 +612,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -653,7 +661,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -693,7 +701,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
     // Regression: with no subgraph call, no subgraph tool-start/tool-end is re-emitted.
@@ -727,7 +735,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
     const subgraphStarts = events.filter(
@@ -784,7 +792,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -813,7 +821,6 @@ describe('StreamManager + Runner', () => {
         output: mindmapResult,
       },
     ])
-    expect(streamId).toMatch(/^stream_/)
   })
 
   it('anchors the subgraph card after an earlier real tool, matching final history order', async () => {
@@ -842,7 +849,7 @@ describe('StreamManager + Runner', () => {
         ],
       }),
     )
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -877,7 +884,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(events.map((event) => event.type)).toEqual(['token', 'message-start', 'token', 'end'])
@@ -894,13 +901,13 @@ describe('StreamManager + Runner', () => {
         tokensBySession: { 'session-a': 'A', 'session-b': 'B' },
       }),
     )
-    const streamA = manager.startStream({
+    const streamA = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane' },
     })
-    const streamB = manager.startStream({
+    const streamB = startStream(manager, {
       sessionId: 'session-b',
       message: 'question',
       workspaceUuid: 'workspace-b',
@@ -927,13 +934,13 @@ describe('StreamManager + Runner', () => {
         tokensBySession: { 'session-a': 'partial-A', 'session-b': 'partial-B' },
       }),
     )
-    const streamA = manager.startStream({
+    const streamA = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       workspaceUuid: 'workspace-a',
       context: { fileUuid: 'file-a', filePath: '/a.mindlane' },
     })
-    const streamB = manager.startStream({
+    const streamB = startStream(manager, {
       sessionId: 'session-b',
       message: 'question',
       workspaceUuid: 'workspace-b',
@@ -964,7 +971,7 @@ describe('StreamManager + Runner', () => {
         includeToolState: true,
       }),
     )
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       workspaceUuid: 'workspace-a',
@@ -988,7 +995,7 @@ describe('StreamManager + Runner', () => {
     setRuntimeFactory(() => {
       throw new Error('startup failed')
     })
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       workspaceUuid: 'workspace-a',
@@ -1011,7 +1018,7 @@ describe('StreamManager + Runner', () => {
     const runtime = createRuntime({ gate: gate.promise, capturedToolNames })
 
     setRuntimeFactory(() => runtime)
-    manager.startStream({
+    startStream(manager, {
       sessionId: 'session-a',
       message: 'question',
       ...defaultRequestFields,
@@ -1033,13 +1040,13 @@ describe('StreamManager + Runner', () => {
     const createRuntimeSpy = vi.fn(() => createRuntime())
     setRuntimeFactory(createRuntimeSpy)
 
-    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
-    manager.startStream({ sessionId: 'session-b', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-b', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 2)
 
     expect(createRuntimeSpy).toHaveBeenCalledTimes(1)
     manager.invalidateRuntime()
-    manager.startStream({ sessionId: 'session-c', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-c', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 3)
     expect(createRuntimeSpy).toHaveBeenCalledTimes(2)
   })
@@ -1068,7 +1075,7 @@ describe('StreamManager + Runner', () => {
       }),
     )
 
-    const streamId = manager.startStream({
+    startStream(manager, {
       sessionId: 'palace-run-1',
       message: '',
       workspaceUuid: 'workspace-a',
@@ -1077,7 +1084,6 @@ describe('StreamManager + Runner', () => {
     })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
-    expect(streamId).toMatch(/^stream_/)
     // Session write count is 0: no user message, no result, no history read.
     const sessionWrites =
       sessionManager.saveMessage.mock.calls.length + sessionManager.saveMessages.mock.calls.length
@@ -1105,7 +1111,7 @@ describe('StreamManager + Runner', () => {
     const gate = deferred<void>()
     setRuntimeFactory(() => createRuntime({ gate: gate.promise, token: 'partial palace' }))
 
-    const streamId = manager.startStream({
+    const streamId = startStream(manager, {
       sessionId: 'palace-run-2',
       message: '',
       workspaceUuid: 'workspace-a',
@@ -1129,7 +1135,7 @@ describe('StreamManager + Runner', () => {
     const capturedInputs: Array<{ messages: BaseMessage[]; runEntry?: unknown }> = []
     setRuntimeFactory(() => createRuntime({ capturedThreadIds, capturedInputs }))
 
-    manager.startStream({ sessionId: 'session-a', message: 'question', ...defaultRequestFields })
+    startStream(manager, { sessionId: 'session-a', message: 'question', ...defaultRequestFields })
     await waitUntil(() => settledStreamIds(events).length === 1)
 
     expect(capturedThreadIds).toEqual(['session-a'])

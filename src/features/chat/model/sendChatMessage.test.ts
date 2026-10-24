@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   connectAiStore,
+  createFileChatState,
   deriveChatCapsuleEntries,
   resetChatRetryStateForTests,
   useAiStore,
@@ -13,17 +14,23 @@ import { resetRegistry } from '@/features/mindmap/model/registryReset.testutil'
 import { activateFile, createRegistryHarness } from '@/__testutils__/chatHarness'
 import type { ChatContext } from '@contracts/ipc'
 
-type ChatStreamPayload = { threadId: string; message: string; context: ChatContext }
+type ChatStreamPayload = {
+  streamId: string
+  threadId: string
+  message: string
+  context: ChatContext
+}
 
-type ChatStreamResult = { ok: true; streamId: string } | { ok: false; error: string }
+type ChatStreamResult = { ok: true } | { ok: false; error: string }
 
 function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> }) {
   let streamListener: ((event: ChatStreamEvent) => void) | undefined
   const chatStream = vi.fn<(_payload: ChatStreamPayload) => Promise<ChatStreamResult>>(async () =>
-    (options?.chatStream ?? (async () => ({ ok: true as const, streamId: 'stream-1' })))(),
+    (options?.chatStream ?? (async () => ({ ok: true as const })))(),
   )
   const stopStream = vi.fn(async () => ({ ok: true as const }))
   const logError = vi.fn()
+  const logDebug = vi.fn()
   const createFile = vi.fn(
     async (payload: {
       workspacePath: string
@@ -54,7 +61,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
       chat: {
         listSessions: vi.fn(async () => ({ ok: true, data: { sessions: [] } })),
       },
-      shell: { logError },
+      shell: { logError, logDebug },
       workspace: {
         createFile,
         listTree: vi.fn(async () => ({ ok: true, data: [] })),
@@ -74,6 +81,7 @@ function installApis(options?: { chatStream?: () => Promise<ChatStreamResult> })
     chatStream,
     stopStream,
     logError,
+    logDebug,
     createFile,
     emit: (event: ChatStreamEvent) => streamListener?.(event),
   }
@@ -83,7 +91,7 @@ beforeEach(() => {
   resetChatRetryStateForTests()
 })
 
-describe('sendChatMessage handshake', () => {
+describe('sendChatMessage stream registration', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     useAiStore.setState({
@@ -132,7 +140,7 @@ describe('sendChatMessage handshake', () => {
     expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([])
   })
 
-  it('registers the stream with origin ids only after chatStream resolves', async () => {
+  it('registers the stream with origin ids before the invoke resolves', async () => {
     let resolveStream!: (value: ChatStreamResult) => void
     const { chatStream } = installApis({
       chatStream: () =>
@@ -144,15 +152,14 @@ describe('sendChatMessage handshake', () => {
 
     const sending = useAiStore.getState().sendChatMessage('hello')
     await vi.waitFor(() => expect(chatStream).toHaveBeenCalledTimes(1))
-    expect(chatStream).toHaveBeenCalledWith(
-      expect.objectContaining({ threadId: 'session-a', message: 'hello' }),
-    )
-    expect(useAiStore.getState().activeStreamIds['session-a']).toBeUndefined()
 
-    resolveStream({ ok: true, streamId: 'stream-1' })
-    expect(await sending).toBe(true)
-
-    expect(useAiStore.getState().activeStreamIds['session-a']).toBe('stream-1')
+    // The renderer chose the id, so the mapping exists while the invoke is still
+    // pending — there is no window in which an event has nowhere to land.
+    const request = chatStream.mock.calls[0]![0]
+    expect(request.threadId).toBe('session-a')
+    expect(request.message).toBe('hello')
+    expect(request.streamId).toBeTruthy()
+    expect(useAiStore.getState().activeStreamIds['session-a']).toBe(request.streamId)
     expect(useAiStore.getState().sessionFileUuids['session-a']).toBe('file-a')
     const entries = deriveChatCapsuleEntries(
       useAiStore.getState().fileChats,
@@ -164,11 +171,14 @@ describe('sendChatMessage handshake', () => {
     )
     expect(entries[0]?.status).toBe('generating')
     expect(entries[0]?.fileName).toBe('file-a.mindlane')
+
+    resolveStream({ ok: true })
+    expect(await sending).toBe(true)
   })
 
-  it('buffers stream events during the handshake and flushes only matching stream ids', async () => {
+  it('routes events that arrive while the invoke is still pending, and drops other ids', async () => {
     let resolveStream!: (value: ChatStreamResult) => void
-    const { chatStream, emit } = installApis({
+    const { chatStream, emit, logDebug } = installApis({
       chatStream: () =>
         new Promise<ChatStreamResult>((resolve) => {
           resolveStream = resolve
@@ -180,15 +190,44 @@ describe('sendChatMessage handshake', () => {
 
     const sending = useAiStore.getState().sendChatMessage('hello')
     await vi.waitFor(() => expect(chatStream).toHaveBeenCalledTimes(1))
+    const { streamId } = chatStream.mock.calls[0]![0]
 
-    emit({ streamId: 'stream-1', sessionId: 'session-a', type: 'token', payload: 'early' })
+    // Arrival order of invoke response and events no longer matters: the first
+    // event already finds its mapping.
+    emit({ streamId, sessionId: 'session-a', type: 'token', payload: 'early' })
     emit({ streamId: 'other-stream', sessionId: 'session-a', type: 'token', payload: 'stray' })
-    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('')
-
-    resolveStream({ ok: true, streamId: 'stream-1' })
-    await sending
-
     expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('early')
+    expect(logDebug).toHaveBeenCalledWith(expect.stringContaining('dropped token event'))
+
+    resolveStream({ ok: true })
+    await sending
+    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('early')
+  })
+
+  it('stops only the stream of the current file', async () => {
+    const { chatStream, stopStream } = installApis()
+    activateFile('file-a')
+    await useAiStore.getState().sendChatMessage('first')
+    const firstStreamId = chatStream.mock.calls[0]![0].streamId
+
+    // A second file starts its own stream while the first is still running.
+    activateFile('file-b')
+    useAiStore.setState((state) => ({
+      fileChats: {
+        ...state.fileChats,
+        'file-a': { ...createFileChatState('session-a'), busy: true },
+      },
+      sessionFileUuids: { 'session-a': 'file-a', 'session-b': 'file-b' },
+      activeStreamIds: { 'session-a': firstStreamId },
+    }))
+    await useAiStore.getState().sendChatMessage('second')
+    const secondStreamId = chatStream.mock.calls[1]![0].streamId
+
+    useAiStore.getState().stopChatStream()
+
+    expect(stopStream).toHaveBeenCalledTimes(1)
+    expect(stopStream).toHaveBeenCalledWith(secondStreamId)
+    expect(stopStream).not.toHaveBeenCalledWith(firstStreamId)
   })
 
   it('does not wedge in busy state when the IPC bridge is missing', async () => {
@@ -301,7 +340,9 @@ describe('sendChatMessage entry conversation (no file open)', () => {
       expect.objectContaining({ role: 'user', content: 'Help me draft a study plan' }),
     ])
     expect(chat?.busy).toBe(true)
-    expect(useAiStore.getState().activeStreamIds[chat!.activeSessionId]).toBe('stream-1')
+    expect(useAiStore.getState().activeStreamIds[chat!.activeSessionId]).toBe(
+      chatStream.mock.calls[0]![0].streamId,
+    )
   })
 
   it('takes the file title from the attached document name and keeps the attachment in the turn', async () => {

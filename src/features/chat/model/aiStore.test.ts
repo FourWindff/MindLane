@@ -58,6 +58,8 @@ function installApis(options?: {
     deleteSession: vi.fn(options?.deleteSession ?? (async () => ({ ok: true as const }))),
   }
 
+  const shell = { logError: vi.fn(), logWarning: vi.fn(), logDebug: vi.fn() }
+
   Object.defineProperty(globalThis, 'window', { configurable: true, value: globalThis })
   Object.defineProperty(globalThis.window, 'mindlane', {
     configurable: true,
@@ -71,6 +73,7 @@ function installApis(options?: {
         }),
       },
       chat,
+      shell,
       workspace: {
         getSession: vi.fn(async () => ({
           workspacePath: '/workspace',
@@ -84,7 +87,7 @@ function installApis(options?: {
     },
   })
 
-  return { chat, emit: (event: ChatStreamEvent) => streamListener?.(event) }
+  return { chat, shell, emit: (event: ChatStreamEvent) => streamListener?.(event) }
 }
 
 import { createRegistryHarness } from '@/__testutils__/chatHarness'
@@ -243,8 +246,8 @@ describe('aiStore per-file chat state', () => {
     })
   })
 
-  it('drops events whose stream ID is stale or unknown', () => {
-    const { emit } = installApis()
+  it('drops events whose stream ID is stale or unknown, logging each drop', () => {
+    const { emit, shell } = installApis()
     const harness = createRegistryHarness()
     connectAiStore(harness.registry)
     useAiStore.setState({
@@ -257,24 +260,38 @@ describe('aiStore per-file chat state', () => {
     emit({ streamId: 'unknown-stream', sessionId: 'unknown', type: 'token', payload: 'unknown' })
 
     expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('')
+    expect(shell.logDebug).toHaveBeenCalledTimes(2)
+    expect(shell.logDebug).toHaveBeenCalledWith(expect.stringContaining('no active stream matches'))
   })
 
-  it('replays events that arrive while a known session is awaiting its stream ID', () => {
+  it('routes each stream to its own file regardless of arrival order', () => {
     const { emit } = installApis()
     const harness = createRegistryHarness()
     connectAiStore(harness.registry)
     useAiStore.setState({
-      currentFileUuid: 'file-a',
       fileChats: {
         'file-a': { ...createFileChatState('session-a'), busy: true },
+        'file-b': { ...createFileChatState('session-b'), busy: true },
       },
-      sessionFileUuids: { 'session-a': 'file-a' },
+      sessionFileUuids: { 'session-a': 'file-a', 'session-b': 'file-b' },
+      activeStreamIds: { 'session-a': 'stream-a', 'session-b': 'stream-b' },
     })
 
-    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'token', payload: 'early' })
-    useAiStore.getState().registerStream('file-a', 'session-a', 'stream-a')
+    // Interleaved, with B finishing first: the mapping is keyed on ids only, so
+    // the order in which events arrive cannot change their destination.
+    emit({ streamId: 'stream-b', sessionId: 'session-b', type: 'token', payload: 'B' })
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'token', payload: 'A' })
+    emit({ streamId: 'stream-b', sessionId: 'session-b', type: 'end', payload: { content: 'B' } })
+    emit({ streamId: 'stream-a', sessionId: 'session-a', type: 'end', payload: { content: 'A' } })
 
-    expect(useAiStore.getState().fileChats['file-a']?.streamText).toBe('early')
+    expect(useAiStore.getState().fileChats['file-a']?.chatMessages).toEqual([
+      expect.objectContaining({ role: 'assistant', content: 'A' }),
+    ])
+    expect(useAiStore.getState().fileChats['file-b']?.chatMessages).toEqual([
+      expect.objectContaining({ role: 'assistant', content: 'B' }),
+    ])
+    expect(useAiStore.getState().fileChats['file-a']?.busy).toBe(false)
+    expect(useAiStore.getState().fileChats['file-b']?.busy).toBe(false)
   })
 
   it('restores the workspace active session for the file', async () => {

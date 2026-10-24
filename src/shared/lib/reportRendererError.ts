@@ -14,3 +14,8 @@ export function reportRendererError(message: string): void {
 export function reportRendererWarning(message: string): void {
   window.mindlane?.shell?.logWarning?.(message)
 }
+
+/** Report a discarded non-fatal event: visible in the diagnostic log, never retried. */
+export function reportRendererDebug(message: string): void {
+  window.mindlane?.shell?.logDebug?.(message)
+}
